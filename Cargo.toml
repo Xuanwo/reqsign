@@ -3,9 +3,17 @@ name = "reqsign"
 version = "0.0.0"
 edition = "2021"
 authors = ["Xuanwo <github@xuanwo.io>"]
-description = "Signing requests for cloud services"
+description = "Signing requests for cloud services without heavy SDKs"
 documentation = "https://docs.rs/reqsign"
 license = "Apache-2.0"
 categories = ["command-line-utilities", "web-programming"]
 
 [dependencies]
+reqwest = "0.11"
+anyhow = "1"
+http = "0.2"
+time = { version = "0.3", features = ["formatting", "parsing"] }
+once_cell = "1"
+
+[dev-dependencies]
+aws-sigv4 = "0.8"
