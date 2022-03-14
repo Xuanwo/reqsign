@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use anyhow::Result;
 use aws_sigv4;
 use aws_sigv4::http_request::{
-    PercentEncodingMode, SignableBody, SignableRequest, SigningSettings,
+    PayloadChecksumKind, PercentEncodingMode, SignableBody, SignableRequest, SigningSettings,
 };
 use aws_sigv4::SigningParams;
 
@@ -29,6 +29,7 @@ fn test_get_object() -> Result<()> {
 
     let mut ss = SigningSettings::default();
     ss.percent_encoding_mode = PercentEncodingMode::Single;
+    ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
 
     let sp = SigningParams::builder()
         .access_key("access_key_id")

@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 use std::time::SystemTime;
 
@@ -7,7 +7,6 @@ use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use log::debug;
 
-use super::header::X_AMZ_DATE;
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
 use crate::time::{self, DATE, ISO8601};
@@ -123,6 +122,7 @@ impl Signer {
         let signature = hex_hmac_sha256(&signing_key, string_to_sign.as_bytes());
 
         Ok(SignedOutput {
+            signed_time: canonical_req.time,
             signed_scope: scope,
             signed_headers: canonical_req.signed_headers,
             signature,
@@ -130,6 +130,15 @@ impl Signer {
     }
 
     pub fn apply(&self, sig: &SignedOutput, req: &mut impl SignableRequest) -> Result<()> {
+        req.apply_header(
+            HeaderName::from_static(super::header::X_AMZ_DATE),
+            &time::format(sig.signed_time, ISO8601),
+        )?;
+        req.apply_header(
+            HeaderName::from_str(super::header::X_AMZ_CONTENT_SHA_256)
+                .expect("x_amz_content_sha_256 header name must be valid"),
+            "UNSIGNED-PAYLOAD",
+        )?;
         req.apply_header(
             http::header::AUTHORIZATION,
             &format!(
@@ -139,12 +148,24 @@ impl Signer {
                 sig.signed_headers.join(";"),
                 sig.signature
             ),
-        )
+        )?;
+
+        Ok(())
     }
 
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         let sig = self.calculate(req)?;
         self.apply(&sig, req)
+    }
+}
+
+impl Debug for Signer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Signer {{ region: {}, service: {} }}",
+            self.region, self.service
+        )
     }
 }
 
@@ -213,12 +234,28 @@ impl CanonicalRequest {
 
         // Insert DATE header if not present.
         if canonical_headers
-            .get(HeaderName::from_static(X_AMZ_DATE))
+            .get(HeaderName::from_static(super::header::X_AMZ_DATE))
             .is_none()
         {
             let date_header = HeaderValue::try_from(time::format(now, ISO8601))
                 .expect("date is valid header value");
-            canonical_headers.insert(HeaderName::from_static(X_AMZ_DATE), date_header);
+            canonical_headers.insert(
+                HeaderName::from_static(super::header::X_AMZ_DATE),
+                date_header,
+            );
+        }
+
+        // Insert X_AMZ_CONTENT_SHA_256 header if not present.
+        if canonical_headers
+            .get(HeaderName::from_static(
+                super::header::X_AMZ_CONTENT_SHA_256,
+            ))
+            .is_none()
+        {
+            canonical_headers.insert(
+                HeaderName::from_static(super::header::X_AMZ_CONTENT_SHA_256),
+                HeaderValue::from_static("UNSIGNED-PAYLOAD"),
+            );
         }
 
         // TODO: handle X_AMZ_CONTENT_SHA_256 header here.
@@ -231,6 +268,8 @@ impl CanonicalRequest {
             }
             signed_headers.push(name.clone());
         }
+
+        signed_headers.sort_by(|x, y| x.as_str().cmp(y.as_str()));
 
         Ok((signed_headers, canonical_headers))
     }
@@ -271,6 +310,7 @@ impl Display for CanonicalRequest {
 }
 
 pub struct SignedOutput {
+    signed_time: SystemTime,
     signed_scope: String,
     signed_headers: Vec<HeaderName>,
     signature: String,
