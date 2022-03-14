@@ -1,25 +1,30 @@
-use std::str::FromStr;
-
 use anyhow::Result;
 use http::header::HeaderName;
-use http::{HeaderMap, Method, Uri};
+use http::{HeaderMap, Method};
 
 pub trait SignableRequest {
-    fn method(&self) -> http::Method;
-    fn uri(&self) -> http::uri::Uri;
+    fn method(&self) -> &http::Method;
+    fn path(&self) -> &str;
+    fn authority(&self) -> &str;
     fn headers(&self) -> &http::HeaderMap;
 
     fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()>;
 }
 
 impl SignableRequest for reqwest::Request {
-    fn method(&self) -> Method {
+    fn method(&self) -> &Method {
         let this = self as &reqwest::Request;
-        this.method().clone()
+        this.method()
     }
 
-    fn uri(&self) -> Uri {
-        Uri::from_str(self.url().as_str()).expect("request url invalid")
+    fn path(&self) -> &str {
+        let this = self as &reqwest::Request;
+        this.url().path()
+    }
+
+    fn authority(&self) -> &str {
+        let this = self as &reqwest::Request;
+        this.url().host_str().expect("request uri must have host")
     }
 
     fn headers(&self) -> &HeaderMap {
@@ -35,14 +40,22 @@ impl SignableRequest for reqwest::Request {
 }
 
 impl<T> SignableRequest for http::Request<T> {
-    fn method(&self) -> Method {
+    fn method(&self) -> &Method {
         let this = self as &http::Request<T>;
-        this.method().clone()
+        this.method()
     }
 
-    fn uri(&self) -> Uri {
+    fn path(&self) -> &str {
         let this = self as &http::Request<T>;
-        this.uri().clone()
+        this.uri().path()
+    }
+
+    fn authority(&self) -> &str {
+        let this = self as &http::Request<T>;
+        this.uri()
+            .authority()
+            .expect("request uri must have authority")
+            .as_str()
     }
 
     fn headers(&self) -> &HeaderMap {

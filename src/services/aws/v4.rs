@@ -170,29 +170,29 @@ impl Debug for Signer {
 }
 
 #[derive(Clone)]
-struct CanonicalRequest {
-    method: http::Method,
-    path: String,
+struct CanonicalRequest<'a> {
+    method: &'a http::Method,
+    path: &'a str,
     params: Option<String>,
     headers: http::HeaderMap,
 
     time: SystemTime,
     signed_headers: Vec<HeaderName>,
-    content_sha256: String,
+    content_sha256: &'a str,
 }
 
-impl CanonicalRequest {
-    pub fn from(signer: &Signer, req: &impl SignableRequest) -> Result<Self> {
-        let uri = req.uri();
-        let path = uri.path();
-
+impl<'a> CanonicalRequest<'a> {
+    pub fn from<'b>(
+        signer: &'b Signer,
+        req: &'b impl SignableRequest,
+    ) -> Result<CanonicalRequest<'b>> {
         let now = signer.time.unwrap_or_else(SystemTime::now);
 
         let (signed_headers, canonical_headers) = Self::headers(signer, req, now)?;
 
         Ok(CanonicalRequest {
             method: req.method(),
-            path: path.to_string(),
+            path: req.path(),
             params: Self::params(),
             headers: canonical_headers,
 
@@ -202,7 +202,7 @@ impl CanonicalRequest {
             //
             // we need to support get payload hash. For now, we will implement
             // unsigned payload at first.
-            content_sha256: "UNSIGNED-PAYLOAD".to_string(),
+            content_sha256: "UNSIGNED-PAYLOAD",
         })
     }
 
@@ -223,11 +223,7 @@ impl CanonicalRequest {
 
         // Insert HOST header if not present.
         if canonical_headers.get(&http::header::HOST).is_none() {
-            let uri = req.uri();
-            let authority = uri
-                .authority()
-                .expect("request uri authority must be set for signing");
-            let header = HeaderValue::try_from(authority.as_str())
+            let header = HeaderValue::try_from(req.authority())
                 .expect("endpoint must contain valid header characters");
             canonical_headers.insert(http::header::HOST, header);
         }
@@ -279,7 +275,7 @@ impl CanonicalRequest {
     }
 }
 
-impl Display for CanonicalRequest {
+impl<'a> Display for CanonicalRequest<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.method)?;
         writeln!(f, "{}", self.path)?;
