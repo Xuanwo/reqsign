@@ -1,3 +1,3 @@
-mod aws;
-mod azure;
-mod google;
+pub mod aws;
+pub mod azure;
+pub mod google;
