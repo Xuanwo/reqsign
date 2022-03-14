@@ -8,6 +8,10 @@ documentation = "https://docs.rs/reqsign"
 license = "Apache-2.0"
 categories = ["command-line-utilities", "web-programming"]
 
+[[bench]]
+name = "aws"
+harness = false
+
 [dependencies]
 reqwest = "0.11"
 anyhow = "1"
@@ -22,3 +26,6 @@ log = "0.4"
 [dev-dependencies]
 aws-sigv4 = "0.8"
 env_logger = "0.9"
+criterion = { version = "0.3", features = [
+    "html_reports",
+] }
