@@ -1,8 +1,10 @@
 use std::time::SystemTime;
 
+use anyhow::Result;
 use time::format_description::FormatItem;
 use time::formatting::Formattable;
 use time::macros::format_description;
+use time::parsing::Parsable;
 
 /// Export Format from time crate.
 pub type Format = &'static [FormatItem<'static>];
@@ -33,4 +35,10 @@ pub type RFC3339 = time::format_description::well_known::Rfc3339;
 pub fn format(time: SystemTime, format: impl Formattable) -> String {
     let time = OffsetDateTime::from(time);
     time.format(&format).expect("input time must be valid")
+}
+
+/// Parse input string into system time.
+pub fn parse(s: &str, format: impl Parsable) -> Result<SystemTime> {
+    let time = OffsetDateTime::parse(s, &format)?;
+    Ok(time.into())
 }

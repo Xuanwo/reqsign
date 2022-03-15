@@ -1,37 +1,38 @@
 use std::fmt::{Debug, Display, Formatter};
+use std::mem;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::SystemTime;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use log::debug;
+use tokio::sync::{OnceCell, RwLock};
 
+use super::credential::Credential;
+use super::loader::CredentialLoadChain;
+use super::loader::RegionLoadChain;
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
+use crate::services::aws::loader::{CredentialLoad, RegionLoad};
 use crate::time::{self, DATE, ISO8601};
 
 #[derive(Default)]
 pub struct Builder {
-    access_key: String,
-    secret_key: String,
-    #[allow(dead_code)]
-    security_token: Option<String>,
-
-    region: String,
     service: String,
+    region: String,
+    credential: Credential,
+
+    region_load: RegionLoadChain,
+    credential_load: CredentialLoadChain,
 
     time: Option<SystemTime>,
 }
 
 impl Builder {
-    pub fn access_key(&mut self, access_key: &str) -> &mut Self {
-        self.access_key = access_key.to_string();
-        self
-    }
-
-    pub fn secret_key(&mut self, secret_key: &str) -> &mut Self {
-        self.secret_key = secret_key.to_string();
+    pub fn service(&mut self, service: &str) -> &mut Self {
+        self.service = service.to_string();
         self
     }
 
@@ -40,8 +41,23 @@ impl Builder {
         self
     }
 
-    pub fn service(&mut self, service: &str) -> &mut Self {
-        self.service = service.to_string();
+    pub fn region_loader(&mut self, region: RegionLoadChain) -> &mut Self {
+        self.region_load = region;
+        self
+    }
+
+    pub fn access_key(&mut self, access_key: &str) -> &mut Self {
+        self.credential.set_access_key(access_key);
+        self
+    }
+
+    pub fn secret_key(&mut self, secret_key: &str) -> &mut Self {
+        self.credential.set_secret_key(secret_key);
+        self
+    }
+
+    pub fn credential_loader(&mut self, credential: CredentialLoadChain) -> &mut Self {
+        self.credential_load = credential;
         self
     }
 
@@ -51,27 +67,34 @@ impl Builder {
         self
     }
 
-    pub fn build(&mut self) -> Signer {
-        Signer {
-            access_key: self.access_key.clone(),
-            secret_key: self.secret_key.clone(),
-            security_token: None,
-            region: self.region.clone(),
-            service: self.service.clone(),
-            time: self.time,
+    pub async fn build(&mut self) -> Result<Signer> {
+        // Try load region from env
+        if self.region.is_empty() {
+            let region = self.region_load.load_region().await?;
+            if region.is_none() {
+                return Err(anyhow!("region is empty"));
+            }
+            self.region = region.unwrap();
         }
+
+        Ok(Signer {
+            service: mem::take(&mut self.service),
+            region: mem::take(&mut self.region),
+            credential: Arc::new(RwLock::new(OnceCell::new_with(Some(mem::take(
+                &mut self.credential,
+            ))))),
+            credential_load: mem::take(&mut self.credential_load),
+            time: self.time,
+        })
     }
 }
 
-#[derive(Clone)]
 pub struct Signer {
-    access_key: String,
-    secret_key: String,
-    #[allow(dead_code)]
-    security_token: Option<String>,
-
-    region: String,
     service: String,
+    region: String,
+
+    credential: Arc<RwLock<OnceCell<Credential>>>,
+    credential_load: CredentialLoadChain,
 
     time: Option<SystemTime>,
 }
@@ -81,8 +104,29 @@ impl Signer {
         Builder::default()
     }
 
-    pub fn calculate(&self, req: &impl SignableRequest) -> Result<SignedOutput> {
-        let canonical_req = CanonicalRequest::from(self, req)?;
+    /// Load credential via credential load chain specified while building.
+    async fn credential(&self) -> Result<Credential> {
+        // Return cached credential if it's valid.
+        if let Some(cred) = self.credential.read().await.get() {
+            if cred.is_valid() {
+                return Ok(cred.clone());
+            }
+        }
+
+        if let Some(cred) = self.credential_load.load_credential().await? {
+            let mut lock = self.credential.write().await;
+            // No matter the cell contains credential or not, we just take them
+            // and drop them. So we can set the new value inside.
+            let _ = lock.take();
+            lock.set(cred.clone()).expect("cell must be empty");
+            Ok(cred)
+        } else {
+            Err(anyhow!("credential is not found"))
+        }
+    }
+
+    pub async fn calculate(&self, req: &impl SignableRequest) -> Result<SignedOutput> {
+        let canonical_req = CanonicalRequest::from(req, self.time)?;
 
         let encoded_req = hex_sha256(canonical_req.to_string().as_bytes());
 
@@ -113,8 +157,10 @@ impl Signer {
         };
         debug!("string to sign: {string_to_sign}");
 
+        let cred = self.credential().await?;
+
         let signing_key = generate_signing_key(
-            &self.secret_key,
+            cred.secret_key(),
             canonical_req.time,
             &self.region,
             &self.service,
@@ -122,6 +168,7 @@ impl Signer {
         let signature = hex_hmac_sha256(&signing_key, string_to_sign.as_bytes());
 
         Ok(SignedOutput {
+            access_key_id: cred.access_key().to_string(),
             signed_time: canonical_req.time,
             signed_scope: scope,
             signed_headers: canonical_req.signed_headers,
@@ -131,11 +178,11 @@ impl Signer {
 
     pub fn apply(&self, sig: &SignedOutput, req: &mut impl SignableRequest) -> Result<()> {
         req.apply_header(
-            HeaderName::from_static(super::header::X_AMZ_DATE),
+            HeaderName::from_static(super::constants::X_AMZ_DATE),
             &time::format(sig.signed_time, ISO8601),
         )?;
         req.apply_header(
-            HeaderName::from_str(super::header::X_AMZ_CONTENT_SHA_256)
+            HeaderName::from_str(super::constants::X_AMZ_CONTENT_SHA_256)
                 .expect("x_amz_content_sha_256 header name must be valid"),
             "UNSIGNED-PAYLOAD",
         )?;
@@ -143,7 +190,7 @@ impl Signer {
             http::header::AUTHORIZATION,
             &format!(
                 "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
-                self.access_key,
+                sig.access_key_id,
                 sig.signed_scope,
                 sig.signed_headers.join(";"),
                 sig.signature
@@ -153,8 +200,8 @@ impl Signer {
         Ok(())
     }
 
-    pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        let sig = self.calculate(req)?;
+    pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
+        let sig = self.calculate(req).await?;
         self.apply(&sig, req)
     }
 }
@@ -182,13 +229,10 @@ struct CanonicalRequest<'a> {
 }
 
 impl<'a> CanonicalRequest<'a> {
-    pub fn from<'b>(
-        signer: &'b Signer,
-        req: &'b impl SignableRequest,
-    ) -> Result<CanonicalRequest<'b>> {
-        let now = signer.time.unwrap_or_else(SystemTime::now);
+    pub fn from(req: &impl SignableRequest, time: Option<SystemTime>) -> Result<CanonicalRequest> {
+        let now = time.unwrap_or_else(SystemTime::now);
 
-        let (signed_headers, canonical_headers) = Self::headers(signer, req, now)?;
+        let (signed_headers, canonical_headers) = Self::headers(req, now)?;
 
         Ok(CanonicalRequest {
             method: req.method(),
@@ -207,7 +251,6 @@ impl<'a> CanonicalRequest<'a> {
     }
 
     pub fn headers(
-        _signer: &Signer,
         req: &impl SignableRequest,
         now: SystemTime,
     ) -> Result<(Vec<HeaderName>, HeaderMap)> {
@@ -230,13 +273,13 @@ impl<'a> CanonicalRequest<'a> {
 
         // Insert DATE header if not present.
         if canonical_headers
-            .get(HeaderName::from_static(super::header::X_AMZ_DATE))
+            .get(HeaderName::from_static(super::constants::X_AMZ_DATE))
             .is_none()
         {
             let date_header = HeaderValue::try_from(time::format(now, ISO8601))
                 .expect("date is valid header value");
             canonical_headers.insert(
-                HeaderName::from_static(super::header::X_AMZ_DATE),
+                HeaderName::from_static(super::constants::X_AMZ_DATE),
                 date_header,
             );
         }
@@ -244,12 +287,12 @@ impl<'a> CanonicalRequest<'a> {
         // Insert X_AMZ_CONTENT_SHA_256 header if not present.
         if canonical_headers
             .get(HeaderName::from_static(
-                super::header::X_AMZ_CONTENT_SHA_256,
+                super::constants::X_AMZ_CONTENT_SHA_256,
             ))
             .is_none()
         {
             canonical_headers.insert(
-                HeaderName::from_static(super::header::X_AMZ_CONTENT_SHA_256),
+                HeaderName::from_static(super::constants::X_AMZ_CONTENT_SHA_256),
                 HeaderValue::from_static("UNSIGNED-PAYLOAD"),
             );
         }
@@ -306,6 +349,7 @@ impl<'a> Display for CanonicalRequest<'a> {
 }
 
 pub struct SignedOutput {
+    access_key_id: String,
     signed_time: SystemTime,
     signed_scope: String,
     signed_headers: Vec<HeaderName>,

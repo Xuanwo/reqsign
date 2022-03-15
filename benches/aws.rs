@@ -15,22 +15,27 @@ criterion_group!(benches, bench);
 criterion_main!(benches);
 
 pub fn bench(c: &mut Criterion) {
+    let runtime = tokio::runtime::Runtime::new().expect("runtime must be valid");
     let mut group = c.benchmark_group("aws_v4");
 
     group.bench_function("reqsign", |b| {
-        let s = Signer::builder()
-            .access_key("access_key_id")
-            .secret_key("secret_access_key")
-            .service("s3")
-            .region("test")
-            .build();
+        let s = runtime
+            .block_on(
+                Signer::builder()
+                    .access_key("access_key_id")
+                    .secret_key("secret_access_key")
+                    .service("s3")
+                    .region("test")
+                    .build(),
+            )
+            .expect("signer must be valid");
 
-        b.iter(|| {
+        b.to_async(&runtime).iter(|| async {
             let mut req = reqwest::Request::new(
                 http::Method::GET,
                 Url::from_str("http://127.0.0.1:9900/hello").expect("must success"),
             );
-            s.sign(&mut req).expect("must success")
+            s.sign(&mut req).await.expect("must success")
         })
     });
 

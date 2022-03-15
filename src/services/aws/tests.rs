@@ -17,8 +17,8 @@ fn test_time() -> SystemTime {
         .into()
 }
 
-#[test]
-fn test_get_object() -> Result<()> {
+#[tokio::test]
+async fn test_get_object() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     let mut req = http::Request::new("");
@@ -59,9 +59,10 @@ fn test_get_object() -> Result<()> {
         .region("test")
         .service("s3")
         .time(test_time())
-        .build();
+        .build()
+        .await?;
 
-    let actual = signer.calculate(&req)?;
+    let actual = signer.calculate(&req).await?;
 
     assert_eq!(expect, actual.signature());
     Ok(())
