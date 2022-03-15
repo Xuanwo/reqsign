@@ -26,9 +26,9 @@ async-trait = "0.1"
 dirs = "4"
 rust-ini = "0.18"
 roxmltree = "0.14"
+tokio = { version = "1.17", features = ["full"] }
 
 [dev-dependencies]
 aws-sigv4 = "0.8"
 env_logger = "0.9"
 criterion = { version = "0.3", features = ["async_tokio", "html_reports"] }
-tokio = { version = "1.17", features = ["full"] }

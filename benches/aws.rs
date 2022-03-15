@@ -1,5 +1,4 @@
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::SystemTime;
 
 use aws_sigv4::http_request::{
@@ -20,7 +19,7 @@ pub fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("aws_v4");
 
     group.bench_function("reqsign", |b| {
-        let mut s = runtime
+        let s = runtime
             .block_on(
                 Signer::builder()
                     .access_key("access_key_id")
@@ -31,7 +30,7 @@ pub fn bench(c: &mut Criterion) {
             )
             .expect("signer must be valid");
 
-        b.to_async(&runtime).iter(async {
+        b.to_async(&runtime).iter(|| async {
             let mut req = reqwest::Request::new(
                 http::Method::GET,
                 Url::from_str("http://127.0.0.1:9900/hello").expect("must success"),

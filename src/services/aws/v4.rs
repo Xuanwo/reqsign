@@ -1,12 +1,14 @@
 use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use anyhow::{anyhow, Result};
 use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use log::debug;
+use tokio::sync::{OnceCell, RwLock};
 
 use super::credential::Credential;
 use super::loader::CredentialLoadChain;
@@ -75,20 +77,12 @@ impl Builder {
             self.region = region.unwrap();
         }
 
-        // Try load credential from env.
-        // TODO: refactor logic here.
-        if !self.credential.is_valid() {
-            let cred = self.credential_load.load_credential().await?;
-            if cred.is_none() {
-                return Err(anyhow!("credential is empty"));
-            }
-            self.credential = cred.unwrap();
-        }
-
         Ok(Signer {
             service: mem::take(&mut self.service),
             region: mem::take(&mut self.region),
-            credential: mem::take(&mut self.credential),
+            credential: Arc::new(RwLock::new(OnceCell::new_with(Some(mem::take(
+                &mut self.credential,
+            ))))),
             credential_load: mem::take(&mut self.credential_load),
             time: self.time,
         })
@@ -99,7 +93,7 @@ pub struct Signer {
     service: String,
     region: String,
 
-    credential: Credential,
+    credential: Arc<RwLock<OnceCell<Credential>>>,
     credential_load: CredentialLoadChain,
 
     time: Option<SystemTime>,
@@ -110,50 +104,28 @@ impl Signer {
         Builder::default()
     }
 
-    pub async fn load_credential(&mut self) -> Result<()> {
+    /// Load credential via credential load chain specified while building.
+    async fn credential(&self) -> Result<Credential> {
+        // Return cached credential if it's valid.
+        if let Some(cred) = self.credential.read().await.get() {
+            if cred.is_valid() {
+                return Ok(cred.clone());
+            }
+        }
+
         if let Some(cred) = self.credential_load.load_credential().await? {
-            self.credential = cred;
-            Ok(())
+            let mut lock = self.credential.write().await;
+            // No matter the cell contains credential or not, we just take them
+            // and drop them. So we can set the new value inside.
+            let _ = lock.take();
+            lock.set(cred.clone()).expect("cell must be empty");
+            Ok(cred)
         } else {
-            Err(anyhow!("credential is empty"))
+            Err(anyhow!("credential is not found"))
         }
     }
 
-    async fn access_key_id(&mut self) -> Result<&str> {
-        if self.credential.is_valid() {
-            return Ok(self.credential.access_key());
-        }
-
-        self.load_credential().await?;
-
-        // Credential must be valid after load.
-        return Ok(self.credential.access_key());
-    }
-
-    async fn secret_access_key(&mut self) -> Result<&str> {
-        if self.credential.is_valid() {
-            return Ok(self.credential.secret_key());
-        }
-
-        self.load_credential().await?;
-
-        // Credential must be valid after load.
-        return Ok(self.credential.secret_key());
-    }
-
-    #[allow(dead_code)]
-    async fn security_token(&mut self) -> Result<Option<&str>> {
-        if self.credential.is_valid() {
-            return Ok(self.credential.security_token());
-        }
-
-        self.load_credential().await?;
-
-        // Credential must be valid after load.
-        return Ok(self.credential.security_token());
-    }
-
-    pub async fn calculate(&mut self, req: &impl SignableRequest) -> Result<SignedOutput> {
+    pub async fn calculate(&self, req: &impl SignableRequest) -> Result<SignedOutput> {
         let canonical_req = CanonicalRequest::from(req, self.time)?;
 
         let encoded_req = hex_sha256(canonical_req.to_string().as_bytes());
@@ -185,15 +157,18 @@ impl Signer {
         };
         debug!("string to sign: {string_to_sign}");
 
-        let region = self.region.clone();
-        let service = self.service.clone();
-        let secret_key = self.secret_access_key().await?;
+        let cred = self.credential().await?;
 
-        let signing_key = generate_signing_key(secret_key, canonical_req.time, &region, &service);
+        let signing_key = generate_signing_key(
+            cred.secret_key(),
+            canonical_req.time,
+            &self.region,
+            &self.service,
+        );
         let signature = hex_hmac_sha256(&signing_key, string_to_sign.as_bytes());
 
         Ok(SignedOutput {
-            access_key_id: self.access_key_id().await?.to_string(),
+            access_key_id: cred.access_key().to_string(),
             signed_time: canonical_req.time,
             signed_scope: scope,
             signed_headers: canonical_req.signed_headers,
@@ -201,7 +176,7 @@ impl Signer {
         })
     }
 
-    pub fn apply(&mut self, sig: &SignedOutput, req: &mut impl SignableRequest) -> Result<()> {
+    pub fn apply(&self, sig: &SignedOutput, req: &mut impl SignableRequest) -> Result<()> {
         req.apply_header(
             HeaderName::from_static(super::constants::X_AMZ_DATE),
             &time::format(sig.signed_time, ISO8601),
@@ -225,7 +200,7 @@ impl Signer {
         Ok(())
     }
 
-    pub async fn sign(&mut self, req: &mut impl SignableRequest) -> Result<()> {
+    pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         let sig = self.calculate(req).await?;
         self.apply(&sig, req)
     }

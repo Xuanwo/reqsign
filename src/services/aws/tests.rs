@@ -53,7 +53,7 @@ async fn test_get_object() -> Result<()> {
     .expect("signing must succeed");
     let (_, expect) = output.into_parts();
 
-    let mut signer = Signer::builder()
+    let signer = Signer::builder()
         .access_key("access_key_id")
         .secret_key("secret_access_key")
         .region("test")
