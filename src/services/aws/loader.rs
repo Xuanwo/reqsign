@@ -236,3 +236,50 @@ impl CredentialLoad for WebIdentityTokenLoader {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use once_cell::sync::Lazy;
+    use tokio::runtime::Runtime;
+
+    use super::*;
+    use crate::services::aws::constants::*;
+
+    static TOKIO: Lazy<Runtime> = Lazy::new(|| Runtime::new().expect("runtime must be valid"));
+
+    #[test]
+    fn test_env_loader_without_env() {
+        temp_env::with_vars_unset(vec![AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY], || {
+            TOKIO.block_on(async {
+                let l = EnvLoader {};
+                let x = l
+                    .load_credential()
+                    .await
+                    .expect("load_credential must success");
+                assert!(x.is_none());
+            });
+        });
+    }
+
+    #[test]
+    fn test_env_loader_with_env() {
+        temp_env::with_vars(
+            vec![
+                (AWS_ACCESS_KEY_ID, Some("access_key_id")),
+                (AWS_SECRET_ACCESS_KEY, Some("secret_access_key")),
+            ],
+            || {
+                TOKIO.block_on(async {
+                    let l = EnvLoader {};
+                    let x = l
+                        .load_credential()
+                        .await
+                        .expect("load_credential must success")
+                        .expect("credential must be valid");
+                    assert_eq!("access_key_id", x.access_key());
+                    assert_eq!("secret_access_key", x.secret_key());
+                });
+            },
+        );
+    }
+}
