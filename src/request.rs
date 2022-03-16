@@ -5,6 +5,7 @@ use http::{HeaderMap, Method};
 pub trait SignableRequest {
     fn method(&self) -> &http::Method;
     fn path(&self) -> &str;
+    fn query(&self) -> Option<&str>;
     fn authority(&self) -> &str;
     fn headers(&self) -> &http::HeaderMap;
 
@@ -20,6 +21,11 @@ impl SignableRequest for reqwest::Request {
     fn path(&self) -> &str {
         let this = self as &reqwest::Request;
         this.url().path()
+    }
+
+    fn query(&self) -> Option<&str> {
+        let this = self as &reqwest::Request;
+        this.url().query()
     }
 
     fn authority(&self) -> &str {
@@ -48,6 +54,11 @@ impl<T> SignableRequest for http::Request<T> {
     fn path(&self) -> &str {
         let this = self as &http::Request<T>;
         this.uri().path()
+    }
+
+    fn query(&self) -> Option<&str> {
+        let this = self as &http::Request<T>;
+        this.uri().query()
     }
 
     fn authority(&self) -> &str {

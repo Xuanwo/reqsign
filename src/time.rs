@@ -42,7 +42,7 @@ pub fn format(time: SystemTime, format: impl Formattable) -> String {
 }
 
 /// Parse input string into system time.
-pub fn parse(s: &str, format: impl Parsable) -> Result<SystemTime> {
+pub fn parse_utc(s: &str, format: impl Parsable) -> Result<SystemTime> {
     let time = PrimitiveDateTime::parse(s, &format)?.assume_utc();
     Ok(time.into())
 }

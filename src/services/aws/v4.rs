@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::str::FromStr;
@@ -88,6 +89,7 @@ impl Builder {
             .service
             .as_ref()
             .ok_or_else(|| anyhow!("service is required"))?;
+        debug!("service: {:?}", service);
 
         let credential = if self.credential.is_valid() {
             Some(self.credential.clone())
@@ -102,6 +104,7 @@ impl Builder {
 
             self.credential_load.load_credential().await?
         };
+        debug!("credential has been set to: {:?}", &credential);
 
         let region = match &self.region {
             Some(region) => region.to_string(),
@@ -119,6 +122,7 @@ impl Builder {
                     .ok_or_else(|| anyhow!("region is required"))?
             }
         };
+        debug!("region has been set to: {}", &region);
 
         Ok(Signer {
             service: service.to_string(),
@@ -173,7 +177,7 @@ impl Signer {
 
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
         let canonical_req = CanonicalRequest::from(req, self.time, cred)?;
-        debug!("canonical_req: {canonical_req}");
+        debug!("calculated canonical_req: {canonical_req}");
 
         let encoded_req = hex_sha256(canonical_req.to_string().as_bytes());
 
@@ -184,7 +188,7 @@ impl Signer {
             self.region,
             self.service
         );
-        debug!("scope: {scope}");
+        debug!("calculated scope: {scope}");
 
         // StringToSign:
         //
@@ -202,7 +206,7 @@ impl Signer {
             write!(f, "{}", &encoded_req)?;
             f
         };
-        debug!("string to sign: {string_to_sign}");
+        debug!("calculated string to sign: {string_to_sign}");
 
         let signing_key = generate_signing_key(
             cred.secret_key(),
@@ -255,14 +259,17 @@ impl Signer {
     }
 
     pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        let cred = self.credential().await?;
+        if let Some(cred) = self.credential().await? {
+            let sig = self.calculate(req, &cred)?;
+            return self.apply(&sig, req);
+        }
 
         if self.allow_anonymous {
+            debug!("credential not found and anonymous is allowed, skipping signing.");
             return Ok(());
         }
 
-        let sig = self.calculate(req, &cred.unwrap())?;
-        self.apply(&sig, req)
+        Err(anyhow!("credential not found"))
     }
 }
 
@@ -301,7 +308,7 @@ impl<'a> CanonicalRequest<'a> {
         Ok(CanonicalRequest {
             method: req.method(),
             path: req.path(),
-            params: Self::params(),
+            params: Self::params(req),
             headers: canonical_headers,
 
             time: now,
@@ -390,8 +397,35 @@ impl<'a> CanonicalRequest<'a> {
         Ok((signed_headers, canonical_headers))
     }
 
-    pub fn params() -> Option<String> {
-        None
+    pub fn params(req: &impl SignableRequest) -> Option<String> {
+        let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
+            form_urlencoded::parse(req.query().unwrap_or_default().as_bytes()).collect();
+        // Sort by param name
+        params.sort();
+
+        if params.is_empty() {
+            None
+        } else {
+            let x = Some(
+                params
+                    .iter()
+                    .map(|(k, v)| {
+                        format!(
+                            "{}={}",
+                            form_urlencoded::byte_serialize(k.as_bytes())
+                                .collect::<Vec<&'_ str>>()
+                                .join(""),
+                            form_urlencoded::byte_serialize(v.as_bytes())
+                                .collect::<Vec<&'_ str>>()
+                                .join(""),
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join("&"),
+            );
+            debug!("param is : {:?}", x);
+            x
+        }
     }
 }
 
@@ -483,16 +517,8 @@ mod tests {
     use aws_sigv4::SigningParams;
 
     use super::*;
-    use crate::time::{PrimitiveDateTime, ISO8601};
 
-    fn test_time() -> SystemTime {
-        PrimitiveDateTime::parse("20220101T120000Z", ISO8601)
-            .expect("test time must be valid")
-            .assume_utc()
-            .into()
-    }
-
-    fn test_request() -> http::Request<&'static str> {
+    fn test_get_request() -> http::Request<&'static str> {
         let mut req = http::Request::new("");
         *req.method_mut() = http::Method::GET;
         *req.uri_mut() = "http://127.0.0.1:9000/hello"
@@ -502,60 +528,94 @@ mod tests {
         req
     }
 
+    fn test_get_request_with_query() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello?list-type=2&max-keys=3&prefix=CI/&start-after=ExampleGuide.pdf"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_put_request() -> http::Request<&'static str> {
+        let content = "Hello,World!";
+        let mut req = http::Request::new(content);
+        *req.method_mut() = http::Method::PUT;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+
+        req.headers_mut().insert(
+            http::header::CONTENT_LENGTH,
+            HeaderValue::from_str(&content.len().to_string()).expect("must be valid"),
+        );
+
+        req
+    }
+
     #[tokio::test]
     async fn test_calculate() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut req = test_request();
+        for req_fn in [
+            test_get_request,
+            test_get_request_with_query,
+            test_put_request,
+        ] {
+            let mut req = req_fn();
+            let now = SystemTime::now();
 
-        let mut ss = SigningSettings::default();
-        ss.percent_encoding_mode = PercentEncodingMode::Single;
-        ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+            let mut ss = SigningSettings::default();
+            ss.percent_encoding_mode = PercentEncodingMode::Double;
+            ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
 
-        let sp = SigningParams::builder()
-            .access_key("access_key_id")
-            .secret_key("secret_access_key")
-            .region("test")
-            .service_name("s3")
-            .time(test_time())
-            .settings(ss)
-            .build()
-            .expect("signing params must be valid");
+            let sp = SigningParams::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .service_name("s3")
+                .time(now)
+                .settings(ss)
+                .build()
+                .expect("signing params must be valid");
 
-        let output = aws_sigv4::http_request::sign(
-            SignableRequest::new(
-                req.method(),
-                req.uri(),
-                req.headers(),
-                SignableBody::UnsignedPayload,
-            ),
-            &sp,
-        )
-        .expect("signing must succeed");
-        let (aws_sig, expect_sig) = output.into_parts();
-        aws_sig.apply_to_request(&mut req);
-        let expect_headers = req.headers();
+            let output = aws_sigv4::http_request::sign(
+                SignableRequest::new(
+                    req.method(),
+                    req.uri(),
+                    req.headers(),
+                    SignableBody::UnsignedPayload,
+                ),
+                &sp,
+            )
+            .expect("signing must succeed");
+            let (aws_sig, expect_sig) = output.into_parts();
+            aws_sig.apply_to_request(&mut req);
+            let expect_headers = req.headers();
 
-        let mut req = test_request();
+            let mut req = req_fn();
 
-        let signer = Signer::builder()
-            .access_key("access_key_id")
-            .secret_key("secret_access_key")
-            .region("test")
-            .service("s3")
-            .time(test_time())
-            .build()
-            .await?;
+            let signer = Signer::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .service("s3")
+                .time(now)
+                .build()
+                .await?;
 
-        let cred = signer
-            .credential()
-            .await?
-            .expect("credential must be valid");
-        let actual = signer.calculate(&req, &cred)?;
-        signer.apply(&actual, &mut req).expect("must apply success");
+            let cred = signer
+                .credential()
+                .await?
+                .expect("credential must be valid");
+            let actual = signer.calculate(&req, &cred)?;
+            signer.apply(&actual, &mut req).expect("must apply success");
 
-        assert_eq!(expect_sig, actual.signature());
-        assert_eq!(expect_headers, req.headers());
+            assert_eq!(expect_sig, actual.signature());
+            assert_eq!(expect_headers, req.headers());
+        }
+
         Ok(())
     }
 
@@ -563,58 +623,62 @@ mod tests {
     async fn test_calculate_with_token() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let mut req = test_request();
+        for req_fn in [test_get_request, test_put_request] {
+            let mut req = req_fn();
+            let now = SystemTime::now();
 
-        let mut ss = SigningSettings::default();
-        ss.percent_encoding_mode = PercentEncodingMode::Single;
-        ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+            let mut ss = SigningSettings::default();
+            ss.percent_encoding_mode = PercentEncodingMode::Double;
+            ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
 
-        let sp = SigningParams::builder()
-            .access_key("access_key_id")
-            .secret_key("secret_access_key")
-            .region("test")
-            .security_token("security_token")
-            .service_name("s3")
-            .time(test_time())
-            .settings(ss)
-            .build()
-            .expect("signing params must be valid");
+            let sp = SigningParams::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .security_token("security_token")
+                .service_name("s3")
+                .time(now)
+                .settings(ss)
+                .build()
+                .expect("signing params must be valid");
 
-        let output = aws_sigv4::http_request::sign(
-            SignableRequest::new(
-                req.method(),
-                req.uri(),
-                req.headers(),
-                SignableBody::UnsignedPayload,
-            ),
-            &sp,
-        )
-        .expect("signing must succeed");
-        let (aws_sig, expect_sig) = output.into_parts();
-        aws_sig.apply_to_request(&mut req);
-        let expect_headers = req.headers();
+            let output = aws_sigv4::http_request::sign(
+                SignableRequest::new(
+                    req.method(),
+                    req.uri(),
+                    req.headers(),
+                    SignableBody::UnsignedPayload,
+                ),
+                &sp,
+            )
+            .expect("signing must succeed");
+            let (aws_sig, expect_sig) = output.into_parts();
+            aws_sig.apply_to_request(&mut req);
+            let expect_headers = req.headers();
 
-        let mut req = test_request();
+            let mut req = req_fn();
 
-        let signer = Signer::builder()
-            .access_key("access_key_id")
-            .secret_key("secret_access_key")
-            .region("test")
-            .security_token("security_token")
-            .service("s3")
-            .time(test_time())
-            .build()
-            .await?;
+            let signer = Signer::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .security_token("security_token")
+                .service("s3")
+                .time(now)
+                .build()
+                .await?;
 
-        let cred = signer
-            .credential()
-            .await?
-            .expect("credential must be valid");
-        let actual = signer.calculate(&req, &cred)?;
-        signer.apply(&actual, &mut req).expect("must apply success");
+            let cred = signer
+                .credential()
+                .await?
+                .expect("credential must be valid");
+            let actual = signer.calculate(&req, &cred)?;
+            signer.apply(&actual, &mut req).expect("must apply success");
 
-        assert_eq!(expect_sig, actual.signature());
-        assert_eq!(expect_headers, req.headers());
+            assert_eq!(expect_sig, actual.signature());
+            assert_eq!(expect_headers, req.headers());
+        }
+
         Ok(())
     }
 }

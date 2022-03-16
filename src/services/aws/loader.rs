@@ -265,7 +265,7 @@ impl CredentialLoad for WebIdentityTokenLoader {
                         "Expiration" => {
                             let text = n.text().expect("Expiration must be exist");
 
-                            builder.expires_in(time::parse(text, ISO8601_WITH_SEPERATOR)?);
+                            builder.expires_in(time::parse_utc(text, ISO8601_WITH_SEPERATOR)?);
                         }
                         _ => {}
                     }
