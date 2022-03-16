@@ -103,6 +103,17 @@ impl CredentialLoad for EnvLoader {
     }
 }
 
+#[async_trait]
+impl RegionLoad for EnvLoader {
+    async fn load_region(&self) -> Result<Option<String>> {
+        if let Ok(region) = env::var(super::constants::AWS_REGION) {
+            Ok(Some(region))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 /// Load credential from AWS profiles
 ///
 /// ## Location of Profile Files
@@ -120,16 +131,21 @@ impl CredentialLoad for EnvLoader {
 #[derive(Default, Clone, Debug)]
 struct ProfileLoader {}
 
+/// Comment from [Where are configuration settings stored?](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html)
+///
+/// > You can keep all of your profile settings in a single file as the AWS
+/// > CLI can read credentials from the config file. If there are credentials
+/// > in both files for a profile sharing the same name, the keys in the
+/// > credentials file take precedence.
 #[async_trait]
 impl CredentialLoad for ProfileLoader {
     async fn load_credential(&self) -> Result<Option<Credential>> {
-        let cfg_path = env::var(super::constants::AWS_CONFIG_FILE)
-            .unwrap_or_else(|_| "~/.aws/config".to_string());
-        if let Some(cfg_path) = expand_homedir(&cfg_path) {
-            if fs::metadata(&cfg_path).is_ok() {
-                let conf = Ini::load_from_file(cfg_path)?;
-                // NOTE: section in config must prefixed with "profile"
-                if let Some(props) = conf.section(Some("profile default")) {
+        let cred_path = env::var(super::constants::AWS_SHARED_CREDENTIALS_FILE)
+            .unwrap_or_else(|_| "~/.aws/credentials".to_string());
+        if let Some(cred_path) = expand_homedir(&cred_path) {
+            if fs::metadata(&cred_path).is_ok() {
+                let conf = Ini::load_from_file(cred_path)?;
+                if let Some(props) = conf.section(Some("default")) {
                     if let (Some(ak), Some(sk)) = (
                         props.get("aws_access_key_id"),
                         props.get("aws_secret_access_key"),
@@ -140,18 +156,37 @@ impl CredentialLoad for ProfileLoader {
             }
         }
 
-        let cred_path = env::var(super::constants::AWS_SHARED_CREDENTIALS_FILE)
-            .unwrap_or_else(|_| "~/.aws/credentials".to_string());
-        if let Some(cred_path) = expand_homedir(&cred_path) {
-            if fs::metadata(&cred_path).is_ok() {
-                let conf = Ini::load_from_file(cred_path)?;
-                // NOTE: section in config must not prefixed with "profile"
+        let cfg_path = env::var(super::constants::AWS_CONFIG_FILE)
+            .unwrap_or_else(|_| "~/.aws/config".to_string());
+        if let Some(cfg_path) = expand_homedir(&cfg_path) {
+            if fs::metadata(&cfg_path).is_ok() {
+                let conf = Ini::load_from_file(cfg_path)?;
                 if let Some(props) = conf.section(Some("default")) {
                     if let (Some(ak), Some(sk)) = (
                         props.get("aws_access_key_id"),
                         props.get("aws_secret_access_key"),
                     ) {
                         return Ok(Some(Credential::new(ak, sk)));
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+}
+
+#[async_trait]
+impl RegionLoad for ProfileLoader {
+    async fn load_region(&self) -> Result<Option<String>> {
+        let cfg_path = env::var(super::constants::AWS_CONFIG_FILE)
+            .unwrap_or_else(|_| "~/.aws/config".to_string());
+        if let Some(cfg_path) = expand_homedir(&cfg_path) {
+            if fs::metadata(&cfg_path).is_ok() {
+                let conf = Ini::load_from_file(cfg_path)?;
+                if let Some(props) = conf.section(Some("default")) {
+                    if let Some(region) = props.get("region") {
+                        return Ok(Some(region.to_string()));
                     }
                 }
             }
@@ -248,7 +283,7 @@ mod tests {
     static TOKIO: Lazy<Runtime> = Lazy::new(|| Runtime::new().expect("runtime must be valid"));
 
     #[test]
-    fn test_env_loader_without_env() {
+    fn test_credential_env_loader_without_env() {
         temp_env::with_vars_unset(vec![AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY], || {
             TOKIO.block_on(async {
                 let l = EnvLoader {};
@@ -262,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn test_env_loader_with_env() {
+    fn test_credential_env_loader_with_env() {
         temp_env::with_vars(
             vec![
                 (AWS_ACCESS_KEY_ID, Some("access_key_id")),
@@ -278,6 +313,173 @@ mod tests {
                         .expect("credential must be valid");
                     assert_eq!("access_key_id", x.access_key());
                     assert_eq!("secret_access_key", x.secret_key());
+                });
+            },
+        );
+    }
+
+    #[test]
+    fn test_credential_profile_loader_from_config() {
+        temp_env::with_vars(
+            vec![
+                (
+                    AWS_CONFIG_FILE,
+                    Some(format!(
+                        "{}/testdata/services/aws/default_config",
+                        env::current_dir()
+                            .expect("current_dir must exist")
+                            .to_string_lossy()
+                    )),
+                ),
+                (
+                    AWS_SHARED_CREDENTIALS_FILE,
+                    Some(format!(
+                        "{}/testdata/services/aws/not_exist",
+                        env::current_dir()
+                            .expect("current_dir must exist")
+                            .to_string_lossy()
+                    )),
+                ),
+            ],
+            || {
+                TOKIO.block_on(async {
+                    let l = ProfileLoader {};
+                    let x = l
+                        .load_credential()
+                        .await
+                        .expect("load_credential must success")
+                        .expect("credential must be valid");
+                    assert_eq!("config_access_key_id", x.access_key());
+                    assert_eq!("config_secret_access_key", x.secret_key());
+                });
+            },
+        );
+    }
+
+    #[test]
+    fn test_credential_profile_loader_from_shared() {
+        temp_env::with_vars(
+            vec![
+                (
+                    AWS_CONFIG_FILE,
+                    Some(format!(
+                        "{}/testdata/services/aws/not_exist",
+                        env::current_dir()
+                            .expect("current_dir must exist")
+                            .to_string_lossy()
+                    )),
+                ),
+                (
+                    AWS_SHARED_CREDENTIALS_FILE,
+                    Some(format!(
+                        "{}/testdata/services/aws/default_credential",
+                        env::current_dir()
+                            .expect("current_dir must exist")
+                            .to_string_lossy()
+                    )),
+                ),
+            ],
+            || {
+                TOKIO.block_on(async {
+                    let l = ProfileLoader {};
+                    let x = l
+                        .load_credential()
+                        .await
+                        .expect("load_credential must success")
+                        .expect("credential must be valid");
+                    assert_eq!("shared_access_key_id", x.access_key());
+                    assert_eq!("shared_secret_access_key", x.secret_key());
+                });
+            },
+        );
+    }
+
+    /// AWS_SHARED_CREDENTIALS_FILE should be taken first.
+    #[test]
+    fn test_credential_profile_loader_from_both() {
+        temp_env::with_vars(
+            vec![
+                (
+                    AWS_CONFIG_FILE,
+                    Some(format!(
+                        "{}/testdata/services/aws/default_config",
+                        env::current_dir()
+                            .expect("current_dir must exist")
+                            .to_string_lossy()
+                    )),
+                ),
+                (
+                    AWS_SHARED_CREDENTIALS_FILE,
+                    Some(format!(
+                        "{}/testdata/services/aws/default_credential",
+                        env::current_dir()
+                            .expect("current_dir must exist")
+                            .to_string_lossy()
+                    )),
+                ),
+            ],
+            || {
+                TOKIO.block_on(async {
+                    let l = ProfileLoader {};
+                    let x = l
+                        .load_credential()
+                        .await
+                        .expect("load_credential must success")
+                        .expect("credential must be valid");
+                    assert_eq!("shared_access_key_id", x.access_key());
+                    assert_eq!("shared_secret_access_key", x.secret_key());
+                });
+            },
+        );
+    }
+
+    #[test]
+    fn test_region_env_loader_without_env() {
+        temp_env::with_vars_unset(vec![AWS_REGION], || {
+            TOKIO.block_on(async {
+                let l = EnvLoader {};
+                let x = l.load_region().await.expect("load_region must success");
+                assert!(x.is_none());
+            });
+        });
+    }
+
+    #[test]
+    fn test_region_env_loader_with_env() {
+        temp_env::with_vars(vec![(AWS_REGION, Some("test"))], || {
+            TOKIO.block_on(async {
+                let l = EnvLoader {};
+                let x = l
+                    .load_region()
+                    .await
+                    .expect("load_credential must success")
+                    .expect("region must be valid");
+                assert_eq!("test", x);
+            });
+        });
+    }
+
+    #[test]
+    fn test_region_profile_loader() {
+        temp_env::with_vars(
+            vec![(
+                AWS_CONFIG_FILE,
+                Some(format!(
+                    "{}/testdata/services/aws/default_config",
+                    env::current_dir()
+                        .expect("current_dir must exist")
+                        .to_string_lossy()
+                )),
+            )],
+            || {
+                TOKIO.block_on(async {
+                    let l = ProfileLoader {};
+                    let x = l
+                        .load_region()
+                        .await
+                        .expect("load_credential must success")
+                        .expect("region must be valid");
+                    assert_eq!("test", x);
                 });
             },
         );
