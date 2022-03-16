@@ -338,7 +338,7 @@ impl<'a> CanonicalRequest<'a> {
 
         // Insert HOST header if not present.
         if canonical_headers.get(&http::header::HOST).is_none() {
-            let header = HeaderValue::try_from(req.authority())
+            let header = HeaderValue::try_from(req.host_port())
                 .expect("endpoint must contain valid header characters");
             canonical_headers.insert(http::header::HOST, header);
         }
