@@ -22,8 +22,8 @@ use crate::time::{self, DATE, ISO8601};
 
 #[derive(Default)]
 pub struct Builder {
-    service: String,
-    region: String,
+    service: Option<String>,
+    region: Option<String>,
     credential: Credential,
 
     region_load: RegionLoadChain,
@@ -34,12 +34,12 @@ pub struct Builder {
 
 impl Builder {
     pub fn service(&mut self, service: &str) -> &mut Self {
-        self.service = service.to_string();
+        self.service = Some(service.to_string());
         self
     }
 
     pub fn region(&mut self, region: &str) -> &mut Self {
-        self.region = region.to_string();
+        self.region = Some(region.to_string());
         self
     }
 
@@ -58,6 +58,7 @@ impl Builder {
         self
     }
 
+    #[cfg(test)]
     pub fn security_token(&mut self, security_token: &str) -> &mut Self {
         self.credential.set_security_token(Some(security_token));
         self
@@ -75,31 +76,39 @@ impl Builder {
     }
 
     pub async fn build(&mut self) -> Result<Signer> {
-        if self.region_load.is_empty() {
-            self.region_load
-                .push(EnvLoader::default())
-                .push(ProfileLoader::default());
-        }
+        let service = self
+            .service
+            .as_ref()
+            .ok_or_else(|| anyhow!("service is required"))?;
 
-        if self.credential_load.is_empty() {
+        // If credential is not valid, we need to populate the credential_load chain.
+        if !self.credential.is_valid() {
             self.credential_load
                 .push(EnvLoader::default())
                 .push(ProfileLoader::default())
                 .push(WebIdentityTokenLoader::default());
         }
 
-        // Try load region from env
-        if self.region.is_empty() {
-            let region = self.region_load.load_region().await?;
-            if region.is_none() {
-                return Err(anyhow!("region is empty"));
+        let region = match &self.region {
+            Some(region) => region.to_string(),
+            None => {
+                // Make sure region load chain has been set before check region.
+                if self.region_load.is_empty() {
+                    self.region_load
+                        .push(EnvLoader::default())
+                        .push(ProfileLoader::default());
+                }
+
+                self.region_load
+                    .load_region()
+                    .await?
+                    .ok_or_else(|| anyhow!("region is required"))?
             }
-            self.region = region.unwrap();
-        }
+        };
 
         Ok(Signer {
-            service: mem::take(&mut self.service),
-            region: mem::take(&mut self.region),
+            service: service.to_string(),
+            region,
             credential: Arc::new(RwLock::new(OnceCell::new_with(Some(mem::take(
                 &mut self.credential,
             ))))),
