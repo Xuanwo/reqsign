@@ -28,6 +28,9 @@ sha2 = "0.10"
 time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
 tokio = { version = "1.17", features = ["full"] }
 base64 = "0.13"
+form_urlencoded = "1"
+percent-encoding = "2"
+
 [dev-dependencies]
 aws-sigv4 = "0.8"
 criterion = { version = "0.3", features = ["async_tokio", "html_reports"] }

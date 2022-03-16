@@ -25,3 +25,5 @@ pub const AWS_PROFILE: &str = "AWS_PROFILE";
 pub const AWS_WEB_IDENTITY_TOKEN_FILE: &str = "AWS_WEB_IDENTITY_TOKEN_FILE";
 #[allow(dead_code)]
 pub const AWS_ROLE_ARN: &str = "AWS_ROLE_ARN";
+#[allow(dead_code)]
+pub const AWS_ROLE_SESSION_NAME: &str = "AWS_ROLE_SESSION_NAME";

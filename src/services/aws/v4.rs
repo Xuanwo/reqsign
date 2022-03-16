@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::str::FromStr;
@@ -8,36 +9,40 @@ use anyhow::{anyhow, Result};
 use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use log::debug;
-use tokio::sync::{OnceCell, RwLock};
+use tokio::sync::RwLock;
 
 use super::credential::Credential;
 use super::loader::CredentialLoadChain;
 use super::loader::RegionLoadChain;
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
-use crate::services::aws::loader::{CredentialLoad, RegionLoad};
+use crate::services::aws::loader::{
+    CredentialLoad, EnvLoader, ProfileLoader, RegionLoad, WebIdentityTokenLoader,
+};
 use crate::time::{self, DATE, ISO8601};
 
 #[derive(Default)]
 pub struct Builder {
-    service: String,
-    region: String,
+    service: Option<String>,
+    region: Option<String>,
     credential: Credential,
 
     region_load: RegionLoadChain,
     credential_load: CredentialLoadChain,
+
+    allow_anonymous: bool,
 
     time: Option<SystemTime>,
 }
 
 impl Builder {
     pub fn service(&mut self, service: &str) -> &mut Self {
-        self.service = service.to_string();
+        self.service = Some(service.to_string());
         self
     }
 
     pub fn region(&mut self, region: &str) -> &mut Self {
-        self.region = region.to_string();
+        self.region = Some(region.to_string());
         self
     }
 
@@ -56,8 +61,20 @@ impl Builder {
         self
     }
 
+    #[cfg(test)]
+    pub fn security_token(&mut self, security_token: &str) -> &mut Self {
+        self.credential.set_security_token(Some(security_token));
+        self
+    }
+
     pub fn credential_loader(&mut self, credential: CredentialLoadChain) -> &mut Self {
         self.credential_load = credential;
+        self
+    }
+
+    /// Allow anonymous request if credential is not loaded.
+    pub fn allow_anonymous(&mut self) -> &mut Self {
+        self.allow_anonymous = true;
         self
     }
 
@@ -68,22 +85,51 @@ impl Builder {
     }
 
     pub async fn build(&mut self) -> Result<Signer> {
-        // Try load region from env
-        if self.region.is_empty() {
-            let region = self.region_load.load_region().await?;
-            if region.is_none() {
-                return Err(anyhow!("region is empty"));
+        let service = self
+            .service
+            .as_ref()
+            .ok_or_else(|| anyhow!("service is required"))?;
+        debug!("service: {:?}", service);
+
+        let credential = if self.credential.is_valid() {
+            Some(self.credential.clone())
+        } else {
+            // Make sure credential load chain has been set before checking.
+            if self.credential_load.is_empty() {
+                self.credential_load
+                    .push(EnvLoader::default())
+                    .push(ProfileLoader::default())
+                    .push(WebIdentityTokenLoader::default());
             }
-            self.region = region.unwrap();
-        }
+
+            self.credential_load.load_credential().await?
+        };
+        debug!("credential has been set to: {:?}", &credential);
+
+        let region = match &self.region {
+            Some(region) => region.to_string(),
+            None => {
+                // Make sure region load chain has been set before checking.
+                if self.region_load.is_empty() {
+                    self.region_load
+                        .push(EnvLoader::default())
+                        .push(ProfileLoader::default());
+                }
+
+                self.region_load
+                    .load_region()
+                    .await?
+                    .ok_or_else(|| anyhow!("region is required"))?
+            }
+        };
+        debug!("region has been set to: {}", &region);
 
         Ok(Signer {
-            service: mem::take(&mut self.service),
-            region: mem::take(&mut self.region),
-            credential: Arc::new(RwLock::new(OnceCell::new_with(Some(mem::take(
-                &mut self.credential,
-            ))))),
+            service: service.to_string(),
+            region,
+            credential: Arc::new(RwLock::new(credential)),
             credential_load: mem::take(&mut self.credential_load),
+            allow_anonymous: self.allow_anonymous,
             time: self.time,
         })
     }
@@ -92,9 +138,11 @@ impl Builder {
 pub struct Signer {
     service: String,
     region: String,
-
-    credential: Arc<RwLock<OnceCell<Credential>>>,
+    credential: Arc<RwLock<Option<Credential>>>,
     credential_load: CredentialLoadChain,
+
+    /// Allow anonymous request if credential is not loaded.
+    allow_anonymous: bool,
 
     time: Option<SystemTime>,
 }
@@ -105,28 +153,31 @@ impl Signer {
     }
 
     /// Load credential via credential load chain specified while building.
-    async fn credential(&self) -> Result<Credential> {
+    async fn credential(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
-        if let Some(cred) = self.credential.read().await.get() {
-            if cred.is_valid() {
-                return Ok(cred.clone());
+        match self.credential.read().await.clone() {
+            None => return Ok(None),
+            Some(cred) => {
+                if cred.is_valid() {
+                    return Ok(Some(cred));
+                }
             }
         }
 
         if let Some(cred) = self.credential_load.load_credential().await? {
             let mut lock = self.credential.write().await;
-            // No matter the cell contains credential or not, we just take them
-            // and drop them. So we can set the new value inside.
-            let _ = lock.take();
-            lock.set(cred.clone()).expect("cell must be empty");
-            Ok(cred)
+            *lock = Some(cred.clone());
+            Ok(Some(cred))
         } else {
-            Err(anyhow!("credential is not found"))
+            // We used to get credential correctly, but now we can't.
+            // Something must happened in the running environment.
+            Err(anyhow!("credential should be loaded but not"))
         }
     }
 
-    pub async fn calculate(&self, req: &impl SignableRequest) -> Result<SignedOutput> {
-        let canonical_req = CanonicalRequest::from(req, self.time)?;
+    pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
+        let canonical_req = CanonicalRequest::from(req, self.time, cred)?;
+        debug!("calculated canonical_req: {canonical_req}");
 
         let encoded_req = hex_sha256(canonical_req.to_string().as_bytes());
 
@@ -137,7 +188,7 @@ impl Signer {
             self.region,
             self.service
         );
-        debug!("scope: {scope}");
+        debug!("calculated scope: {scope}");
 
         // StringToSign:
         //
@@ -155,9 +206,7 @@ impl Signer {
             write!(f, "{}", &encoded_req)?;
             f
         };
-        debug!("string to sign: {string_to_sign}");
-
-        let cred = self.credential().await?;
+        debug!("calculated string to sign: {string_to_sign}");
 
         let signing_key = generate_signing_key(
             cred.secret_key(),
@@ -169,6 +218,7 @@ impl Signer {
 
         Ok(SignedOutput {
             access_key_id: cred.access_key().to_string(),
+            security_token: cred.security_token().map(|v| v.to_string()),
             signed_time: canonical_req.time,
             signed_scope: scope,
             signed_headers: canonical_req.signed_headers,
@@ -182,10 +232,18 @@ impl Signer {
             &time::format(sig.signed_time, ISO8601),
         )?;
         req.apply_header(
-            HeaderName::from_str(super::constants::X_AMZ_CONTENT_SHA_256)
-                .expect("x_amz_content_sha_256 header name must be valid"),
+            HeaderName::from_static(super::constants::X_AMZ_CONTENT_SHA_256),
             "UNSIGNED-PAYLOAD",
         )?;
+
+        // Set X_AMZ_SECURITY_TOKEN if we have security_token
+        if let Some(token) = &sig.security_token {
+            req.apply_header(
+                HeaderName::from_static(super::constants::X_AMZ_SECURITY_TOKEN),
+                token,
+            )?;
+        }
+
         req.apply_header(
             http::header::AUTHORIZATION,
             &format!(
@@ -201,8 +259,17 @@ impl Signer {
     }
 
     pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        let sig = self.calculate(req).await?;
-        self.apply(&sig, req)
+        if let Some(cred) = self.credential().await? {
+            let sig = self.calculate(req, &cred)?;
+            return self.apply(&sig, req);
+        }
+
+        if self.allow_anonymous {
+            debug!("credential not found and anonymous is allowed, skipping signing.");
+            return Ok(());
+        }
+
+        Err(anyhow!("credential not found"))
     }
 }
 
@@ -229,15 +296,19 @@ struct CanonicalRequest<'a> {
 }
 
 impl<'a> CanonicalRequest<'a> {
-    pub fn from(req: &impl SignableRequest, time: Option<SystemTime>) -> Result<CanonicalRequest> {
+    pub fn from<'b>(
+        req: &'b impl SignableRequest,
+        time: Option<SystemTime>,
+        cred: &'b Credential,
+    ) -> Result<CanonicalRequest<'b>> {
         let now = time.unwrap_or_else(SystemTime::now);
 
-        let (signed_headers, canonical_headers) = Self::headers(req, now)?;
+        let (signed_headers, canonical_headers) = Self::headers(req, now, cred)?;
 
         Ok(CanonicalRequest {
             method: req.method(),
             path: req.path(),
-            params: Self::params(),
+            params: Self::params(req),
             headers: canonical_headers,
 
             time: now,
@@ -253,6 +324,7 @@ impl<'a> CanonicalRequest<'a> {
     pub fn headers(
         req: &impl SignableRequest,
         now: SystemTime,
+        cred: &Credential,
     ) -> Result<(Vec<HeaderName>, HeaderMap)> {
         let mut canonical_headers = HeaderMap::with_capacity(req.headers().len());
         for (name, value) in req.headers().iter() {
@@ -266,7 +338,7 @@ impl<'a> CanonicalRequest<'a> {
 
         // Insert HOST header if not present.
         if canonical_headers.get(&http::header::HOST).is_none() {
-            let header = HeaderValue::try_from(req.authority())
+            let header = HeaderValue::try_from(req.host_port())
                 .expect("endpoint must contain valid header characters");
             canonical_headers.insert(http::header::HOST, header);
         }
@@ -297,6 +369,18 @@ impl<'a> CanonicalRequest<'a> {
             );
         }
 
+        // Insert X_AMZ_SECURITY_TOKEN header if security token exists.
+        if let Some(token) = cred.security_token() {
+            let mut value = HeaderValue::from_str(token)?;
+            // Set token value sensitive to valid leaking.
+            value.set_sensitive(true);
+
+            canonical_headers.insert(
+                HeaderName::from_static(super::constants::X_AMZ_SECURITY_TOKEN),
+                value,
+            );
+        }
+
         // TODO: handle X_AMZ_CONTENT_SHA_256 header here.
 
         let mut signed_headers = Vec::with_capacity(canonical_headers.len());
@@ -313,8 +397,35 @@ impl<'a> CanonicalRequest<'a> {
         Ok((signed_headers, canonical_headers))
     }
 
-    pub fn params() -> Option<String> {
-        None
+    pub fn params(req: &impl SignableRequest) -> Option<String> {
+        let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
+            form_urlencoded::parse(req.query().unwrap_or_default().as_bytes()).collect();
+        // Sort by param name
+        params.sort();
+
+        if params.is_empty() {
+            None
+        } else {
+            let x = Some(
+                params
+                    .iter()
+                    .map(|(k, v)| {
+                        format!(
+                            "{}={}",
+                            form_urlencoded::byte_serialize(k.as_bytes())
+                                .collect::<Vec<&'_ str>>()
+                                .join(""),
+                            form_urlencoded::byte_serialize(v.as_bytes())
+                                .collect::<Vec<&'_ str>>()
+                                .join(""),
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join("&"),
+            );
+            debug!("param is : {:?}", x);
+            x
+        }
     }
 }
 
@@ -350,6 +461,7 @@ impl<'a> Display for CanonicalRequest<'a> {
 
 pub struct SignedOutput {
     access_key_id: String,
+    security_token: Option<String>,
     signed_time: SystemTime,
     signed_scope: String,
     signed_headers: Vec<HeaderName>,
@@ -391,4 +503,182 @@ pub fn generate_signing_key(
     let sign_request = hmac_sha256(sign_service.as_slice(), "aws4_request".as_bytes());
 
     sign_request
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::SystemTime;
+
+    use anyhow::Result;
+    use aws_sigv4;
+    use aws_sigv4::http_request::{
+        PayloadChecksumKind, PercentEncodingMode, SignableBody, SignableRequest, SigningSettings,
+    };
+    use aws_sigv4::SigningParams;
+
+    use super::*;
+
+    fn test_get_request() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_get_request_with_query() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello?list-type=2&max-keys=3&prefix=CI/&start-after=ExampleGuide.pdf"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_put_request() -> http::Request<&'static str> {
+        let content = "Hello,World!";
+        let mut req = http::Request::new(content);
+        *req.method_mut() = http::Method::PUT;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+
+        req.headers_mut().insert(
+            http::header::CONTENT_LENGTH,
+            HeaderValue::from_str(&content.len().to_string()).expect("must be valid"),
+        );
+
+        req
+    }
+
+    #[tokio::test]
+    async fn test_calculate() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        for req_fn in [
+            test_get_request,
+            test_get_request_with_query,
+            test_put_request,
+        ] {
+            let mut req = req_fn();
+            let now = SystemTime::now();
+
+            let mut ss = SigningSettings::default();
+            ss.percent_encoding_mode = PercentEncodingMode::Double;
+            ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+
+            let sp = SigningParams::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .service_name("s3")
+                .time(now)
+                .settings(ss)
+                .build()
+                .expect("signing params must be valid");
+
+            let output = aws_sigv4::http_request::sign(
+                SignableRequest::new(
+                    req.method(),
+                    req.uri(),
+                    req.headers(),
+                    SignableBody::UnsignedPayload,
+                ),
+                &sp,
+            )
+            .expect("signing must succeed");
+            let (aws_sig, expect_sig) = output.into_parts();
+            aws_sig.apply_to_request(&mut req);
+            let expect_headers = req.headers();
+
+            let mut req = req_fn();
+
+            let signer = Signer::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .service("s3")
+                .time(now)
+                .build()
+                .await?;
+
+            let cred = signer
+                .credential()
+                .await?
+                .expect("credential must be valid");
+            let actual = signer.calculate(&req, &cred)?;
+            signer.apply(&actual, &mut req).expect("must apply success");
+
+            assert_eq!(expect_sig, actual.signature());
+            assert_eq!(expect_headers, req.headers());
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_calculate_with_token() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        for req_fn in [test_get_request, test_put_request] {
+            let mut req = req_fn();
+            let now = SystemTime::now();
+
+            let mut ss = SigningSettings::default();
+            ss.percent_encoding_mode = PercentEncodingMode::Double;
+            ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+
+            let sp = SigningParams::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .security_token("security_token")
+                .service_name("s3")
+                .time(now)
+                .settings(ss)
+                .build()
+                .expect("signing params must be valid");
+
+            let output = aws_sigv4::http_request::sign(
+                SignableRequest::new(
+                    req.method(),
+                    req.uri(),
+                    req.headers(),
+                    SignableBody::UnsignedPayload,
+                ),
+                &sp,
+            )
+            .expect("signing must succeed");
+            let (aws_sig, expect_sig) = output.into_parts();
+            aws_sig.apply_to_request(&mut req);
+            let expect_headers = req.headers();
+
+            let mut req = req_fn();
+
+            let signer = Signer::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .security_token("security_token")
+                .service("s3")
+                .time(now)
+                .build()
+                .await?;
+
+            let cred = signer
+                .credential()
+                .await?
+                .expect("credential must be valid");
+            let actual = signer.calculate(&req, &cred)?;
+            signer.apply(&actual, &mut req).expect("must apply success");
+
+            assert_eq!(expect_sig, actual.signature());
+            assert_eq!(expect_headers, req.headers());
+        }
+
+        Ok(())
+    }
 }
