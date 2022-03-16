@@ -8,36 +8,40 @@ use anyhow::{anyhow, Result};
 use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use log::debug;
-use tokio::sync::{OnceCell, RwLock};
+use tokio::sync::RwLock;
 
 use super::credential::Credential;
 use super::loader::CredentialLoadChain;
 use super::loader::RegionLoadChain;
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
-use crate::services::aws::loader::{CredentialLoad, RegionLoad};
+use crate::services::aws::loader::{
+    CredentialLoad, EnvLoader, ProfileLoader, RegionLoad, WebIdentityTokenLoader,
+};
 use crate::time::{self, DATE, ISO8601};
 
 #[derive(Default)]
 pub struct Builder {
-    service: String,
-    region: String,
+    service: Option<String>,
+    region: Option<String>,
     credential: Credential,
 
     region_load: RegionLoadChain,
     credential_load: CredentialLoadChain,
+
+    allow_anonymous: bool,
 
     time: Option<SystemTime>,
 }
 
 impl Builder {
     pub fn service(&mut self, service: &str) -> &mut Self {
-        self.service = service.to_string();
+        self.service = Some(service.to_string());
         self
     }
 
     pub fn region(&mut self, region: &str) -> &mut Self {
-        self.region = region.to_string();
+        self.region = Some(region.to_string());
         self
     }
 
@@ -56,6 +60,7 @@ impl Builder {
         self
     }
 
+    #[cfg(test)]
     pub fn security_token(&mut self, security_token: &str) -> &mut Self {
         self.credential.set_security_token(Some(security_token));
         self
@@ -66,6 +71,12 @@ impl Builder {
         self
     }
 
+    /// Allow anonymous request if credential is not loaded.
+    pub fn allow_anonymous(&mut self) -> &mut Self {
+        self.allow_anonymous = true;
+        self
+    }
+
     #[cfg(test)]
     pub fn time(&mut self, time: SystemTime) -> &mut Self {
         self.time = Some(time);
@@ -73,22 +84,48 @@ impl Builder {
     }
 
     pub async fn build(&mut self) -> Result<Signer> {
-        // Try load region from env
-        if self.region.is_empty() {
-            let region = self.region_load.load_region().await?;
-            if region.is_none() {
-                return Err(anyhow!("region is empty"));
+        let service = self
+            .service
+            .as_ref()
+            .ok_or_else(|| anyhow!("service is required"))?;
+
+        let credential = if self.credential.is_valid() {
+            Some(self.credential.clone())
+        } else {
+            // Make sure credential load chain has been set before checking.
+            if self.credential_load.is_empty() {
+                self.credential_load
+                    .push(EnvLoader::default())
+                    .push(ProfileLoader::default())
+                    .push(WebIdentityTokenLoader::default());
             }
-            self.region = region.unwrap();
-        }
+
+            self.credential_load.load_credential().await?
+        };
+
+        let region = match &self.region {
+            Some(region) => region.to_string(),
+            None => {
+                // Make sure region load chain has been set before checking.
+                if self.region_load.is_empty() {
+                    self.region_load
+                        .push(EnvLoader::default())
+                        .push(ProfileLoader::default());
+                }
+
+                self.region_load
+                    .load_region()
+                    .await?
+                    .ok_or_else(|| anyhow!("region is required"))?
+            }
+        };
 
         Ok(Signer {
-            service: mem::take(&mut self.service),
-            region: mem::take(&mut self.region),
-            credential: Arc::new(RwLock::new(OnceCell::new_with(Some(mem::take(
-                &mut self.credential,
-            ))))),
+            service: service.to_string(),
+            region,
+            credential: Arc::new(RwLock::new(credential)),
             credential_load: mem::take(&mut self.credential_load),
+            allow_anonymous: self.allow_anonymous,
             time: self.time,
         })
     }
@@ -97,9 +134,11 @@ impl Builder {
 pub struct Signer {
     service: String,
     region: String,
-
-    credential: Arc<RwLock<OnceCell<Credential>>>,
+    credential: Arc<RwLock<Option<Credential>>>,
     credential_load: CredentialLoadChain,
+
+    /// Allow anonymous request if credential is not loaded.
+    allow_anonymous: bool,
 
     time: Option<SystemTime>,
 }
@@ -110,30 +149,30 @@ impl Signer {
     }
 
     /// Load credential via credential load chain specified while building.
-    async fn credential(&self) -> Result<Credential> {
+    async fn credential(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
-        if let Some(cred) = self.credential.read().await.get() {
-            if cred.is_valid() {
-                return Ok(cred.clone());
+        match self.credential.read().await.clone() {
+            None => return Ok(None),
+            Some(cred) => {
+                if cred.is_valid() {
+                    return Ok(Some(cred));
+                }
             }
         }
 
         if let Some(cred) = self.credential_load.load_credential().await? {
             let mut lock = self.credential.write().await;
-            // No matter the cell contains credential or not, we just take them
-            // and drop them. So we can set the new value inside.
-            let _ = lock.take();
-            lock.set(cred.clone()).expect("cell must be empty");
-            Ok(cred)
+            *lock = Some(cred.clone());
+            Ok(Some(cred))
         } else {
-            Err(anyhow!("credential is not found"))
+            // We used to get credential correctly, but now we can't.
+            // Something must happened in the running environment.
+            Err(anyhow!("credential should be loaded but not"))
         }
     }
 
-    pub async fn calculate(&self, req: &impl SignableRequest) -> Result<SignedOutput> {
-        let cred = self.credential().await?;
-
-        let canonical_req = CanonicalRequest::from(req, self.time, &cred)?;
+    pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
+        let canonical_req = CanonicalRequest::from(req, self.time, cred)?;
         debug!("canonical_req: {canonical_req}");
 
         let encoded_req = hex_sha256(canonical_req.to_string().as_bytes());
@@ -216,7 +255,13 @@ impl Signer {
     }
 
     pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        let sig = self.calculate(req).await?;
+        let cred = self.credential().await?;
+
+        if self.allow_anonymous {
+            return Ok(());
+        }
+
+        let sig = self.calculate(req, &cred.unwrap())?;
         self.apply(&sig, req)
     }
 }
@@ -502,7 +547,11 @@ mod tests {
             .build()
             .await?;
 
-        let actual = signer.calculate(&req).await?;
+        let cred = signer
+            .credential()
+            .await?
+            .expect("credential must be valid");
+        let actual = signer.calculate(&req, &cred)?;
         signer.apply(&actual, &mut req).expect("must apply success");
 
         assert_eq!(expect_sig, actual.signature());
@@ -557,7 +606,11 @@ mod tests {
             .build()
             .await?;
 
-        let actual = signer.calculate(&req).await?;
+        let cred = signer
+            .credential()
+            .await?
+            .expect("credential must be valid");
+        let actual = signer.calculate(&req, &cred)?;
         signer.apply(&actual, &mut req).expect("must apply success");
 
         assert_eq!(expect_sig, actual.signature());
