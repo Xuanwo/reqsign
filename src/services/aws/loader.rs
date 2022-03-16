@@ -245,7 +245,7 @@ mod tests {
     use super::*;
     use crate::services::aws::constants::*;
 
-    const TOKIO: Lazy<Runtime> = Lazy::new(|| Runtime::new().expect("runtime must be valid"));
+    static TOKIO: Lazy<Runtime> = Lazy::new(|| Runtime::new().expect("runtime must be valid"));
 
     #[test]
     fn test_env_loader_without_env() {
