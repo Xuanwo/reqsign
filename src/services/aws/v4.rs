@@ -56,6 +56,11 @@ impl Builder {
         self
     }
 
+    pub fn security_token(&mut self, security_token: &str) -> &mut Self {
+        self.credential.set_security_token(Some(security_token));
+        self
+    }
+
     pub fn credential_loader(&mut self, credential: CredentialLoadChain) -> &mut Self {
         self.credential_load = credential;
         self
@@ -126,7 +131,10 @@ impl Signer {
     }
 
     pub async fn calculate(&self, req: &impl SignableRequest) -> Result<SignedOutput> {
-        let canonical_req = CanonicalRequest::from(req, self.time)?;
+        let cred = self.credential().await?;
+
+        let canonical_req = CanonicalRequest::from(req, self.time, &cred)?;
+        debug!("canonical_req: {canonical_req}");
 
         let encoded_req = hex_sha256(canonical_req.to_string().as_bytes());
 
@@ -157,8 +165,6 @@ impl Signer {
         };
         debug!("string to sign: {string_to_sign}");
 
-        let cred = self.credential().await?;
-
         let signing_key = generate_signing_key(
             cred.secret_key(),
             canonical_req.time,
@@ -169,6 +175,7 @@ impl Signer {
 
         Ok(SignedOutput {
             access_key_id: cred.access_key().to_string(),
+            security_token: cred.security_token().map(|v| v.to_string()),
             signed_time: canonical_req.time,
             signed_scope: scope,
             signed_headers: canonical_req.signed_headers,
@@ -182,10 +189,18 @@ impl Signer {
             &time::format(sig.signed_time, ISO8601),
         )?;
         req.apply_header(
-            HeaderName::from_str(super::constants::X_AMZ_CONTENT_SHA_256)
-                .expect("x_amz_content_sha_256 header name must be valid"),
+            HeaderName::from_static(super::constants::X_AMZ_CONTENT_SHA_256),
             "UNSIGNED-PAYLOAD",
         )?;
+
+        // Set X_AMZ_SECURITY_TOKEN if we have security_token
+        if let Some(token) = &sig.security_token {
+            req.apply_header(
+                HeaderName::from_static(super::constants::X_AMZ_SECURITY_TOKEN),
+                token,
+            )?;
+        }
+
         req.apply_header(
             http::header::AUTHORIZATION,
             &format!(
@@ -229,10 +244,14 @@ struct CanonicalRequest<'a> {
 }
 
 impl<'a> CanonicalRequest<'a> {
-    pub fn from(req: &impl SignableRequest, time: Option<SystemTime>) -> Result<CanonicalRequest> {
+    pub fn from<'b>(
+        req: &'b impl SignableRequest,
+        time: Option<SystemTime>,
+        cred: &'b Credential,
+    ) -> Result<CanonicalRequest<'b>> {
         let now = time.unwrap_or_else(SystemTime::now);
 
-        let (signed_headers, canonical_headers) = Self::headers(req, now)?;
+        let (signed_headers, canonical_headers) = Self::headers(req, now, cred)?;
 
         Ok(CanonicalRequest {
             method: req.method(),
@@ -253,6 +272,7 @@ impl<'a> CanonicalRequest<'a> {
     pub fn headers(
         req: &impl SignableRequest,
         now: SystemTime,
+        cred: &Credential,
     ) -> Result<(Vec<HeaderName>, HeaderMap)> {
         let mut canonical_headers = HeaderMap::with_capacity(req.headers().len());
         for (name, value) in req.headers().iter() {
@@ -294,6 +314,18 @@ impl<'a> CanonicalRequest<'a> {
             canonical_headers.insert(
                 HeaderName::from_static(super::constants::X_AMZ_CONTENT_SHA_256),
                 HeaderValue::from_static("UNSIGNED-PAYLOAD"),
+            );
+        }
+
+        // Insert X_AMZ_SECURITY_TOKEN header if security token exists.
+        if let Some(token) = cred.security_token() {
+            let mut value = HeaderValue::from_str(token)?;
+            // Set token value sensitive to valid leaking.
+            value.set_sensitive(true);
+
+            canonical_headers.insert(
+                HeaderName::from_static(super::constants::X_AMZ_SECURITY_TOKEN),
+                value,
             );
         }
 
@@ -350,6 +382,7 @@ impl<'a> Display for CanonicalRequest<'a> {
 
 pub struct SignedOutput {
     access_key_id: String,
+    security_token: Option<String>,
     signed_time: SystemTime,
     signed_scope: String,
     signed_headers: Vec<HeaderName>,
@@ -391,4 +424,144 @@ pub fn generate_signing_key(
     let sign_request = hmac_sha256(sign_service.as_slice(), "aws4_request".as_bytes());
 
     sign_request
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::SystemTime;
+
+    use anyhow::Result;
+    use aws_sigv4;
+    use aws_sigv4::http_request::{
+        PayloadChecksumKind, PercentEncodingMode, SignableBody, SignableRequest, SigningSettings,
+    };
+    use aws_sigv4::SigningParams;
+
+    use super::*;
+    use crate::time::{PrimitiveDateTime, ISO8601};
+
+    fn test_time() -> SystemTime {
+        PrimitiveDateTime::parse("20220101T120000Z", ISO8601)
+            .expect("test time must be valid")
+            .assume_utc()
+            .into()
+    }
+
+    fn test_request() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    #[tokio::test]
+    async fn test_calculate() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut req = test_request();
+
+        let mut ss = SigningSettings::default();
+        ss.percent_encoding_mode = PercentEncodingMode::Single;
+        ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+
+        let sp = SigningParams::builder()
+            .access_key("access_key_id")
+            .secret_key("secret_access_key")
+            .region("test")
+            .service_name("s3")
+            .time(test_time())
+            .settings(ss)
+            .build()
+            .expect("signing params must be valid");
+
+        let output = aws_sigv4::http_request::sign(
+            SignableRequest::new(
+                req.method(),
+                req.uri(),
+                req.headers(),
+                SignableBody::UnsignedPayload,
+            ),
+            &sp,
+        )
+        .expect("signing must succeed");
+        let (aws_sig, expect_sig) = output.into_parts();
+        aws_sig.apply_to_request(&mut req);
+        let expect_headers = req.headers();
+
+        let mut req = test_request();
+
+        let signer = Signer::builder()
+            .access_key("access_key_id")
+            .secret_key("secret_access_key")
+            .region("test")
+            .service("s3")
+            .time(test_time())
+            .build()
+            .await?;
+
+        let actual = signer.calculate(&req).await?;
+        signer.apply(&actual, &mut req).expect("must apply success");
+
+        assert_eq!(expect_sig, actual.signature());
+        assert_eq!(expect_headers, req.headers());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_calculate_with_token() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let mut req = test_request();
+
+        let mut ss = SigningSettings::default();
+        ss.percent_encoding_mode = PercentEncodingMode::Single;
+        ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+
+        let sp = SigningParams::builder()
+            .access_key("access_key_id")
+            .secret_key("secret_access_key")
+            .region("test")
+            .security_token("security_token")
+            .service_name("s3")
+            .time(test_time())
+            .settings(ss)
+            .build()
+            .expect("signing params must be valid");
+
+        let output = aws_sigv4::http_request::sign(
+            SignableRequest::new(
+                req.method(),
+                req.uri(),
+                req.headers(),
+                SignableBody::UnsignedPayload,
+            ),
+            &sp,
+        )
+        .expect("signing must succeed");
+        let (aws_sig, expect_sig) = output.into_parts();
+        aws_sig.apply_to_request(&mut req);
+        let expect_headers = req.headers();
+
+        let mut req = test_request();
+
+        let signer = Signer::builder()
+            .access_key("access_key_id")
+            .secret_key("secret_access_key")
+            .region("test")
+            .security_token("security_token")
+            .service("s3")
+            .time(test_time())
+            .build()
+            .await?;
+
+        let actual = signer.calculate(&req).await?;
+        signer.apply(&actual, &mut req).expect("must apply success");
+
+        assert_eq!(expect_sig, actual.signature());
+        assert_eq!(expect_headers, req.headers());
+        Ok(())
+    }
 }
