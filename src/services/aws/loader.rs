@@ -7,16 +7,16 @@
 use std::str::FromStr;
 use std::{env, fs};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ini::Ini;
-use log::debug;
+use log::warn;
 use reqwest::Url;
 
 use super::credential::Credential;
 use crate::dirs::expand_homedir;
 use crate::time;
-use crate::time::ISO8601;
+use crate::time::ISO8601_WITH_SEPERATOR;
 
 /// Loader trait will try to load credential and region from different sources.
 #[async_trait]
@@ -201,13 +201,9 @@ impl RegionLoad for ProfileLoader {
 /// ## TODO
 ///
 /// - Explain how web identity token works
-/// - Support load web identity token from aws config.
-/// - Support load session name from `AWS_ROLE_SESSION_NAME`
+/// - Support load web identity token file from aws config.
 #[derive(Default, Clone, Debug)]
-struct WebIdentityTokenLoader {
-    // TODO: it seems we don't need region to start
-// region: String,
-}
+struct WebIdentityTokenLoader {}
 
 #[async_trait]
 impl CredentialLoad for WebIdentityTokenLoader {
@@ -218,29 +214,33 @@ impl CredentialLoad for WebIdentityTokenLoader {
         ) {
             let token = fs::read_to_string(token).expect("must valid");
 
+            // Construct request to AWS STS Service.
             let mut url = Url::from_str("https://sts.amazonaws.com/").expect("must be valid url");
             url.query_pairs_mut()
                 .append_pair("Action", "AssumeRoleWithWebIdentity")
                 .append_pair("RoleArn", &role_arn)
-                .append_pair("WebIdentityToken", &token);
-
+                .append_pair("WebIdentityToken", &token)
+                .append_pair("Version", "2011-06-15")
+                .append_pair(
+                    "RoleSessionName",
+                    &env::var(super::constants::AWS_ROLE_SESSION_NAME)
+                        .unwrap_or_else(|_| "reqsign".to_string()),
+                );
             let mut req = reqwest::Request::new(http::Method::POST, url);
             req.headers_mut().insert(
                 http::header::CONTENT_TYPE,
                 "application/x-www-form-urlencoded".parse()?,
             );
+
+            // Sending and parse response from STS service
             let resp = reqwest::Client::new().execute(req).await?;
-            debug!(
-                "AWS STS services returns response with status code {}",
-                resp.status()
-            );
             if resp.status() == http::StatusCode::OK {
                 let text = resp.text().await?;
                 let doc = roxmltree::Document::parse(&text)?;
                 let node = doc
                     .descendants()
                     .find(|n| n.tag_name().name() == "Credentials")
-                    .unwrap();
+                    .ok_or_else(|| anyhow!("Credentials not found in STS response"))?;
 
                 let mut builder = Credential::builder();
                 for n in node.children() {
@@ -257,7 +257,7 @@ impl CredentialLoad for WebIdentityTokenLoader {
                         "Expiration" => {
                             let text = n.text().expect("Expiration must be exist");
 
-                            builder.expires_in(time::parse(text, ISO8601)?);
+                            builder.expires_in(time::parse(text, ISO8601_WITH_SEPERATOR)?);
                         }
                         _ => {}
                     }
@@ -265,6 +265,9 @@ impl CredentialLoad for WebIdentityTokenLoader {
                 let cred = builder.build()?;
 
                 return Ok(Some(cred));
+            } else {
+                // Print error response if we request sts service failed.
+                warn!("request to AWS STS Services failed: {}", resp.text().await?)
             }
         }
 
@@ -274,6 +277,7 @@ impl CredentialLoad for WebIdentityTokenLoader {
 
 #[cfg(test)]
 mod tests {
+    use log::debug;
     use once_cell::sync::Lazy;
     use tokio::runtime::Runtime;
 
@@ -431,6 +435,32 @@ mod tests {
                 });
             },
         );
+    }
+
+    /// This test relay on `AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN`
+    /// been set correctly.
+    ///
+    /// Please verify logic manually until we find a way to test it.
+    #[test]
+    #[ignore]
+    fn test_credential_web_loader() {
+        env_logger::init();
+
+        TOKIO.block_on(async {
+            let l = WebIdentityTokenLoader {};
+            let x = l
+                .load_credential()
+                .await
+                .expect("load_credential must success")
+                .expect("credential must be valid");
+            debug!(
+                "ak: {}, sk: {}, token: {:?}, valid: {}",
+                x.access_key(),
+                x.secret_key(),
+                x.security_token(),
+                x.is_valid()
+            );
+        });
     }
 
     #[test]
