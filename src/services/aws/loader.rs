@@ -30,6 +30,10 @@ pub struct RegionLoadChain {
 }
 
 impl RegionLoadChain {
+    pub fn is_empty(&self) -> bool {
+        self.loaders.is_empty()
+    }
+
     pub fn push(&mut self, l: impl RegionLoad + 'static) -> &mut Self {
         self.loaders.push(Box::new(l));
 
@@ -62,6 +66,10 @@ pub struct CredentialLoadChain {
 }
 
 impl CredentialLoadChain {
+    pub fn is_empty(&self) -> bool {
+        self.loaders.is_empty()
+    }
+
     pub fn push(&mut self, l: impl CredentialLoad + 'static) -> &mut Self {
         self.loaders.push(Box::new(l));
 
@@ -87,7 +95,7 @@ impl CredentialLoad for CredentialLoadChain {
 /// - `AWS_SECRET_ACCESS_KEY`
 /// - `AWS_REGION`
 #[derive(Default, Clone, Debug)]
-struct EnvLoader {}
+pub struct EnvLoader {}
 
 #[async_trait]
 impl CredentialLoad for EnvLoader {
@@ -129,7 +137,7 @@ impl RegionLoad for EnvLoader {
 ///
 /// - We only support `default` profile now, and `AWS_PROFILE` support should be added.
 #[derive(Default, Clone, Debug)]
-struct ProfileLoader {}
+pub struct ProfileLoader {}
 
 /// Comment from [Where are configuration settings stored?](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html)
 ///
@@ -203,7 +211,7 @@ impl RegionLoad for ProfileLoader {
 /// - Explain how web identity token works
 /// - Support load web identity token file from aws config.
 #[derive(Default, Clone, Debug)]
-struct WebIdentityTokenLoader {}
+pub struct WebIdentityTokenLoader {}
 
 #[async_trait]
 impl CredentialLoad for WebIdentityTokenLoader {

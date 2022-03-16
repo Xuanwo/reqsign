@@ -15,7 +15,9 @@ use super::loader::CredentialLoadChain;
 use super::loader::RegionLoadChain;
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
-use crate::services::aws::loader::{CredentialLoad, RegionLoad};
+use crate::services::aws::loader::{
+    CredentialLoad, EnvLoader, ProfileLoader, RegionLoad, WebIdentityTokenLoader,
+};
 use crate::time::{self, DATE, ISO8601};
 
 #[derive(Default)]
@@ -73,6 +75,19 @@ impl Builder {
     }
 
     pub async fn build(&mut self) -> Result<Signer> {
+        if self.region_load.is_empty() {
+            self.region_load
+                .push(EnvLoader::default())
+                .push(ProfileLoader::default());
+        }
+
+        if self.credential_load.is_empty() {
+            self.credential_load
+                .push(EnvLoader::default())
+                .push(ProfileLoader::default())
+                .push(WebIdentityTokenLoader::default());
+        }
+
         // Try load region from env
         if self.region.is_empty() {
             let region = self.region_load.load_region().await?;
