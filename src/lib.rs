@@ -10,7 +10,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<()>{
 //!     // Signer will load region and credentials from environment by default.
-//!     let signer = Signer::builder().service("s3").build().await?;
+//!     let signer = Signer::builder().service("s3").region("test").build().await?;
 //!     // Construct request
 //!     let url = Url::parse( "https://s3.amazonaws.com/testbucket")?;
 //!     let mut req = reqwest::Request::new(http::Method::GET, url);
