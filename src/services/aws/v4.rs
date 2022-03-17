@@ -12,15 +12,15 @@ use log::debug;
 use tokio::sync::RwLock;
 
 use super::credential::Credential;
-use super::loader::CredentialLoadChain;
-use super::loader::RegionLoadChain;
+use super::loader::{
+    CredentialLoad, CredentialLoadChain, EnvLoader, ProfileLoader, RegionLoad, RegionLoadChain,
+    WebIdentityTokenLoader,
+};
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
-use crate::services::aws::loader::{
-    CredentialLoad, EnvLoader, ProfileLoader, RegionLoad, WebIdentityTokenLoader,
-};
 use crate::time::{self, DATE, ISO8601};
 
+/// Builder for Signer.
 #[derive(Default)]
 pub struct Builder {
     service: Option<String>,
@@ -36,37 +36,59 @@ pub struct Builder {
 }
 
 impl Builder {
+    /// Specify service like "s3".
     pub fn service(&mut self, service: &str) -> &mut Self {
         self.service = Some(service.to_string());
         self
     }
 
+    /// Specify region.
+    ///
+    /// If not set, we will try to load via `region_loader`.
     pub fn region(&mut self, region: &str) -> &mut Self {
         self.region = Some(region.to_string());
         self
     }
 
+    /// Specify region load behavior
+    ///
+    /// If not set, we will use the default region loader.
     pub fn region_loader(&mut self, region: RegionLoadChain) -> &mut Self {
         self.region_load = region;
         self
     }
 
+    /// Specify access key id.
+    ///
+    /// If not set, we will try to load via `credential_loader`.
     pub fn access_key(&mut self, access_key: &str) -> &mut Self {
         self.credential.set_access_key(access_key);
         self
     }
 
+    /// Specify secret access key.
+    ///
+    /// If not set, we will try to load via `credential_loader`.
     pub fn secret_key(&mut self, secret_key: &str) -> &mut Self {
         self.credential.set_secret_key(secret_key);
         self
     }
 
+    /// Specify security token.
+    ///
+    /// # Note
+    ///
+    /// Security token always come with an expires in, we must load it from
+    /// via credential loader. So this function should never be exported.
     #[cfg(test)]
     pub fn security_token(&mut self, security_token: &str) -> &mut Self {
         self.credential.set_security_token(Some(security_token));
         self
     }
 
+    /// Specify credential load behavior
+    ///
+    /// If not set, we will use the default credential loader.
     pub fn credential_loader(&mut self, credential: CredentialLoadChain) -> &mut Self {
         self.credential_load = credential;
         self
@@ -78,12 +100,21 @@ impl Builder {
         self
     }
 
+    /// Specify the signing time.
+    ///
+    /// # Note
+    ///
+    /// We should always take current time to sign requests.
+    /// Only use this function for testing.
     #[cfg(test)]
     pub fn time(&mut self, time: SystemTime) -> &mut Self {
         self.time = Some(time);
         self
     }
 
+    /// Use exising information to build a new signer.
+    ///
+    /// The builder should not be used anymore.
     pub async fn build(&mut self) -> Result<Signer> {
         let service = self
             .service
@@ -135,6 +166,9 @@ impl Builder {
     }
 }
 
+/// Singer that implement AWS SigV4.
+///
+/// - [Signature Version 4 signing process](https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html)
 pub struct Signer {
     service: String,
     region: String,
@@ -148,11 +182,17 @@ pub struct Signer {
 }
 
 impl Signer {
+    /// Create a builder.
     pub fn builder() -> Builder {
         Builder::default()
     }
 
     /// Load credential via credential load chain specified while building.
+    ///
+    /// # Note
+    ///
+    /// This function should never be exported to avoid credential leaking by
+    /// mistake.
     async fn credential(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
         match self.credential.read().await.clone() {
@@ -175,6 +215,7 @@ impl Signer {
         }
     }
 
+    /// Calculate signing requests via SignableRequest.
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
         let canonical_req = CanonicalRequest::from(req, self.time, cred)?;
         debug!("calculated canonical_req: {canonical_req}");
@@ -226,6 +267,7 @@ impl Signer {
         })
     }
 
+    /// Apply signed results to requests.
     pub fn apply(&self, sig: &SignedOutput, req: &mut impl SignableRequest) -> Result<()> {
         req.apply_header(
             HeaderName::from_static(super::constants::X_AMZ_DATE),
@@ -258,6 +300,30 @@ impl Signer {
         Ok(())
     }
 
+    /// Signing request.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use reqsign::services::aws::v4::Signer;
+    /// use reqwest::{Client, Request, Url};
+    /// use anyhow::Result;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<()>{
+    ///     // Signer will load region and credentials from environment by default.
+    ///     let signer = Signer::builder().service("s3").build().await?;
+    ///     // Construct request
+    ///     let url = Url::parse( "https://s3.amazonaws.com/testbucket")?;
+    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     // Signing request with Signer
+    ///     signer.sign(&mut req).await?;
+    ///     // Sending already signed request.
+    ///     let resp = Client::new().execute(req).await?;
+    ///     println!("resp got status: {}", resp.status());
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         if let Some(cred) = self.credential().await? {
             let sig = self.calculate(req, &cred)?;
@@ -277,8 +343,8 @@ impl Debug for Signer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Signer {{ region: {}, service: {} }}",
-            self.region, self.service
+            "Signer {{ region: {}, service: {}, allow_anonymous: {} }}",
+            self.region, self.service, self.allow_anonymous
         )
     }
 }
@@ -459,6 +525,7 @@ impl<'a> Display for CanonicalRequest<'a> {
     }
 }
 
+/// Signed resulted that calculated by `Signer`.
 pub struct SignedOutput {
     access_key_id: String,
     security_token: Option<String>,
@@ -469,6 +536,7 @@ pub struct SignedOutput {
 }
 
 impl SignedOutput {
+    #[cfg(test)]
     pub fn signature(&self) -> String {
         self.signature.clone()
     }
@@ -485,12 +553,7 @@ fn normalize_header_value(header_value: &HeaderValue) -> HeaderValue {
     HeaderValue::from_bytes(&bs[starting_index..ending_index]).expect("invalid header value")
 }
 
-pub fn generate_signing_key(
-    secret: &str,
-    time: SystemTime,
-    region: &str,
-    service: &str,
-) -> Vec<u8> {
+fn generate_signing_key(secret: &str, time: SystemTime, region: &str, service: &str) -> Vec<u8> {
     // Sign secret
     let secret = format!("AWS4{}", secret);
     // Sign date
