@@ -101,7 +101,7 @@ impl Signer {
         }
     }
 
-    pub async fn sign(&self, request: &mut impl SignableRequest) -> Result<String> {
+    pub async fn sign(&self, request: &mut impl SignableRequest) -> Result<()>{
         let headers = request.headers();
         let uri = Url::parse(request.path())?;
         let method = request.method();
@@ -126,8 +126,9 @@ impl Signer {
 
         let auth = sign(&str_to_sign, &key).unwrap();
         // debug!("auth == {:?}", auth);
+        request.apply_header(AUTHORIZATION,&auth);
+        Ok(())
 
-        Ok(format!("SharedKey {}:{}", account, auth))
     }
 }
 // alias  to use core::client::storage_account_client::generate_authorization
