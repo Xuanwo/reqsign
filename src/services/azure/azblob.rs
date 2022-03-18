@@ -134,6 +134,7 @@ impl Signer {
 
         let auth = sign(&str_to_sign, &key).unwrap();
         println!("auth == {:?}", auth);
+        let auth =     format!("SharedKey {}:{}", account, auth);
         request.apply_header(AUTHORIZATION,&auth)?;
         Ok(())
 
