@@ -10,7 +10,7 @@ use anyhow::{anyhow, Result};
 use http::{header::*, method::Method};
 use http::HeaderMap;
 use log::debug;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 
 use std::sync::Arc;
@@ -62,13 +62,17 @@ impl Builder {
         })
     }
 }
-
+#[derive(Default)]
 pub struct Signer {
     credential: Arc<RwLock<Option<Credential>>>,
     credential_load: CredentialLoadChain,
     time: Option<SystemTime>,
 }
-
+impl Debug for Signer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
 impl Signer {
     pub fn builder() -> Builder {
         Builder::default()
