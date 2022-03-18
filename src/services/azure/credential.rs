@@ -114,12 +114,7 @@ impl Debug for Credential {
             "Credential {{ access_key: {}, secret_key: {}, security_token: {} }}",
             redact(&self.access_acount),
             redact(&self.access_key),
-            redact(
-                self.sas_token
-                    .as_ref()
-                    .unwrap_or(&"".to_string())
-                    .as_str()
-            )
+            redact(self.sas_token.as_ref().unwrap_or(&"".to_string()).as_str())
         )
     }
 }

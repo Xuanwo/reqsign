@@ -21,6 +21,9 @@ impl CredentialLoadChain {
 
         self
     }
+    pub fn is_empty(&self) -> bool {
+        self.loaders.is_empty()
+    }
 }
 #[async_trait]
 impl CredentialLoad for CredentialLoadChain {
@@ -34,13 +37,14 @@ impl CredentialLoad for CredentialLoadChain {
         Ok(None)
     }
 }
+
 /// Load credential from env values
 ///
 /// - `AWS_ACCESS_KEY_ID`
 /// - `AWS_SECRET_ACCESS_KEY`
 /// - `AWS_REGION`
 #[derive(Default, Clone, Debug)]
-struct EnvLoader {}
+pub struct EnvLoader {}
 
 #[async_trait]
 impl CredentialLoad for EnvLoader {
@@ -55,7 +59,6 @@ impl CredentialLoad for EnvLoader {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
