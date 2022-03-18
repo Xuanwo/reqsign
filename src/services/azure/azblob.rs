@@ -121,12 +121,20 @@ impl Signer {
 
         let str_to_sign = string_to_sign(headers, &url, method, &account);
 
-        println!("\nstr_to_sign == {:?}\n", str_to_sign);
-        println!("str_to_sign == {}", str_to_sign);
+        let dt = chrono::Utc::now();
+        let time = format!("{}", dt.format("%a, %d %h %Y %T GMT"));
+
+        request.apply_header(
+            HeaderName::from_static(super::constants::MS_DATE),
+            &time)?;
+        request.apply_header(
+            HeaderName::from_static(super::constants::HEADER_VERSION),
+            &AZURE_VERSION)?;  
+
 
         let auth = sign(&str_to_sign, &key).unwrap();
         println!("auth == {:?}", auth);
-        request.apply_header(AUTHORIZATION,&auth);
+        request.apply_header(AUTHORIZATION,&auth)?;
         Ok(())
 
     }
