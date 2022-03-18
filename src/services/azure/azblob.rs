@@ -105,12 +105,12 @@ impl Signer {
     }
 
     pub async fn sign(&self, request: &mut impl SignableRequest) -> Result<()>{
-        let headers = request.headers();
+
         let host = request.host();
         let path = request.path();
         let url = Url::parse(&format!("https://{}{}",host,path)).expect("parsing url success");
 
-        let method = request.method();
+        let method = request.method().clone();
         let account = self
             .credential()
             .await?
@@ -118,9 +118,7 @@ impl Signer {
             .access_acount()
             .to_string();
         let key = self.credential().await?.unwrap().access_key().to_string();
-
-        let str_to_sign = string_to_sign(headers, &url, method, &account);
-
+        
         let dt = chrono::Utc::now();
         let time = format!("{}", dt.format("%a, %d %h %Y %T GMT"));
 
@@ -131,9 +129,12 @@ impl Signer {
             HeaderName::from_static(super::constants::HEADER_VERSION),
             &AZURE_VERSION)?;  
 
+        let header = request.headers().clone();
+        
+        let str_to_sign = string_to_sign(&header, &url, &method, &account);
 
         let auth = sign(&str_to_sign, &key).unwrap();
-        println!("auth == {:?}", auth);
+
         let auth =     format!("SharedKey {}:{}", account, auth);
         request.apply_header(AUTHORIZATION,&auth)?;
         Ok(())
