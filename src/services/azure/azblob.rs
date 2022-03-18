@@ -70,7 +70,10 @@ pub struct Signer {
 }
 impl Debug for Signer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(
+            f,
+            "Signer {{ umplement!}}"
+        )
     }
 }
 impl Signer {
