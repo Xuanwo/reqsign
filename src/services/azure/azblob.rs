@@ -106,7 +106,10 @@ impl Signer {
 
     pub async fn sign(&self, request: &mut impl SignableRequest) -> Result<()>{
         let headers = request.headers();
-        let uri = Url::parse(request.path())?;
+        let host = request.host();
+        let path = request.path();
+        let url = Url::parse(&format!("https://{}{}",host,path)).expect("parsing url success");
+
         let method = request.method();
         let account = self
             .credential()
@@ -116,19 +119,13 @@ impl Signer {
             .to_string();
         let key = self.credential().await?.unwrap().access_key().to_string();
 
-        dbg!(&headers);
-        dbg!(&uri);
-        dbg!(&method);
-        dbg!(&account);
-        dbg!(&key);
+        let str_to_sign = string_to_sign(headers, &url, method, &account);
 
-        let str_to_sign = string_to_sign(headers, &uri, method, &account);
-
-        // debug!("\nstr_to_sign == {:?}\n", str_to_sign);
-        // debug!("str_to_sign == {}", str_to_sign);
+        println!("\nstr_to_sign == {:?}\n", str_to_sign);
+        println!("str_to_sign == {}", str_to_sign);
 
         let auth = sign(&str_to_sign, &key).unwrap();
-        // debug!("auth == {:?}", auth);
+        println!("auth == {:?}", auth);
         request.apply_header(AUTHORIZATION,&auth);
         Ok(())
 
@@ -287,46 +284,3 @@ pub fn sign(data: &str, key: &str) -> Result<String> {
     Ok(encode(&signature))
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::services::azure::credential;
-
-    use super::*;
-    use anyhow::Result;
-    fn test_get_request() -> http::Request<&'static str> {
-        let mut req = http::Request::new("");
-        *req.method_mut() = http::Method::GET;
-        *req.uri_mut() = "http://127.0.0.1:9000/hello"
-            .parse()
-            .expect("url must be valid");
-
-        req
-    }
-
-    // #[tokio::test]
-    // async fn test_calculate() -> Result<()>
-    // {
-    //     use crate::services::azure::constants::*;
-
-    //     let mut request = test_get_request();
-    //     let dt = chrono::Utc::now();
-    //     let time = format!("{}", dt.format("%a, %d %h %Y %T GMT"));
-
-    //     request.headers_mut().insert(
-    //         MS_DATE,
-    //         HeaderValue::from_str(&time)?,
-    //     );
-    //     request.headers_mut().insert(
-    //         HEADER_VERSION,
-    //         HeaderValue::from_str(&AZURE_VERSION)?,
-    //     );
-
-    //     let auth = generate_authorization(
-    //         request,
-    //         credential
-    //     );
-    //     request.header(AUTHORIZATION, auth)
-
-    //     Ok(())
-    // }
-}
