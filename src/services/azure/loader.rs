@@ -2,8 +2,8 @@ use super::credential::Credential;
 use anyhow::Result;
 use async_trait::async_trait;
 
-use std::str::FromStr;
-use std::{env, fs};
+
+use std::env;
 /// Loader trait will try to load credential and region from different sources.
 #[async_trait]
 pub trait CredentialLoad: Send + Sync {

@@ -14,7 +14,6 @@ use std::fmt::{Debug,Formatter};
 use std::mem;
 
 use std::sync::Arc;
-use std::time::SystemTime;
 use tokio::sync::RwLock;
 use url::Url;
 
@@ -24,7 +23,6 @@ use crate::request::SignableRequest;
 pub struct Builder {
     credential: Credential,
     credential_load: CredentialLoadChain,
-    time: Option<SystemTime>,
 }
 
 impl Builder {
