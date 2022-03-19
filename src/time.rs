@@ -1,3 +1,5 @@
+//! Time related utils.
+
 use std::time::SystemTime;
 
 use anyhow::Result;
@@ -10,11 +12,9 @@ use time::parsing::Parsable;
 pub type Format = &'static [FormatItem<'static>];
 
 /// Export PrimitiveDateTime from time crate.
-#[allow(dead_code)]
 pub type PrimitiveDateTime = time::PrimitiveDateTime;
 
 /// Export OffsetDateTime from time crate.
-#[allow(dead_code)]
 pub type OffsetDateTime = time::OffsetDateTime;
 
 /// Date format: "20220313"

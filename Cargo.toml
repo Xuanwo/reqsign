@@ -1,12 +1,12 @@
 [package]
 authors = ["Xuanwo <github@xuanwo.io>"]
 categories = ["command-line-utilities", "web-programming"]
-description = "Signing requests for cloud services without heavy SDKs"
+description = "Signing API requests without effort."
 documentation = "https://docs.rs/reqsign"
 edition = "2021"
 license = "Apache-2.0"
 name = "reqsign"
-version = "0.0.0"
+version = "0.0.1"
 
 [[bench]]
 harness = false
@@ -25,7 +25,7 @@ reqwest = "0.11"
 roxmltree = "0.14"
 rust-ini = "0.18"
 sha2 = "0.10"
-time = { version = "0.3", features = ["formatting", "parsing", "macros"] }
+time = { version = "0.3.7", features = ["formatting", "parsing", "macros"] }
 tokio = { version = "1.17", features = ["full"] }
 base64 = "0.13"
 form_urlencoded = "1"
