@@ -1,6 +1,8 @@
-// Env values used in aws services.
+// Env values used in azure services.
+//AZURE_STORAGE_ACCOUNT = Credential.access_name
 #[allow(dead_code)]
 pub const AZURE_STORAGE_ACCOUNT: &str = "AZURE_STORAGE_ACCOUNT";
+//AZURE_STORAGE_ACCOUNT = Credential.shared_key
 #[allow(dead_code)]
 pub const AZURE_STORAGE_KEY: &str = "AZURE_STORAGE_KEY";
 #[allow(dead_code)]

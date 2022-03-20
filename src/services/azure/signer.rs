@@ -1,16 +1,20 @@
 use super::constants::*;
 use super::credential::Credential;
 use super::loader::*;
+
 use base64::encode;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 
-use anyhow::{anyhow, Result};
+use crate::time::format;
+use std::time::SystemTime;
+use time::format_description::well_known::Rfc2822;
 
-use http::{header::*, method::Method};
+use anyhow::{anyhow, Result};
 use http::HeaderMap;
+use http::{header::*, method::Method};
 use log::debug;
-use std::fmt::{Debug,Formatter};
+use std::fmt::{Debug, Formatter};
 use std::mem;
 
 use std::sync::Arc;
@@ -31,13 +35,13 @@ impl Builder {
         self
     }
 
-    pub fn access_key(&mut self, access_key: &str) -> &mut Self {
-        self.credential.set_access_key(access_key);
+    pub fn shared_key(&mut self, shared_key: &str) -> &mut Self {
+        self.credential.set_shared_key(shared_key);
         self
     }
 
-    pub fn access_acount(&mut self, access_acount: &str) -> &mut Self {
-        self.credential.set_access_acount(access_acount);
+    pub fn access_name(&mut self, access_name: &str) -> &mut Self {
+        self.credential.set_access_name(access_name);
         self
     }
 
@@ -64,14 +68,14 @@ pub struct Signer {
     credential: Arc<RwLock<Option<Credential>>>,
     credential_load: CredentialLoadChain,
 }
+
+//since access_account and shared_key should be kept secret,so debug trait is unimplemented
 impl Debug for Signer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Signer {{ umplement!}}"
-        )
+        write!(f, "Signer {{ unimplement!}}")
     }
 }
+
 impl Signer {
     pub fn builder() -> Builder {
         Builder::default()
@@ -100,50 +104,41 @@ impl Signer {
         }
     }
 
-    pub async fn sign(&self, request: &mut impl SignableRequest) -> Result<()>{
-
+    pub async fn sign(&self, request: &mut impl SignableRequest) -> Result<()> {
         let host = request.host();
         let path = request.path();
-        let url = Url::parse(&format!("https://{}{}",host,path)).expect("parsing url success");
+        let url = Url::parse(&format!("https://{}{}", host, path)).expect("parsing url success");
 
         let method = request.method().clone();
-        let account = self
-            .credential()
-            .await?
-            .unwrap()
-            .access_acount()
-            .to_string();
-        let key = self.credential().await?.unwrap().access_key().to_string();
-        
-        let dt = chrono::Utc::now();
-        let time = format!("{}", dt.format("%a, %d %h %Y %T GMT"));
 
-        request.apply_header(
-            HeaderName::from_static(super::constants::MS_DATE),
-            &time)?;
+        // account = credential.access_name, keep variable nameaccount aligning with azure sdk for rust
+        // refer https://github.com/Azure/azure-sdk-for-rust/blob/main/sdk/storage/src/core/clients/storage_account_client.rs
+        let account = self.credential().await?.unwrap().access_name().to_string();
+        // key = credential.shared_key, keep variable name key aligning with azure sdk for rust
+        // refer https://github.com/Azure/azure-sdk-for-rust/blob/main/sdk/storage/src/core/clients/storage_account_client.rs
+        let key = self.credential().await?.unwrap().shared_key().to_string();
+
+        let now = SystemTime::now();
+
+        let time = format(now, &Rfc2822);
+
+        request.apply_header(HeaderName::from_static(super::constants::MS_DATE), &time)?;
         request.apply_header(
             HeaderName::from_static(super::constants::HEADER_VERSION),
-            &AZURE_VERSION)?;  
+            AZURE_VERSION,
+        )?;
 
         let header = request.headers().clone();
-        
+
         let str_to_sign = string_to_sign(&header, &url, &method, &account);
 
         let auth = sign(&str_to_sign, &key).unwrap();
 
-        let auth =     format!("SharedKey {}:{}", account, auth);
-        request.apply_header(AUTHORIZATION,&auth)?;
-        Ok(())
+        let auth = format!("SharedKey {}:{}", account, auth);
 
+        request.apply_header(AUTHORIZATION, &auth)?;
+        Ok(())
     }
-}
-// alias  to use core::client::storage_account_client::generate_authorization
-#[derive(Debug, Clone, Copy)]
-pub enum ServiceType {
-    Blob,
-    // Queue,
-    // File,
-    Table,
 }
 
 #[allow(unknown_lints)]
@@ -289,4 +284,3 @@ pub fn sign(data: &str, key: &str) -> Result<String> {
     let signature = hmac.finalize().into_bytes();
     Ok(encode(&signature))
 }
-

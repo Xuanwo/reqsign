@@ -2,7 +2,6 @@ use super::credential::Credential;
 use anyhow::Result;
 use async_trait::async_trait;
 
-
 use std::env;
 /// Loader trait will try to load credential and region from different sources.
 #[async_trait]
@@ -40,9 +39,9 @@ impl CredentialLoad for CredentialLoadChain {
 
 /// Load credential from env values
 ///
-/// - `AWS_ACCESS_KEY_ID`
-/// - `AWS_SECRET_ACCESS_KEY`
-/// - `AWS_REGION`
+/// - `AZBLOB_ACCESS_NAME`
+/// - `AZBLOB_SHARED_KEY`
+
 #[derive(Default, Clone, Debug)]
 pub struct EnvLoader {}
 
@@ -74,8 +73,8 @@ mod tests {
     fn test_credential_env_loader_with_env() {
         temp_env::with_vars(
             vec![
-                (AZURE_STORAGE_ACCOUNT, Some("access_acount")),
-                (AZURE_STORAGE_KEY, Some("access_key")),
+                (AZURE_STORAGE_ACCOUNT, Some("access_name")),
+                (AZURE_STORAGE_KEY, Some("shared_key")),
             ],
             || {
                 TOKIO.block_on(async {
@@ -85,8 +84,8 @@ mod tests {
                         .await
                         .expect("load_credential must success")
                         .expect("credential must be valid");
-                    assert_eq!("access_acount", x.access_acount());
-                    assert_eq!("access_key", x.access_key());
+                    assert_eq!("access_name", x.access_name());
+                    assert_eq!("shared_key", x.shared_key());
                 });
             },
         );

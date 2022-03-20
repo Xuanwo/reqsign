@@ -1,4 +1,4 @@
-pub mod azblob;
+pub mod signer;
 
 mod constants;
 mod credential;
