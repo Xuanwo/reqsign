@@ -117,11 +117,13 @@ impl Signer {
         // key = credential.shared_key, keep variable name key aligning with azure sdk for rust
         // refer https://github.com/Azure/azure-sdk-for-rust/blob/main/sdk/storage/src/core/clients/storage_account_client.rs
         let key = self.credential().await?.unwrap().shared_key().to_string();
-
+        
         let now = SystemTime::now();
-
+        // time = Sun, 20 Mar 2022 01:45:13 +0000
         let time = format(now, &Rfc2822);
-
+        // convert time to Sun, 20 Mar 2022 01:45:13 GMT
+        let time = str::replace(&time, "+0000", "GMT");
+        
         request.apply_header(HeaderName::from_static(super::constants::MS_DATE), &time)?;
         request.apply_header(
             HeaderName::from_static(super::constants::HEADER_VERSION),
