@@ -107,7 +107,8 @@ impl Signer {
     pub async fn sign(&self, request: &mut impl SignableRequest) -> Result<()> {
         let host = request.host();
         let path = request.path();
-        let url = Url::parse(&format!("https://{}{}", host, path)).expect("parsing url success");
+        let query = request.query().unwrap();
+        let url = Url::parse(&format!("https://{}{}?{}", host, path,query)).expect("parsing url success");
 
         let method = request.method().clone();
 
