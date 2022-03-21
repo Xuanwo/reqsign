@@ -128,9 +128,15 @@ impl Signer {
         request.apply_header(
             HeaderName::from_static(super::constants::HEADER_VERSION),
             AZURE_VERSION,
-        )?;
-
+        )?; 
         let header = request.headers().clone();
+
+        println!("time :{:?}",time);
+        println!("url :{:?}",url);
+        println!("method :{:?}",method);
+        println!("account :{:?}",account);
+        println!("key :{:?}",key);
+        println!("header :{:?}",header);
 
         let str_to_sign = string_to_sign(&header, &url, &method, &account);
 
