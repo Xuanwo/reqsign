@@ -107,8 +107,11 @@ impl Signer {
     pub async fn sign(&self, request: &mut impl SignableRequest) -> Result<()> {
         let host = request.host();
         let path = request.path();
-        let query = request.query().unwrap();
-        let url = Url::parse(&format!("https://{}{}?{}", host, path,query)).expect("parsing url success");
+        let option_query = request.query();
+        let url:Url = match option_query{
+            Some(query) =>Url::parse(&format!("https://{}{}?{}", host, path,query)).expect("parsing url success"),
+            _ => Url::parse(&format!("https://{}{}", host, path)).expect("parsing url success")
+        };
 
         let method = request.method().clone();
 
@@ -131,13 +134,6 @@ impl Signer {
             AZURE_VERSION,
         )?; 
         let header = request.headers().clone();
-
-        println!("time :{:?}",time);
-        println!("url :{:?}",url);
-        println!("method :{:?}",method);
-        println!("account :{:?}",account);
-        println!("key :{:?}",key);
-        println!("header :{:?}",header);
 
         let str_to_sign = string_to_sign(&header, &url, &method, &account);
 
