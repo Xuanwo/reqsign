@@ -268,7 +268,7 @@ impl Signer {
     }
 
     /// Apply signed results to requests.
-    pub fn apply(&self, sig: &SignedOutput, req: &mut impl SignableRequest) -> Result<()> {
+    pub fn apply(&self, req: &mut impl SignableRequest, sig: &SignedOutput) -> Result<()> {
         req.apply_header(
             HeaderName::from_static(super::constants::X_AMZ_DATE),
             &time::format(sig.signed_time, ISO8601),
@@ -332,7 +332,7 @@ impl Signer {
     pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         if let Some(cred) = self.credential().await? {
             let sig = self.calculate(req, &cred)?;
-            return self.apply(&sig, req);
+            return self.apply(req, &sig);
         }
 
         if self.allow_anonymous {

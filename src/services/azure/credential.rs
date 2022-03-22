@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use std::fmt::{Debug, Formatter};
 use std::mem;
+
 #[derive(Default)]
 pub struct Builder {
     cred: Credential,
@@ -40,15 +41,18 @@ impl Credential {
             cred: Default::default(),
         }
     }
+
     pub fn new(account_name: &str, account_key: &str) -> Self {
         Credential {
             account_name: account_name.to_string(),
             account_key: account_key.to_string(),
         }
     }
+
     pub fn account_name(&self) -> &str {
         &self.account_name
     }
+
     pub fn set_account_name(&mut self, account_name: &str) -> &mut Self {
         self.account_name = account_name.to_string();
         self
@@ -57,6 +61,7 @@ impl Credential {
     pub fn account_key(&self) -> &str {
         &self.account_key
     }
+
     pub fn set_account_key(&mut self, account_key: &str) -> &mut Self {
         self.account_key = account_key.to_string();
         self
