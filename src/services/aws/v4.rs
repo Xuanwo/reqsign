@@ -678,7 +678,7 @@ mod tests {
                 .await?
                 .expect("credential must be valid");
             let actual = signer.calculate(&req, &cred)?;
-            signer.apply(&actual, &mut req).expect("must apply success");
+            signer.apply(&mut req, &actual).expect("must apply success");
 
             assert_eq!(expect_sig, actual.signature());
             assert_eq!(expect_headers, req.headers());
@@ -741,7 +741,7 @@ mod tests {
                 .await?
                 .expect("credential must be valid");
             let actual = signer.calculate(&req, &cred)?;
-            signer.apply(&actual, &mut req).expect("must apply success");
+            signer.apply(&mut req, &actual).expect("must apply success");
 
             assert_eq!(expect_sig, actual.signature());
             assert_eq!(expect_headers, req.headers());
