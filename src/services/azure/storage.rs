@@ -23,6 +23,8 @@ use crate::time::RFC2822;
 pub struct Builder {
     credential: Credential,
     credential_load: CredentialLoadChain,
+
+    time: Option<SystemTime>,
 }
 
 impl Builder {
@@ -38,6 +40,11 @@ impl Builder {
 
     pub fn credential_loader(&mut self, credential_load: CredentialLoadChain) -> &mut Self {
         self.credential_load = credential_load;
+        self
+    }
+
+    pub fn time(&mut self, time: SystemTime) -> &mut Self {
+        self.time = Some(time);
         self
     }
 
@@ -57,6 +64,7 @@ impl Builder {
             credential: Arc::new(RwLock::new(credential)),
             credential_load: mem::take(&mut self.credential_load),
 
+            time: self.time,
             allow_anonymous: false,
         })
     }
@@ -67,6 +75,7 @@ pub struct Signer {
     credential: Arc<RwLock<Option<Credential>>>,
     credential_load: CredentialLoadChain,
 
+    time: Option<SystemTime>,
     allow_anonymous: bool,
 }
 
@@ -105,14 +114,15 @@ impl Signer {
     }
 
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        let string_to_sign = string_to_sign(req, cred)?;
+        let now = self.time.unwrap_or_else(|| SystemTime::now());
+        let string_to_sign = string_to_sign(req, cred, now)?;
         let auth = base64_hmac_sha256(
             &base64_decode(cred.account_key()),
             string_to_sign.as_bytes(),
         );
 
         Ok(SignedOutput {
-            account_name: cred.account_key().to_string(),
+            account_name: cred.account_name().to_string(),
             signed_time: SystemTime::now(),
             signature: auth,
         })
@@ -121,7 +131,7 @@ impl Signer {
     pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
         req.apply_header(
             HeaderName::from_static(super::constants::X_MS_DATE),
-            &format(output.signed_time, &RFC2822 {}),
+            &httpdate::fmt_http_date(output.signed_time),
         )?;
         req.apply_header(
             HeaderName::from_static(super::constants::X_MS_VERSION),
@@ -180,7 +190,11 @@ pub struct SignedOutput {
 /// ## Reference
 ///
 /// - [Blob, Queue, and File Services (Shared Key authorization)](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
-fn string_to_sign(req: &impl SignableRequest, cred: &Credential) -> Result<String> {
+fn string_to_sign(
+    req: &impl SignableRequest,
+    cred: &Credential,
+    now: SystemTime,
+) -> Result<String> {
     #[inline]
     fn get_or_default<'a>(h: &'a HeaderMap, key: &'a HeaderName) -> Result<&'a str> {
         match h.get(key) {
@@ -208,8 +222,10 @@ fn string_to_sign(req: &impl SignableRequest, cred: &Credential) -> Result<Strin
     writeln!(&mut s, "{}", get_or_default(h, &IF_NONE_MATCH)?)?;
     writeln!(&mut s, "{}", get_or_default(h, &IF_UNMODIFIED_SINCE)?)?;
     writeln!(&mut s, "{}", get_or_default(h, &RANGE)?)?;
-    writeln!(&mut s, "{}", canonicalize_header(req)?)?;
+    writeln!(&mut s, "{}", canonicalize_header(req, now)?)?;
     write!(&mut s, "{}", canonicalize_resource(req, cred))?;
+
+    debug!("string to sign: {}", &s);
 
     Ok(s)
 }
@@ -224,22 +240,40 @@ pub fn add_if_exists<K: AsHeaderName>(h: &HeaderMap, key: K) -> &str {
 /// ## Reference
 ///
 /// - [Constructing the canonicalized headers string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string)
-fn canonicalize_header(req: &impl SignableRequest) -> Result<String> {
+fn canonicalize_header(req: &impl SignableRequest, now: SystemTime) -> Result<String> {
     let mut headers = req
         .headers()
         .iter()
         // Filter all header that starts with "x-ms-"
         .filter(|(k, _)| k.as_str().starts_with("x-ms-"))
         // Convert all header name to lowercase
-        .map(|(k, v)| (k.as_str().to_lowercase(), v.clone()))
-        .collect::<Vec<(String, HeaderValue)>>();
+        .map(|(k, v)| {
+            (
+                k.as_str().to_lowercase(),
+                v.to_str().expect("must be valid header").to_string(),
+            )
+        })
+        .collect::<Vec<(String, String)>>();
+
+    // Insert x_ms_date header.
+    headers.push((
+        super::constants::X_MS_DATE.to_lowercase(),
+        httpdate::fmt_http_date(now),
+    ));
+
+    // Insert x_ms_version header.
+    headers.push((
+        super::constants::X_MS_VERSION.to_lowercase(),
+        super::constants::AZURE_VERSION.to_string(),
+    ));
+
     // Sort via header name.
     headers.sort_by(|x, y| x.0.cmp(&y.0));
 
     Ok(headers
         .iter()
         // Format into "name:value"
-        .map(|(k, v)| format!("{}:{}", k, v.to_str().expect("must be value header")))
+        .map(|(k, v)| format!("{}:{}", k, v))
         .collect::<Vec<String>>()
         // Join via "\n"
         .join("\n"))
