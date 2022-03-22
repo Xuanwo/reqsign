@@ -35,13 +35,13 @@ impl Builder {
         self
     }
 
-    pub fn shared_key(&mut self, shared_key: &str) -> &mut Self {
-        self.credential.set_shared_key(shared_key);
+    pub fn account_key(&mut self, account_key: &str) -> &mut Self {
+        self.credential.set_account_key(account_key);
         self
     }
 
-    pub fn access_name(&mut self, access_name: &str) -> &mut Self {
-        self.credential.set_access_name(access_name);
+    pub fn account_name(&mut self, account_name: &str) -> &mut Self {
+        self.credential.set_account_name(account_name);
         self
     }
 
@@ -69,7 +69,7 @@ pub struct Signer {
     credential_load: CredentialLoadChain,
 }
 
-//since access_account and shared_key should be kept secret,so debug trait is unimplemented
+//since account_name and account_key should be kept secret,so debug trait is unimplemented
 impl Debug for Signer {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Signer {{ unimplement!}}")
@@ -108,38 +108,37 @@ impl Signer {
         let host = request.host();
         let path = request.path();
         let option_query = request.query();
-        let url:Url = match option_query{
-            Some(query) =>Url::parse(&format!("https://{}{}?{}", host, path,query)).expect("parsing url success"),
-            _ => Url::parse(&format!("https://{}{}", host, path)).expect("parsing url success")
+        let url: Url = match option_query {
+            Some(query) => Url::parse(&format!("https://{}{}?{}", host, path, query))
+                .expect("parsing url success"),
+            _ => Url::parse(&format!("https://{}{}", host, path)).expect("parsing url success"),
         };
 
         let method = request.method().clone();
 
-        // account = credential.access_name, keep variable nameaccount aligning with azure sdk for rust
-        // refer https://github.com/Azure/azure-sdk-for-rust/blob/main/sdk/storage/src/core/clients/storage_account_client.rs
-        let account = self.credential().await?.unwrap().access_name().to_string();
-        // key = credential.shared_key, keep variable name key aligning with azure sdk for rust
-        // refer https://github.com/Azure/azure-sdk-for-rust/blob/main/sdk/storage/src/core/clients/storage_account_client.rs
-        let key = self.credential().await?.unwrap().shared_key().to_string();
-        
+        let account_name = self.credential().await?.unwrap().account_name().to_string();
+
+        let account_key = self.credential().await?.unwrap().account_key().to_string();
+
         let now = SystemTime::now();
         // time = Sun, 20 Mar 2022 01:45:13 +0000
         let time = format(now, &Rfc2822);
         // convert time to Sun, 20 Mar 2022 01:45:13 GMT
         let time = str::replace(&time, "+0000", "GMT");
-        
-        request.apply_header(HeaderName::from_static(super::constants::MS_DATE), &time)?;
+
+        request.apply_header(HeaderName::from_static(super::header::MS_DATE), &time)?;
         request.apply_header(
-            HeaderName::from_static(super::constants::HEADER_VERSION),
+            HeaderName::from_static(super::header::HEADER_VERSION),
             AZURE_VERSION,
-        )?; 
+        )?;
+
         let header = request.headers().clone();
 
-        let str_to_sign = string_to_sign(&header, &url, &method, &account);
+        let str_to_sign = string_to_sign(&header, &url, &method, &account_name);
 
-        let auth = sign(&str_to_sign, &key).unwrap();
+        let auth = sign(&str_to_sign, &account_key).unwrap();
 
-        let auth = format!("SharedKey {}:{}", account, auth);
+        let auth = format!("SharedKey {}:{}", account_name, auth);
 
         request.apply_header(AUTHORIZATION, &auth)?;
         Ok(())

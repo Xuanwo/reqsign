@@ -39,8 +39,8 @@ impl CredentialLoad for CredentialLoadChain {
 
 /// Load credential from env values
 ///
-/// - `AZBLOB_ACCESS_NAME`
-/// - `AZBLOB_SHARED_KEY`
+/// - `AZURE_STORAGE_ACCOUNT_NAME`
+/// - `AZURE_STORAGE_ACCOUNT_KEY`
 
 #[derive(Default, Clone, Debug)]
 pub struct EnvLoader {}
@@ -49,8 +49,8 @@ pub struct EnvLoader {}
 impl CredentialLoad for EnvLoader {
     async fn load_credential(&self) -> Result<Option<Credential>> {
         if let (Ok(sa), Ok(sk)) = (
-            env::var(super::constants::AZURE_STORAGE_ACCOUNT),
-            env::var(super::constants::AZURE_STORAGE_KEY),
+            env::var(super::constants::AZURE_STORAGE_ACCOUNT_NAME),
+            env::var(super::constants::AZURE_STORAGE_ACCOUNT_KEY),
         ) {
             Ok(Some(Credential::new(&sa, &sk)))
         } else {
@@ -73,8 +73,8 @@ mod tests {
     fn test_credential_env_loader_with_env() {
         temp_env::with_vars(
             vec![
-                (AZURE_STORAGE_ACCOUNT, Some("access_name")),
-                (AZURE_STORAGE_KEY, Some("shared_key")),
+                (AZURE_STORAGE_ACCOUNT_NAME, Some("account_name")),
+                (AZURE_STORAGE_ACCOUNT_KEY, Some("account_key")),
             ],
             || {
                 TOKIO.block_on(async {
@@ -84,8 +84,8 @@ mod tests {
                         .await
                         .expect("load_credential must success")
                         .expect("credential must be valid");
-                    assert_eq!("access_name", x.access_name());
-                    assert_eq!("shared_key", x.shared_key());
+                    assert_eq!("account_name", x.account_name());
+                    assert_eq!("account_key", x.account_key());
                 });
             },
         );

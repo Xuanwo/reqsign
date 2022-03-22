@@ -1,15 +1,11 @@
 // Env values used in azure services.
-//AZURE_STORAGE_ACCOUNT = Credential.access_name
+//AZURE_STORAGE_ACCOUNT_NAME = Credential.account_name
 #[allow(dead_code)]
-pub const AZURE_STORAGE_ACCOUNT: &str = "AZURE_STORAGE_ACCOUNT";
-//AZURE_STORAGE_ACCOUNT = Credential.shared_key
+pub const AZURE_STORAGE_ACCOUNT_NAME: &str = "AZURE_STORAGE_ACCOUNT_NAME";
+//AZURE_STORAGE_ACCOUNT_NAME = Credential.account_key
 #[allow(dead_code)]
-pub const AZURE_STORAGE_KEY: &str = "AZURE_STORAGE_KEY";
+pub const AZURE_STORAGE_ACCOUNT_KEY: &str = "AZURE_STORAGE_ACCOUNT_KEY";
 #[allow(dead_code)]
-pub const CONTENT_MD5: &str = "Content-MD5";
-#[allow(dead_code)]
-pub const MS_DATE: &str = "x-ms-date";
-#[allow(dead_code)]
-pub const HEADER_VERSION: &str = "x-ms-version";
+pub const CONTENT_MD5: &str = "content-md5";
 #[allow(dead_code)]
 pub const AZURE_VERSION: &str = "2019-12-12";
