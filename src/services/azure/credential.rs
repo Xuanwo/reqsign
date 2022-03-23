@@ -1,6 +1,7 @@
-use anyhow::{anyhow, Result};
 use std::fmt::{Debug, Formatter};
 use std::mem;
+
+use anyhow::{anyhow, Result};
 
 #[derive(Default)]
 pub struct Builder {

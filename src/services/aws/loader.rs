@@ -15,7 +15,6 @@ use reqwest::Url;
 
 use super::credential::Credential;
 use crate::dirs::expand_homedir;
-
 use crate::time::parse_rfc3339;
 
 /// Loader trait will try to load credential and region from different sources.
