@@ -15,8 +15,8 @@ use reqwest::Url;
 
 use super::credential::Credential;
 use crate::dirs::expand_homedir;
-use crate::time;
-use crate::time::ISO8601_WITH_SEPERATOR;
+
+use crate::time::parse_rfc3339;
 
 /// Loader trait will try to load credential and region from different sources.
 #[async_trait]
@@ -265,7 +265,7 @@ impl CredentialLoad for WebIdentityTokenLoader {
                         "Expiration" => {
                             let text = n.text().expect("Expiration must be exist");
 
-                            builder.expires_in(time::parse_utc(text, ISO8601_WITH_SEPERATOR)?);
+                            builder.expires_in(parse_rfc3339(text)?);
                         }
                         _ => {}
                     }

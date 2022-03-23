@@ -17,6 +17,7 @@ anyhow = "1"
 async-trait = "0.1"
 base64 = "0.13"
 bytes = "1.1"
+chrono = "0.4.19"
 dirs = "4"
 form_urlencoded = "1"
 hex = "0.4"
@@ -29,13 +30,11 @@ reqwest = "0.11"
 roxmltree = "0.14"
 rust-ini = "0.18"
 sha2 = "0.10"
-time = { version = "0.3.7", features = ["formatting", "parsing", "macros"] }
 tokio = { version = "1.17", features = ["full"] }
-httpdate = "1.0.2"
 
 [dev-dependencies]
 aws-sigv4 = "0.8"
 criterion = { version = "0.3", features = ["async_tokio", "html_reports"] }
+dotenv = "0.15"
 env_logger = "0.9"
 temp-env = "0.2"
-dotenv = "0.15"

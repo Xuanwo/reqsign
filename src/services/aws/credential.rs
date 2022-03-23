@@ -1,10 +1,12 @@
 use std::fmt::{Debug, Formatter};
 use std::mem;
 use std::ops::Add;
-use std::time::SystemTime;
 
 use anyhow::{anyhow, Result};
-use time::Duration;
+
+use chrono::Duration;
+
+use crate::time::{self, DateTime};
 
 #[derive(Default)]
 pub struct Builder {
@@ -24,7 +26,7 @@ impl Builder {
         self.cred.security_token = Some(security_token.to_string());
         self
     }
-    pub fn expires_in(&mut self, expires_in: SystemTime) -> &mut Self {
+    pub fn expires_in(&mut self, expires_in: DateTime) -> &mut Self {
         self.cred.expires_in = Some(expires_in);
         self
     }
@@ -45,7 +47,7 @@ pub struct Credential {
     access_key: String,
     secret_key: String,
     security_token: Option<String>,
-    expires_in: Option<SystemTime>,
+    expires_in: Option<DateTime>,
 }
 
 impl Credential {
@@ -86,7 +88,7 @@ impl Credential {
         self
     }
 
-    pub fn set_expires_in(&mut self, expires_in: Option<SystemTime>) -> &mut Self {
+    pub fn set_expires_in(&mut self, expires_in: Option<DateTime>) -> &mut Self {
         self.expires_in = expires_in;
         self
     }
@@ -98,7 +100,7 @@ impl Credential {
         // Take 120s as buffer to avoid edge cases.
         if let Some(valid) = self
             .expires_in
-            .map(|v| v > SystemTime::now().add(Duration::minutes(2)))
+            .map(|v| v > time::now().add(Duration::minutes(2)))
         {
             return valid;
         }

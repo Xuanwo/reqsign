@@ -3,7 +3,6 @@ use std::fmt::Write;
 use std::fmt::{Debug, Formatter};
 use std::mem;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use anyhow::{anyhow, Result};
 use http::header::*;
@@ -16,13 +15,14 @@ use super::credential::Credential;
 use super::loader::*;
 use crate::hash::{base64_decode, base64_hmac_sha256};
 use crate::request::SignableRequest;
+use crate::time::{self, format_http_date, DateTime};
 
 #[derive(Default)]
 pub struct Builder {
     credential: Credential,
     credential_load: CredentialLoadChain,
 
-    time: Option<SystemTime>,
+    time: Option<DateTime>,
 }
 
 impl Builder {
@@ -41,7 +41,7 @@ impl Builder {
         self
     }
 
-    pub fn time(&mut self, time: SystemTime) -> &mut Self {
+    pub fn time(&mut self, time: DateTime) -> &mut Self {
         self.time = Some(time);
         self
     }
@@ -73,7 +73,7 @@ pub struct Signer {
     credential: Arc<RwLock<Option<Credential>>>,
     credential_load: CredentialLoadChain,
 
-    time: Option<SystemTime>,
+    time: Option<DateTime>,
     allow_anonymous: bool,
 }
 
@@ -112,7 +112,7 @@ impl Signer {
     }
 
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        let now = self.time.unwrap_or_else(SystemTime::now);
+        let now = self.time.unwrap_or_else(time::now);
         let string_to_sign = string_to_sign(req, cred, now)?;
         let auth = base64_hmac_sha256(
             &base64_decode(cred.account_key()),
@@ -121,7 +121,7 @@ impl Signer {
 
         Ok(SignedOutput {
             account_name: cred.account_name().to_string(),
-            signed_time: SystemTime::now(),
+            signed_time: now,
             signature: auth,
         })
     }
@@ -129,7 +129,7 @@ impl Signer {
     pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
         req.apply_header(
             HeaderName::from_static(super::constants::X_MS_DATE),
-            &httpdate::fmt_http_date(output.signed_time),
+            &format_http_date(output.signed_time),
         )?;
         req.apply_header(
             HeaderName::from_static(super::constants::X_MS_VERSION),
@@ -160,7 +160,7 @@ impl Signer {
 
 pub struct SignedOutput {
     account_name: String,
-    signed_time: SystemTime,
+    signed_time: DateTime,
     signature: String,
 }
 
@@ -188,11 +188,7 @@ pub struct SignedOutput {
 /// ## Reference
 ///
 /// - [Blob, Queue, and File Services (Shared Key authorization)](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
-fn string_to_sign(
-    req: &impl SignableRequest,
-    cred: &Credential,
-    now: SystemTime,
-) -> Result<String> {
+fn string_to_sign(req: &impl SignableRequest, cred: &Credential, now: DateTime) -> Result<String> {
     #[inline]
     fn get_or_default<'a>(h: &'a HeaderMap, key: &'a HeaderName) -> Result<&'a str> {
         match h.get(key) {
@@ -238,7 +234,7 @@ pub fn add_if_exists<K: AsHeaderName>(h: &HeaderMap, key: K) -> &str {
 /// ## Reference
 ///
 /// - [Constructing the canonicalized headers string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string)
-fn canonicalize_header(req: &impl SignableRequest, now: SystemTime) -> Result<String> {
+fn canonicalize_header(req: &impl SignableRequest, now: DateTime) -> Result<String> {
     let mut headers = req
         .headers()
         .iter()
@@ -256,7 +252,7 @@ fn canonicalize_header(req: &impl SignableRequest, now: SystemTime) -> Result<St
     // Insert x_ms_date header.
     headers.push((
         super::constants::X_MS_DATE.to_lowercase(),
-        httpdate::fmt_http_date(now),
+        format_http_date(now),
     ));
 
     // Insert x_ms_version header.

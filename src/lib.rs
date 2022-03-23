@@ -32,4 +32,4 @@ pub mod services;
 
 pub(crate) mod dirs;
 pub(crate) mod hash;
-pub(crate) mod time;
+pub mod time;
