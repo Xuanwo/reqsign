@@ -5,7 +5,6 @@ use std::mem;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use crate::hash::{base64_decode, base64_hmac_sha256};
 use anyhow::{anyhow, Result};
 use http::header::*;
 use http::HeaderMap;
@@ -15,9 +14,8 @@ use tokio::sync::RwLock;
 use super::constants::*;
 use super::credential::Credential;
 use super::loader::*;
+use crate::hash::{base64_decode, base64_hmac_sha256};
 use crate::request::SignableRequest;
-use crate::time::format;
-use crate::time::RFC2822;
 
 #[derive(Default)]
 pub struct Builder {
@@ -114,7 +112,7 @@ impl Signer {
     }
 
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        let now = self.time.unwrap_or_else(|| SystemTime::now());
+        let now = self.time.unwrap_or_else(SystemTime::now);
         let string_to_sign = string_to_sign(req, cred, now)?;
         let auth = base64_hmac_sha256(
             &base64_decode(cred.account_key()),
