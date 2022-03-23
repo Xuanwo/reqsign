@@ -5,6 +5,16 @@ use hmac::Mac;
 use sha2::Digest;
 use sha2::Sha256;
 
+/// Base64 encode
+pub fn base64_encode(content: &[u8]) -> String {
+    base64::encode(content)
+}
+
+// Base64 decode
+pub fn base64_decode(content: &str) -> Vec<u8> {
+    base64::decode(content).expect("base64 decode must success")
+}
+
 /// SHA256 hash.
 #[allow(dead_code)]
 pub fn sha256(content: &[u8]) -> Vec<u8> {
@@ -25,6 +35,14 @@ pub fn hmac_sha256(key: &[u8], content: &[u8]) -> Vec<u8> {
     h.update(content);
 
     h.finalize().into_bytes().to_vec()
+}
+
+/// Base64 encoded HMAC with SHA256 hash.
+pub fn base64_hmac_sha256(key: &[u8], content: &[u8]) -> String {
+    let mut h = Hmac::<Sha256>::new_from_slice(key).expect("invalid key length");
+    h.update(content);
+
+    base64_encode(&h.finalize().into_bytes())
 }
 
 /// Hex encoded HMAC with SHA256 hash.

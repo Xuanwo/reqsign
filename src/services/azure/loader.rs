@@ -1,8 +1,10 @@
-use super::credential::Credential;
+use std::env;
+
 use anyhow::Result;
 use async_trait::async_trait;
 
-use std::env;
+use super::credential::Credential;
+
 /// Loader trait will try to load credential and region from different sources.
 #[async_trait]
 pub trait CredentialLoad: Send + Sync {
@@ -24,6 +26,7 @@ impl CredentialLoadChain {
         self.loaders.is_empty()
     }
 }
+
 #[async_trait]
 impl CredentialLoad for CredentialLoadChain {
     async fn load_credential(&self) -> Result<Option<Credential>> {
@@ -41,7 +44,6 @@ impl CredentialLoad for CredentialLoadChain {
 ///
 /// - `AZURE_STORAGE_ACCOUNT_NAME`
 /// - `AZURE_STORAGE_ACCOUNT_KEY`
-
 #[derive(Default, Clone, Debug)]
 pub struct EnvLoader {}
 

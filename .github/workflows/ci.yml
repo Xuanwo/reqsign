@@ -46,8 +46,12 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --no-fail-fast
+          args: -- --nocapture
         env:
-          RUST_TEST_THREADS: '2'
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full
+          REQSIGN_AZURE_STORAGE_TEST: ${{ secrets.REQSIGN_AZURE_STORAGE_TEST }}
+          REQSIGN_AZURE_STORAGE_ENDPOINT: ${{ secrets.REQSIGN_AZURE_STORAGE_ENDPOINT }}
+          REQSIGN_AZURE_STORAGE_BUCKET: ${{ secrets.REQSIGN_AZURE_STORAGE_BUCKET }}
+          REQSIGN_AZURE_STORAGE_ACCOUNT_NAME: ${{ secrets.REQSIGN_AZURE_STORAGE_ACCOUNT_NAME }}
+          REQSIGN_AZURE_STORAGE_ACCOUNT_KEY: ${{ secrets.REQSIGN_AZURE_STORAGE_ACCOUNT_KEY }}
