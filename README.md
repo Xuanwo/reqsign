@@ -38,7 +38,27 @@ async fn main() -> Result<()>{
 
 - Pure rust with minimal dependencies.
 - Test again official SDK and services.
+- Supported services
+  - AWS services (SigV4): `reqsign::services::aws::v4::Signer`
+  - Azure Storage services: `reqsign::services::azure::storage::Signer`
+
+## Contributing
+
+Check out the [CONTRIBUTING.md](./CONTRIBUTING.md) guide for more details on getting started with contributing to this project.
+
+## Getting help
+
+Submit [issues](https://github.com/Xuanwo/reqsign/issues/new/choose) for bug report or asking questions in [discussion](https://github.com/Xuanwo/reqsign/discussions/new?category=q-a).
 
 ## Acknowledge
 
-Inspired a lot from [aws-sigv4](https://crates.io/crates/aws-sigv4).
+Inspired a lot from:
+
+- [aws-sigv4](https://crates.io/crates/aws-sigv4) for AWS SigV4 support.
+- [azure_storage_blobs](https://crates.io/crates/azure_storage_blobs) for Azure Storage support.
+
+#### License
+
+<sup>
+Licensed under <a href="./LICENSE">Apache License, Version 2.0</a>.
+</sup>

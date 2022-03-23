@@ -11,15 +11,12 @@ use log::debug;
 use tokio::sync::RwLock;
 
 use super::credential::Credential;
-use super::loader::{
-    CredentialLoad, CredentialLoadChain, EnvLoader, ProfileLoader, RegionLoad, RegionLoadChain,
-    WebIdentityTokenLoader,
-};
+use super::loader::*;
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
 use crate::time::{self, format_date, format_iso8601, DateTime};
 
-/// Builder for Signer.
+/// Builder for `Signer`.
 #[derive(Default)]
 pub struct Builder {
     service: Option<String>,
@@ -119,7 +116,7 @@ impl Builder {
             .service
             .as_ref()
             .ok_or_else(|| anyhow!("service is required"))?;
-        debug!("service: {:?}", service);
+        debug!("signer: service: {:?}", service);
 
         let credential = if self.credential.is_valid() {
             Some(self.credential.clone())
@@ -134,7 +131,7 @@ impl Builder {
 
             self.credential_load.load_credential().await?
         };
-        debug!("credential has been set to: {:?}", &credential);
+        debug!("signer credential: {:?}", &credential);
 
         let region = match &self.region {
             Some(region) => region.to_string(),
@@ -152,7 +149,7 @@ impl Builder {
                     .ok_or_else(|| anyhow!("region is required"))?
             }
         };
-        debug!("region has been set to: {}", &region);
+        debug!("signer region: {}", &region);
 
         Ok(Signer {
             service: service.to_string(),
@@ -318,7 +315,7 @@ impl Signer {
     ///         .build()
     ///         .await?;
     ///     // Construct request
-    ///     let url = Url::parse( "https://s3.amazonaws.com/testbucket")?;
+    ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
     ///     signer.sign(&mut req).await?;
