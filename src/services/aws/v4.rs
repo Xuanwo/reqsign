@@ -3,7 +3,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use anyhow::{anyhow, Result};
 use http::header::HeaderName;
@@ -18,7 +17,7 @@ use super::loader::{
 };
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
-use crate::time::{self, DATE, ISO8601};
+use crate::time::{self, format_date, format_iso8601, DateTime};
 
 /// Builder for Signer.
 #[derive(Default)]
@@ -32,7 +31,7 @@ pub struct Builder {
 
     allow_anonymous: bool,
 
-    time: Option<SystemTime>,
+    time: Option<DateTime>,
 }
 
 impl Builder {
@@ -107,7 +106,7 @@ impl Builder {
     /// We should always take current time to sign requests.
     /// Only use this function for testing.
     #[cfg(test)]
-    pub fn time(&mut self, time: SystemTime) -> &mut Self {
+    pub fn time(&mut self, time: DateTime) -> &mut Self {
         self.time = Some(time);
         self
     }
@@ -178,7 +177,7 @@ pub struct Signer {
     /// Allow anonymous request if credential is not loaded.
     allow_anonymous: bool,
 
-    time: Option<SystemTime>,
+    time: Option<DateTime>,
 }
 
 impl Signer {
@@ -225,7 +224,7 @@ impl Signer {
         // Scope: "20220313/<region>/<service>/aws4_request"
         let scope = format!(
             "{}/{}/{}/aws4_request",
-            time::format(canonical_req.time, DATE),
+            format_date(canonical_req.time),
             self.region,
             self.service
         );
@@ -242,7 +241,7 @@ impl Signer {
 
             let mut f = String::new();
             writeln!(f, "AWS4-HMAC-SHA256")?;
-            writeln!(f, "{}", time::format(canonical_req.time, ISO8601))?;
+            writeln!(f, "{}", format_iso8601(canonical_req.time))?;
             writeln!(f, "{}", &scope)?;
             write!(f, "{}", &encoded_req)?;
             f
@@ -271,7 +270,7 @@ impl Signer {
     pub fn apply(&self, req: &mut impl SignableRequest, sig: &SignedOutput) -> Result<()> {
         req.apply_header(
             HeaderName::from_static(super::constants::X_AMZ_DATE),
-            &time::format(sig.signed_time, ISO8601),
+            &format_iso8601(sig.signed_time),
         )?;
         req.apply_header(
             HeaderName::from_static(super::constants::X_AMZ_CONTENT_SHA_256),
@@ -361,7 +360,7 @@ struct CanonicalRequest<'a> {
     params: Option<String>,
     headers: http::HeaderMap,
 
-    time: SystemTime,
+    time: DateTime,
     signed_headers: Vec<HeaderName>,
     content_sha256: &'a str,
 }
@@ -369,10 +368,10 @@ struct CanonicalRequest<'a> {
 impl<'a> CanonicalRequest<'a> {
     pub fn from<'b>(
         req: &'b impl SignableRequest,
-        time: Option<SystemTime>,
+        time: Option<DateTime>,
         cred: &'b Credential,
     ) -> Result<CanonicalRequest<'b>> {
-        let now = time.unwrap_or_else(SystemTime::now);
+        let now = time.unwrap_or_else(time::now);
 
         let (signed_headers, canonical_headers) = Self::headers(req, now, cred)?;
 
@@ -394,7 +393,7 @@ impl<'a> CanonicalRequest<'a> {
 
     pub fn headers(
         req: &impl SignableRequest,
-        now: SystemTime,
+        now: DateTime,
         cred: &Credential,
     ) -> Result<(Vec<HeaderName>, HeaderMap)> {
         let mut canonical_headers = HeaderMap::with_capacity(req.headers().len());
@@ -419,8 +418,8 @@ impl<'a> CanonicalRequest<'a> {
             .get(HeaderName::from_static(super::constants::X_AMZ_DATE))
             .is_none()
         {
-            let date_header = HeaderValue::try_from(time::format(now, ISO8601))
-                .expect("date is valid header value");
+            let date_header =
+                HeaderValue::try_from(format_iso8601(now)).expect("date is valid header value");
             canonical_headers.insert(
                 HeaderName::from_static(super::constants::X_AMZ_DATE),
                 date_header,
@@ -534,7 +533,7 @@ impl<'a> Display for CanonicalRequest<'a> {
 pub struct SignedOutput {
     access_key_id: String,
     security_token: Option<String>,
-    signed_time: SystemTime,
+    signed_time: DateTime,
     signed_scope: String,
     signed_headers: Vec<HeaderName>,
     signature: String,
@@ -558,11 +557,11 @@ fn normalize_header_value(header_value: &HeaderValue) -> HeaderValue {
     HeaderValue::from_bytes(&bs[starting_index..ending_index]).expect("invalid header value")
 }
 
-fn generate_signing_key(secret: &str, time: SystemTime, region: &str, service: &str) -> Vec<u8> {
+fn generate_signing_key(secret: &str, time: DateTime, region: &str, service: &str) -> Vec<u8> {
     // Sign secret
     let secret = format!("AWS4{}", secret);
     // Sign date
-    let sign_date = hmac_sha256(secret.as_bytes(), time::format(time, DATE).as_bytes());
+    let sign_date = hmac_sha256(secret.as_bytes(), format_date(time).as_bytes());
     // Sign region
     let sign_region = hmac_sha256(sign_date.as_slice(), region.as_bytes());
     // Sign service
@@ -575,14 +574,13 @@ fn generate_signing_key(secret: &str, time: SystemTime, region: &str, service: &
 
 #[cfg(test)]
 mod tests {
-    use std::time::SystemTime;
-
     use anyhow::Result;
     use aws_sigv4;
     use aws_sigv4::http_request::{
         PayloadChecksumKind, PercentEncodingMode, SignableBody, SignableRequest, SigningSettings,
     };
     use aws_sigv4::SigningParams;
+    use std::time::SystemTime;
 
     use super::*;
 
@@ -632,7 +630,7 @@ mod tests {
             test_put_request,
         ] {
             let mut req = req_fn();
-            let now = SystemTime::now();
+            let now = time::now();
 
             let mut ss = SigningSettings::default();
             ss.percent_encoding_mode = PercentEncodingMode::Double;
@@ -643,7 +641,7 @@ mod tests {
                 .secret_key("secret_access_key")
                 .region("test")
                 .service_name("s3")
-                .time(now)
+                .time(SystemTime::from(now))
                 .settings(ss)
                 .build()
                 .expect("signing params must be valid");
@@ -693,7 +691,7 @@ mod tests {
 
         for req_fn in [test_get_request, test_put_request] {
             let mut req = req_fn();
-            let now = SystemTime::now();
+            let now = time::now();
 
             let mut ss = SigningSettings::default();
             ss.percent_encoding_mode = PercentEncodingMode::Double;
@@ -705,7 +703,7 @@ mod tests {
                 .region("test")
                 .security_token("security_token")
                 .service_name("s3")
-                .time(now)
+                .time(SystemTime::from(now))
                 .settings(ss)
                 .build()
                 .expect("signing params must be valid");
