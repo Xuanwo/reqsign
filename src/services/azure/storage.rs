@@ -17,6 +17,7 @@ use crate::hash::{base64_decode, base64_hmac_sha256};
 use crate::request::SignableRequest;
 use crate::time::{self, format_http_date, DateTime};
 
+/// Builder for `Signer`.
 #[derive(Default)]
 pub struct Builder {
     credential: Credential,
@@ -26,26 +27,41 @@ pub struct Builder {
 }
 
 impl Builder {
-    pub fn account_key(&mut self, account_key: &str) -> &mut Self {
-        self.credential.set_account_key(account_key);
-        self
-    }
-
+    /// Specify account name.
     pub fn account_name(&mut self, account_name: &str) -> &mut Self {
         self.credential.set_account_name(account_name);
         self
     }
 
+    /// Specify account key.
+    pub fn account_key(&mut self, account_key: &str) -> &mut Self {
+        self.credential.set_account_key(account_key);
+        self
+    }
+
+    /// Specify credential load behavior
+    ///
+    /// If not set, we will use the default credential loader.
     pub fn credential_loader(&mut self, credential_load: CredentialLoadChain) -> &mut Self {
         self.credential_load = credential_load;
         self
     }
 
+    /// Specify the signing time.
+    ///
+    /// # Note
+    ///
+    /// We should always take current time to sign requests.
+    /// Only use this function for testing.
+    #[cfg(test)]
     pub fn time(&mut self, time: DateTime) -> &mut Self {
         self.time = Some(time);
         self
     }
 
+    /// Use exising information to build a new signer.
+    ///
+    /// The builder should not be used anymore.
     pub async fn build(&mut self) -> Result<Signer> {
         let credential = if self.credential.is_valid() {
             Some(self.credential.clone())
@@ -57,7 +73,8 @@ impl Builder {
 
             self.credential_load.load_credential().await?
         };
-        debug!("credential has been set to: {:?}", &credential);
+        debug!("signer credential: {:?}", &credential);
+
         Ok(Signer {
             credential: Arc::new(RwLock::new(credential)),
             credential_load: mem::take(&mut self.credential_load),
@@ -68,13 +85,16 @@ impl Builder {
     }
 }
 
-#[derive(Default)]
+/// Singer that implement Azure Storage Shared Key Authorization.
+///
+/// - [Authorize with Shared Key](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
 pub struct Signer {
     credential: Arc<RwLock<Option<Credential>>>,
     credential_load: CredentialLoadChain,
 
-    time: Option<DateTime>,
+    /// Allow anonymous request if credential is not loaded.
     allow_anonymous: bool,
+    time: Option<DateTime>,
 }
 
 impl Debug for Signer {
@@ -84,11 +104,17 @@ impl Debug for Signer {
 }
 
 impl Signer {
+    /// Create a builder.
     pub fn builder() -> Builder {
         Builder::default()
     }
 
     /// Load credential via credential load chain specified while building.
+    ///
+    /// # Note
+    ///
+    /// This function should never be exported to avoid credential leaking by
+    /// mistake.
     async fn credential(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
         match self.credential.read().await.clone() {
@@ -111,6 +137,7 @@ impl Signer {
         }
     }
 
+    /// Calculate signing requests via SignableRequest.
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
         let now = self.time.unwrap_or_else(time::now);
         let string_to_sign = string_to_sign(req, cred, now)?;
@@ -126,6 +153,7 @@ impl Signer {
         })
     }
 
+    /// Apply signed results to requests.
     pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
         req.apply_header(
             HeaderName::from_static(super::constants::X_MS_DATE),
@@ -143,6 +171,34 @@ impl Signer {
         Ok(())
     }
 
+    /// Signing request.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use reqsign::services::azure::storage::Signer;
+    /// use reqwest::{Client, Request, Url};
+    /// use anyhow::Result;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<()>{
+    ///     // Signer will load region and credentials from environment by default.
+    ///     let signer = Signer::builder()
+    ///         .account_name("account_name")
+    ///         .account_key("YWNjb3VudF9rZXkK") // base64 of "account_key"
+    ///         .build()
+    ///         .await?;
+    ///     // Construct request
+    ///     let url = Url::parse("https://test.blob.core.windows.net/testbucket/testblob")?;
+    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     // Signing request with Signer
+    ///     signer.sign(&mut req).await?;
+    ///     // Sending already signed request.
+    ///     let resp = Client::new().execute(req).await?;
+    ///     println!("resp got status: {}", resp.status());
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         if let Some(cred) = self.credential().await? {
             let sig = self.calculate(req, &cred)?;

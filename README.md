@@ -39,8 +39,8 @@ async fn main() -> Result<()>{
 - Pure rust with minimal dependencies.
 - Test again official SDK and services.
 - Supported services
-  - AWS services (SigV4)
-  - Azure Storage services
+  - AWS services (SigV4): `reqsign::services::aws::v4::Signer`
+  - Azure Storage services: `reqsign::services::azure::storage::Signer`
 
 ## Contributing
 

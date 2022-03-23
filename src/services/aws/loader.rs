@@ -1,3 +1,5 @@
+//! Loader is used to load credential or region from env.
+//!
 //! - Environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION
 //! - The default credentials files located in ~/.aws/config and ~/.aws/credentials (location can vary per platform)
 //! - Web Identity Token credentials from the environment or container (including EKS)
