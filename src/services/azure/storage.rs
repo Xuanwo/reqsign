@@ -185,7 +185,7 @@ impl Signer {
     ///     // Signer will load region and credentials from environment by default.
     ///     let signer = Signer::builder()
     ///         .account_name("account_name")
-    ///         .account_key("YWNjb3VudF9rZXkK") // base64 of "account_key"
+    ///         .account_key("YWNjb3VudF9rZXkK")
     ///         .build()
     ///         .await?;
     ///     // Construct request
