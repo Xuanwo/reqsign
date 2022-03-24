@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use http::header::HeaderName;
-use http::{HeaderMap, Method};
+use http::{HeaderMap, HeaderValue, Method};
 
 /// Trait for all signable request.
 ///
@@ -105,7 +105,9 @@ impl SignableRequest for reqwest::Request {
     }
 
     fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
-        self.headers_mut().insert(name, value.parse()?);
+        let mut value: HeaderValue = value.parse()?;
+        value.set_sensitive(true);
+        self.headers_mut().insert(name, value);
 
         Ok(())
     }
@@ -144,7 +146,9 @@ impl<T> SignableRequest for http::Request<T> {
     }
 
     fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
-        self.headers_mut().insert(name, value.parse()?);
+        let mut value: HeaderValue = value.parse()?;
+        value.set_sensitive(true);
+        self.headers_mut().insert(name, value);
 
         Ok(())
     }
