@@ -39,7 +39,8 @@ impl Debug for Credential {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Deserialize, Default)]
+#[serde(default)]
 pub struct Token {
     access_token: String,
     scope: String,

@@ -2,9 +2,11 @@ use std::env;
 use std::ops::{Add, Sub};
 use std::sync::Arc;
 
+use crate::hash::base64_decode;
 use anyhow::{anyhow, Result};
-use http::header;
+use http::{header, StatusCode};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
+use log::error;
 use reqwest::{Body, Request};
 use tokio::sync::RwLock;
 
@@ -13,10 +15,22 @@ use super::credential::{Claims, Credential, Token};
 use crate::request::SignableRequest;
 use crate::time::{self, DateTime, Duration};
 
-#[derive(Debug, Default)]
+enum CredentialLoader {
+    Path(String),
+    Content(String),
+    None,
+}
+
+impl Default for CredentialLoader {
+    fn default() -> Self {
+        CredentialLoader::None
+    }
+}
+
+#[derive(Default)]
 pub struct Builder {
     scope: Option<String>,
-    credential: Option<String>,
+    credential: CredentialLoader,
 }
 
 impl Builder {
@@ -24,8 +38,14 @@ impl Builder {
         self.scope = Some(scope.to_string());
         self
     }
-    pub fn credential(&mut self, credential: &str) -> &mut Self {
-        self.credential = Some(credential.to_string());
+
+    pub fn credential_from_path(&mut self, path: &str) -> &mut Self {
+        self.credential = CredentialLoader::Path(path.to_string());
+        self
+    }
+
+    pub fn credential_from_content(&mut self, credential: &str) -> &mut Self {
+        self.credential = CredentialLoader::Content(credential.to_string());
         self
     }
 
@@ -35,10 +55,11 @@ impl Builder {
             None => return Err(anyhow!("google signer requires scope, but not set")),
         };
 
-        let credential = match &self.credential {
-            Some(v) => v.clone(),
-            None => match env::var(GOOGLE_APPLICATION_CREDENTIALS) {
-                Ok(v) => v,
+        let credential_content = match &self.credential {
+            CredentialLoader::Path(v) => tokio::fs::read(&v).await?,
+            CredentialLoader::Content(v) => base64_decode(v),
+            CredentialLoader::None => match env::var(GOOGLE_APPLICATION_CREDENTIALS) {
+                Ok(v) => tokio::fs::read(&v).await?,
                 Err(err) => {
                     return Err(anyhow!(
                         "google signer requires credential file, but not found: {}",
@@ -48,13 +69,12 @@ impl Builder {
             },
         };
 
-        let content = tokio::fs::read(&credential).await?;
-        let credential: Credential = serde_json::from_slice(&content)?;
+        let credential: Credential = serde_json::from_slice(&credential_content)?;
 
         Ok(Signer {
             scope,
             credential,
-            token: Arc::new(Default::default()),
+            token: Arc::new(RwLock::new((Token::default(), DateTime::now_utc()))),
             client: reqwest::Client::new(),
         })
     }
@@ -63,7 +83,7 @@ impl Builder {
 pub struct Signer {
     scope: String,
     credential: Credential,
-    token: Arc<RwLock<Option<(Token, DateTime)>>>,
+    token: Arc<RwLock<(Token, DateTime)>>,
 
     client: reqwest::Client,
 }
@@ -100,43 +120,41 @@ impl Signer {
         ));
 
         let resp = self.client.execute(req).await?;
+        if resp.status() != StatusCode::OK {
+            error!("exchange token got unexpected response: {:?}", resp);
+            return Err(anyhow!("exchange token failed: {:?}", resp));
+        }
+
         let content = resp.bytes().await?;
         let token: Token = serde_json::from_slice(&content)?;
-
         Ok(token)
     }
 
-    async fn token(&self) -> Result<Option<Token>> {
-        match self.token.read().await.clone() {
-            None => return Ok(None),
-            Some((token, expire_in)) => {
-                if time::now() < expire_in.sub(Duration::minutes(2)) {
-                    return Ok(Some(token));
-                }
-            }
+    async fn token(&self) -> Result<Token> {
+        let (token, expire_in) = self.token.read().await.clone();
+        if time::now() < expire_in.sub(Duration::minutes(2)) {
+            return Ok(token);
         }
 
         let now = time::now();
         let token = self.exchange_token().await?;
         let mut lock = self.token.write().await;
-        *lock = Some((
+        *lock = (
             token.clone(),
             now.add(Duration::seconds(token.expires_in() as i64)),
-        ));
-        Ok(Some(token))
+        );
+        Ok(token)
     }
 
     /// TODO: we can also send API via signed JWT: [Addendum: Service account authorization without OAuth](https://developers.google.com/identity/protocols/oauth2/service-account#jwt-auth)
     pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(token) = self.token().await? {
-            req.apply_header(
-                header::AUTHORIZATION,
-                &format!("Bearer {}", token.access_token()),
-            )?;
-            return Ok(());
-        }
+        let token = self.token().await?;
+        req.apply_header(
+            header::AUTHORIZATION,
+            &format!("Bearer {}", token.access_token()),
+        )?;
 
-        Err(anyhow!("token not found"))
+        Ok(())
     }
 }
 
