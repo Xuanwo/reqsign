@@ -72,22 +72,30 @@ async fn test_list_blobs() -> Result<()> {
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let mut req = reqwest::Request::new(
-        http::Method::GET,
-        format!("{}?restype=container&comp=list", url).parse()?,
-    );
+    for query in [
+        // Without prefix
+        "restype=container&comp=list",
+        // With not encoded prefix
+        "restype=container&comp=list&prefix=test/path/to/dir",
+        // With encoded prefix
+        "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
+    ] {
+        let mut req =
+            reqwest::Request::new(http::Method::GET, format!("{}?{}", url, query).parse()?);
 
-    signer
-        .sign(&mut req)
-        .await
-        .expect("sign request must success");
+        signer
+            .sign(&mut req)
+            .await
+            .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+        debug!("signed request: {:?}", req);
 
-    let client = reqwest::Client::new();
-    let resp = client.execute(req).await.expect("request must success");
+        let client = reqwest::Client::new();
+        let resp = client.execute(req).await.expect("request must success");
 
-    debug!("got response: {:?}", resp);
-    assert_eq!(StatusCode::OK, resp.status());
+        debug!("got response: {:?}", resp);
+        assert_eq!(StatusCode::OK, resp.status());
+    }
+
     Ok(())
 }
