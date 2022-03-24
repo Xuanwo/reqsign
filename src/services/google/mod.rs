@@ -1,3 +1,5 @@
+//! Google Service Signer
+
 mod constants;
 mod credential;
 mod signer;

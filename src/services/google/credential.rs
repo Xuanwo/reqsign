@@ -39,6 +39,18 @@ impl Debug for Credential {
     }
 }
 
+pub enum CredentialLoader {
+    Path(String),
+    Content(String),
+    None,
+}
+
+impl Default for CredentialLoader {
+    fn default() -> Self {
+        CredentialLoader::None
+    }
+}
+
 #[derive(Clone, Deserialize, Default)]
 #[serde(default)]
 pub struct Token {

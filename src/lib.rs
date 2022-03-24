@@ -32,6 +32,7 @@
 //!
 //! - [AWS SigV4][crate::services::aws::v4::Signer] for AWS services like S3.
 //! - [Azure Storage][crate::services::azure::storage::Signer] for Azure Storage services like Azure Blob Service.
+//! - [Google][crate::services::google::Signer] for All google cloud services like Google Cloud Storage Service.
 pub mod request;
 pub mod services;
 
