@@ -31,6 +31,9 @@ rust-ini = "0.18"
 sha2 = "0.10"
 time = { version = "0.3.9", features = ["macros", "formatting", "parsing"] }
 tokio = { version = "1.17", features = ["full"] }
+serde = {version = "1.0.136", features = ["derive"]}
+serde_json = "1.0.79"
+jsonwebtoken = "8.0.1"
 
 [dev-dependencies]
 aws-sigv4 = "0.9"
