@@ -8,6 +8,7 @@ use anyhow::{anyhow, Result};
 use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use log::debug;
+use percent_encoding::utf8_percent_encode;
 use tokio::sync::RwLock;
 
 use super::credential::Credential;
@@ -499,7 +500,11 @@ impl<'a> CanonicalRequest<'a> {
 impl<'a> Display for CanonicalRequest<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{}", self.method)?;
-        writeln!(f, "{}", self.path)?;
+        writeln!(
+            f,
+            "{}",
+            utf8_percent_encode(self.path, &super::constants::AWS_URI_ENCODE_SET)
+        )?;
         writeln!(f, "{}", self.params.as_ref().unwrap_or(&"".to_string()))?;
         for header in &self.signed_headers {
             let value = &self.headers[header];
