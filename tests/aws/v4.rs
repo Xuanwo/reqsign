@@ -60,6 +60,37 @@ async fn test_head_object() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_head_object_with_special_characters() -> Result<()> {
+    let signer = init_signer().await;
+    if signer.is_none() {
+        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+
+    let mut req = reqwest::Request::new(
+        http::Method::HEAD,
+        format!("{}/{}", url, "!@#$%^&*()_+-=;:'><,/?.txt").parse()?,
+    );
+
+    signer
+        .sign(&mut req)
+        .await
+        .expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = reqwest::Client::new();
+    let resp = client.execute(req).await.expect("request must success");
+
+    debug!("got response: {:?}", resp);
+    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_list_bucket() -> Result<()> {
     let signer = init_signer().await;
     if signer.is_none() {
