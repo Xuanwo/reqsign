@@ -175,7 +175,7 @@ impl Signer {
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```no_run
     /// use reqsign::services::azure::storage::Signer;
     /// use reqwest::{Client, Request, Url};
     /// use anyhow::Result;
@@ -225,7 +225,7 @@ pub struct SignedOutput {
 /// ## Format
 ///
 /// ```text
-/// VERB + "\n" +  
+/// VERB + "\n" +
 /// Content-Encoding + "\n" +
 /// Content-Language + "\n" +
 /// Content-Length + "\n" +
