@@ -10,10 +10,9 @@ use std::str::FromStr;
 use std::{env, fs};
 
 use anyhow::{anyhow, Result};
-use async_trait::async_trait;
 use ini::Ini;
+use isahc::ReadResponseExt;
 use log::warn;
-use reqwest::Url;
 
 use super::credential::Credential;
 use crate::dirs::expand_homedir;
@@ -41,7 +40,6 @@ impl RegionLoadChain {
     }
 }
 
-#[async_trait]
 impl RegionLoad for RegionLoadChain {
     fn load_region(&self) -> Result<Option<String>> {
         for l in self.loaders.iter() {
@@ -55,9 +53,8 @@ impl RegionLoad for RegionLoadChain {
 }
 
 /// Loader trait will try to load credential and region from different sources.
-#[async_trait]
 pub trait CredentialLoad: Send + Sync {
-    async fn load_credential(&self) -> Result<Option<Credential>>;
+    fn load_credential(&self) -> Result<Option<Credential>>;
 }
 
 #[derive(Default)]
@@ -77,11 +74,10 @@ impl CredentialLoadChain {
     }
 }
 
-#[async_trait]
 impl CredentialLoad for CredentialLoadChain {
-    async fn load_credential(&self) -> Result<Option<Credential>> {
+    fn load_credential(&self) -> Result<Option<Credential>> {
         for l in self.loaders.iter() {
-            if let Some(c) = l.load_credential().await? {
+            if let Some(c) = l.load_credential()? {
                 return Ok(Some(c));
             }
         }
@@ -98,9 +94,8 @@ impl CredentialLoad for CredentialLoadChain {
 #[derive(Default, Clone, Debug)]
 pub struct EnvLoader {}
 
-#[async_trait]
 impl CredentialLoad for EnvLoader {
-    async fn load_credential(&self) -> Result<Option<Credential>> {
+    fn load_credential(&self) -> Result<Option<Credential>> {
         if let (Ok(ak), Ok(sk)) = (
             env::var(super::constants::AWS_ACCESS_KEY_ID),
             env::var(super::constants::AWS_SECRET_ACCESS_KEY),
@@ -145,9 +140,8 @@ pub struct ProfileLoader {}
 /// > CLI can read credentials from the config file. If there are credentials
 /// > in both files for a profile sharing the same name, the keys in the
 /// > credentials file take precedence.
-#[async_trait]
 impl CredentialLoad for ProfileLoader {
-    async fn load_credential(&self) -> Result<Option<Credential>> {
+    fn load_credential(&self) -> Result<Option<Credential>> {
         let cred_path = env::var(super::constants::AWS_SHARED_CREDENTIALS_FILE)
             .unwrap_or_else(|_| "~/.aws/credentials".to_string());
         if let Some(cred_path) = expand_homedir(&cred_path) {
@@ -184,7 +178,6 @@ impl CredentialLoad for ProfileLoader {
     }
 }
 
-#[async_trait]
 impl RegionLoad for ProfileLoader {
     fn load_region(&self) -> Result<Option<String>> {
         let cfg_path = env::var(super::constants::AWS_CONFIG_FILE)
@@ -213,37 +206,29 @@ impl RegionLoad for ProfileLoader {
 #[derive(Default, Clone, Debug)]
 pub struct WebIdentityTokenLoader {}
 
-#[async_trait]
 impl CredentialLoad for WebIdentityTokenLoader {
-    async fn load_credential(&self) -> Result<Option<Credential>> {
+    fn load_credential(&self) -> Result<Option<Credential>> {
         if let (Ok(token), Ok(role_arn)) = (
             env::var(super::constants::AWS_WEB_IDENTITY_TOKEN_FILE),
             env::var(super::constants::AWS_ROLE_ARN),
         ) {
             let token = fs::read_to_string(token).expect("must valid");
+            let role_session_name = env::var(super::constants::AWS_ROLE_SESSION_NAME)
+                .unwrap_or_else(|_| "reqsign".to_string());
 
             // Construct request to AWS STS Service.
-            let mut url = Url::from_str("https://sts.amazonaws.com/").expect("must be valid url");
-            url.query_pairs_mut()
-                .append_pair("Action", "AssumeRoleWithWebIdentity")
-                .append_pair("RoleArn", &role_arn)
-                .append_pair("WebIdentityToken", &token)
-                .append_pair("Version", "2011-06-15")
-                .append_pair(
-                    "RoleSessionName",
-                    &env::var(super::constants::AWS_ROLE_SESSION_NAME)
-                        .unwrap_or_else(|_| "reqsign".to_string()),
-                );
-            let mut req = reqwest::Request::new(http::Method::POST, url);
+            let mut req = isahc::Request::new(isahc::Body::empty());
+            *req.uri_mut() = http::Uri::from_str(&format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}"))
+                .expect("must be valid url");
             req.headers_mut().insert(
                 http::header::CONTENT_TYPE,
                 "application/x-www-form-urlencoded".parse()?,
             );
 
             // Sending and parse response from STS service
-            let resp = reqwest::Client::new().execute(req).await?;
+            let mut resp = isahc::HttpClient::new()?.send(req)?;
             if resp.status() == http::StatusCode::OK {
-                let text = resp.text().await?;
+                let text = resp.text()?;
                 let doc = roxmltree::Document::parse(&text)?;
                 let node = doc
                     .descendants()
@@ -275,7 +260,7 @@ impl CredentialLoad for WebIdentityTokenLoader {
                 return Ok(Some(cred));
             } else {
                 // Print error response if we request sts service failed.
-                warn!("request to AWS STS Services failed: {}", resp.text().await?)
+                warn!("request to AWS STS Services failed: {}", resp.text()?)
             }
         }
 
@@ -299,10 +284,7 @@ mod tests {
         temp_env::with_vars_unset(vec![AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY], || {
             TOKIO.block_on(async {
                 let l = EnvLoader {};
-                let x = l
-                    .load_credential()
-                    .await
-                    .expect("load_credential must success");
+                let x = l.load_credential().expect("load_credential must success");
                 assert!(x.is_none());
             });
         });
@@ -320,7 +302,6 @@ mod tests {
                     let l = EnvLoader {};
                     let x = l
                         .load_credential()
-                        .await
                         .expect("load_credential must success")
                         .expect("credential must be valid");
                     assert_eq!("access_key_id", x.access_key());
@@ -358,7 +339,6 @@ mod tests {
                     let l = ProfileLoader {};
                     let x = l
                         .load_credential()
-                        .await
                         .expect("load_credential must success")
                         .expect("credential must be valid");
                     assert_eq!("config_access_key_id", x.access_key());
@@ -396,7 +376,6 @@ mod tests {
                     let l = ProfileLoader {};
                     let x = l
                         .load_credential()
-                        .await
                         .expect("load_credential must success")
                         .expect("credential must be valid");
                     assert_eq!("shared_access_key_id", x.access_key());
@@ -435,7 +414,6 @@ mod tests {
                     let l = ProfileLoader {};
                     let x = l
                         .load_credential()
-                        .await
                         .expect("load_credential must success")
                         .expect("credential must be valid");
                     assert_eq!("shared_access_key_id", x.access_key());
@@ -458,7 +436,6 @@ mod tests {
             let l = WebIdentityTokenLoader {};
             let x = l
                 .load_credential()
-                .await
                 .expect("load_credential must success")
                 .expect("credential must be valid");
             debug!(

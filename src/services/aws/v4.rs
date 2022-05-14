@@ -3,13 +3,13 @@ use std::fmt::{Debug, Display, Formatter};
 use std::mem;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
 use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use log::debug;
 use percent_encoding::utf8_percent_encode;
-use tokio::sync::RwLock;
 
 use super::credential::Credential;
 use super::loader::*;
@@ -112,7 +112,7 @@ impl Builder {
     /// Use exising information to build a new signer.
     ///
     /// The builder should not be used anymore.
-    pub async fn build(&mut self) -> Result<Signer> {
+    pub fn build(&mut self) -> Result<Signer> {
         let service = self
             .service
             .as_ref()
@@ -130,7 +130,7 @@ impl Builder {
                     .push(WebIdentityTokenLoader::default());
             }
 
-            self.credential_load.load_credential().await?
+            self.credential_load.load_credential()?
         };
         debug!("signer credential: {:?}", &credential);
 
@@ -189,9 +189,9 @@ impl Signer {
     ///
     /// This function should never be exported to avoid credential leaking by
     /// mistake.
-    async fn credential(&self) -> Result<Option<Credential>> {
+    fn credential(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
-        match self.credential.read().await.clone() {
+        match self.credential.read().expect("lock poisoned").clone() {
             None => return Ok(None),
             Some(cred) => {
                 if cred.is_valid() {
@@ -200,8 +200,8 @@ impl Signer {
             }
         }
 
-        if let Some(cred) = self.credential_load.load_credential().await? {
-            let mut lock = self.credential.write().await;
+        if let Some(cred) = self.credential_load.load_credential()? {
+            let mut lock = self.credential.write().expect("lock poisoned");
             *lock = Some(cred.clone());
             Ok(Some(cred))
         } else {
@@ -312,21 +312,20 @@ impl Signer {
     ///         .service("s3")
     ///         .region("test")
     ///         .allow_anonymous()
-    ///         .build()
-    ///         .await?;
+    ///         .build()?;
     ///     // Construct request
     ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
-    ///     signer.sign(&mut req).await?;
+    ///     signer.sign(&mut req)?;
     ///     // Sending already signed request.
     ///     let resp = Client::new().execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
     ///     Ok(())
     /// }
     /// ```
-    pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential().await? {
+    pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
+        if let Some(cred) = self.credential()? {
             let sig = self.calculate(req, &cred)?;
             return self.apply(req, &sig);
         }
@@ -669,13 +668,9 @@ mod tests {
                 .region("test")
                 .service("s3")
                 .time(now)
-                .build()
-                .await?;
+                .build()?;
 
-            let cred = signer
-                .credential()
-                .await?
-                .expect("credential must be valid");
+            let cred = signer.credential()?.expect("credential must be valid");
             let actual = signer.calculate(&req, &cred)?;
             signer.apply(&mut req, &actual).expect("must apply success");
 
@@ -732,13 +727,9 @@ mod tests {
                 .security_token("security_token")
                 .service("s3")
                 .time(now)
-                .build()
-                .await?;
+                .build()?;
 
-            let cred = signer
-                .credential()
-                .await?
-                .expect("credential must be valid");
+            let cred = signer.credential()?.expect("credential must be valid");
             let actual = signer.calculate(&req, &cred)?;
             signer.apply(&mut req, &actual).expect("must apply success");
 
