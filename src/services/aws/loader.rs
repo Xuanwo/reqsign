@@ -20,9 +20,8 @@ use crate::dirs::expand_homedir;
 use crate::time::parse_rfc3339;
 
 /// Loader trait will try to load credential and region from different sources.
-#[async_trait]
 pub trait RegionLoad: Send + Sync {
-    async fn load_region(&self) -> Result<Option<String>>;
+    fn load_region(&self) -> Result<Option<String>>;
 }
 
 #[derive(Default)]
@@ -44,9 +43,9 @@ impl RegionLoadChain {
 
 #[async_trait]
 impl RegionLoad for RegionLoadChain {
-    async fn load_region(&self) -> Result<Option<String>> {
+    fn load_region(&self) -> Result<Option<String>> {
         for l in self.loaders.iter() {
-            if let Some(r) = l.load_region().await? {
+            if let Some(r) = l.load_region()? {
                 return Ok(Some(r));
             }
         }
@@ -77,6 +76,7 @@ impl CredentialLoadChain {
         self
     }
 }
+
 #[async_trait]
 impl CredentialLoad for CredentialLoadChain {
     async fn load_credential(&self) -> Result<Option<Credential>> {
@@ -112,9 +112,8 @@ impl CredentialLoad for EnvLoader {
     }
 }
 
-#[async_trait]
 impl RegionLoad for EnvLoader {
-    async fn load_region(&self) -> Result<Option<String>> {
+    fn load_region(&self) -> Result<Option<String>> {
         if let Ok(region) = env::var(super::constants::AWS_REGION) {
             Ok(Some(region))
         } else {
@@ -187,7 +186,7 @@ impl CredentialLoad for ProfileLoader {
 
 #[async_trait]
 impl RegionLoad for ProfileLoader {
-    async fn load_region(&self) -> Result<Option<String>> {
+    fn load_region(&self) -> Result<Option<String>> {
         let cfg_path = env::var(super::constants::AWS_CONFIG_FILE)
             .unwrap_or_else(|_| "~/.aws/config".to_string());
         if let Some(cfg_path) = expand_homedir(&cfg_path) {
@@ -477,7 +476,7 @@ mod tests {
         temp_env::with_vars_unset(vec![AWS_REGION], || {
             TOKIO.block_on(async {
                 let l = EnvLoader {};
-                let x = l.load_region().await.expect("load_region must success");
+                let x = l.load_region().expect("load_region must success");
                 assert!(x.is_none());
             });
         });
@@ -490,7 +489,6 @@ mod tests {
                 let l = EnvLoader {};
                 let x = l
                     .load_region()
-                    .await
                     .expect("load_credential must success")
                     .expect("region must be valid");
                 assert_eq!("test", x);
@@ -515,7 +513,6 @@ mod tests {
                     let l = ProfileLoader {};
                     let x = l
                         .load_region()
-                        .await
                         .expect("load_credential must success")
                         .expect("region must be valid");
                     assert_eq!("test", x);

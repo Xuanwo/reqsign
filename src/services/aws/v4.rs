@@ -145,8 +145,7 @@ impl Builder {
                 }
 
                 self.region_load
-                    .load_region()
-                    .await?
+                    .load_region()?
                     .ok_or_else(|| anyhow!("region is required"))?
             }
         };

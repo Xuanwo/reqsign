@@ -41,6 +41,7 @@ async fn main() -> Result<()>{
 - Supported services
   - AWS services (SigV4): `reqsign::services::aws::v4::Signer`
   - Azure Storage services: `reqsign::services::azure::storage::Signer`
+  - Google services: `reqsign::services::google::Signer`
 
 ## Contributing
 
