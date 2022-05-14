@@ -3,12 +3,12 @@ use std::fmt::Write;
 use std::fmt::{Debug, Formatter};
 use std::mem;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
 use http::header::*;
 use http::HeaderMap;
 use log::debug;
-use tokio::sync::RwLock;
 
 use super::constants::*;
 use super::credential::Credential;
@@ -62,7 +62,7 @@ impl Builder {
     /// Use exising information to build a new signer.
     ///
     /// The builder should not be used anymore.
-    pub async fn build(&mut self) -> Result<Signer> {
+    pub fn build(&mut self) -> Result<Signer> {
         let credential = if self.credential.is_valid() {
             Some(self.credential.clone())
         } else {
@@ -71,7 +71,7 @@ impl Builder {
                 self.credential_load.push(EnvLoader::default());
             }
 
-            self.credential_load.load_credential().await?
+            self.credential_load.load_credential()?
         };
         debug!("signer credential: {:?}", &credential);
 
@@ -115,9 +115,9 @@ impl Signer {
     ///
     /// This function should never be exported to avoid credential leaking by
     /// mistake.
-    async fn credential(&self) -> Result<Option<Credential>> {
+    fn credential(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
-        match self.credential.read().await.clone() {
+        match self.credential.read().expect("lock poisoned").clone() {
             None => return Ok(None),
             Some(cred) => {
                 if cred.is_valid() {
@@ -126,8 +126,8 @@ impl Signer {
             }
         }
 
-        if let Some(cred) = self.credential_load.load_credential().await? {
-            let mut lock = self.credential.write().await;
+        if let Some(cred) = self.credential_load.load_credential()? {
+            let mut lock = self.credential.write().expect("lock poisoned");
             *lock = Some(cred.clone());
             Ok(Some(cred))
         } else {
@@ -186,21 +186,20 @@ impl Signer {
     ///     let signer = Signer::builder()
     ///         .account_name("account_name")
     ///         .account_key("YWNjb3VudF9rZXkK")
-    ///         .build()
-    ///         .await?;
+    ///         .build()?;
     ///     // Construct request
     ///     let url = Url::parse("https://test.blob.core.windows.net/testbucket/testblob")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
-    ///     signer.sign(&mut req).await?;
+    ///     signer.sign(&mut req)?;
     ///     // Sending already signed request.
     ///     let resp = Client::new().execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
     ///     Ok(())
     /// }
     /// ```
-    pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential().await? {
+    pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
+        if let Some(cred) = self.credential()? {
             let sig = self.calculate(req, &cred)?;
             return self.apply(req, &sig);
         }

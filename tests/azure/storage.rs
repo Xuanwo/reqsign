@@ -4,7 +4,7 @@ use reqsign::services::azure::storage::Signer;
 use reqwest::StatusCode;
 use std::env;
 
-async fn init_signer() -> Option<Signer> {
+fn init_signer() -> Option<Signer> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -25,12 +25,12 @@ async fn init_signer() -> Option<Signer> {
             .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_KEY must set"),
     );
 
-    Some(builder.build().await.expect("signer must be valid"))
+    Some(builder.build().expect("signer must be valid"))
 }
 
 #[tokio::test]
 async fn test_head_blob() -> Result<()> {
-    let signer = init_signer().await;
+    let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
@@ -45,10 +45,7 @@ async fn test_head_blob() -> Result<()> {
         format!("{}/{}", url, "not_exist_file").parse()?,
     );
 
-    signer
-        .sign(&mut req)
-        .await
-        .expect("sign request must success");
+    signer.sign(&mut req).expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
@@ -62,7 +59,7 @@ async fn test_head_blob() -> Result<()> {
 
 #[tokio::test]
 async fn test_list_blobs() -> Result<()> {
-    let signer = init_signer().await;
+    let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
@@ -83,10 +80,7 @@ async fn test_list_blobs() -> Result<()> {
         let mut req =
             reqwest::Request::new(http::Method::GET, format!("{}?{}", url, query).parse()?);
 
-        signer
-            .sign(&mut req)
-            .await
-            .expect("sign request must success");
+        signer.sign(&mut req).expect("sign request must success");
 
         debug!("signed request: {:?}", req);
 

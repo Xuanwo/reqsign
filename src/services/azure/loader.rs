@@ -1,14 +1,12 @@
 use std::env;
 
 use anyhow::Result;
-use async_trait::async_trait;
 
 use super::credential::Credential;
 
 /// Loader trait will try to load credential and region from different sources.
-#[async_trait]
 pub trait CredentialLoad: Send + Sync {
-    async fn load_credential(&self) -> Result<Option<Credential>>;
+    fn load_credential(&self) -> Result<Option<Credential>>;
 }
 
 #[derive(Default)]
@@ -27,11 +25,10 @@ impl CredentialLoadChain {
     }
 }
 
-#[async_trait]
 impl CredentialLoad for CredentialLoadChain {
-    async fn load_credential(&self) -> Result<Option<Credential>> {
+    fn load_credential(&self) -> Result<Option<Credential>> {
         for l in self.loaders.iter() {
-            if let Some(c) = l.load_credential().await? {
+            if let Some(c) = l.load_credential()? {
                 return Ok(Some(c));
             }
         }
@@ -47,9 +44,8 @@ impl CredentialLoad for CredentialLoadChain {
 #[derive(Default, Clone, Debug)]
 pub struct EnvLoader {}
 
-#[async_trait]
 impl CredentialLoad for EnvLoader {
-    async fn load_credential(&self) -> Result<Option<Credential>> {
+    fn load_credential(&self) -> Result<Option<Credential>> {
         if let (Ok(sa), Ok(sk)) = (
             env::var(super::constants::AZURE_STORAGE_ACCOUNT_NAME),
             env::var(super::constants::AZURE_STORAGE_ACCOUNT_KEY),
@@ -83,7 +79,6 @@ mod tests {
                     let l = EnvLoader {};
                     let x = l
                         .load_credential()
-                        .await
                         .expect("load_credential must success")
                         .expect("credential must be valid");
                     assert_eq!("account_name", x.account_name());
