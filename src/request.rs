@@ -73,6 +73,10 @@ pub trait SignableRequest {
 }
 
 /// Implement `SignableRequest` for `reqwest::Request`
+///
+/// # TODO
+///
+/// Make this under feature so that we don't need to depend on reqwest directly.
 impl SignableRequest for reqwest::Request {
     fn method(&self) -> &Method {
         let this = self as &reqwest::Request;
