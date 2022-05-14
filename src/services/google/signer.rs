@@ -1,13 +1,13 @@
 use std::env;
 use std::ops::{Add, Sub};
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
 use http::{header, StatusCode};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use log::error;
-use reqwest::{Body, Request};
-use tokio::sync::RwLock;
+use reqwest::blocking::{Body, Request};
 
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use super::credential::{Claims, Credential, CredentialLoader, Token};
@@ -61,17 +61,17 @@ impl Builder {
     ///
     ///
     /// The builder should not be used anymore.
-    pub async fn build(&mut self) -> Result<Signer> {
+    pub fn build(&mut self) -> Result<Signer> {
         let scope = match &self.scope {
             Some(v) => v.clone(),
             None => return Err(anyhow!("google signer requires scope, but not set")),
         };
 
         let credential_content = match &self.credential {
-            CredentialLoader::Path(v) => tokio::fs::read(&v).await?,
+            CredentialLoader::Path(v) => std::fs::read(&v)?,
             CredentialLoader::Content(v) => base64_decode(v),
             CredentialLoader::None => match env::var(GOOGLE_APPLICATION_CREDENTIALS) {
-                Ok(v) => tokio::fs::read(&v).await?,
+                Ok(v) => std::fs::read(&v)?,
                 Err(err) => {
                     return Err(anyhow!(
                         "google signer requires credential file, but not found: {}",
@@ -87,7 +87,7 @@ impl Builder {
             scope,
             credential,
             token: Arc::new(RwLock::new((Token::default(), DateTime::now_utc()))),
-            client: reqwest::Client::new(),
+            client: reqwest::blocking::Client::new(),
         })
     }
 }
@@ -102,7 +102,7 @@ pub struct Signer {
     credential: Credential,
     token: Arc<RwLock<(Token, DateTime)>>,
 
-    client: reqwest::Client,
+    client: reqwest::blocking::Client,
 }
 
 impl Signer {
@@ -113,7 +113,7 @@ impl Signer {
     /// Exchange token via Google OAuth2 Service.
     ///
     /// Reference: [Using OAuth 2.0 for Server to Server Applications](https://developers.google.com/identity/protocols/oauth2/service-account#authorizingrequests)
-    async fn exchange_token(&self) -> Result<Token> {
+    fn exchange_token(&self) -> Result<Token> {
         let jwt = jsonwebtoken::encode(
             &Header::new(Algorithm::RS256),
             &Claims::new(self.credential.client_email(), &self.scope),
@@ -136,26 +136,26 @@ impl Signer {
                 .finish(),
         ));
 
-        let resp = self.client.execute(req).await?;
+        let resp = self.client.execute(req)?;
         if resp.status() != StatusCode::OK {
             error!("exchange token got unexpected response: {:?}", resp);
             return Err(anyhow!("exchange token failed: {:?}", resp));
         }
 
-        let content = resp.bytes().await?;
+        let content = resp.bytes()?;
         let token: Token = serde_json::from_slice(&content)?;
         Ok(token)
     }
 
-    async fn token(&self) -> Result<Token> {
-        let (token, expire_in) = self.token.read().await.clone();
+    fn token(&self) -> Result<Token> {
+        let (token, expire_in) = self.token.read().expect("lock poisoned").clone();
         if time::now() < expire_in.sub(Duration::minutes(2)) {
             return Ok(token);
         }
 
         let now = time::now();
-        let token = self.exchange_token().await?;
-        let mut lock = self.token.write().await;
+        let token = self.exchange_token()?;
+        let mut lock = self.token.write().expect("lock poisoned");
         *lock = (
             token.clone(),
             now.add(Duration::seconds(token.expires_in() as i64)),
@@ -178,15 +178,14 @@ impl Signer {
     ///     let signer = Signer::builder()
     ///         .scope("https://www.googleapis.com/auth/devstorage.read_only")
     ///         .credential_from_path("/path/to/credential/file")
-    ///         .build()
-    ///         .await?;
+    ///         .build()?;
     ///
     ///     // Construct request
     ///     let url = Url::parse("https://storage.googleapis.com/storage/v1/b/test")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///
     ///     // Signing request with Signer
-    ///     signer.sign(&mut req).await?;
+    ///     signer.sign(&mut req)?;
     ///
     ///     // Sending already signed request.
     ///     let resp = Client::new().execute(req).await?;
@@ -198,8 +197,8 @@ impl Signer {
     /// # TODO
     ///
     /// we can also send API via signed JWT: [Addendum: Service account authorization without OAuth](https://developers.google.com/identity/protocols/oauth2/service-account#jwt-auth)
-    pub async fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        let token = self.token().await?;
+    pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
+        let token = self.token()?;
         req.apply_header(
             header::AUTHORIZATION,
             &format!("Bearer {}", token.access_token()),
@@ -211,12 +210,7 @@ impl Signer {
 
 #[cfg(test)]
 mod tests {
-    use once_cell::sync::Lazy;
-    use tokio::runtime::Runtime;
-
     use super::*;
-
-    static TOKIO: Lazy<Runtime> = Lazy::new(|| Runtime::new().expect("runtime must be valid"));
 
     #[test]
     fn test_builder() {
@@ -231,18 +225,16 @@ mod tests {
                 )),
             )],
             || {
-                TOKIO.block_on(async {
-                    let signer = Signer::builder()
-                        .scope("test")
-                        .build()
-                        .await
-                        .expect("signer must be valid");
-                    assert_eq!(
-                        "test-234@test.iam.gserviceaccount.com",
-                        signer.credential.client_email()
-                    );
-                    assert_eq!(
-                        "-----BEGIN RSA PRIVATE KEY-----
+                let signer = Signer::builder()
+                    .scope("test")
+                    .build()
+                    .expect("signer must be valid");
+                assert_eq!(
+                    "test-234@test.iam.gserviceaccount.com",
+                    signer.credential.client_email()
+                );
+                assert_eq!(
+                    "-----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQDOy4jaJIcVlffi5ENtlNhJ0tsI1zt21BI3DMGtPq7n3Ymow24w
 BV2Z73l4dsqwRo2QVSwnCQ2bVtM2DgckMNDShfWfKe3LRcl96nnn51AtAYIfRnc+
 ogstzxZi4J64f7IR3KIAFxJnzo+a6FS6MmsYMAs8/Oj68fRmCD0AbAs5ZwIDAQAB
@@ -258,9 +250,8 @@ WSjmfo3qemZ6Z5ymHyjMcj9FOE4AtW71Uw6wX7juR3eo7HPwdkRjdK34EDUc9i9o
 V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
 -----END RSA PRIVATE KEY-----
 ",
-                        signer.credential.private_key()
-                    );
-                });
+                    signer.credential.private_key()
+                );
             },
         );
     }

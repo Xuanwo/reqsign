@@ -117,6 +117,51 @@ impl SignableRequest for reqwest::Request {
     }
 }
 
+/// Implement `SignableRequest` for `reqwest::blocking::Request`
+///
+/// # TODO
+///
+/// Make this under feature so that we don't need to depend on reqwest directly.
+impl SignableRequest for reqwest::blocking::Request {
+    fn method(&self) -> &Method {
+        let this = self as &reqwest::blocking::Request;
+        this.method()
+    }
+
+    fn headers(&self) -> &HeaderMap {
+        let this = self as &reqwest::blocking::Request;
+        this.headers()
+    }
+
+    fn path(&self) -> &str {
+        let this = self as &reqwest::blocking::Request;
+        this.url().path()
+    }
+
+    fn query(&self) -> Option<&str> {
+        let this = self as &reqwest::blocking::Request;
+        this.url().query()
+    }
+
+    fn host(&self) -> &str {
+        let this = self as &reqwest::blocking::Request;
+        this.url().host_str().expect("request uri must have host")
+    }
+
+    fn port(&self) -> Option<usize> {
+        let this = self as &reqwest::blocking::Request;
+        this.url().port().map(|v| v as usize)
+    }
+
+    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+        let mut value: HeaderValue = value.parse()?;
+        value.set_sensitive(true);
+        self.headers_mut().insert(name, value);
+
+        Ok(())
+    }
+}
+
 /// Implement `SignableRequest` for `http::Request`
 impl<T> SignableRequest for http::Request<T> {
     fn method(&self) -> &Method {
