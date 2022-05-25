@@ -25,7 +25,6 @@ jobs:
           - windows-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: Swatinem/rust-cache@v1
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -41,7 +40,6 @@ jobs:
           - windows-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: Swatinem/rust-cache@v1
       - name: Test
         uses: actions-rs/cargo@v1
         with:
@@ -61,7 +59,9 @@ jobs:
           REQSIGN_AWS_V4_URL: ${{ secrets.REQSIGN_AWS_V4_URL }}
           REQSIGN_AWS_V4_REGION: ${{ secrets.REQSIGN_AWS_V4_REGION }}
           REQSIGN_AWS_V4_ACCESS_KEY: ${{ secrets.REQSIGN_AWS_V4_ACCESS_KEY }}
-          REQSIGN_AWS_V4_SECRET_KEY: ${{ secrets.REQSIGN_AWS_V4_SECRET_KEY }}
+          REQSIGN_AWS_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ROLE_ARN }}
+          REQSIGN_AWS_IDP_URL: ${{ secrets.REQSIGN_AWS_IDP_URL }}
+          REQSIGN_AWS_IDP_BODY: ${{ secrets.REQSIGN_AWS_IDP_BODY }}
           # Google Cloud Storage Test
           REQSIGN_GOOGLE_TEST: ${{ secrets.REQSIGN_GOOGLE_TEST }}
           REQSIGN_GOOGLE_CREDENTIAL: ${{ secrets.REQSIGN_GOOGLE_CREDENTIAL }}
