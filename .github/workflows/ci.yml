@@ -1,6 +1,6 @@
 name: CI
 
-on: [push, pull_request]
+on: [ push, pull_request ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
@@ -59,6 +59,7 @@ jobs:
           REQSIGN_AWS_V4_URL: ${{ secrets.REQSIGN_AWS_V4_URL }}
           REQSIGN_AWS_V4_REGION: ${{ secrets.REQSIGN_AWS_V4_REGION }}
           REQSIGN_AWS_V4_ACCESS_KEY: ${{ secrets.REQSIGN_AWS_V4_ACCESS_KEY }}
+          REQSIGN_AWS_V4_SECRET_KEY: ${{ secrets.REQSIGN_AWS_V4_SECRET_KEY }}
           REQSIGN_AWS_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ROLE_ARN }}
           REQSIGN_AWS_IDP_URL: ${{ secrets.REQSIGN_AWS_IDP_URL }}
           REQSIGN_AWS_IDP_BODY: ${{ secrets.REQSIGN_AWS_IDP_BODY }}
