@@ -212,14 +212,17 @@ impl CredentialLoad for WebIdentityTokenLoader {
             env::var(super::constants::AWS_WEB_IDENTITY_TOKEN_FILE),
             env::var(super::constants::AWS_ROLE_ARN),
         ) {
-            let token = fs::read_to_string(token).expect("must valid");
+            let token = fs::read_to_string(token)
+                .expect("must valid")
+                .trim()
+                .to_string();
             let role_session_name = env::var(super::constants::AWS_ROLE_SESSION_NAME)
                 .unwrap_or_else(|_| "reqsign".to_string());
 
             // Construct request to AWS STS Service.
             let mut req = isahc::Request::new(isahc::Body::empty());
-            *req.uri_mut() = http::Uri::from_str(&format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}"))
-                .expect("must be valid url");
+            let url = format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
+            *req.uri_mut() = http::Uri::from_str(&url).expect("must be valid url");
             req.headers_mut().insert(
                 http::header::CONTENT_TYPE,
                 "application/x-www-form-urlencoded".parse()?,
@@ -270,7 +273,6 @@ impl CredentialLoad for WebIdentityTokenLoader {
 
 #[cfg(test)]
 mod tests {
-    use log::debug;
     use once_cell::sync::Lazy;
     use tokio::runtime::Runtime;
 
@@ -421,31 +423,6 @@ mod tests {
                 });
             },
         );
-    }
-
-    /// This test relay on `AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN`
-    /// been set correctly.
-    ///
-    /// Please verify logic manually until we find a way to test it.
-    #[test]
-    #[ignore]
-    fn test_credential_web_loader() {
-        env_logger::init();
-
-        TOKIO.block_on(async {
-            let l = WebIdentityTokenLoader {};
-            let x = l
-                .load_credential()
-                .expect("load_credential must success")
-                .expect("credential must be valid");
-            debug!(
-                "ak: {}, sk: {}, token: {:?}, valid: {}",
-                x.access_key(),
-                x.secret_key(),
-                x.security_token(),
-                x.is_valid()
-            );
-        });
     }
 
     #[test]
