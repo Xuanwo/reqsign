@@ -91,8 +91,8 @@ fn test_signer_with_web_loader() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn test_head_object() -> Result<()> {
+#[test]
+fn test_head_object() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
@@ -118,8 +118,8 @@ async fn test_head_object() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn test_head_object_with_special_characters() -> Result<()> {
+#[test]
+fn test_head_object_with_special_characters() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
@@ -145,8 +145,8 @@ async fn test_head_object_with_special_characters() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn test_list_bucket() -> Result<()> {
+#[test]
+fn test_list_bucket() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
