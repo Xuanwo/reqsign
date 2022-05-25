@@ -7,12 +7,15 @@
 //! - EC2 Instance Metadata Service (IAM Roles attached to instance)
 
 use std::str::FromStr;
+use std::thread::sleep;
 use std::{env, fs};
 
 use anyhow::{anyhow, Result};
 use ini::Ini;
 use isahc::ReadResponseExt;
 use log::warn;
+use quick_xml::de;
+use serde::Deserialize;
 
 use super::credential::Credential;
 use crate::dirs::expand_homedir;
@@ -219,61 +222,79 @@ impl CredentialLoad for WebIdentityTokenLoader {
             let role_session_name = env::var(super::constants::AWS_ROLE_SESSION_NAME)
                 .unwrap_or_else(|_| "reqsign".to_string());
 
-            // Construct request to AWS STS Service.
-            let mut req = isahc::Request::new(isahc::Body::empty());
-            let url = format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
-            *req.uri_mut() = http::Uri::from_str(&url).expect("must be valid url");
-            req.headers_mut().insert(
-                http::header::CONTENT_TYPE,
-                "application/x-www-form-urlencoded".parse()?,
-            );
+            let mut retry = backon::ExponentialBackoff::default();
 
-            // Sending and parse response from STS service
-            let mut resp = isahc::HttpClient::new()?.send(req)?;
-            if resp.status() == http::StatusCode::OK {
-                let text = resp.text()?;
-                let doc = roxmltree::Document::parse(&text)?;
-                let node = doc
-                    .descendants()
-                    .find(|n| n.tag_name().name() == "Credentials")
-                    .ok_or_else(|| anyhow!("Credentials not found in STS response"))?;
+            let mut resp = loop {
+                // Construct request to AWS STS Service.
+                let mut req = isahc::Request::new(isahc::Body::empty());
+                let url = format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
+                *req.uri_mut() = http::Uri::from_str(&url).expect("must be valid url");
+                req.headers_mut().insert(
+                    http::header::CONTENT_TYPE,
+                    "application/x-www-form-urlencoded".parse()?,
+                );
 
-                let mut builder = Credential::builder();
-                for n in node.children() {
-                    match n.tag_name().name() {
-                        "AccessKeyId" => {
-                            builder.access_key(n.text().expect("AccessKeyId must be exist"));
-                        }
-                        "SecretAccessKey" => {
-                            builder.secret_key(n.text().expect("SecretAccessKey must be exist"));
-                        }
-                        "SessionToken" => {
-                            builder.security_token(n.text().expect("SessionToken must be exist"));
-                        }
-                        "Expiration" => {
-                            let text = n.text().expect("Expiration must be exist");
+                let mut resp = isahc::HttpClient::new()?.send(req)?;
+                if resp.status() == http::StatusCode::OK {
+                    break resp;
+                } else {
+                    let content = resp.text()?;
+                    warn!("request to AWS STS Services failed: {content}");
 
-                            builder.expires_in(parse_rfc3339(text)?);
+                    match retry.next() {
+                        Some(dur) => sleep(dur),
+                        None => {
+                            return Err(anyhow!(
+                                "request to AWS STS Services still failed after retry: {}",
+                                content
+                            ))
                         }
-                        _ => {}
                     }
                 }
-                let cred = builder.build()?;
+            };
 
-                return Ok(Some(cred));
-            } else {
-                // Print error response if we request sts service failed.
-                warn!("request to AWS STS Services failed: {}", resp.text()?)
-            }
+            let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.text()?)?;
+            let cred = resp.result.credentials;
+
+            let mut builder = Credential::builder();
+            builder.access_key(&cred.access_key_id);
+            builder.secret_key(&cred.secret_access_key);
+            builder.security_token(&cred.session_token);
+            builder.expires_in(parse_rfc3339(&cred.expiration)?);
+
+            return Ok(Some(builder.build()?));
         }
 
         Ok(None)
     }
 }
 
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct AssumeRoleWithWebIdentityResponse {
+    #[serde(rename = "AssumeRoleWithWebIdentityResult")]
+    result: AssumeRoleWithWebIdentityResult,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct AssumeRoleWithWebIdentityResult {
+    credentials: AssumeRoleWithWebIdentityCredentials,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct AssumeRoleWithWebIdentityCredentials {
+    access_key_id: String,
+    secret_access_key: String,
+    session_token: String,
+    expiration: String,
+}
+
 #[cfg(test)]
 mod tests {
     use once_cell::sync::Lazy;
+    use quick_xml::de;
     use tokio::runtime::Runtime;
 
     use super::*;
@@ -473,5 +494,42 @@ mod tests {
                 });
             },
         );
+    }
+
+    #[test]
+    fn test_parse_assume_role_with_web_identity_response() -> Result<()> {
+        let content = r#"<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+  <AssumeRoleWithWebIdentityResult>
+    <Audience>test_audience</Audience>
+    <AssumedRoleUser>
+      <AssumedRoleId>role_id:reqsign</AssumedRoleId>
+      <Arn>arn:aws:sts::123:assumed-role/reqsign/reqsign</Arn>
+    </AssumedRoleUser>
+    <Provider>arn:aws:iam::123:oidc-provider/example.com/</Provider>
+    <Credentials>
+      <AccessKeyId>access_key_id</AccessKeyId>
+      <SecretAccessKey>secret_access_key</SecretAccessKey>
+      <SessionToken>session_token</SessionToken>
+      <Expiration>2022-05-25T11:45:17Z</Expiration>
+    </Credentials>
+    <SubjectFromWebIdentityToken>subject</SubjectFromWebIdentityToken>
+  </AssumeRoleWithWebIdentityResult>
+  <ResponseMetadata>
+    <RequestId>b1663ad1-23ab-45e9-b465-9af30b202eba</RequestId>
+  </ResponseMetadata>
+</AssumeRoleWithWebIdentityResponse>"#;
+
+        let resp: AssumeRoleWithWebIdentityResponse =
+            de::from_str(content).expect("xml deserialize must success");
+
+        assert_eq!(&resp.result.credentials.access_key_id, "access_key_id");
+        assert_eq!(
+            &resp.result.credentials.secret_access_key,
+            "secret_access_key"
+        );
+        assert_eq!(&resp.result.credentials.session_token, "session_token");
+        assert_eq!(&resp.result.credentials.expiration, "2022-05-25T11:45:17Z");
+
+        Ok(())
     }
 }
