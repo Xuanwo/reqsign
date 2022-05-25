@@ -5,9 +5,9 @@ use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
 use http::{header, StatusCode};
+use isahc::{ReadResponseExt, Request};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use log::error;
-use reqwest::blocking::{Body, Request};
 
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use super::credential::{Claims, Credential, CredentialLoader, Token};
@@ -87,7 +87,7 @@ impl Builder {
             scope,
             credential,
             token: Arc::new(RwLock::new((Token::default(), DateTime::now_utc()))),
-            client: reqwest::blocking::Client::new(),
+            client: isahc::HttpClient::new()?,
         })
     }
 }
@@ -102,7 +102,7 @@ pub struct Signer {
     credential: Credential,
     token: Arc<RwLock<(Token, DateTime)>>,
 
-    client: reqwest::blocking::Client,
+    client: isahc::HttpClient,
 }
 
 impl Signer {
@@ -121,22 +121,20 @@ impl Signer {
         )?;
 
         let mut req = Request::new(
-            http::Method::POST,
-            "https://oauth2.googleapis.com/token".parse()?,
+            form_urlencoded::Serializer::new(String::new())
+                .append_pair("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
+                .append_pair("assertion", &jwt)
+                .finish(),
         );
+        *req.method_mut() = http::Method::POST;
+        *req.uri_mut() = "https://oauth2.googleapis.com/token".parse()?;
         // Insert content_type in header
         req.headers_mut().insert(
             header::CONTENT_TYPE,
             "application/x-www-form-urlencoded".parse()?,
         );
-        *req.body_mut() = Some(Body::from(
-            form_urlencoded::Serializer::new(String::new())
-                .append_pair("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
-                .append_pair("assertion", &jwt)
-                .finish(),
-        ));
 
-        let resp = self.client.execute(req)?;
+        let mut resp = self.client.send(req)?;
         if resp.status() != StatusCode::OK {
             error!("exchange token got unexpected response: {:?}", resp);
             return Err(anyhow!("exchange token failed: {:?}", resp));
