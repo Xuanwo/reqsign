@@ -46,7 +46,8 @@ fn test_signer_with_web_loader() -> Result<()> {
 
     let role_arn = env::var("REQSIGN_AWS_ROLE_ARN").expect("REQSIGN_AWS_ROLE_ARN not exist");
     let idp_url = env::var("REQSIGN_AWS_IDP_URL").expect("REQSIGN_AWS_IDP_URL not exist");
-    let idp_content = env::var("REQSIGN_AWS_IDP_BODY").expect("REQSIGN_AWS_IDP_BODY not exist");
+    let idp_content =
+        base64::decode(env::var("REQSIGN_AWS_IDP_BODY").expect("REQSIGN_AWS_IDP_BODY not exist"))?;
 
     let mut req = http::Request::new(idp_content);
     *req.method_mut() = http::Method::POST;
