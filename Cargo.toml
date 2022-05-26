@@ -27,7 +27,7 @@ jsonwebtoken = "8.0.1"
 log = "0.4"
 once_cell = "1"
 percent-encoding = "2"
-quick-xml = { version = "0.22.0", features = ["serialize"] }
+quick-xml = { version = "0.23.0", features = ["serialize"] }
 reqwest = { version = "0.11", features = ["blocking"] }
 rust-ini = "0.18"
 serde = { version = "1.0.136", features = ["derive"] }
