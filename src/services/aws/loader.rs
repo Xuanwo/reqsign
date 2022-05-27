@@ -222,10 +222,10 @@ impl CredentialLoad for WebIdentityTokenLoader {
             let role_session_name = env::var(super::constants::AWS_ROLE_SESSION_NAME)
                 .unwrap_or_else(|_| "reqsign".to_string());
 
-            /// Based on our user reports, AWS STS may need 10s to reach consistency
-            /// Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
-            ///
-            /// Reference: <https://github.com/datafuselabs/opendal/issues/288>
+            // Based on our user reports, AWS STS may need 10s to reach consistency
+            // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
+            //
+            // Reference: <https://github.com/datafuselabs/opendal/issues/288>
             let mut retry = backon::ExponentialBackoff::default()
                 .with_max_times(4)
                 .with_jitter();
