@@ -11,6 +11,7 @@ use std::thread::sleep;
 use std::{env, fs};
 
 use anyhow::{anyhow, Result};
+use backon::ExponentialBackoff;
 use ini::Ini;
 use isahc::ReadResponseExt;
 use log::warn;
@@ -211,53 +212,58 @@ pub struct WebIdentityTokenLoader {}
 
 impl CredentialLoad for WebIdentityTokenLoader {
     fn load_credential(&self) -> Result<Option<Credential>> {
-        if let (Ok(token), Ok(role_arn)) = (
-            env::var(super::constants::AWS_WEB_IDENTITY_TOKEN_FILE),
-            env::var(super::constants::AWS_ROLE_ARN),
-        ) {
-            let token = fs::read_to_string(token)
-                .expect("must valid")
-                .trim()
-                .to_string();
-            let role_session_name = env::var(super::constants::AWS_ROLE_SESSION_NAME)
-                .unwrap_or_else(|_| "reqsign".to_string());
+        // Based on our user reports, AWS STS may need 10s to reach consistency
+        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
+        //
+        // Reference: <https://github.com/datafuselabs/opendal/issues/288>
+        let mut retry = ExponentialBackoff::default()
+            .with_max_times(4)
+            .with_jitter();
 
-            // Based on our user reports, AWS STS may need 10s to reach consistency
-            // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
-            //
-            // Reference: <https://github.com/datafuselabs/opendal/issues/288>
-            let mut retry = backon::ExponentialBackoff::default()
-                .with_max_times(4)
-                .with_jitter();
-
-            let mut resp = loop {
-                // Construct request to AWS STS Service.
-                let mut req = isahc::Request::new(isahc::Body::empty());
-                let url = format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
-                *req.uri_mut() = http::Uri::from_str(&url).expect("must be valid url");
-                req.headers_mut().insert(
-                    http::header::CONTENT_TYPE,
-                    "application/x-www-form-urlencoded".parse()?,
-                );
-
-                let mut resp = isahc::HttpClient::new()?.send(req)?;
-                if resp.status() == http::StatusCode::OK {
-                    break resp;
-                } else {
-                    let content = resp.text()?;
-                    warn!("request to AWS STS Services failed: {content}");
+        loop {
+            match self.load_credential_inner() {
+                Ok(v) => return Ok(v),
+                Err(e) => {
+                    warn!("load credential from AWS STS Services failed: {e}");
 
                     match retry.next() {
                         Some(dur) => sleep(dur),
                         None => {
                             return Err(anyhow!(
-                                "request to AWS STS Services still failed after retry: {}",
-                                content
-                            ))
+                            "load credential from AWS STS Services still failed after retry: {e}",
+                        ))
                         }
                     }
                 }
-            };
+            }
+        }
+    }
+}
+
+impl WebIdentityTokenLoader {
+    fn load_credential_inner(&self) -> Result<Option<Credential>> {
+        if let (Ok(token), Ok(role_arn)) = (
+            env::var(super::constants::AWS_WEB_IDENTITY_TOKEN_FILE),
+            env::var(super::constants::AWS_ROLE_ARN),
+        ) {
+            let token = fs::read_to_string(token)?.trim().to_string();
+            let role_session_name = env::var(super::constants::AWS_ROLE_SESSION_NAME)
+                .unwrap_or_else(|_| "reqsign".to_string());
+
+            // Construct request to AWS STS Service.
+            let mut req = isahc::Request::new(isahc::Body::empty());
+            let url = format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
+            *req.uri_mut() = http::Uri::from_str(&url)?;
+            req.headers_mut().insert(
+                http::header::CONTENT_TYPE,
+                "application/x-www-form-urlencoded".parse()?,
+            );
+
+            let mut resp = isahc::HttpClient::new()?.send(req)?;
+            if resp.status() != http::StatusCode::OK {
+                let content = resp.text()?;
+                return Err(anyhow!("request to AWS STS Services failed: {content}"));
+            }
 
             let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.text()?)?;
             let cred = resp.result.credentials;
