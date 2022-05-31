@@ -23,11 +23,12 @@ async fn main() -> Result<()>{
     // Signer will load region and credentials from environment by default.
     let signer = Signer::builder().service("s3").build()?;
     // Construct request
-    let url = Url::parse( "https://s3.amazonaws.com/testbucket")?;
+    let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
     let mut req = reqwest::Request::new(http::Method::GET, url);
+
     // Signing request with Signer
     signer.sign(&mut req)?;
-  
+
     // Sending already signed request.
     let resp = Client::new().execute(req).await?;
     println!("resp got status: {}", resp.status());
