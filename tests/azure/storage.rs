@@ -1,7 +1,7 @@
 use anyhow::Result;
+use http::StatusCode;
 use log::{debug, warn};
 use reqsign::services::azure::storage::Signer;
-use reqwest::StatusCode;
 use std::env;
 
 fn init_signer() -> Option<Signer> {
@@ -28,8 +28,8 @@ fn init_signer() -> Option<Signer> {
     Some(builder.build().expect("signer must be valid"))
 }
 
-#[tokio::test]
-async fn test_head_blob() -> Result<()> {
+#[test]
+fn test_head_blob() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
@@ -40,25 +40,25 @@ async fn test_head_blob() -> Result<()> {
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let mut req = reqwest::Request::new(
-        http::Method::HEAD,
-        format!("{}/{}", url, "not_exist_file").parse()?,
-    );
+    let mut builder = isahc::Request::builder();
+    builder = builder.method(http::Method::HEAD);
+    builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
+    let mut req = builder.body(isahc::Body::empty())?;
 
     signer.sign(&mut req).expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
-    let client = reqwest::Client::new();
-    let resp = client.execute(req).await.expect("request must success");
+    let client = isahc::HttpClient::new()?;
+    let resp = client.send(req).expect("request must success");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
 
-#[tokio::test]
-async fn test_list_blobs() -> Result<()> {
+#[test]
+fn test_list_blobs() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
@@ -77,15 +77,17 @@ async fn test_list_blobs() -> Result<()> {
         // With encoded prefix
         "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
     ] {
-        let mut req =
-            reqwest::Request::new(http::Method::GET, format!("{}?{}", url, query).parse()?);
+        let mut builder = isahc::Request::builder();
+        builder = builder.method(http::Method::GET);
+        builder = builder.uri(format!("{}?{}", url, query));
+        let mut req = builder.body(isahc::Body::empty())?;
 
         signer.sign(&mut req).expect("sign request must success");
 
         debug!("signed request: {:?}", req);
 
-        let client = reqwest::Client::new();
-        let resp = client.execute(req).await.expect("request must success");
+        let client = isahc::HttpClient::new()?;
+        let resp = client.send(req).expect("request must success");
 
         debug!("got response: {:?}", resp);
         assert_eq!(StatusCode::OK, resp.status());
