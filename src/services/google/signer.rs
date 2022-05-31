@@ -106,6 +106,7 @@ pub struct Signer {
 }
 
 impl Signer {
+    /// Create a builder of Signer.
     pub fn builder() -> Builder {
         Builder::default()
     }

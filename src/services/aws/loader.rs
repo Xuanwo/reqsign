@@ -22,21 +22,33 @@ use super::credential::Credential;
 use crate::dirs::expand_homedir;
 use crate::time::parse_rfc3339;
 
-/// Loader trait will try to load credential and region from different sources.
+/// Loader trait will try to load region from different sources.
 pub trait RegionLoad: Send + Sync {
+    /// Load region from sources.
+    ///
+    /// - If succeed, return `Ok(Some(region))`
+    /// - If not found, return `Ok(None)`
+    /// - If unexpected errors happened, return `Err(err)`
     fn load_region(&self) -> Result<Option<String>>;
 }
 
+/// RegionLoadChain will try to load region via the insert order.
+///
+/// - If found, return directly.
+/// - If not found, keep going and try next one.
+/// - If meeting error, return directly.
 #[derive(Default)]
 pub struct RegionLoadChain {
     loaders: Vec<Box<dyn RegionLoad + 'static>>,
 }
 
 impl RegionLoadChain {
+    /// Check if this chain is empty.
     pub fn is_empty(&self) -> bool {
         self.loaders.is_empty()
     }
 
+    /// Insert new loaders into chain.
     pub fn push(&mut self, l: impl RegionLoad + 'static) -> &mut Self {
         self.loaders.push(Box::new(l));
 
@@ -56,21 +68,33 @@ impl RegionLoad for RegionLoadChain {
     }
 }
 
-/// Loader trait will try to load credential and region from different sources.
+/// Loader trait will try to load credential from different sources.
 pub trait CredentialLoad: Send + Sync {
+    /// Load credential from sources.
+    ///
+    /// - If succeed, return `Ok(Some(cred))`
+    /// - If not found, return `Ok(None)`
+    /// - If unexpected errors happened, return `Err(err)`
     fn load_credential(&self) -> Result<Option<Credential>>;
 }
 
+/// CredentialLoadChain will try to load credential via the insert order.
+///
+/// - If found, return directly.
+/// - If not found, keep going and try next one.
+/// - If meeting error, return directly.
 #[derive(Default)]
 pub struct CredentialLoadChain {
     loaders: Vec<Box<dyn CredentialLoad>>,
 }
 
 impl CredentialLoadChain {
+    /// Check if this chain is empty.
     pub fn is_empty(&self) -> bool {
         self.loaders.is_empty()
     }
 
+    /// Insert new loaders into chain.
     pub fn push(&mut self, l: impl CredentialLoad + 'static) -> &mut Self {
         self.loaders.push(Box::new(l));
 
