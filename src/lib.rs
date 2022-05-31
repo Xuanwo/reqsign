@@ -40,13 +40,16 @@
 //!
 //! - `reqwest_request`: Enable to support signing [`reqwest::Request`]
 //! - `reqwest_blocking_request`: Enable to support signing [`reqwest::blocking::Request`]
+//! - `http_types_request`: Enable to support signing [`http_types::Request`]
 
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
-pub mod request;
 pub mod services;
+pub mod time;
 
 pub(crate) mod dirs;
 pub(crate) mod hash;
-pub mod time;
+
+mod request;
+pub use request::SignableRequest;

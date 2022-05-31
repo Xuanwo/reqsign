@@ -12,8 +12,9 @@ version = "0.0.5"
 all-features = true
 
 [features]
-reqwest_request = ["reqwest"]
+http_types_request = ["http-types"]
 reqwest_blocking_request = ["reqwest/blocking"]
+reqwest_request = ["reqwest"]
 
 [[bench]]
 harness = false
@@ -29,6 +30,7 @@ form_urlencoded = "1"
 hex = "0.4"
 hmac = "0.12"
 http = "0.2"
+http-types = { version = "2.12.0", optional = true }
 isahc = "1.7.2"
 jsonwebtoken = "8.0.1"
 log = "0.4"
