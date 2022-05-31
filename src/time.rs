@@ -6,15 +6,19 @@ use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::OffsetDateTime;
 
+/// DateTime is an alias of [`time::OffsetDateTime`]
+///
 /// We will use UTC time across the whole reqsign lib.
-pub type DateTime = time::OffsetDateTime;
+pub type DateTime = OffsetDateTime;
+/// Duration is an alias of [`time::Duration`]
 pub type Duration = time::Duration;
 
 /// Create datetime of now.
 pub fn now() -> DateTime {
-    time::OffsetDateTime::now_utc()
+    OffsetDateTime::now_utc()
 }
 
+/// DATE is a time format like `20220301`
 pub const DATE: &[FormatItem<'static>] = format_description!("[year][month][day]");
 
 /// Format time into date: `20220301`
@@ -22,6 +26,7 @@ pub fn format_date(t: DateTime) -> String {
     t.format(DATE).expect("time must be valid")
 }
 
+/// ISO8601 is a time format like `20220313T072004Z`.
 pub const ISO8601: &[FormatItem<'static>] =
     format_description!("[year][month][day]T[hour][minute][second]Z");
 
@@ -30,6 +35,7 @@ pub fn format_iso8601(t: DateTime) -> String {
     t.format(ISO8601).expect("time must be valid")
 }
 
+/// HTTP_DATE is a time format like `Sun, 06 Nov 1994 08:49:37 GMT`.
 pub const HTTP_DATE: &[FormatItem<'static>] = format_description!(
     "[weekday repr:short], [day] [month repr:short] [year] [hour]:[minute]:[second] GMT"
 );

@@ -1,3 +1,5 @@
+//! AWS service sigv4 signer
+
 use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 use std::mem;

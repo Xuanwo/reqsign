@@ -1,3 +1,5 @@
+//! Azure storage singer
+
 use std::borrow::Cow;
 use std::fmt::Write;
 use std::fmt::{Debug, Formatter};
@@ -213,6 +215,7 @@ impl Signer {
     }
 }
 
+/// Singed output carries result of this signing.
 pub struct SignedOutput {
     account_name: String,
     signed_time: DateTime,
@@ -277,13 +280,6 @@ fn string_to_sign(req: &impl SignableRequest, cred: &Credential, now: DateTime) 
     debug!("string to sign: {}", &s);
 
     Ok(s)
-}
-
-pub fn add_if_exists<K: AsHeaderName>(h: &HeaderMap, key: K) -> &str {
-    match h.get(key) {
-        Some(ce) => ce.to_str().unwrap(),
-        None => "",
-    }
 }
 
 /// ## Reference
