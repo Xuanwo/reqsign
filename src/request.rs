@@ -11,9 +11,9 @@ use http::{HeaderMap, HeaderValue, Method};
 /// uri components instead of a complete struct.
 pub trait SignableRequest {
     /// Get method of request.
-    fn method(&self) -> &Method;
+    fn method(&self) -> Method;
     /// Get header of request.
-    fn headers(&self) -> &HeaderMap;
+    fn headers(&self) -> HeaderMap;
 
     /// Get path of request.
     ///
@@ -72,16 +72,16 @@ pub trait SignableRequest {
     fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()>;
 }
 
-/// Implement `SignableRequest` for `http::Request`
+/// Implement `SignableRequest` for [`http::Request`]
 impl<T> SignableRequest for http::Request<T> {
-    fn method(&self) -> &Method {
+    fn method(&self) -> Method {
         let this = self as &http::Request<T>;
-        this.method()
+        this.method().clone()
     }
 
-    fn headers(&self) -> &HeaderMap {
+    fn headers(&self) -> HeaderMap {
         let this = self as &http::Request<T>;
-        this.headers()
+        this.headers().clone()
     }
 
     fn path(&self) -> &str {
@@ -113,21 +113,17 @@ impl<T> SignableRequest for http::Request<T> {
     }
 }
 
-/// Implement `SignableRequest` for `reqwest::Request`
-///
-/// # TODO
-///
-/// Make this under feature so that we don't need to depend on reqwest directly.
+/// Implement `SignableRequest` for [`reqwest::Request`]
 #[cfg(feature = "reqwest_request")]
 impl SignableRequest for reqwest::Request {
-    fn method(&self) -> &Method {
+    fn method(&self) -> Method {
         let this = self as &reqwest::Request;
-        this.method()
+        this.method().clone()
     }
 
-    fn headers(&self) -> &HeaderMap {
+    fn headers(&self) -> HeaderMap {
         let this = self as &reqwest::Request;
-        this.headers()
+        this.headers().clone()
     }
 
     fn path(&self) -> &str {
@@ -159,21 +155,17 @@ impl SignableRequest for reqwest::Request {
     }
 }
 
-/// Implement `SignableRequest` for `reqwest::blocking::Request`
-///
-/// # TODO
-///
-/// Make this under feature so that we don't need to depend on reqwest directly.
+/// Implement `SignableRequest` for [`reqwest::blocking::Request`]
 #[cfg(feature = "reqwest_blocking_request")]
 impl SignableRequest for reqwest::blocking::Request {
-    fn method(&self) -> &Method {
+    fn method(&self) -> Method {
         let this = self as &reqwest::blocking::Request;
-        this.method()
+        this.method().clone()
     }
 
-    fn headers(&self) -> &HeaderMap {
+    fn headers(&self) -> HeaderMap {
         let this = self as &reqwest::blocking::Request;
-        this.headers()
+        this.headers().clone()
     }
 
     fn path(&self) -> &str {
@@ -200,6 +192,75 @@ impl SignableRequest for reqwest::blocking::Request {
         let mut value: HeaderValue = value.parse()?;
         value.set_sensitive(true);
         self.headers_mut().insert(name, value);
+
+        Ok(())
+    }
+}
+
+/// Implement `SignableRequest` for [`http_types::Request`]
+#[cfg(feature = "http_types_request")]
+impl SignableRequest for http_types::Request {
+    fn method(&self) -> Method {
+        use std::str::FromStr;
+
+        let this = self as &http_types::Request;
+        match this.method() {
+            http_types::Method::Connect => Method::CONNECT,
+            http_types::Method::Delete => Method::DELETE,
+            http_types::Method::Get => Method::GET,
+            http_types::Method::Head => Method::HEAD,
+            http_types::Method::Options => Method::OPTIONS,
+            http_types::Method::Patch => Method::PATCH,
+            http_types::Method::Post => Method::POST,
+            http_types::Method::Put => Method::PUT,
+            http_types::Method::Trace => Method::TRACE,
+            v => Method::from_str(v.as_ref()).expect("must be valid http method"),
+        }
+    }
+
+    fn headers(&self) -> HeaderMap {
+        use std::str::FromStr;
+
+        let this = self as &http_types::Request;
+        let mut map = HeaderMap::new();
+        for name in this.header_names() {
+            map.insert(
+                HeaderName::from_str(name.as_str()).expect("must be valid header name"),
+                HeaderValue::from_str(this.header(name).expect("header value must exist").as_str())
+                    .expect("must be valid header value"),
+            );
+        }
+
+        map
+    }
+
+    fn path(&self) -> &str {
+        let this = self as &http_types::Request;
+        this.url().path()
+    }
+
+    fn query(&self) -> Option<&str> {
+        let this = self as &http_types::Request;
+        this.url().query()
+    }
+
+    fn host(&self) -> &str {
+        let this = self as &http_types::Request;
+        this.url().host_str().expect("request url must have host")
+    }
+
+    fn port(&self) -> Option<usize> {
+        let this = self as &http_types::Request;
+        this.url().port().map(|v| v as usize)
+    }
+
+    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+        self.insert_header(
+            name.as_str(),
+            value
+                .parse::<http_types::headers::HeaderValue>()
+                .expect("header value must be valid"),
+        );
 
         Ok(())
     }

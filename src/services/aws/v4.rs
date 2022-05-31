@@ -353,7 +353,7 @@ impl Debug for Signer {
 
 #[derive(Clone)]
 struct CanonicalRequest<'a> {
-    method: &'a http::Method,
+    method: http::Method,
     path: &'a str,
     params: Option<String>,
     headers: http::HeaderMap,

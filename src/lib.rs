@@ -40,6 +40,7 @@
 //!
 //! - `reqwest_request`: Enable to support signing [`reqwest::Request`]
 //! - `reqwest_blocking_request`: Enable to support signing [`reqwest::blocking::Request`]
+//! - `http_types_request`: Enable to support signing [`http_types::Request`]
 
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]

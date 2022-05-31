@@ -259,21 +259,21 @@ fn string_to_sign(req: &impl SignableRequest, cred: &Credential, now: DateTime) 
     let mut s = String::new();
 
     writeln!(&mut s, "{}", req.method().as_str())?;
-    writeln!(&mut s, "{}", get_or_default(h, &CONTENT_ENCODING)?)?;
-    writeln!(&mut s, "{}", get_or_default(h, &CONTENT_LANGUAGE)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_ENCODING)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_LANGUAGE)?)?;
     writeln!(
         &mut s,
         "{}",
-        get_or_default(h, &CONTENT_LENGTH).map(|v| if v == "0" { "" } else { v })?
+        get_or_default(&h, &CONTENT_LENGTH).map(|v| if v == "0" { "" } else { v })?
     )?;
-    writeln!(&mut s, "{}", get_or_default(h, &CONTENT_MD5.parse()?)?)?;
-    writeln!(&mut s, "{}", get_or_default(h, &CONTENT_TYPE)?)?;
-    writeln!(&mut s, "{}", get_or_default(h, &DATE)?)?;
-    writeln!(&mut s, "{}", get_or_default(h, &IF_MODIFIED_SINCE)?)?;
-    writeln!(&mut s, "{}", get_or_default(h, &IF_MATCH)?)?;
-    writeln!(&mut s, "{}", get_or_default(h, &IF_NONE_MATCH)?)?;
-    writeln!(&mut s, "{}", get_or_default(h, &IF_UNMODIFIED_SINCE)?)?;
-    writeln!(&mut s, "{}", get_or_default(h, &RANGE)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_MD5.parse()?)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_TYPE)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &DATE)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &IF_MODIFIED_SINCE)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &IF_MATCH)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &IF_NONE_MATCH)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &IF_UNMODIFIED_SINCE)?)?;
+    writeln!(&mut s, "{}", get_or_default(&h, &RANGE)?)?;
     writeln!(&mut s, "{}", canonicalize_header(req, now)?)?;
     write!(&mut s, "{}", canonicalize_resource(req, cred))?;
 
