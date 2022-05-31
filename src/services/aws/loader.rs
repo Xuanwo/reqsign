@@ -90,6 +90,23 @@ impl CredentialLoad for CredentialLoadChain {
     }
 }
 
+/// DummyLoader always returns `Ok(None)`.
+///
+/// It's useful when users don't want to load credential/region from env.
+pub struct DummyLoader {}
+
+impl CredentialLoad for DummyLoader {
+    fn load_credential(&self) -> Result<Option<Credential>> {
+        Ok(None)
+    }
+}
+
+impl RegionLoad for DummyLoader {
+    fn load_region(&self) -> Result<Option<String>> {
+        Ok(None)
+    }
+}
+
 /// Load credential from env values
 ///
 /// - `AWS_ACCESS_KEY_ID`
