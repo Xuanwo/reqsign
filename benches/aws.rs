@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use std::time::SystemTime;
 
 use aws_sigv4::http_request::{
@@ -7,7 +6,6 @@ use aws_sigv4::http_request::{
 use aws_sigv4::SigningParams;
 use criterion::criterion_main;
 use criterion::{criterion_group, Criterion};
-use reqwest::Url;
 
 use reqsign::services::aws::v4::Signer;
 
@@ -15,7 +13,6 @@ criterion_group!(benches, bench);
 criterion_main!(benches);
 
 pub fn bench(c: &mut Criterion) {
-    let runtime = tokio::runtime::Runtime::new().expect("runtime must be valid");
     let mut group = c.benchmark_group("aws_v4");
 
     group.bench_function("reqsign", |b| {
@@ -27,11 +24,13 @@ pub fn bench(c: &mut Criterion) {
             .build()
             .expect("signer must be valid");
 
-        b.to_async(&runtime).iter(|| async {
-            let mut req = reqwest::Request::new(
-                http::Method::GET,
-                Url::from_str("http://127.0.0.1:9900/hello").expect("must success"),
-            );
+        b.iter(|| {
+            let mut req = http::Request::new("");
+            *req.method_mut() = http::Method::GET;
+            *req.uri_mut() = "http://127.0.0.1:9000/hello"
+                .parse()
+                .expect("url must be valid");
+
             s.sign(&mut req).expect("must success")
         })
     });

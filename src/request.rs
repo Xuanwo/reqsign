@@ -11,9 +11,9 @@ use http::{HeaderMap, HeaderValue, Method};
 /// uri components instead of a complete struct.
 pub trait SignableRequest {
     /// Get method of request.
-    fn method(&self) -> &http::Method;
+    fn method(&self) -> &Method;
     /// Get header of request.
-    fn headers(&self) -> &http::HeaderMap;
+    fn headers(&self) -> &HeaderMap;
 
     /// Get path of request.
     ///
@@ -72,11 +72,53 @@ pub trait SignableRequest {
     fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()>;
 }
 
+/// Implement `SignableRequest` for `http::Request`
+impl<T> SignableRequest for http::Request<T> {
+    fn method(&self) -> &Method {
+        let this = self as &http::Request<T>;
+        this.method()
+    }
+
+    fn headers(&self) -> &HeaderMap {
+        let this = self as &http::Request<T>;
+        this.headers()
+    }
+
+    fn path(&self) -> &str {
+        let this = self as &http::Request<T>;
+        this.uri().path()
+    }
+
+    fn query(&self) -> Option<&str> {
+        let this = self as &http::Request<T>;
+        this.uri().query()
+    }
+
+    fn host(&self) -> &str {
+        let this = self as &http::Request<T>;
+        this.uri().host().expect("request uri must have host")
+    }
+
+    fn port(&self) -> Option<usize> {
+        let this = self as &http::Request<T>;
+        this.uri().port_u16().map(|v| v as usize)
+    }
+
+    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+        let mut value: HeaderValue = value.parse()?;
+        value.set_sensitive(true);
+        self.headers_mut().insert(name, value);
+
+        Ok(())
+    }
+}
+
 /// Implement `SignableRequest` for `reqwest::Request`
 ///
 /// # TODO
 ///
 /// Make this under feature so that we don't need to depend on reqwest directly.
+#[cfg(feature = "reqwest_request")]
 impl SignableRequest for reqwest::Request {
     fn method(&self) -> &Method {
         let this = self as &reqwest::Request;
@@ -122,6 +164,7 @@ impl SignableRequest for reqwest::Request {
 /// # TODO
 ///
 /// Make this under feature so that we don't need to depend on reqwest directly.
+#[cfg(feature = "reqwest_blocking_request")]
 impl SignableRequest for reqwest::blocking::Request {
     fn method(&self) -> &Method {
         let this = self as &reqwest::blocking::Request;
@@ -151,47 +194,6 @@ impl SignableRequest for reqwest::blocking::Request {
     fn port(&self) -> Option<usize> {
         let this = self as &reqwest::blocking::Request;
         this.url().port().map(|v| v as usize)
-    }
-
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
-        let mut value: HeaderValue = value.parse()?;
-        value.set_sensitive(true);
-        self.headers_mut().insert(name, value);
-
-        Ok(())
-    }
-}
-
-/// Implement `SignableRequest` for `http::Request`
-impl<T> SignableRequest for http::Request<T> {
-    fn method(&self) -> &Method {
-        let this = self as &http::Request<T>;
-        this.method()
-    }
-
-    fn headers(&self) -> &HeaderMap {
-        let this = self as &http::Request<T>;
-        this.headers()
-    }
-
-    fn path(&self) -> &str {
-        let this = self as &http::Request<T>;
-        this.uri().path()
-    }
-
-    fn query(&self) -> Option<&str> {
-        let this = self as &http::Request<T>;
-        this.uri().query()
-    }
-
-    fn host(&self) -> &str {
-        let this = self as &http::Request<T>;
-        this.uri().host().expect("request uri must have host")
-    }
-
-    fn port(&self) -> Option<usize> {
-        let this = self as &http::Request<T>;
-        this.uri().port_u16().map(|v| v as usize)
     }
 
     fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {

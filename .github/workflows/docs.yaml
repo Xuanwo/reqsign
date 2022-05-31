@@ -2,7 +2,6 @@ name: Docs
 
 on:
   push:
-    branches: [ main ]
   workflow_dispatch:
 
 concurrency:
@@ -19,12 +18,27 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: doc
-          args: --no-deps
+          args: --no-deps --all-features
 
       - name: Deploy to vercel
-        env:
-          VERCEL_ORG_ID: ${{secrets.VERCEL_ORG_ID}}
-          VERCEL_PROJECT_ID: ${{secrets.VERCEL_PROJECT_ID}}
-        run: |
-          npm i -g vercel
-          vercel --token=${{ secrets.VERCEL_TOKEN }} --prod --scope xuanwo ./target/doc
+        if: github.ref_name == 'main'
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          scope: xuanwo
+          working-directory: ./target/doc
+
+      - name: Deploy to vercel (preview)
+        if: github.ref_name != 'main'
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          scope: xuanwo
+          working-directory: ./target/doc
