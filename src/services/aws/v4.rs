@@ -741,4 +741,101 @@ mod tests {
 
         Ok(())
     }
+
+    fn test_get_request_virtual_host() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://hello.s3.test.example.com"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_get_request_with_query_virtual_host() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://hello.s3.test.example.com?list-type=2&max-keys=3&prefix=CI/&start-after=ExampleGuide.pdf"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_put_request_virtual_host() -> http::Request<&'static str> {
+        let content = "Hello,World!";
+        let mut req = http::Request::new(content);
+        *req.method_mut() = http::Method::PUT;
+        *req.uri_mut() = "http://hello.s3.test.example.com"
+            .parse()
+            .expect("url must be valid");
+
+        req.headers_mut().insert(
+            http::header::CONTENT_LENGTH,
+            HeaderValue::from_str(&content.len().to_string()).expect("must be valid"),
+        );
+
+        req
+    }
+
+    #[tokio::test]
+    async fn test_calculate_virtual_host() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        for req_fn in [
+            test_get_request_virtual_host,
+            test_get_request_with_query_virtual_host,
+            test_put_request_virtual_host,
+        ] {
+            let mut req = req_fn();
+            let now = time::now();
+
+            let mut ss = SigningSettings::default();
+            ss.percent_encoding_mode = PercentEncodingMode::Double;
+            ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+
+            let sp = SigningParams::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .service_name("s3")
+                .time(SystemTime::from(now))
+                .settings(ss)
+                .build()
+                .expect("signing params must be valid");
+
+            let output = aws_sigv4::http_request::sign(
+                SignableRequest::new(
+                    req.method(),
+                    req.uri(),
+                    req.headers(),
+                    SignableBody::UnsignedPayload,
+                ),
+                &sp,
+            )
+            .expect("signing must succeed");
+            let (aws_sig, expect_sig) = output.into_parts();
+            aws_sig.apply_to_request(&mut req);
+            let expect_headers = req.headers();
+
+            let mut req = req_fn();
+
+            let signer = Signer::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .service("s3")
+                .time(now)
+                .build()?;
+
+            let cred = signer.credential()?.expect("credential must be valid");
+            let actual = signer.calculate(&req, &cred)?;
+            signer.apply(&mut req, &actual).expect("must apply success");
+
+            assert_eq!(expect_sig, actual.signature());
+            assert_eq!(expect_headers, req.headers());
+        }
+
+        Ok(())
+    }
 }
