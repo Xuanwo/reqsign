@@ -2,9 +2,10 @@ use anyhow::Result;
 use http::StatusCode;
 use isahc::ReadResponseExt;
 use log::{debug, warn};
-use reqsign::services::aws::loader;
+use percent_encoding::utf8_percent_encode;
 use reqsign::services::aws::loader::CredentialLoad;
 use reqsign::services::aws::v4::Signer;
+use reqsign::services::aws::{loader, AWS_URI_ENCODE_SET};
 use serde::Deserialize;
 use std::str::FromStr;
 use std::{env, fs};
@@ -132,6 +133,37 @@ fn test_head_object_with_special_characters() -> Result<()> {
     let mut req = isahc::Request::new(isahc::Body::empty());
     *req.method_mut() = http::Method::HEAD;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "!@#$%^&*()_+-=;:'><,/?.txt"))?;
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = isahc::HttpClient::new()?;
+    let resp = client.send(req).expect("request must success");
+
+    debug!("got response: {:?}", resp);
+    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    Ok(())
+}
+
+#[test]
+fn test_head_object_with_encoded_characters() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+
+    let mut req = isahc::Request::new(isahc::Body::empty());
+    *req.method_mut() = http::Method::HEAD;
+    *req.uri_mut() = http::Uri::from_str(&format!(
+        "{}/{}",
+        url,
+        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", &AWS_URI_ENCODE_SET)
+    ))?;
 
     signer.sign(&mut req).expect("sign request must success");
 

@@ -11,7 +11,7 @@ use anyhow::{anyhow, Result};
 use http::header::HeaderName;
 use http::{HeaderMap, HeaderValue};
 use log::debug;
-use percent_encoding::utf8_percent_encode;
+use percent_encoding::{percent_decode_str, utf8_percent_encode};
 
 use super::credential::Credential;
 use super::loader::*;
@@ -354,7 +354,7 @@ impl Debug for Signer {
 #[derive(Clone)]
 struct CanonicalRequest<'a> {
     method: http::Method,
-    path: &'a str,
+    path: String,
     params: Option<String>,
     headers: http::HeaderMap,
 
@@ -373,9 +373,11 @@ impl<'a> CanonicalRequest<'a> {
 
         let (signed_headers, canonical_headers) = Self::headers(req, now, cred)?;
 
+        let path = percent_decode_str(req.path()).decode_utf8()?.to_string();
+
         Ok(CanonicalRequest {
             method: req.method(),
-            path: req.path(),
+            path,
             params: Self::params(req),
             headers: canonical_headers,
 
@@ -503,7 +505,7 @@ impl<'a> Display for CanonicalRequest<'a> {
         writeln!(
             f,
             "{}",
-            utf8_percent_encode(self.path, &super::constants::AWS_URI_ENCODE_SET)
+            utf8_percent_encode(&self.path, &super::constants::AWS_URI_ENCODE_SET)
         )?;
         writeln!(f, "{}", self.params.as_ref().unwrap_or(&"".to_string()))?;
         for header in &self.signed_headers {
