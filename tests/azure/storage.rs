@@ -1,8 +1,10 @@
 use anyhow::Result;
 use http::StatusCode;
 use log::{debug, warn};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqsign::services::azure::storage::Signer;
 use std::env;
+use std::str::FromStr;
 
 fn init_signer() -> Option<Signer> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -44,6 +46,38 @@ fn test_head_blob() -> Result<()> {
     builder = builder.method(http::Method::HEAD);
     builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
     let mut req = builder.body(isahc::Body::empty())?;
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = isahc::HttpClient::new()?;
+    let resp = client.send(req).expect("request must success");
+
+    debug!("got response: {:?}", resp);
+    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    Ok(())
+}
+
+#[test]
+fn test_head_object_with_encoded_characters() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url =
+        &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
+
+    let mut req = isahc::Request::new(isahc::Body::empty());
+    *req.method_mut() = http::Method::HEAD;
+    *req.uri_mut() = http::Uri::from_str(&format!(
+        "{}/{}",
+        url,
+        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
+    ))?;
 
     signer.sign(&mut req).expect("sign request must success");
 
