@@ -72,10 +72,12 @@ pub trait SignableRequest {
     }
 
     /// Insert new headers into header map.
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()>;
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()>;
 
-    /// Append new query into url.
-    fn apply_query(&mut self, query: &str) -> Result<()>;
+    /// Set new query into url.
+    ///
+    /// This function SHOULD append full query.
+    fn set_query(&mut self, query: &str) -> Result<()>;
 }
 
 /// Implement `SignableRequest` for [`http::Request`]
@@ -110,7 +112,7 @@ impl<T> SignableRequest for http::Request<T> {
         this.uri().port_u16().map(|v| v as usize)
     }
 
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
         let mut value: HeaderValue = value.parse()?;
         value.set_sensitive(true);
         self.headers_mut().insert(name, value);
@@ -118,7 +120,7 @@ impl<T> SignableRequest for http::Request<T> {
         Ok(())
     }
 
-    fn apply_query(&mut self, query: &str) -> Result<()> {
+    fn set_query(&mut self, query: &str) -> Result<()> {
         let this = self as &mut http::Request<T>;
 
         let mut parts = mem::take(this.uri_mut()).into_parts();
@@ -128,15 +130,7 @@ impl<T> SignableRequest for http::Request<T> {
                 .path_and_query
                 .unwrap_or_else(|| PathAndQuery::from_static("/"));
 
-            let mut s = pq.path().to_string();
-            s.push('?');
-            if let Some(v) = pq.query() {
-                s.push_str(v);
-                s.push('&');
-            }
-            s.push_str(query);
-
-            pq = PathAndQuery::from_str(&s)?;
+            pq = PathAndQuery::from_str(&format!("{}?{}", pq.path(), query))?;
 
             Some(pq)
         };
@@ -180,7 +174,7 @@ impl SignableRequest for reqwest::Request {
         this.url().port().map(|v| v as usize)
     }
 
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
         let mut value: HeaderValue = value.parse()?;
         value.set_sensitive(true);
         self.headers_mut().insert(name, value);
@@ -188,8 +182,11 @@ impl SignableRequest for reqwest::Request {
         Ok(())
     }
 
-    fn apply_query(&mut self, _query: &str) -> Result<()> {
-        todo!()
+    fn set_query(&mut self, query: &str) -> Result<()> {
+        let this = self as &mut reqwest::Request;
+        this.url_mut().set_query(Some(query));
+
+        Ok(())
     }
 }
 
@@ -226,7 +223,7 @@ impl SignableRequest for reqwest::blocking::Request {
         this.url().port().map(|v| v as usize)
     }
 
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
         let mut value: HeaderValue = value.parse()?;
         value.set_sensitive(true);
         self.headers_mut().insert(name, value);
@@ -234,8 +231,11 @@ impl SignableRequest for reqwest::blocking::Request {
         Ok(())
     }
 
-    fn apply_query(&mut self, _query: &str) -> Result<()> {
-        todo!()
+    fn set_query(&mut self, query: &str) -> Result<()> {
+        let this = self as &mut reqwest::blocking::Request;
+        this.url_mut().set_query(Some(query));
+
+        Ok(())
     }
 }
 
@@ -292,7 +292,7 @@ impl SignableRequest for http_types::Request {
         this.url().port().map(|v| v as usize)
     }
 
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
         self.insert_header(
             name.as_str(),
             value
@@ -303,8 +303,11 @@ impl SignableRequest for http_types::Request {
         Ok(())
     }
 
-    fn apply_query(&mut self, _query: &str) -> Result<()> {
-        todo!()
+    fn set_query(&mut self, query: &str) -> Result<()> {
+        let this = self as &mut http_types::Request;
+        this.url_mut().set_query(Some(query));
+
+        Ok(())
     }
 }
 
@@ -326,20 +329,26 @@ mod tests {
                 "exist query without =",
                 "http://127.0.0.1/?a",
                 "x=y&c=d",
-                "http://127.0.0.1/?a&x=y&c=d",
+                "http://127.0.0.1/?x=y&c=d",
             ),
             (
                 "exist query",
                 "http://127.0.0.1/?a=p",
                 "x=y&c=d",
-                "http://127.0.0.1/?a=p&x=y&c=d",
+                "http://127.0.0.1/?x=y&c=d",
+            ),
+            (
+                "with path",
+                "http://127.0.0.1/abc",
+                "a=b&c=d",
+                "http://127.0.0.1/abc?a=b&c=d",
             ),
         ];
 
         for (name, input_uri, input_query, expected) in cases {
             let mut req = http::Request::get(Uri::from_str(input_uri)?).body(())?;
 
-            req.apply_query(input_query)?;
+            req.set_query(input_query)?;
 
             assert_eq!(req.uri().to_string(), expected, "{name}")
         }

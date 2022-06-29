@@ -24,3 +24,12 @@ pub static AWS_URI_ENCODE_SET: AsciiSet = NON_ALPHANUMERIC
     .remove(b'.')
     .remove(b'_')
     .remove(b'~');
+
+/// AsciiSet for [AWS UriEncode](https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html)
+///
+/// But used in query.
+pub static AWS_QUERY_ENCODE_SET: AsciiSet = NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');

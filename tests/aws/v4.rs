@@ -2,13 +2,14 @@ use anyhow::Result;
 use http::StatusCode;
 use isahc::ReadResponseExt;
 use log::{debug, warn};
-use percent_encoding::utf8_percent_encode;
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use reqsign::services::aws::loader;
 use reqsign::services::aws::loader::CredentialLoad;
 use reqsign::services::aws::v4::Signer;
-use reqsign::services::aws::{loader, AWS_URI_ENCODE_SET};
 use serde::Deserialize;
 use std::str::FromStr;
 use std::{env, fs};
+use time::Duration;
 
 fn init_signer() -> Option<Signer> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -120,6 +121,64 @@ fn test_head_object() -> Result<()> {
 }
 
 #[test]
+fn test_put_object_with_query() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+
+    let mut req = isahc::Request::new(isahc::Body::from("Hello, World!"));
+    *req.method_mut() = http::Method::PUT;
+    *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "put_object_test"))?;
+
+    signer
+        .sign_query(&mut req, Duration::hours(1))
+        .expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = isahc::HttpClient::new()?;
+    let mut resp = client.send(req).expect("request must success");
+
+    debug!("got response: {:?}", String::from_utf8(resp.bytes()?)?);
+    assert_eq!(StatusCode::OK, resp.status());
+    Ok(())
+}
+
+#[test]
+fn test_get_object_with_query() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+
+    let mut req = isahc::Request::new(isahc::Body::empty());
+    *req.method_mut() = http::Method::GET;
+    *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
+
+    signer
+        .sign_query(&mut req, Duration::hours(1))
+        .expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = isahc::HttpClient::new()?;
+    let resp = client.send(req).expect("request must success");
+
+    debug!("got response: {:?}", resp);
+    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    Ok(())
+}
+
+#[test]
 fn test_head_object_with_special_characters() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
@@ -162,7 +221,7 @@ fn test_head_object_with_encoded_characters() -> Result<()> {
     *req.uri_mut() = http::Uri::from_str(&format!(
         "{}/{}",
         url,
-        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", &AWS_URI_ENCODE_SET)
+        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
     signer.sign(&mut req).expect("sign request must success");
