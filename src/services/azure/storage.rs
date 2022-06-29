@@ -157,15 +157,15 @@ impl Signer {
 
     /// Apply signed results to requests.
     pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
-        req.apply_header(
+        req.insert_header(
             HeaderName::from_static(super::constants::X_MS_DATE),
             &format_http_date(output.signed_time),
         )?;
-        req.apply_header(
+        req.insert_header(
             HeaderName::from_static(super::constants::X_MS_VERSION),
             AZURE_VERSION,
         )?;
-        req.apply_header(
+        req.insert_header(
             AUTHORIZATION,
             &format!("SharedKey {}:{}", &output.account_name, &output.signature),
         )?;

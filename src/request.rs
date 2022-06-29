@@ -2,7 +2,10 @@
 
 use anyhow::Result;
 use http::header::HeaderName;
-use http::{HeaderMap, HeaderValue, Method};
+use http::uri::PathAndQuery;
+use http::{HeaderMap, HeaderValue, Method, Uri};
+use std::mem;
+use std::str::FromStr;
 
 /// Trait for all signable request.
 ///
@@ -69,7 +72,12 @@ pub trait SignableRequest {
     }
 
     /// Insert new headers into header map.
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()>;
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()>;
+
+    /// Set new query into url.
+    ///
+    /// This function SHOULD append full query.
+    fn set_query(&mut self, query: &str) -> Result<()>;
 }
 
 /// Implement `SignableRequest` for [`http::Request`]
@@ -104,10 +112,30 @@ impl<T> SignableRequest for http::Request<T> {
         this.uri().port_u16().map(|v| v as usize)
     }
 
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
         let mut value: HeaderValue = value.parse()?;
         value.set_sensitive(true);
         self.headers_mut().insert(name, value);
+
+        Ok(())
+    }
+
+    fn set_query(&mut self, query: &str) -> Result<()> {
+        let this = self as &mut http::Request<T>;
+
+        let mut parts = mem::take(this.uri_mut()).into_parts();
+
+        parts.path_and_query = {
+            let mut pq = parts
+                .path_and_query
+                .unwrap_or_else(|| PathAndQuery::from_static("/"));
+
+            pq = PathAndQuery::from_str(&format!("{}?{}", pq.path(), query))?;
+
+            Some(pq)
+        };
+
+        *this.uri_mut() = Uri::from_parts(parts)?;
 
         Ok(())
     }
@@ -146,10 +174,17 @@ impl SignableRequest for reqwest::Request {
         this.url().port().map(|v| v as usize)
     }
 
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
         let mut value: HeaderValue = value.parse()?;
         value.set_sensitive(true);
         self.headers_mut().insert(name, value);
+
+        Ok(())
+    }
+
+    fn set_query(&mut self, query: &str) -> Result<()> {
+        let this = self as &mut reqwest::Request;
+        this.url_mut().set_query(Some(query));
 
         Ok(())
     }
@@ -188,10 +223,17 @@ impl SignableRequest for reqwest::blocking::Request {
         this.url().port().map(|v| v as usize)
     }
 
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
         let mut value: HeaderValue = value.parse()?;
         value.set_sensitive(true);
         self.headers_mut().insert(name, value);
+
+        Ok(())
+    }
+
+    fn set_query(&mut self, query: &str) -> Result<()> {
+        let this = self as &mut reqwest::blocking::Request;
+        this.url_mut().set_query(Some(query));
 
         Ok(())
     }
@@ -201,8 +243,6 @@ impl SignableRequest for reqwest::blocking::Request {
 #[cfg(feature = "http_types_request")]
 impl SignableRequest for http_types::Request {
     fn method(&self) -> Method {
-        use std::str::FromStr;
-
         let this = self as &http_types::Request;
         match this.method() {
             http_types::Method::Connect => Method::CONNECT,
@@ -219,8 +259,6 @@ impl SignableRequest for http_types::Request {
     }
 
     fn headers(&self) -> HeaderMap {
-        use std::str::FromStr;
-
         let this = self as &http_types::Request;
         let mut map = HeaderMap::new();
         for name in this.header_names() {
@@ -254,13 +292,66 @@ impl SignableRequest for http_types::Request {
         this.url().port().map(|v| v as usize)
     }
 
-    fn apply_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
         self.insert_header(
             name.as_str(),
             value
                 .parse::<http_types::headers::HeaderValue>()
                 .expect("header value must be valid"),
         );
+
+        Ok(())
+    }
+
+    fn set_query(&mut self, query: &str) -> Result<()> {
+        let this = self as &mut http_types::Request;
+        this.url_mut().set_query(Some(query));
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_http_request_apply_query() -> Result<()> {
+        let cases = vec![
+            (
+                "empty query",
+                "http://127.0.0.1/",
+                "a=b&c=d",
+                "http://127.0.0.1/?a=b&c=d",
+            ),
+            (
+                "exist query without =",
+                "http://127.0.0.1/?a",
+                "x=y&c=d",
+                "http://127.0.0.1/?x=y&c=d",
+            ),
+            (
+                "exist query",
+                "http://127.0.0.1/?a=p",
+                "x=y&c=d",
+                "http://127.0.0.1/?x=y&c=d",
+            ),
+            (
+                "with path",
+                "http://127.0.0.1/abc",
+                "a=b&c=d",
+                "http://127.0.0.1/abc?a=b&c=d",
+            ),
+        ];
+
+        for (name, input_uri, input_query, expected) in cases {
+            let mut req = http::Request::get(Uri::from_str(input_uri)?).body(())?;
+
+            req.set_query(input_query)?;
+
+            assert_eq!(req.uri().to_string(), expected, "{name}")
+        }
 
         Ok(())
     }

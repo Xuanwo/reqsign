@@ -13,11 +13,12 @@ use http::{HeaderMap, HeaderValue};
 use log::debug;
 use percent_encoding::{percent_decode_str, utf8_percent_encode};
 
+use super::constants::AWS_QUERY_ENCODE_SET;
 use super::credential::Credential;
 use super::loader::*;
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
-use crate::time::{self, format_date, format_iso8601, DateTime};
+use crate::time::{self, format_date, format_iso8601, DateTime, Duration};
 
 /// Builder for `Signer`.
 #[derive(Default)]
@@ -214,8 +215,14 @@ impl Signer {
     }
 
     /// Calculate signing requests via SignableRequest.
-    pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        let canonical_req = CanonicalRequest::from(req, self.time, cred)?;
+    pub fn calculate(
+        &self,
+        req: &impl SignableRequest,
+        cred: &Credential,
+        method: SigningMethod,
+    ) -> Result<SignedOutput> {
+        let canonical_req =
+            CanonicalRequest::from(req, method, self.time, cred, &self.region, &self.service)?;
         debug!("calculated canonical_req: {canonical_req}");
 
         let encoded_req = hex_sha256(canonical_req.to_string().as_bytes());
@@ -256,10 +263,12 @@ impl Signer {
         let signature = hex_hmac_sha256(&signing_key, string_to_sign.as_bytes());
 
         Ok(SignedOutput {
+            method,
             access_key_id: cred.access_key().to_string(),
             security_token: cred.security_token().map(|v| v.to_string()),
             signed_time: canonical_req.time,
             signed_scope: scope,
+            signed_query: canonical_req.params.unwrap_or_default(),
             signed_headers: canonical_req.signed_headers,
             signature,
         })
@@ -267,38 +276,49 @@ impl Signer {
 
     /// Apply signed results to requests.
     pub fn apply(&self, req: &mut impl SignableRequest, sig: &SignedOutput) -> Result<()> {
-        req.apply_header(
-            HeaderName::from_static(super::constants::X_AMZ_DATE),
-            &format_iso8601(sig.signed_time),
-        )?;
-        req.apply_header(
-            HeaderName::from_static(super::constants::X_AMZ_CONTENT_SHA_256),
-            "UNSIGNED-PAYLOAD",
-        )?;
+        match sig.method {
+            SigningMethod::Header => {
+                req.insert_header(
+                    HeaderName::from_static(super::constants::X_AMZ_DATE),
+                    &format_iso8601(sig.signed_time),
+                )?;
+                req.insert_header(
+                    HeaderName::from_static(super::constants::X_AMZ_CONTENT_SHA_256),
+                    "UNSIGNED-PAYLOAD",
+                )?;
 
-        // Set X_AMZ_SECURITY_TOKEN if we have security_token
-        if let Some(token) = &sig.security_token {
-            req.apply_header(
-                HeaderName::from_static(super::constants::X_AMZ_SECURITY_TOKEN),
-                token,
-            )?;
+                // Set X_AMZ_SECURITY_TOKEN if we have security_token
+                if let Some(token) = &sig.security_token {
+                    req.insert_header(
+                        HeaderName::from_static(super::constants::X_AMZ_SECURITY_TOKEN),
+                        token,
+                    )?;
+                }
+
+                req.insert_header(
+                    http::header::AUTHORIZATION,
+                    &format!(
+                        "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
+                        sig.access_key_id,
+                        sig.signed_scope,
+                        sig.signed_headers.join(";"),
+                        sig.signature
+                    ),
+                )?;
+            }
+            SigningMethod::Query(_) => {
+                debug_assert!(!sig.signed_query.is_empty());
+                req.set_query(&format!(
+                    "{}&X-Amz-Signature={}",
+                    sig.signed_query, sig.signature
+                ))?
+            }
         }
-
-        req.apply_header(
-            http::header::AUTHORIZATION,
-            &format!(
-                "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
-                sig.access_key_id,
-                sig.signed_scope,
-                sig.signed_headers.join(";"),
-                sig.signature
-            ),
-        )?;
 
         Ok(())
     }
 
-    /// Signing request.
+    /// Signing request with header.
     ///
     /// # Example
     ///
@@ -328,7 +348,50 @@ impl Signer {
     /// ```
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         if let Some(cred) = self.credential()? {
-            let sig = self.calculate(req, &cred)?;
+            let sig = self.calculate(req, &cred, SigningMethod::Header)?;
+            return self.apply(req, &sig);
+        }
+
+        if self.allow_anonymous {
+            debug!("credential not found and anonymous is allowed, skipping signing.");
+            return Ok(());
+        }
+
+        Err(anyhow!("credential not found"))
+    }
+
+    /// Signing request with query.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use reqsign::services::aws::v4::Signer;
+    /// use reqwest::{Client, Request, Url};
+    /// use anyhow::Result;
+    /// use time::Duration;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<()>{
+    ///     // Signer will load region and credentials from environment by default.
+    ///     let signer = Signer::builder()
+    ///         .service("s3")
+    ///         .region("test")
+    ///         .allow_anonymous()
+    ///         .build()?;
+    ///     // Construct request
+    ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
+    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     // Signing request with Signer
+    ///     signer.sign_query(&mut req, Duration::hours(1))?;
+    ///     // Sending already signed request.
+    ///     let resp = Client::new().execute(req).await?;
+    ///     println!("resp got status: {}", resp.status());
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
+        if let Some(cred) = self.credential()? {
+            let sig = self.calculate(req, &cred, SigningMethod::Query(expire))?;
             return self.apply(req, &sig);
         }
 
@@ -351,6 +414,15 @@ impl Debug for Signer {
     }
 }
 
+/// SigningMethod is the method that used in signing.
+#[derive(Copy, Clone)]
+pub enum SigningMethod {
+    /// Signing with header.
+    Header,
+    /// Signing with query.
+    Query(Duration),
+}
+
 #[derive(Clone)]
 struct CanonicalRequest<'a> {
     method: http::Method,
@@ -366,19 +438,24 @@ struct CanonicalRequest<'a> {
 impl<'a> CanonicalRequest<'a> {
     pub fn from<'b>(
         req: &'b impl SignableRequest,
+        method: SigningMethod,
         time: Option<DateTime>,
         cred: &'b Credential,
+        region: &str,
+        service: &str,
     ) -> Result<CanonicalRequest<'b>> {
         let now = time.unwrap_or_else(time::now);
 
-        let (signed_headers, canonical_headers) = Self::headers(req, now, cred)?;
+        let (signed_headers, canonical_headers) = Self::headers(req, now, cred, method)?;
+
+        let canonical_queries = Self::params(req, method, now, cred, region, service);
 
         let path = percent_decode_str(req.path()).decode_utf8()?.to_string();
 
         Ok(CanonicalRequest {
             method: req.method(),
             path,
-            params: Self::params(req),
+            params: canonical_queries,
             headers: canonical_headers,
 
             time: now,
@@ -395,6 +472,7 @@ impl<'a> CanonicalRequest<'a> {
         req: &impl SignableRequest,
         now: DateTime,
         cred: &Credential,
+        method: SigningMethod,
     ) -> Result<(Vec<HeaderName>, HeaderMap)> {
         let mut canonical_headers = HeaderMap::with_capacity(req.headers().len());
         for (name, value) in req.headers().iter() {
@@ -413,45 +491,47 @@ impl<'a> CanonicalRequest<'a> {
             canonical_headers.insert(http::header::HOST, header);
         }
 
-        // Insert DATE header if not present.
-        if canonical_headers
-            .get(HeaderName::from_static(super::constants::X_AMZ_DATE))
-            .is_none()
-        {
-            let date_header =
-                HeaderValue::try_from(format_iso8601(now)).expect("date is valid header value");
-            canonical_headers.insert(
-                HeaderName::from_static(super::constants::X_AMZ_DATE),
-                date_header,
-            );
+        if matches!(method, SigningMethod::Header) {
+            // Insert DATE header if not present.
+            if canonical_headers
+                .get(HeaderName::from_static(super::constants::X_AMZ_DATE))
+                .is_none()
+            {
+                let date_header =
+                    HeaderValue::try_from(format_iso8601(now)).expect("date is valid header value");
+                canonical_headers.insert(
+                    HeaderName::from_static(super::constants::X_AMZ_DATE),
+                    date_header,
+                );
+            }
+
+            // Insert X_AMZ_CONTENT_SHA_256 header if not present.
+            if canonical_headers
+                .get(HeaderName::from_static(
+                    super::constants::X_AMZ_CONTENT_SHA_256,
+                ))
+                .is_none()
+            {
+                canonical_headers.insert(
+                    HeaderName::from_static(super::constants::X_AMZ_CONTENT_SHA_256),
+                    HeaderValue::from_static("UNSIGNED-PAYLOAD"),
+                );
+            }
+
+            // Insert X_AMZ_SECURITY_TOKEN header if security token exists.
+            if let Some(token) = cred.security_token() {
+                let mut value = HeaderValue::from_str(token)?;
+                // Set token value sensitive to valid leaking.
+                value.set_sensitive(true);
+
+                canonical_headers.insert(
+                    HeaderName::from_static(super::constants::X_AMZ_SECURITY_TOKEN),
+                    value,
+                );
+            }
+
+            // TODO: handle X_AMZ_CONTENT_SHA_256 header here.
         }
-
-        // Insert X_AMZ_CONTENT_SHA_256 header if not present.
-        if canonical_headers
-            .get(HeaderName::from_static(
-                super::constants::X_AMZ_CONTENT_SHA_256,
-            ))
-            .is_none()
-        {
-            canonical_headers.insert(
-                HeaderName::from_static(super::constants::X_AMZ_CONTENT_SHA_256),
-                HeaderValue::from_static("UNSIGNED-PAYLOAD"),
-            );
-        }
-
-        // Insert X_AMZ_SECURITY_TOKEN header if security token exists.
-        if let Some(token) = cred.security_token() {
-            let mut value = HeaderValue::from_str(token)?;
-            // Set token value sensitive to valid leaking.
-            value.set_sensitive(true);
-
-            canonical_headers.insert(
-                HeaderName::from_static(super::constants::X_AMZ_SECURITY_TOKEN),
-                value,
-            );
-        }
-
-        // TODO: handle X_AMZ_CONTENT_SHA_256 header here.
 
         let mut signed_headers = Vec::with_capacity(canonical_headers.len());
         for (name, _) in &canonical_headers {
@@ -467,35 +547,55 @@ impl<'a> CanonicalRequest<'a> {
         Ok((signed_headers, canonical_headers))
     }
 
-    pub fn params(req: &impl SignableRequest) -> Option<String> {
-        let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
+    pub fn params(
+        req: &impl SignableRequest,
+        method: SigningMethod,
+        now: DateTime,
+        cred: &Credential,
+        region: &str,
+        service: &str,
+    ) -> Option<String> {
+        let mut params: Vec<_> =
             form_urlencoded::parse(req.query().unwrap_or_default().as_bytes()).collect();
+
+        if let SigningMethod::Query(expire) = method {
+            params.push(("X-Amz-Algorithm".into(), "AWS4-HMAC-SHA256".into()));
+            params.push((
+                "X-Amz-Credential".into(),
+                Cow::Owned(format!(
+                    "{}/{}/{}/{}/aws4_request",
+                    cred.access_key(),
+                    format_date(now),
+                    region,
+                    service
+                )),
+            ));
+            params.push(("X-Amz-Date".into(), Cow::Owned(format_iso8601(now))));
+            params.push((
+                "X-Amz-Expires".into(),
+                Cow::Owned(expire.whole_seconds().to_string()),
+            ));
+            params.push(("X-Amz-SignedHeaders".into(), "host".into()));
+        }
         // Sort by param name
         params.sort();
 
         if params.is_empty() {
-            None
-        } else {
-            let x = Some(
-                params
-                    .iter()
-                    .map(|(k, v)| {
-                        format!(
-                            "{}={}",
-                            form_urlencoded::byte_serialize(k.as_bytes())
-                                .collect::<Vec<&'_ str>>()
-                                .join(""),
-                            form_urlencoded::byte_serialize(v.as_bytes())
-                                .collect::<Vec<&'_ str>>()
-                                .join(""),
-                        )
-                    })
-                    .collect::<Vec<String>>()
-                    .join("&"),
-            );
-            debug!("param is : {:?}", x);
-            x
+            return None;
         }
+
+        let param = params
+            .iter()
+            .map(|(k, v)| {
+                (
+                    utf8_percent_encode(k, &AWS_QUERY_ENCODE_SET),
+                    utf8_percent_encode(v, &AWS_QUERY_ENCODE_SET),
+                )
+            })
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect::<Vec<String>>()
+            .join("&");
+        Some(param)
     }
 }
 
@@ -535,10 +635,13 @@ impl<'a> Display for CanonicalRequest<'a> {
 
 /// Signed resulted that calculated by `Signer`.
 pub struct SignedOutput {
+    method: SigningMethod,
+
     access_key_id: String,
     security_token: Option<String>,
     signed_time: DateTime,
     signed_scope: String,
+    signed_query: String,
     signed_headers: Vec<HeaderName>,
     signature: String,
 }
@@ -675,7 +778,7 @@ mod tests {
                 .build()?;
 
             let cred = signer.credential()?.expect("credential must be valid");
-            let actual = signer.calculate(&req, &cred)?;
+            let actual = signer.calculate(&req, &cred, SigningMethod::Header)?;
             signer.apply(&mut req, &actual).expect("must apply success");
 
             assert_eq!(expect_sig, actual.signature());
@@ -734,7 +837,7 @@ mod tests {
                 .build()?;
 
             let cred = signer.credential()?.expect("credential must be valid");
-            let actual = signer.calculate(&req, &cred)?;
+            let actual = signer.calculate(&req, &cred, SigningMethod::Header)?;
             signer.apply(&mut req, &actual).expect("must apply success");
 
             assert_eq!(expect_sig, actual.signature());
@@ -831,7 +934,7 @@ mod tests {
                 .build()?;
 
             let cred = signer.credential()?.expect("credential must be valid");
-            let actual = signer.calculate(&req, &cred)?;
+            let actual = signer.calculate(&req, &cred, SigningMethod::Header)?;
             signer.apply(&mut req, &actual).expect("must apply success");
 
             assert_eq!(expect_sig, actual.signature());

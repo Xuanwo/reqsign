@@ -198,7 +198,7 @@ impl Signer {
     /// we can also send API via signed JWT: [Addendum: Service account authorization without OAuth](https://developers.google.com/identity/protocols/oauth2/service-account#jwt-auth)
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         let token = self.token()?;
-        req.apply_header(
+        req.insert_header(
             header::AUTHORIZATION,
             &format!("Bearer {}", token.access_token()),
         )?;
