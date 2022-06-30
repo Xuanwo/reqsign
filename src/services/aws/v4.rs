@@ -478,10 +478,15 @@ impl<'a> CanonicalRequest<'a> {
         for (name, value) in req.headers().iter() {
             // Header names and values need to be normalized according to Step 4 of https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
             // Using append instead of insert means this will not clobber headers that have the same lowercased name
-            canonical_headers.append(
-                HeaderName::from_str(&name.as_str().to_lowercase())?,
-                normalize_header_value(value),
-            );
+            if name == http::header::HOST
+                || name == http::header::CONTENT_TYPE
+                || name.as_str().starts_with("x-amz-")
+            {
+                canonical_headers.append(
+                    HeaderName::from_str(name.as_str())?,
+                    normalize_header_value(value),
+                );
+            }
         }
 
         // Insert HOST header if not present.
@@ -535,10 +540,6 @@ impl<'a> CanonicalRequest<'a> {
 
         let mut signed_headers = Vec::with_capacity(canonical_headers.len());
         for (name, _) in &canonical_headers {
-            // The user agent header should not be signed because it may be altered by proxies
-            if name == http::header::USER_AGENT {
-                continue;
-            }
             signed_headers.push(name.clone());
         }
 
