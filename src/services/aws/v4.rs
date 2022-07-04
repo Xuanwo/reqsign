@@ -495,7 +495,7 @@ impl CanonicalRequest {
 
     fn signed_headers(&self) -> Vec<&str> {
         let mut signed_headers = self.headers.keys().map(|v| v.as_str()).collect::<Vec<_>>();
-        signed_headers.sort();
+        signed_headers.sort_unstable();
 
         signed_headers
     }
