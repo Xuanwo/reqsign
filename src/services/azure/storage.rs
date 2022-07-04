@@ -159,16 +159,19 @@ impl Signer {
     pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
         req.insert_header(
             HeaderName::from_static(super::constants::X_MS_DATE),
-            &format_http_date(output.signed_time),
+            format_http_date(output.signed_time).parse()?,
         )?;
         req.insert_header(
             HeaderName::from_static(super::constants::X_MS_VERSION),
-            AZURE_VERSION,
+            AZURE_VERSION.parse()?,
         )?;
-        req.insert_header(
-            AUTHORIZATION,
-            &format!("SharedKey {}:{}", &output.account_name, &output.signature),
-        )?;
+        req.insert_header(AUTHORIZATION, {
+            let mut value: HeaderValue =
+                format!("SharedKey {}:{}", &output.account_name, &output.signature).parse()?;
+            value.set_sensitive(true);
+
+            value
+        })?;
 
         Ok(())
     }

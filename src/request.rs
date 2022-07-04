@@ -72,7 +72,7 @@ pub trait SignableRequest {
     }
 
     /// Insert new headers into header map.
-    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()>;
+    fn insert_header(&mut self, name: HeaderName, value: HeaderValue) -> Result<()>;
 
     /// Set new query into url.
     ///
@@ -112,9 +112,7 @@ impl<T> SignableRequest for http::Request<T> {
         this.uri().port_u16().map(|v| v as usize)
     }
 
-    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
-        let mut value: HeaderValue = value.parse()?;
-        value.set_sensitive(true);
+    fn insert_header(&mut self, name: HeaderName, value: HeaderValue) -> Result<()> {
         self.headers_mut().insert(name, value);
 
         Ok(())
@@ -174,9 +172,7 @@ impl SignableRequest for reqwest::Request {
         this.url().port().map(|v| v as usize)
     }
 
-    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
-        let mut value: HeaderValue = value.parse()?;
-        value.set_sensitive(true);
+    fn insert_header(&mut self, name: HeaderName, value: HeaderValue) -> Result<()> {
         self.headers_mut().insert(name, value);
 
         Ok(())
@@ -223,9 +219,7 @@ impl SignableRequest for reqwest::blocking::Request {
         this.url().port().map(|v| v as usize)
     }
 
-    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
-        let mut value: HeaderValue = value.parse()?;
-        value.set_sensitive(true);
+    fn insert_header(&mut self, name: HeaderName, value: HeaderValue) -> Result<()> {
         self.headers_mut().insert(name, value);
 
         Ok(())
@@ -292,10 +286,12 @@ impl SignableRequest for http_types::Request {
         this.url().port().map(|v| v as usize)
     }
 
-    fn insert_header(&mut self, name: HeaderName, value: &str) -> Result<()> {
+    fn insert_header(&mut self, name: HeaderName, value: HeaderValue) -> Result<()> {
         self.insert_header(
             name.as_str(),
             value
+                .to_str()
+                .expect("header value must be valid")
                 .parse::<http_types::headers::HeaderValue>()
                 .expect("header value must be valid"),
         );
