@@ -52,4 +52,3 @@ pub(crate) mod dirs;
 pub(crate) mod hash;
 
 mod request;
-pub use request::SignableRequest;
