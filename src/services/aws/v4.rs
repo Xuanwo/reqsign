@@ -636,6 +636,36 @@ mod tests {
         req
     }
 
+    fn test_get_request_with_sse() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption",
+            "a".parse().expect("must be valid"),
+        );
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption-customer-algorithm",
+            "b".parse().expect("must be valid"),
+        );
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption-customer-key",
+            "c".parse().expect("must be valid"),
+        );
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption-customer-key-md5",
+            "d".parse().expect("must be valid"),
+        );
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption-aws-kms-key-id",
+            "e".parse().expect("must be valid"),
+        );
+
+        req
+    }
+
     fn test_get_request_with_query() -> http::Request<&'static str> {
         let mut req = http::Request::new("");
         *req.method_mut() = http::Method::GET;
@@ -701,6 +731,7 @@ mod tests {
     fn test_cases() -> &'static [fn() -> http::Request<&'static str>] {
         &[
             test_get_request,
+            test_get_request_with_sse,
             test_get_request_with_query,
             test_get_request_virtual_host,
             test_get_request_with_query_virtual_host,
@@ -709,12 +740,55 @@ mod tests {
         ]
     }
 
+    fn compare_request(name: &str, l: &http::Request<&str>, r: &http::Request<&str>) {
+        fn format_headers(req: &http::Request<&str>) -> Vec<String> {
+            use crate::request::SignableRequest;
+
+            let mut hs = req
+                .headers()
+                .iter()
+                .map(|(k, v)| format!("{}:{}", k, v.to_str().expect("must be valid")))
+                .collect::<Vec<_>>();
+
+            // Insert host if original request doesn't have it.
+            if !hs.contains(&format!("host:{}", req.host_port())) {
+                hs.push(format!("host:{}", req.host_port()))
+            }
+
+            hs.sort();
+            hs
+        }
+
+        assert_eq!(
+            format_headers(l),
+            format_headers(r),
+            "{name} header mismatch"
+        );
+
+        fn format_query(req: &http::Request<&str>) -> Vec<String> {
+            let query = req.uri().query().unwrap_or_default();
+            let mut query = form_urlencoded::parse(query.as_bytes())
+                .map(|(k, v)| format!("{}={}", &k, &v))
+                .collect::<Vec<_>>();
+            query.sort();
+            query
+        }
+
+        assert_eq!(format_query(l), format_query(r), "{name} query mismatch");
+    }
+
     #[tokio::test]
     async fn test_calculate() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         for req_fn in test_cases() {
             let mut req = req_fn();
+            let name = format!(
+                "{} {} {:?}",
+                req.method(),
+                req.uri().path(),
+                req.uri().query(),
+            );
             let now = time::now();
 
             let mut ss = SigningSettings::default();
@@ -743,7 +817,7 @@ mod tests {
             .expect("signing must succeed");
             let (aws_sig, _) = output.into_parts();
             aws_sig.apply_to_request(&mut req);
-            let expect_headers = req.headers();
+            let expected_req = req;
 
             let mut req = req_fn();
 
@@ -759,11 +833,9 @@ mod tests {
             let creq = signer.canonicalize(&req, SigningMethod::Header, &cred)?;
             let actual = signer.calculate(creq, &cred)?;
             signer.apply(&mut req, actual).expect("must apply success");
+            let actual_req = req;
 
-            assert_eq!(
-                expect_headers.get(header::AUTHORIZATION),
-                req.headers().get(header::AUTHORIZATION)
-            );
+            compare_request(&name, &expected_req, &actual_req);
         }
 
         Ok(())
@@ -811,7 +883,7 @@ mod tests {
             .expect("signing must succeed");
             let (aws_sig, _) = output.into_parts();
             aws_sig.apply_to_request(&mut req);
-            let expect_query = req.uri().query();
+            let expected_req = req;
 
             let mut req = req_fn();
 
@@ -828,22 +900,9 @@ mod tests {
                 signer.canonicalize(&req, SigningMethod::Query(Duration::hours(1)), &cred)?;
             let actual = signer.calculate(creq, &cred)?;
             signer.apply(&mut req, actual)?;
+            let actual_req = req;
 
-            let expect_query = {
-                let query = expect_query.unwrap_or_default();
-                let mut query: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
-                query.sort();
-                query
-            };
-
-            let actual_query = {
-                let query = req.uri().query().unwrap_or_default();
-                let mut query: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
-                query.sort();
-                query
-            };
-
-            assert_eq!(expect_query, actual_query, "{name}");
+            compare_request(&name, &expected_req, &actual_req);
         }
 
         Ok(())
@@ -855,6 +914,12 @@ mod tests {
 
         for req_fn in test_cases() {
             let mut req = req_fn();
+            let name = format!(
+                "{} {} {:?}",
+                req.method(),
+                req.uri().path(),
+                req.uri().query(),
+            );
             let now = time::now();
 
             let mut ss = SigningSettings::default();
@@ -884,7 +949,7 @@ mod tests {
             .expect("signing must succeed");
             let (aws_sig, _) = output.into_parts();
             aws_sig.apply_to_request(&mut req);
-            let expect_headers = req.headers();
+            let expected_req = req;
 
             let mut req = req_fn();
 
@@ -901,11 +966,9 @@ mod tests {
             let creq = signer.canonicalize(&req, SigningMethod::Header, &cred)?;
             let actual = signer.calculate(creq, &cred)?;
             signer.apply(&mut req, actual).expect("must apply success");
+            let actual_req = req;
 
-            assert_eq!(
-                expect_headers.get(header::AUTHORIZATION),
-                req.headers().get(header::AUTHORIZATION)
-            );
+            compare_request(&name, &expected_req, &actual_req);
         }
 
         Ok(())
@@ -954,7 +1017,7 @@ mod tests {
             .expect("signing must succeed");
             let (aws_sig, _) = output.into_parts();
             aws_sig.apply_to_request(&mut req);
-            let expect_query = req.uri().query();
+            let expected_req = req;
 
             let mut req = req_fn();
 
@@ -972,22 +1035,9 @@ mod tests {
                 signer.canonicalize(&req, SigningMethod::Query(Duration::hours(1)), &cred)?;
             let actual = signer.calculate(creq, &cred)?;
             signer.apply(&mut req, actual).expect("must apply success");
+            let actual_req = req;
 
-            let expect_query = {
-                let query = expect_query.unwrap_or_default();
-                let mut query: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
-                query.sort();
-                query
-            };
-
-            let actual_query = {
-                let query = req.uri().query().unwrap_or_default();
-                let mut query: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
-                query.sort();
-                query
-            };
-
-            assert_eq!(expect_query, actual_query, "{name}");
+            compare_request(&name, &expected_req, &actual_req);
         }
 
         Ok(())
