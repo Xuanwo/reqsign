@@ -528,6 +528,10 @@ impl CanonicalRequest {
                 "X-Amz-SignedHeaders".into(),
                 self.signed_headers().join(";").into(),
             ));
+
+            if let Some(token) = cred.security_token() {
+                params.push(("X-Amz-Security-Token".into(), token.into()));
+            }
         }
         // Sort by param name
         params.sort();
@@ -642,6 +646,26 @@ mod tests {
         req
     }
 
+    fn test_get_request_virtual_host() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://hello.s3.test.example.com"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_get_request_with_query_virtual_host() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://hello.s3.test.example.com?list-type=2&max-keys=3&prefix=CI/&start-after=ExampleGuide.pdf"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
     fn test_put_request() -> http::Request<&'static str> {
         let content = "Hello,World!";
         let mut req = http::Request::new(content);
@@ -658,15 +682,38 @@ mod tests {
         req
     }
 
+    fn test_put_request_virtual_host() -> http::Request<&'static str> {
+        let content = "Hello,World!";
+        let mut req = http::Request::new(content);
+        *req.method_mut() = http::Method::PUT;
+        *req.uri_mut() = "http://hello.s3.test.example.com"
+            .parse()
+            .expect("url must be valid");
+
+        req.headers_mut().insert(
+            header::CONTENT_LENGTH,
+            HeaderValue::from_str(&content.len().to_string()).expect("must be valid"),
+        );
+
+        req
+    }
+
+    fn test_cases() -> &'static [fn() -> http::Request<&'static str>] {
+        &[
+            test_get_request,
+            test_get_request_with_query,
+            test_get_request_virtual_host,
+            test_get_request_with_query_virtual_host,
+            test_put_request,
+            test_put_request_virtual_host,
+        ]
+    }
+
     #[tokio::test]
     async fn test_calculate() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        for req_fn in [
-            test_get_request,
-            test_get_request_with_query,
-            test_put_request,
-        ] {
+        for req_fn in test_cases() {
             let mut req = req_fn();
             let now = time::now();
 
@@ -726,11 +773,7 @@ mod tests {
     async fn test_calculate_in_query() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        for req_fn in [
-            test_get_request,
-            test_get_request_with_query,
-            test_put_request,
-        ] {
+        for req_fn in test_cases() {
             let mut req = req_fn();
             let name = format!(
                 "{} {} {:?}",
@@ -810,7 +853,7 @@ mod tests {
     async fn test_calculate_with_token() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        for req_fn in [test_get_request, test_put_request] {
+        for req_fn in test_cases() {
             let mut req = req_fn();
             let now = time::now();
 
@@ -868,62 +911,31 @@ mod tests {
         Ok(())
     }
 
-    fn test_get_request_virtual_host() -> http::Request<&'static str> {
-        let mut req = http::Request::new("");
-        *req.method_mut() = http::Method::GET;
-        *req.uri_mut() = "http://hello.s3.test.example.com"
-            .parse()
-            .expect("url must be valid");
-
-        req
-    }
-
-    fn test_get_request_with_query_virtual_host() -> http::Request<&'static str> {
-        let mut req = http::Request::new("");
-        *req.method_mut() = http::Method::GET;
-        *req.uri_mut() = "http://hello.s3.test.example.com?list-type=2&max-keys=3&prefix=CI/&start-after=ExampleGuide.pdf"
-            .parse()
-            .expect("url must be valid");
-
-        req
-    }
-
-    fn test_put_request_virtual_host() -> http::Request<&'static str> {
-        let content = "Hello,World!";
-        let mut req = http::Request::new(content);
-        *req.method_mut() = http::Method::PUT;
-        *req.uri_mut() = "http://hello.s3.test.example.com"
-            .parse()
-            .expect("url must be valid");
-
-        req.headers_mut().insert(
-            header::CONTENT_LENGTH,
-            HeaderValue::from_str(&content.len().to_string()).expect("must be valid"),
-        );
-
-        req
-    }
-
     #[tokio::test]
-    async fn test_calculate_virtual_host() -> Result<()> {
+    async fn test_calculate_with_token_in_query() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        for req_fn in [
-            test_get_request_virtual_host,
-            test_get_request_with_query_virtual_host,
-            test_put_request_virtual_host,
-        ] {
+        for req_fn in test_cases() {
             let mut req = req_fn();
+            let name = format!(
+                "{} {} {:?}",
+                req.method(),
+                req.uri().path(),
+                req.uri().query(),
+            );
             let now = time::now();
 
             let mut ss = SigningSettings::default();
             ss.percent_encoding_mode = PercentEncodingMode::Double;
             ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+            ss.signature_location = SignatureLocation::QueryParams;
+            ss.expires_in = Some(std::time::Duration::from_secs(3600));
 
             let sp = SigningParams::builder()
                 .access_key("access_key_id")
                 .secret_key("secret_access_key")
                 .region("test")
+                .security_token("security_token")
                 .service_name("s3")
                 .time(SystemTime::from(now))
                 .settings(ss)
@@ -942,7 +954,7 @@ mod tests {
             .expect("signing must succeed");
             let (aws_sig, _) = output.into_parts();
             aws_sig.apply_to_request(&mut req);
-            let expect_headers = req.headers();
+            let expect_query = req.uri().query();
 
             let mut req = req_fn();
 
@@ -950,19 +962,32 @@ mod tests {
                 .access_key("access_key_id")
                 .secret_key("secret_access_key")
                 .region("test")
+                .security_token("security_token")
                 .service("s3")
                 .time(now)
                 .build()?;
 
             let cred = signer.credential()?.expect("credential must be valid");
-            let creq = signer.canonicalize(&req, SigningMethod::Header, &cred)?;
+            let creq =
+                signer.canonicalize(&req, SigningMethod::Query(Duration::hours(1)), &cred)?;
             let actual = signer.calculate(creq, &cred)?;
             signer.apply(&mut req, actual).expect("must apply success");
 
-            assert_eq!(
-                expect_headers.get(header::AUTHORIZATION),
-                req.headers().get(header::AUTHORIZATION)
-            );
+            let expect_query = {
+                let query = expect_query.unwrap_or_default();
+                let mut query: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
+                query.sort();
+                query
+            };
+
+            let actual_query = {
+                let query = req.uri().query().unwrap_or_default();
+                let mut query: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
+                query.sort();
+                query
+            };
+
+            assert_eq!(expect_query, actual_query, "{name}");
         }
 
         Ok(())
