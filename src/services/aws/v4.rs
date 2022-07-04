@@ -698,18 +698,22 @@ mod tests {
         req
     }
 
-    #[tokio::test]
-    async fn test_calculate() -> Result<()> {
-        let _ = env_logger::builder().is_test(true).try_init();
-
-        for req_fn in [
+    fn test_cases() -> &'static [fn() -> http::Request<&'static str>] {
+        &[
             test_get_request,
             test_get_request_with_query,
             test_get_request_virtual_host,
             test_get_request_with_query_virtual_host,
             test_put_request,
             test_put_request_virtual_host,
-        ] {
+        ]
+    }
+
+    #[tokio::test]
+    async fn test_calculate() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        for req_fn in test_cases() {
             let mut req = req_fn();
             let now = time::now();
 
@@ -769,14 +773,7 @@ mod tests {
     async fn test_calculate_in_query() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        for req_fn in [
-            test_get_request,
-            test_get_request_with_query,
-            test_get_request_virtual_host,
-            test_get_request_with_query_virtual_host,
-            test_put_request,
-            test_put_request_virtual_host,
-        ] {
+        for req_fn in test_cases() {
             let mut req = req_fn();
             let name = format!(
                 "{} {} {:?}",
@@ -856,14 +853,7 @@ mod tests {
     async fn test_calculate_with_token() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        for req_fn in [
-            test_get_request,
-            test_get_request_with_query,
-            test_get_request_virtual_host,
-            test_get_request_with_query_virtual_host,
-            test_put_request,
-            test_put_request_virtual_host,
-        ] {
+        for req_fn in test_cases() {
             let mut req = req_fn();
             let now = time::now();
 
@@ -925,14 +915,7 @@ mod tests {
     async fn test_calculate_with_token_in_query() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        for req_fn in [
-            test_get_request,
-            test_get_request_with_query,
-            test_get_request_virtual_host,
-            test_get_request_with_query_virtual_host,
-            test_put_request,
-            test_put_request_virtual_host,
-        ] {
+        for req_fn in test_cases() {
             let mut req = req_fn();
             let name = format!(
                 "{} {} {:?}",
