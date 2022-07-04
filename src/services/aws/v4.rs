@@ -747,7 +747,7 @@ mod tests {
             let mut hs = req
                 .headers()
                 .iter()
-                .map(|(k, v)| format!("{}:{}", k.to_string(), v.to_str().expect("must be valid")))
+                .map(|(k, v)| format!("{}:{}", k, v.to_str().expect("must be valid")))
                 .collect::<Vec<_>>();
 
             // Insert host if original request doesn't have it.
