@@ -45,7 +45,7 @@ sha2 = "0.10"
 time = { version = "0.3.9", features = ["macros", "formatting", "parsing"] }
 
 [dev-dependencies]
-aws-sigv4 = "0.14"
+aws-sigv4 = "0.15"
 criterion = { version = "0.3", features = ["async_tokio", "html_reports"] }
 dotenv = "0.15"
 env_logger = "0.9"
