@@ -2,6 +2,7 @@
 
 use hmac::Hmac;
 use hmac::Mac;
+use sha1::Sha1;
 use sha2::Digest;
 use sha2::Sha256;
 
@@ -54,4 +55,12 @@ pub fn hex_hmac_sha256(key: &[u8], content: &[u8]) -> String {
     h.update(content);
 
     hex::encode(h.finalize().into_bytes())
+}
+
+/// Base64 encoded HMAC with SHA1 hash.
+pub fn base64_hmac_sha1(key: &[u8], content: &[u8]) -> String {
+    let mut h = Hmac::<Sha1>::new_from_slice(key).expect("invalid key length");
+    h.update(content);
+
+    base64_encode(&h.finalize().into_bytes())
 }
