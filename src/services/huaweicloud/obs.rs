@@ -331,11 +331,11 @@ mod tests {
         req.insert_header(
             HeaderName::from_str("Content-MD5")?,
             HeaderValue::from_str("abc")?,
-        );
+        )?;
         req.insert_header(
             HeaderName::from_str("Content-Type")?,
             HeaderValue::from_str("text/plain")?,
-        );
+        )?;
 
         // Signing request with Signer
         signer.sign(&mut req)?;
