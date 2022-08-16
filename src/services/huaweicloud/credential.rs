@@ -1,3 +1,5 @@
+use std::fmt::{Debug, Formatter};
+
 #[derive(Default, Clone)]
 pub struct Credential {
     access_key: String,
@@ -41,12 +43,10 @@ impl Credential {
 
 impl Debug for Credential {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Credential {{ access_key: {}, secret_key: {}}}",
-            redact(&self.access_key),
-            redact(&self.secret_key),
-        )
+        f.debug_struct("Credential")
+            .field("access_key", &redact(&self.access_key))
+            .field("secret_key", &redact(&self.secret_key))
+            .finish_non_exhaustive()
     }
 }
 
