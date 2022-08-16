@@ -7,9 +7,7 @@ use std::sync::{Arc, RwLock};
 use anyhow::{anyhow, Result};
 use http::header::{HeaderName, AUTHORIZATION, CONTENT_TYPE, DATE};
 use http::{HeaderMap, HeaderValue};
-use lazy_static::lazy_static;
 use log::debug;
-use regex::Regex;
 
 use super::credential::Credential;
 use super::loader::{CredentialLoad, CredentialLoadChain};
@@ -26,6 +24,7 @@ pub struct Builder {
     credential_load: CredentialLoadChain,
 
     time: Option<DateTime>,
+    bucket: Option<String>,
 }
 
 impl Builder {
@@ -61,6 +60,13 @@ impl Builder {
         self
     }
 
+    /// Set the bucket name in canonicalized resource.
+    /// The caller should guarantee the param is same with bucket name in domain.
+    pub fn bucket(&mut self, bucket: &str) -> &mut Self {
+        self.bucket = Some(bucket.to_string());
+        self
+    }
+
     /// Use exising information to build a new signer.
     ///
     /// The builder should not be used anymore.
@@ -76,6 +82,11 @@ impl Builder {
 
         debug!("signer credential: {:?}", &credential);
 
+        let bucket = self
+            .bucket
+            .clone()
+            .ok_or_else(|| anyhow!("bucket should not be none"))?;
+
         match credential {
             None => Err(anyhow!("credential is none")),
             Some(cred) => {
@@ -83,6 +94,7 @@ impl Builder {
                     Ok(Signer {
                         credential: Arc::new(RwLock::new(cred)),
                         time: self.time,
+                        bucket,
                     })
                 } else {
                     Err(anyhow!("credential is invalid"))
@@ -98,6 +110,7 @@ impl Builder {
 pub struct Signer {
     credential: Arc<RwLock<Credential>>,
     time: Option<DateTime>,
+    bucket: String,
 }
 
 impl Debug for Signer {
@@ -117,7 +130,7 @@ impl Signer {
     }
 
     fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        let string_to_sign = string_to_sign(req, cred)?;
+        let string_to_sign = string_to_sign(req, cred, &self.bucket)?;
         let auth = base64_hmac_sha1(cred.secret_key().as_bytes(), string_to_sign.as_bytes());
 
         Ok(SignedOutput {
@@ -205,7 +218,7 @@ pub struct SignedOutput {
 /// ## Reference
 ///
 /// - [User Signature Authentication (OBS)](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0009.html)
-fn string_to_sign(req: &impl SignableRequest, cred: &Credential) -> Result<String> {
+fn string_to_sign(req: &impl SignableRequest, _cred: &Credential, bucket: &str) -> Result<String> {
     #[inline]
     fn get_or_default<'a>(h: &'a HeaderMap, key: &'a HeaderName) -> Result<&'a str> {
         match h.get(key) {
@@ -225,7 +238,7 @@ fn string_to_sign(req: &impl SignableRequest, cred: &Credential) -> Result<Strin
     if !canonicalize_header.is_empty() {
         writeln!(&mut s, "{}", canonicalize_header)?;
     }
-    write!(&mut s, "{}", canonicalize_resource(req, cred)?)?;
+    write!(&mut s, "{}", canonicalize_resource(req, bucket)?)?;
 
     debug!("string to sign: {}", &s);
 
@@ -265,18 +278,16 @@ fn canonicalize_header(req: &impl SignableRequest) -> Result<String> {
 /// ## Reference
 ///
 /// - [Authentication of Signature in a Header](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0010.html)
-fn canonicalize_resource(req: &impl SignableRequest, _cred: &Credential) -> Result<String> {
-    let bucket_name = parse_bucket_name(req.host());
+fn canonicalize_resource(req: &impl SignableRequest, bucket: &str) -> Result<String> {
+    let mut s = String::new();
+
+    write!(&mut s, "/{}", bucket)?;
+    write!(&mut s, "{}", req.path())?;
 
     let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
         form_urlencoded::parse(req.query().unwrap_or_default().as_bytes()).collect();
     // Sort by param name
     params.sort();
-
-    let mut s = String::new();
-
-    write!(&mut s, "/{}", bucket_name.to_string())?;
-    write!(&mut s, "{}", req.path())?;
 
     let params_str = params
         .iter()
@@ -289,36 +300,4 @@ fn canonicalize_resource(req: &impl SignableRequest, _cred: &Credential) -> Resu
     }
 
     Ok(s.to_string())
-}
-
-enum ParseBucketNameResult {
-    CustomBucketDomain(String),
-    DefaultDomainWithBucket(String),
-    DefaultDomainWithoutBucket,
-}
-
-impl ToString for ParseBucketNameResult {
-    fn to_string(&self) -> String {
-        match self {
-            ParseBucketNameResult::CustomBucketDomain(d) => d.clone(),
-            ParseBucketNameResult::DefaultDomainWithBucket(d) => d.clone(),
-            ParseBucketNameResult::DefaultDomainWithoutBucket => "".to_string(),
-        }
-    }
-}
-
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"(([\w\W]+).)?obs.[\w\W]+.myhuaweicloud.com").unwrap();
-}
-
-fn parse_bucket_name(host: &str) -> ParseBucketNameResult {
-    if let Some(captures) = RE.captures(host) {
-        if let Some(bucket) = captures.get(2) {
-            ParseBucketNameResult::DefaultDomainWithBucket(bucket.as_str().to_string())
-        } else {
-            ParseBucketNameResult::DefaultDomainWithoutBucket
-        }
-    } else {
-        ParseBucketNameResult::CustomBucketDomain(host.to_string())
-    }
 }
