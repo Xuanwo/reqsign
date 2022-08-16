@@ -22,7 +22,7 @@ impl Credential {
     }
 
     pub fn secret_key(&self) -> &str {
-        self.secret_key.as_ref()
+        &self.secret_key
     }
 
     pub fn set_secret_key(&mut self, secret_key: &str) -> &mut Self {
