@@ -44,6 +44,7 @@ async fn main() -> Result<()>{
   - AWS services (SigV4): `reqsign::services::aws::v4::Signer`
   - Azure Storage services: `reqsign::services::azure::storage::Signer`
   - Google services: `reqsign::services::google::Signer`
+  - Huawei Cloud OBS: `reqsign::services::huaweicloud::obs::Singer`
 
 ## Contributing
 
