@@ -24,26 +24,26 @@ name = "aws"
 anyhow = "1"
 backon = "0.0.2"
 base64 = "0.13"
-bytes = "1.1"
+bytes = "1"
 dirs = "4"
 form_urlencoded = "1"
 hex = "0.4"
 hmac = "0.12"
 http = "0.2"
-http-types = { version = "2.12.0", optional = true }
+http-types = { version = "2", optional = true }
 isahc = "1.7.2"
-jsonwebtoken = "8.0.1"
+jsonwebtoken = "8"
 log = "0.4"
 once_cell = "1"
 percent-encoding = "2"
-quick-xml = { version = "0.23.0", features = ["serialize"] }
+quick-xml = { version = "0.23", features = ["serialize"] }
 reqwest = { version = "0.11", optional = true }
 rust-ini = "0.18"
-serde = { version = "1.0.136", features = ["derive"] }
-serde_json = "1.0.79"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 sha1 = "0.10"
 sha2 = "0.10"
-time = { version = "0.3.9", features = ["macros", "formatting", "parsing"] }
+time = { version = "0.3", features = ["macros", "formatting", "parsing"] }
 
 [dev-dependencies]
 aws-sigv4 = "0.47"
