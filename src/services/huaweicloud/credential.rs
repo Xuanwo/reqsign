@@ -1,4 +1,4 @@
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct Credential {
     access_key: String,
     secret_key: String,
@@ -36,5 +36,24 @@ impl Credential {
         }
 
         true
+    }
+}
+
+impl Debug for Credential {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Credential {{ access_key: {}, secret_key: {}}}",
+            redact(&self.access_key),
+            redact(&self.secret_key),
+        )
+    }
+}
+
+fn redact(v: &str) -> &str {
+    if v.is_empty() {
+        "<empty>"
+    } else {
+        "<redacted>"
     }
 }
