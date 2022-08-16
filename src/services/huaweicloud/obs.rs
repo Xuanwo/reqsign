@@ -176,9 +176,10 @@ impl Signer {
     ///     let signer = Signer::builder()
     ///         .access_key("access_key")
     ///         .secret_key("123456")
+    ///         .bucket("bucket")
     ///         .build()?;
     ///     // Construct request
-    ///     let url = Url::parse("https://test.blob.core.windows.net/testbucket/testblob")?;
+    ///     let url = Url::parse("https://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
     ///     signer.sign(&mut req)?;
@@ -300,4 +301,54 @@ fn canonicalize_resource(req: &impl SignableRequest, bucket: &str) -> Result<Str
     }
 
     Ok(s.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use ::time::UtcOffset;
+
+    use anyhow::Result;
+    use http::Uri;
+
+    use super::*;
+
+    #[test]
+    fn test_sign() -> Result<()> {
+        let signer = Signer::builder()
+            .access_key("access_key")
+            .secret_key("123456")
+            .bucket("bucket")
+            .time(
+                time::parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+                    .to_offset(UtcOffset::from_hms(0, 0, 0)?),
+            )
+            .build()?;
+
+        let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt";
+        let mut req = http::Request::get(Uri::from_str(get_req)?).body(())?;
+        req.insert_header(
+            HeaderName::from_str("Content-MD5")?,
+            HeaderValue::from_str("abc")?,
+        );
+        req.insert_header(
+            HeaderName::from_str("Content-Type")?,
+            HeaderValue::from_str("text/plain")?,
+        );
+
+        // Signing request with Signer
+        signer.sign(&mut req)?;
+        let headers = req.headers();
+        let auth = headers.get("Authorization").unwrap();
+
+        // calculated from Huaweicloud OBS Signature tool
+        // https://obs-community.obs.cn-north-1.myhuaweicloud.com/sign/header_signature.html
+        assert_eq!(
+            "OBS access_key:9gUZ4ol2W19LyYcc92Bu3U0V09E=",
+            auth.to_str()?,
+        );
+
+        Ok(())
+    }
 }
