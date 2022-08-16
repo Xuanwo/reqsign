@@ -166,8 +166,8 @@ impl Signer {
     /// # Example
     ///
     /// ```no_run
-    /// use reqsign::service::huaweicloud::obs::Signer;
-    /// use request::{Client, Request, Url};
+    /// use reqsign::services::huaweicloud::obs::Signer;
+    /// use reqwest::{Client, Request, Url};
     /// use anyhow::Result;
     ///
     /// #[tokio::main]
@@ -180,7 +180,7 @@ impl Signer {
     ///         .build()?;
     ///     // Construct request
     ///     let url = Url::parse("https://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let mut req = Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
     ///     signer.sign(&mut req)?;
     ///     // Sending already signed request.
