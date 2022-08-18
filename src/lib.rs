@@ -3,12 +3,12 @@
 //! # Example
 //!
 //! ```rust
+//! use anyhow::Result;
 //! use reqsign::services::aws::v4::Signer;
 //! use reqwest::{Client, Request, Url};
-//! use anyhow::Result;
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<()>{
+//! async fn main() -> Result<()> {
 //!     // Signer can load region and credentials from environment by default.
 //!     let signer = Signer::builder()
 //!         .service("s3")
@@ -16,7 +16,7 @@
 //!         .allow_anonymous()
 //!         .build()?;
 //!     // Construct request
-//!     let url = Url::parse( "https://s3.amazonaws.com/testbucket")?;
+//!     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
 //!     let mut req = reqwest::Request::new(http::Method::GET, url);
 //!     // Signing request with Signer
 //!     signer.sign(&mut req)?;
@@ -32,7 +32,7 @@
 //! - [AWS SigV4][crate::services::aws::v4::Signer] for AWS services like S3.
 //! - [Azure Storage][crate::services::azure::storage::Signer] for Azure Storage services like Azure Blob Service.
 //! - [Google][crate::services::google::Signer] for All google cloud services like Google Cloud Storage Service.
-//! - [Huawei Cloud OBS][crate::services::huaweicloud::obs::Singer] for Huawei Cloud Object Storage Service (OBS).
+//! - [Huawei Cloud OBS][crate::services::huaweicloud::obs::Signer] for Huawei Cloud Object Storage Service (OBS).
 //!
 //! # Features
 //!
