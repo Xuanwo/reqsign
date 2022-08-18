@@ -315,12 +315,12 @@ impl Signer {
     /// # Example
     ///
     /// ```rust
+    /// use anyhow::Result;
     /// use reqsign::services::aws::v4::Signer;
     /// use reqwest::{Client, Request, Url};
-    /// use anyhow::Result;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<()>{
+    /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
     ///     let signer = Signer::builder()
     ///         .service("s3")
@@ -358,13 +358,13 @@ impl Signer {
     /// # Example
     ///
     /// ```rust
+    /// use anyhow::Result;
     /// use reqsign::services::aws::v4::Signer;
     /// use reqwest::{Client, Request, Url};
-    /// use anyhow::Result;
     /// use time::Duration;
     ///
     /// #[tokio::main]
-    /// async fn main() -> Result<()>{
+    /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
     ///     let signer = Signer::builder()
     ///         .service("s3")
