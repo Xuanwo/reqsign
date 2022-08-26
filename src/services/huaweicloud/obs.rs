@@ -354,4 +354,83 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_sign_with_subresource() -> Result<()> {
+        let signer = Signer::builder()
+            .access_key("access_key")
+            .secret_key("123456")
+            .bucket("bucket")
+            .time(
+                time::parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+                    .to_offset(UtcOffset::from_hms(0, 0, 0)?),
+            )
+            .build()?;
+
+        let get_req =
+            "http://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt?name=hello&abc=def";
+        let mut req = http::Request::get(Uri::from_str(get_req)?).body(())?;
+        req.insert_header(
+            HeaderName::from_str("Content-MD5")?,
+            HeaderValue::from_str("abc")?,
+        )?;
+        req.insert_header(
+            HeaderName::from_str("Content-Type")?,
+            HeaderValue::from_str("text/plain")?,
+        )?;
+
+        // Signing request with Signer
+        signer.sign(&mut req)?;
+        let headers = req.headers();
+        let auth = headers.get("Authorization").unwrap();
+
+        // calculated from Huaweicloud OBS Signature tool
+        // https://obs-community.obs.cn-north-1.myhuaweicloud.com/sign/header_signature.html
+        // CanonicalizedResource: /bucket/object.txt?name=hello
+        assert_eq!(
+            "OBS access_key:EaTKiO1Qh5KFUvWAVvbCNGktJUY=",
+            auth.to_str()?,
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sign_list_objects() -> Result<()> {
+        let signer = Signer::builder()
+            .access_key("access_key")
+            .secret_key("123456")
+            .bucket("bucket")
+            .time(
+                time::parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+                    .to_offset(UtcOffset::from_hms(0, 0, 0)?),
+            )
+            .build()?;
+
+        let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com?name=hello&abc=def";
+        let mut req = http::Request::get(Uri::from_str(get_req)?).body(())?;
+        req.insert_header(
+            HeaderName::from_str("Content-MD5")?,
+            HeaderValue::from_str("abc")?,
+        )?;
+        req.insert_header(
+            HeaderName::from_str("Content-Type")?,
+            HeaderValue::from_str("text/plain")?,
+        )?;
+
+        // Signing request with Signer
+        signer.sign(&mut req)?;
+        let headers = req.headers();
+        let auth = headers.get("Authorization").unwrap();
+
+        // calculated from Huaweicloud OBS Signature tool
+        // https://obs-community.obs.cn-north-1.myhuaweicloud.com/sign/header_signature.html
+        // CanonicalizedResource: /bucket/?name=hello
+        assert_eq!(
+            "OBS access_key:9OdOsf8PRdhGhpkp7IIbKE0kRvA=",
+            auth.to_str()?,
+        );
+
+        Ok(())
+    }
 }

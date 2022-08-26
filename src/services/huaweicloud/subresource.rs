@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 
+// Please attention: the subsources are case sensitive.
 static SUBRESOURCES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     HashSet::from([
         "CDNNotifyConfiguration",
