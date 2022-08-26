@@ -7,3 +7,4 @@ pub mod obs;
 mod constants;
 mod credential;
 mod loader;
+mod subresource;

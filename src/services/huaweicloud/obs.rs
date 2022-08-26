@@ -15,6 +15,7 @@ use super::loader::{CredentialLoad, CredentialLoadChain};
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
 use crate::services::huaweicloud::loader::EnvLoader;
+use crate::services::huaweicloud::subresource::is_subresource_param;
 use crate::time::{self, DateTime};
 
 /// Builder for `Signer`.
@@ -286,7 +287,9 @@ fn canonicalize_resource(req: &impl SignableRequest, bucket: &str) -> Result<Str
     write!(&mut s, "{}", req.path())?;
 
     let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
-        form_urlencoded::parse(req.query().unwrap_or_default().as_bytes()).collect();
+        form_urlencoded::parse(req.query().unwrap_or_default().as_bytes())
+            .filter(|(k, _)| is_subresource_param(k))
+            .collect();
     // Sort by param name
     params.sort();
 
