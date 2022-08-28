@@ -1,9 +1,10 @@
-# reqsign &emsp; [![Build Status]][actions] [![Latest Version]][crates.io]
+# reqsign &emsp; [![Build Status]][actions] [![Latest Version]][crates.io] [![Crate Downloads]][crates.io]
 
 [Build Status]: https://img.shields.io/github/workflow/status/Xuanwo/reqsign/CI/main
 [actions]: https://github.com/Xuanwo/reqsign/actions?query=branch%3Amain
 [Latest Version]: https://img.shields.io/crates/v/reqsign.svg
 [crates.io]: https://crates.io/crates/reqsign
+[Crate Downloads]: https://img.shields.io/crates/d/reqsign.svg
 
 Signing API requests without effort.
 
