@@ -6,14 +6,12 @@
 //! - ECS Container Credentials (IAM roles for tasks)
 //! - EC2 Instance Metadata Service (IAM Roles attached to instance)
 
-use std::str::FromStr;
 use std::thread::sleep;
 use std::{env, fs};
 
 use anyhow::{anyhow, Result};
 use backon::ExponentialBackoff;
 use ini::Ini;
-use isahc::ReadResponseExt;
 use log::warn;
 use quick_xml::de;
 use serde::Deserialize;
@@ -292,21 +290,19 @@ impl WebIdentityTokenLoader {
                 .unwrap_or_else(|_| "reqsign".to_string());
 
             // Construct request to AWS STS Service.
-            let mut req = isahc::Request::new(isahc::Body::empty());
             let url = format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
-            *req.uri_mut() = http::Uri::from_str(&url)?;
-            req.headers_mut().insert(
-                http::header::CONTENT_TYPE,
-                "application/x-www-form-urlencoded".parse()?,
+            let req = ureq::Agent::new().get(&url).set(
+                http::header::CONTENT_TYPE.as_str(),
+                "application/x-www-form-urlencoded",
             );
 
-            let mut resp = isahc::HttpClient::new()?.send(req)?;
+            let resp = req.call()?;
             if resp.status() != http::StatusCode::OK {
-                let content = resp.text()?;
+                let content = resp.into_string()?;
                 return Err(anyhow!("request to AWS STS Services failed: {content}"));
             }
 
-            let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.text()?)?;
+            let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.into_string()?)?;
             let cred = resp.result.credentials;
 
             let mut builder = Credential::builder();
