@@ -1,11 +1,11 @@
 use anyhow::Result;
-use http::StatusCode;
-use isahc::ReadResponseExt;
+use http::{Request, StatusCode};
 use log::{debug, warn};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqsign::services::aws::loader;
 use reqsign::services::aws::loader::CredentialLoad;
 use reqsign::services::aws::v4::Signer;
+use reqwest::blocking::Client;
 use serde::Deserialize;
 use std::str::FromStr;
 use std::{env, fs};
@@ -51,7 +51,7 @@ fn test_signer_with_web_loader() -> Result<()> {
     let idp_content =
         base64::decode(env::var("REQSIGN_AWS_IDP_BODY").expect("REQSIGN_AWS_IDP_BODY not exist"))?;
 
-    let mut req = http::Request::new(idp_content);
+    let mut req = Request::new(idp_content);
     *req.method_mut() = http::Method::POST;
     *req.uri_mut() = http::Uri::from_str(&idp_url)?;
     req.headers_mut()
@@ -61,8 +61,8 @@ fn test_signer_with_web_loader() -> Result<()> {
     struct Token {
         access_token: String,
     }
-    let token = isahc::HttpClient::new()?
-        .send(req)?
+    let token = Client::new()
+        .execute(req.try_into()?)?
         .json::<Token>()?
         .access_token;
 
@@ -104,7 +104,7 @@ fn test_head_object() -> Result<()> {
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
-    let mut req = isahc::Request::new(isahc::Body::empty());
+    let mut req = Request::new("");
     *req.method_mut() = http::Method::HEAD;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
@@ -112,8 +112,10 @@ fn test_head_object() -> Result<()> {
 
     debug!("signed request: {:?}", req);
 
-    let client = isahc::HttpClient::new()?;
-    let resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -131,7 +133,7 @@ fn test_put_object_with_query() -> Result<()> {
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
-    let mut req = isahc::Request::new(isahc::Body::from("Hello, World!"));
+    let mut req = Request::new("Hello, World!");
     *req.method_mut() = http::Method::PUT;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "put_object_test"))?;
 
@@ -141,11 +143,17 @@ fn test_put_object_with_query() -> Result<()> {
 
     debug!("signed request: {:?}", req);
 
-    let client = isahc::HttpClient::new()?;
-    let mut resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
 
-    debug!("got response: {:?}", String::from_utf8(resp.bytes()?)?);
-    assert_eq!(StatusCode::OK, resp.status());
+    let status = resp.status();
+    debug!(
+        "got response: {:?}",
+        String::from_utf8(resp.bytes()?.to_vec())?
+    );
+    assert_eq!(StatusCode::OK, status);
     Ok(())
 }
 
@@ -160,7 +168,7 @@ fn test_get_object_with_query() -> Result<()> {
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
-    let mut req = isahc::Request::new(isahc::Body::empty());
+    let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
@@ -170,8 +178,10 @@ fn test_get_object_with_query() -> Result<()> {
 
     debug!("signed request: {:?}", req);
 
-    let client = isahc::HttpClient::new()?;
-    let resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -189,7 +199,7 @@ fn test_head_object_with_special_characters() -> Result<()> {
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
-    let mut req = isahc::Request::new(isahc::Body::empty());
+    let mut req = Request::new("");
     *req.method_mut() = http::Method::HEAD;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "!@#$%^&*()_+-=;:'><,/?.txt"))?;
 
@@ -197,8 +207,10 @@ fn test_head_object_with_special_characters() -> Result<()> {
 
     debug!("signed request: {:?}", req);
 
-    let client = isahc::HttpClient::new()?;
-    let resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -216,7 +228,7 @@ fn test_head_object_with_encoded_characters() -> Result<()> {
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
-    let mut req = isahc::Request::new(isahc::Body::empty());
+    let mut req = Request::new("");
     *req.method_mut() = http::Method::HEAD;
     *req.uri_mut() = http::Uri::from_str(&format!(
         "{}/{}",
@@ -228,8 +240,10 @@ fn test_head_object_with_encoded_characters() -> Result<()> {
 
     debug!("signed request: {:?}", req);
 
-    let client = isahc::HttpClient::new()?;
-    let resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -247,7 +261,7 @@ fn test_list_bucket() -> Result<()> {
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
-    let mut req = isahc::Request::new(isahc::Body::empty());
+    let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!(
         "{}?list-type=2&delimiter=/&encoding-type=url",
@@ -258,8 +272,10 @@ fn test_list_bucket() -> Result<()> {
 
     debug!("signed request: {:?}", req);
 
-    let client = isahc::HttpClient::new()?;
-    let resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::OK, resp.status());

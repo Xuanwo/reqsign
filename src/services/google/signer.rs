@@ -5,7 +5,6 @@ use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
 use http::{header, StatusCode};
-use isahc::{ReadResponseExt, Request};
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use log::error;
 
@@ -87,7 +86,7 @@ impl Builder {
             scope,
             credential,
             token: Arc::new(RwLock::new((Token::default(), DateTime::now_utc()))),
-            client: isahc::HttpClient::new()?,
+            client: ureq::Agent::new(),
         })
     }
 }
@@ -102,7 +101,7 @@ pub struct Signer {
     credential: Credential,
     token: Arc<RwLock<(Token, DateTime)>>,
 
-    client: isahc::HttpClient,
+    client: ureq::Agent,
 }
 
 impl Signer {
@@ -121,28 +120,24 @@ impl Signer {
             &EncodingKey::from_rsa_pem(self.credential.private_key().as_bytes())?,
         )?;
 
-        let mut req = Request::new(
-            form_urlencoded::Serializer::new(String::new())
-                .append_pair("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
-                .append_pair("assertion", &jwt)
-                .finish(),
-        );
-        *req.method_mut() = http::Method::POST;
-        *req.uri_mut() = "https://oauth2.googleapis.com/token".parse()?;
-        // Insert content_type in header
-        req.headers_mut().insert(
-            header::CONTENT_TYPE,
-            "application/x-www-form-urlencoded".parse()?,
-        );
+        let resp = self
+            .client
+            .post("https://oauth2.googleapis.com/token")
+            .set(
+                header::CONTENT_TYPE.as_str(),
+                "application/x-www-form-urlencoded",
+            )
+            .send_form(&[
+                ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+                ("assertion", &jwt),
+            ])?;
 
-        let mut resp = self.client.send(req)?;
         if resp.status() != StatusCode::OK {
             error!("exchange token got unexpected response: {:?}", resp);
             return Err(anyhow!("exchange token failed: {:?}", resp));
         }
 
-        let content = resp.bytes()?;
-        let token: Token = serde_json::from_slice(&content)?;
+        let token: Token = serde_json::from_reader(resp.into_reader())?;
         Ok(token)
     }
 

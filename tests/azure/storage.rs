@@ -3,6 +3,7 @@ use http::StatusCode;
 use log::{debug, warn};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqsign::services::azure::storage::Signer;
+use reqwest::blocking::Client;
 use std::env;
 use std::str::FromStr;
 
@@ -42,17 +43,19 @@ fn test_head_blob() -> Result<()> {
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let mut builder = isahc::Request::builder();
+    let mut builder = http::Request::builder();
     builder = builder.method(http::Method::HEAD);
     builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
-    let mut req = builder.body(isahc::Body::empty())?;
+    let mut req = builder.body("")?;
 
     signer.sign(&mut req).expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
-    let client = isahc::HttpClient::new()?;
-    let resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -71,7 +74,7 @@ fn test_head_object_with_encoded_characters() -> Result<()> {
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let mut req = isahc::Request::new(isahc::Body::empty());
+    let mut req = http::Request::new("");
     *req.method_mut() = http::Method::HEAD;
     *req.uri_mut() = http::Uri::from_str(&format!(
         "{}/{}",
@@ -83,8 +86,10 @@ fn test_head_object_with_encoded_characters() -> Result<()> {
 
     debug!("signed request: {:?}", req);
 
-    let client = isahc::HttpClient::new()?;
-    let resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -111,17 +116,19 @@ fn test_list_blobs() -> Result<()> {
         // With encoded prefix
         "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
     ] {
-        let mut builder = isahc::Request::builder();
+        let mut builder = http::Request::builder();
         builder = builder.method(http::Method::GET);
         builder = builder.uri(format!("{}?{}", url, query));
-        let mut req = builder.body(isahc::Body::empty())?;
+        let mut req = builder.body("")?;
 
         signer.sign(&mut req).expect("sign request must success");
 
         debug!("signed request: {:?}", req);
 
-        let client = isahc::HttpClient::new()?;
-        let resp = client.send(req).expect("request must success");
+        let client = Client::new();
+        let resp = client
+            .execute(req.try_into()?)
+            .expect("request must success");
 
         debug!("got response: {:?}", resp);
         assert_eq!(StatusCode::OK, resp.status());
