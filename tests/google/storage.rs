@@ -1,8 +1,8 @@
 use anyhow::Result;
 use http::StatusCode;
-use isahc::HttpClient;
 use log::{debug, warn};
 use reqsign::services::google::Signer;
+use reqwest::blocking::Client;
 use std::env;
 
 fn init_signer() -> Option<Signer> {
@@ -39,17 +39,19 @@ fn test_get_object() -> Result<()> {
     let url = &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_URL")
         .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_URL must set");
 
-    let mut builder = isahc::Request::builder();
+    let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
     builder = builder.uri(format!("{}/o/{}", url, "not_exist_file"));
-    let mut req = builder.body(isahc::Body::empty())?;
+    let mut req = builder.body("")?;
 
     signer.sign(&mut req).expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
-    let client = HttpClient::new()?;
-    let resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -68,17 +70,19 @@ fn test_list_objects() -> Result<()> {
     let url = &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_URL")
         .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_URL must set");
 
-    let mut builder = isahc::Request::builder();
+    let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
     builder = builder.uri(format!("{}/o", url));
-    let mut req = builder.body(isahc::Body::empty())?;
+    let mut req = builder.body("")?;
 
     signer.sign(&mut req).expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
-    let client = HttpClient::new()?;
-    let resp = client.send(req).expect("request must success");
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::OK, resp.status());

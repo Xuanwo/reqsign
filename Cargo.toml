@@ -50,6 +50,6 @@ aws-sigv4 = "0.48"
 criterion = { version = "0.3", features = ["async_tokio", "html_reports"] }
 dotenv = "0.15"
 env_logger = "0.9"
-isahc = { version = "1.7.2", features = ["json"] }
+reqwest = { version = "0.11", features = ["blocking", "json"] }
 temp-env = "0.2"
 tokio = { version = "1.17", features = ["full"] }
