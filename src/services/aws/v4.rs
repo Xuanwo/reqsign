@@ -81,7 +81,6 @@ impl Builder {
     ///
     /// Security token always come with an expires in, we must load it from
     /// via credential loader. So this function should never be exported.
-    #[cfg(test)]
     pub fn security_token(&mut self, security_token: &str) -> &mut Self {
         self.credential.set_security_token(Some(security_token));
         self
