@@ -1,8 +1,8 @@
 use anyhow::Result;
 use http::{Request, StatusCode};
 use log::{debug, warn};
+use reqsign::credential::CredentialLoad;
 use reqsign::services::aliyun::loader;
-use reqsign::services::aliyun::loader::CredentialLoad;
 use reqsign::services::aliyun::oss::{Builder, Signer};
 use reqwest::blocking::Client;
 use serde::Deserialize;
