@@ -15,7 +15,7 @@ use percent_encoding::{percent_decode_str, utf8_percent_encode};
 use super::constants::AWS_QUERY_ENCODE_SET;
 use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::loader::*;
-use crate::credential::Credential;
+use crate::credential::{Credential, CredentialLoad, CredentialLoadChain};
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
 use crate::services::aws::constants::{X_AMZ_DATE, X_AMZ_SECURITY_TOKEN};

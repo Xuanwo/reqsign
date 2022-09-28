@@ -10,8 +10,9 @@ use http::{HeaderMap, HeaderValue};
 use log::debug;
 
 use super::constants::CONTENT_MD5;
-use super::loader::{CredentialLoad, CredentialLoadChain};
 use crate::credential::Credential;
+use crate::credential::CredentialLoad;
+use crate::credential::CredentialLoadChain;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
 use crate::services::huaweicloud::loader::EnvLoader;

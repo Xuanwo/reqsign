@@ -2,40 +2,7 @@ use std::env;
 
 use anyhow::Result;
 
-use crate::credential::Credential;
-
-/// Loader trait will try to load credential and region from different sources.
-pub trait CredentialLoad: Send + Sync {
-    fn load_credential(&self) -> Result<Option<Credential>>;
-}
-
-#[derive(Default)]
-pub struct CredentialLoadChain {
-    loaders: Vec<Box<dyn CredentialLoad>>,
-}
-
-impl CredentialLoadChain {
-    pub fn push(&mut self, l: impl CredentialLoad + 'static) -> &mut Self {
-        self.loaders.push(Box::new(l));
-
-        self
-    }
-    pub fn is_empty(&self) -> bool {
-        self.loaders.is_empty()
-    }
-}
-
-impl CredentialLoad for CredentialLoadChain {
-    fn load_credential(&self) -> Result<Option<Credential>> {
-        for l in self.loaders.iter() {
-            if let Some(c) = l.load_credential()? {
-                return Ok(Some(c));
-            }
-        }
-
-        Ok(None)
-    }
-}
+use crate::credential::{Credential, CredentialLoad};
 
 /// Load credential from env values
 ///

@@ -46,11 +46,11 @@
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
+pub mod credential;
 pub mod services;
 pub mod time;
 
 pub(crate) mod dirs;
 pub(crate) mod hash;
 
-mod credential;
 mod request;

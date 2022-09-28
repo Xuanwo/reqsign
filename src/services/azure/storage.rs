@@ -14,7 +14,7 @@ use log::debug;
 
 use super::constants::*;
 use super::loader::*;
-use crate::credential::Credential;
+use crate::credential::{Credential, CredentialLoad, CredentialLoadChain};
 use crate::hash::{base64_decode, base64_hmac_sha256};
 use crate::request::SignableRequest;
 use crate::time::{self, format_http_date, DateTime};

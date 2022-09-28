@@ -8,64 +8,8 @@ use log::warn;
 use serde::Deserialize;
 
 use crate::credential::Credential;
+use crate::credential::CredentialLoad;
 use crate::time::{format_rfc3339, now, parse_rfc3339};
-
-/// Loader trait will try to load credential from different sources.
-pub trait CredentialLoad: Send + Sync {
-    /// Load credential from sources.
-    ///
-    /// - If succeed, return `Ok(Some(cred))`
-    /// - If not found, return `Ok(None)`
-    /// - If unexpected errors happened, return `Err(err)`
-    fn load_credential(&self) -> Result<Option<Credential>>;
-}
-
-/// CredentialLoadChain will try to load credential via the insert order.
-///
-/// - If found, return directly.
-/// - If not found, keep going and try next one.
-/// - If meeting error, return directly.
-#[derive(Default)]
-pub struct CredentialLoadChain {
-    loaders: Vec<Box<dyn CredentialLoad>>,
-}
-
-impl CredentialLoadChain {
-    /// Check if this chain is empty.
-    pub fn is_empty(&self) -> bool {
-        self.loaders.is_empty()
-    }
-
-    /// Insert new loaders into chain.
-    pub fn push(&mut self, l: impl CredentialLoad + 'static) -> &mut Self {
-        self.loaders.push(Box::new(l));
-
-        self
-    }
-}
-
-impl CredentialLoad for CredentialLoadChain {
-    fn load_credential(&self) -> Result<Option<Credential>> {
-        for l in self.loaders.iter() {
-            if let Some(c) = l.load_credential()? {
-                return Ok(Some(c));
-            }
-        }
-
-        Ok(None)
-    }
-}
-
-/// DummyLoader always returns `Ok(None)`.
-///
-/// It's useful when users don't want to load credential/region from env.
-pub struct DummyLoader {}
-
-impl CredentialLoad for DummyLoader {
-    fn load_credential(&self) -> Result<Option<Credential>> {
-        Ok(None)
-    }
-}
 
 /// Load credential via OIDC token
 #[derive(Clone, Debug)]
