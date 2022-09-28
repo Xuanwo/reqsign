@@ -1,9 +1,4 @@
 //! Loader is used to load credential or region from env.
-//!
-//! - Environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION
-//! - Web Identity Token credentials from the environment
-//! - ECS Container Credentials (IAM roles for tasks)
-//! - EC2 Instance Metadata Service (IAM Roles attached to instance)
 
 use std::thread::sleep;
 
