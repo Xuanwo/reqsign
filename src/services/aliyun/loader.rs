@@ -7,7 +7,7 @@ use backon::ExponentialBackoff;
 use log::warn;
 use serde::Deserialize;
 
-use super::credential::Credential;
+use crate::credential::Credential;
 use crate::time::{format_rfc3339, now, parse_rfc3339};
 
 /// Loader trait will try to load credential from different sources.
@@ -138,15 +138,15 @@ impl OidcTokenLoader {
         }
 
         let resp: AssumeRoleWithOidcResponse = serde_json::from_str(&resp.into_string()?)?;
-        let cred = resp.credentials;
+        let resp_cred = resp.credentials;
 
-        let mut builder = Credential::builder();
-        builder.access_key(&cred.access_key_id);
-        builder.secret_key(&cred.access_key_secret);
-        builder.security_token(&cred.security_token);
-        builder.expires_in(parse_rfc3339(&cred.expiration)?);
+        let cred = Credential::new(&resp_cred.access_key_id, &resp_cred.access_key_secret)
+            .with_security_token(&resp_cred.security_token)
+            .with_expires_in(parse_rfc3339(&resp_cred.expiration)?);
 
-        Ok(Some(builder.build()?))
+        cred.check()?;
+
+        Ok(Some(cred))
     }
 }
 

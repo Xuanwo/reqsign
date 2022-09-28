@@ -52,4 +52,5 @@ pub mod time;
 pub(crate) mod dirs;
 pub(crate) mod hash;
 
+mod credential;
 mod request;

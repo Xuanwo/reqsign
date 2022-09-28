@@ -5,4 +5,3 @@ pub mod loader;
 pub mod v4;
 
 mod constants;
-mod credential;
