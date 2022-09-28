@@ -1,4 +1,4 @@
-//! Azure storage singer
+//! Azure Storage Singer
 
 use std::borrow::Cow;
 use std::fmt::Write;
