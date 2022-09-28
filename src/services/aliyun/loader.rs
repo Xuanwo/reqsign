@@ -8,7 +8,7 @@ use log::warn;
 use serde::Deserialize;
 
 use super::credential::Credential;
-use crate::time::parse_rfc3339;
+use crate::time::{format_rfc3339, now, parse_rfc3339};
 
 /// Loader trait will try to load credential from different sources.
 pub trait CredentialLoad: Send + Sync {
@@ -124,7 +124,7 @@ impl OidcTokenLoader {
         let role_session_name = "reqsign";
 
         // Construct request to Aliyun STS Service.
-        let url = format!("https://sts.aliyuncs.com/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&OIDCToken={}&RoleSessionName={}&Format=JSON", self.provider_arn, self.role_arn, self.token, role_session_name);
+        let url = format!("https://sts.aliyuncs.com/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}", self.provider_arn, self.role_arn,  role_session_name, format_rfc3339(now()), self.token);
 
         let req = self.client.get(&url).set(
             http::header::CONTENT_TYPE.as_str(),

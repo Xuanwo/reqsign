@@ -5,8 +5,8 @@ use super::loader::*;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
 use crate::time;
-use crate::time::DateTime;
 use crate::time::Duration;
+use crate::time::{format_http_date, DateTime};
 use anyhow::{anyhow, Result};
 use http::header::{HeaderName, AUTHORIZATION, CONTENT_TYPE, DATE};
 use http::{HeaderMap, HeaderValue};
@@ -27,6 +27,7 @@ pub struct Builder {
     credential_load: CredentialLoadChain,
     allow_anonymous: bool,
 
+    bucket: String,
     provider_arn: Option<String>,
     role_arn: Option<String>,
     oidc_token: Option<String>,
@@ -35,6 +36,11 @@ pub struct Builder {
 }
 
 impl Builder {
+    /// Specify bucket name.
+    pub fn bucket(&mut self, bucket: &str) -> &mut Self {
+        self.bucket = bucket.to_string();
+        self
+    }
     /// Specify access key id.
     ///
     /// If not set, we will try to load via `credential_loader`.
@@ -99,6 +105,10 @@ impl Builder {
     ///
     /// The builder should not be used anymore.
     pub fn build(&mut self) -> Result<Signer> {
+        if self.bucket.is_empty() {
+            return Err(anyhow!("bucket is required"));
+        }
+
         let credential = if self.credential.is_valid() {
             Some(self.credential.clone())
         } else {
@@ -107,6 +117,7 @@ impl Builder {
         debug!("signer credential: {:?}", &credential);
 
         Ok(Signer {
+            bucket: self.bucket.to_string(),
             credential: Arc::new(RwLock::new(credential)),
             credential_load: mem::take(&mut self.credential_load),
             allow_anonymous: self.allow_anonymous,
@@ -117,6 +128,7 @@ impl Builder {
 
 /// Singer for Aliyun OSS.
 pub struct Signer {
+    bucket: String,
     credential: Arc<RwLock<Option<Credential>>>,
     credential_load: CredentialLoadChain,
 
@@ -156,17 +168,19 @@ impl Signer {
 
     /// Calculate signing requests via SignableRequest.
     fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        let _ = self.time.unwrap_or_else(time::now);
-        let string_to_sign = string_to_sign(req, cred)?;
-        let signature = base64_hmac_sha1(cred.access_key().as_bytes(), string_to_sign.as_bytes());
+        let now = self.time.unwrap_or_else(time::now);
+        let string_to_sign = string_to_sign(req, cred, now, &self.bucket)?;
+        let signature = base64_hmac_sha1(cred.secret_key().as_bytes(), string_to_sign.as_bytes());
 
         Ok(SignedOutput {
             access_key_id: cred.access_key().to_string(),
             signature,
+            signed_time: now,
         })
     }
 
     fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
+        req.insert_header(DATE, format_http_date(output.signed_time).parse()?)?;
         req.insert_header(AUTHORIZATION, {
             let mut value: HeaderValue =
                 format!("OSS {}:{}", output.access_key_id, output.signature).parse()?;
@@ -202,6 +216,7 @@ impl Signer {
 struct SignedOutput {
     access_key_id: String,
     signature: String,
+    signed_time: DateTime,
 }
 
 /// Construct string to sign.
@@ -216,7 +231,12 @@ struct SignedOutput {
 /// + CanonicalizedOSSHeaders
 /// + CanonicalizedResource
 /// ```
-fn string_to_sign(req: &impl SignableRequest, cred: &Credential) -> Result<String> {
+fn string_to_sign(
+    req: &impl SignableRequest,
+    cred: &Credential,
+    now: DateTime,
+    bucket: &str,
+) -> Result<String> {
     #[inline]
     fn get_or_default<'a>(h: &'a HeaderMap, key: &'a HeaderName) -> Result<&'a str> {
         match h.get(key) {
@@ -230,9 +250,14 @@ fn string_to_sign(req: &impl SignableRequest, cred: &Credential) -> Result<Strin
     writeln!(&mut s, "{}", req.method().as_str())?;
     writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_MD5.parse()?)?)?;
     writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_TYPE)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &DATE)?)?;
-    writeln!(&mut s, "{}", canonicalize_header(req, cred)?)?;
-    write!(&mut s, "{}", canonicalize_resource(req))?;
+    writeln!(&mut s, "{}", format_http_date(now))?;
+    {
+        let headers = canonicalize_header(req, cred)?;
+        if !headers.is_empty() {
+            writeln!(&mut s, "{headers}",)?;
+        }
+    }
+    write!(&mut s, "{}", canonicalize_resource(req, bucket))?;
 
     debug!("string to sign: {}", &s);
     Ok(s)
@@ -280,11 +305,7 @@ fn canonicalize_header(req: &impl SignableRequest, cred: &Credential) -> Result<
 /// # Reference
 ///
 /// [Building CanonicalizedResource](https://help.aliyun.com/document_detail/31951.html#section-w2k-sw2-xdb)
-fn canonicalize_resource(req: &impl SignableRequest) -> String {
-    if req.query().is_none() {
-        return req.path().to_string();
-    }
-
+fn canonicalize_resource(req: &impl SignableRequest, bucket: &str) -> String {
     let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
         form_urlencoded::parse(req.query().unwrap_or_default().as_bytes())
             .filter(|(k, _)| is_sub_resource(k))
@@ -298,7 +319,11 @@ fn canonicalize_resource(req: &impl SignableRequest) -> String {
         .collect::<Vec<String>>()
         .join("&");
 
-    req.path().to_string() + "?" + &params_str
+    if params_str.is_empty() {
+        format!("/{bucket}{}", req.path())
+    } else {
+        format!("/{bucket}{}?{}", req.path(), params_str)
+    }
 }
 
 fn is_sub_resource(v: &str) -> bool {
