@@ -2,7 +2,7 @@ use std::env;
 
 use anyhow::Result;
 
-use super::credential::Credential;
+use crate::credential::Credential;
 
 /// Loader trait will try to load credential and region from different sources.
 pub trait CredentialLoad: Send + Sync {
@@ -81,8 +81,8 @@ mod tests {
                         .load_credential()
                         .expect("load_credential must success")
                         .expect("credential must be valid");
-                    assert_eq!("account_name", x.account_name());
-                    assert_eq!("account_key", x.account_key());
+                    assert_eq!("account_name", x.access_key());
+                    assert_eq!("account_key", x.secret_key());
                 });
             },
         );

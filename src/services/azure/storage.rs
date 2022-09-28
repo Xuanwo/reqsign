@@ -13,8 +13,8 @@ use http::HeaderMap;
 use log::debug;
 
 use super::constants::*;
-use super::credential::Credential;
 use super::loader::*;
+use crate::credential::Credential;
 use crate::hash::{base64_decode, base64_hmac_sha256};
 use crate::request::SignableRequest;
 use crate::time::{self, format_http_date, DateTime};
@@ -31,13 +31,13 @@ pub struct Builder {
 impl Builder {
     /// Specify account name.
     pub fn account_name(&mut self, account_name: &str) -> &mut Self {
-        self.credential.set_account_name(account_name);
+        self.credential.set_access_key(account_name);
         self
     }
 
     /// Specify account key.
     pub fn account_key(&mut self, account_key: &str) -> &mut Self {
-        self.credential.set_account_key(account_key);
+        self.credential.set_secret_key(account_key);
         self
     }
 
@@ -143,13 +143,10 @@ impl Signer {
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
         let now = self.time.unwrap_or_else(time::now);
         let string_to_sign = string_to_sign(req, cred, now)?;
-        let auth = base64_hmac_sha256(
-            &base64_decode(cred.account_key()),
-            string_to_sign.as_bytes(),
-        );
+        let auth = base64_hmac_sha256(&base64_decode(cred.secret_key()), string_to_sign.as_bytes());
 
         Ok(SignedOutput {
-            account_name: cred.account_name().to_string(),
+            account_name: cred.access_key().to_string(),
             signed_time: now,
             signature: auth,
         })
@@ -332,7 +329,7 @@ fn canonicalize_header(req: &impl SignableRequest, now: DateTime) -> Result<Stri
 /// - [Constructing the canonicalized resource string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-resource-string)
 fn canonicalize_resource(req: &impl SignableRequest, cred: &Credential) -> String {
     if req.query().is_none() {
-        return format!("/{}{}", cred.account_name(), req.path());
+        return format!("/{}{}", cred.access_key(), req.path());
     }
 
     let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
@@ -342,7 +339,7 @@ fn canonicalize_resource(req: &impl SignableRequest, cred: &Credential) -> Strin
 
     format!(
         "/{}{}\n{}",
-        cred.account_name(),
+        cred.access_key(),
         req.path(),
         params
             .iter()

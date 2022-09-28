@@ -1,44 +1,9 @@
+use anyhow::anyhow;
+use anyhow::Result;
 use std::fmt::{Debug, Formatter};
-use std::mem;
 use std::ops::Add;
 
-use anyhow::{anyhow, Result};
-
 use crate::time::{self, DateTime, Duration};
-
-#[derive(Default)]
-pub struct Builder {
-    cred: Credential,
-}
-
-impl Builder {
-    pub fn access_key(&mut self, access_key: &str) -> &mut Self {
-        self.cred.access_key = access_key.to_string();
-        self
-    }
-    pub fn secret_key(&mut self, secret_key: &str) -> &mut Self {
-        self.cred.secret_key = secret_key.to_string();
-        self
-    }
-    pub fn security_token(&mut self, security_token: &str) -> &mut Self {
-        self.cred.security_token = Some(security_token.to_string());
-        self
-    }
-    pub fn expires_in(&mut self, expires_in: DateTime) -> &mut Self {
-        self.cred.expires_in = Some(expires_in);
-        self
-    }
-    pub fn build(&mut self) -> Result<Credential> {
-        if self.cred.access_key.is_empty() {
-            return Err(anyhow!("access_key should not be empty"));
-        }
-        if self.cred.secret_key.is_empty() {
-            return Err(anyhow!("secret_key should not be empty"));
-        }
-
-        Ok(mem::take(&mut self.cred))
-    }
-}
 
 #[derive(Default, Clone)]
 pub struct Credential {
@@ -49,11 +14,6 @@ pub struct Credential {
 }
 
 impl Credential {
-    pub fn builder() -> Builder {
-        Builder {
-            cred: Default::default(),
-        }
-    }
     pub fn new(access_key: &str, secret_key: &str) -> Self {
         Credential {
             access_key: access_key.to_string(),
@@ -62,6 +22,7 @@ impl Credential {
             expires_in: None,
         }
     }
+
     pub fn access_key(&self) -> &str {
         &self.access_key
     }
@@ -85,9 +46,17 @@ impl Credential {
         self.security_token = token.map(|v| v.to_string());
         self
     }
+    pub fn with_security_token(mut self, token: &str) -> Self {
+        self.security_token = Some(token.to_string());
+        self
+    }
 
     pub fn set_expires_in(&mut self, expires_in: Option<DateTime>) -> &mut Self {
         self.expires_in = expires_in;
+        self
+    }
+    pub fn with_expires_in(mut self, expires_in: DateTime) -> Self {
+        self.expires_in = Some(expires_in);
         self
     }
 
@@ -104,6 +73,14 @@ impl Credential {
         }
 
         true
+    }
+
+    pub fn check(&self) -> Result<()> {
+        if self.is_valid() {
+            Ok(())
+        } else {
+            Err(anyhow!("credential is invalid"))
+        }
     }
 }
 

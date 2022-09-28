@@ -16,7 +16,7 @@ use log::warn;
 use quick_xml::de;
 use serde::Deserialize;
 
-use super::credential::Credential;
+use crate::credential::Credential;
 use crate::dirs::expand_homedir;
 use crate::time::parse_rfc3339;
 
@@ -303,15 +303,15 @@ impl WebIdentityTokenLoader {
             }
 
             let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.into_string()?)?;
-            let cred = resp.result.credentials;
+            let resp_cred = resp.result.credentials;
 
-            let mut builder = Credential::builder();
-            builder.access_key(&cred.access_key_id);
-            builder.secret_key(&cred.secret_access_key);
-            builder.security_token(&cred.session_token);
-            builder.expires_in(parse_rfc3339(&cred.expiration)?);
+            let cred = Credential::new(&resp_cred.access_key_id, &resp_cred.secret_access_key)
+                .with_security_token(&resp_cred.session_token)
+                .with_expires_in(parse_rfc3339(&resp_cred.expiration)?);
 
-            return Ok(Some(builder.build()?));
+            cred.check()?;
+
+            return Ok(Some(cred));
         }
 
         Ok(None)

@@ -2,7 +2,7 @@ use std::env;
 
 use anyhow::Result;
 
-use super::credential::Credential;
+use crate::credential::Credential;
 
 /// Loader trait will try to load credential and region from different sources.
 pub trait CredentialLoad: Send + Sync {

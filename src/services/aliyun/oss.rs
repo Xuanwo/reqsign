@@ -1,7 +1,7 @@
 //! Aliyun OSS Singer
 
-use super::credential::Credential;
 use super::loader::*;
+use crate::credential::Credential;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
 use crate::time;
