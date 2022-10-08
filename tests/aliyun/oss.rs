@@ -132,7 +132,7 @@ fn test_head_object_with_special_characters() -> Result<()> {
     *req.uri_mut() = http::Uri::from_str(&format!(
         "{}/{}",
         url,
-        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
+        utf8_percent_encode("not-exist-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
     signer.sign(&mut req).expect("sign request must success");
