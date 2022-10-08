@@ -11,6 +11,7 @@ use http::header::{HeaderName, AUTHORIZATION, CONTENT_TYPE, DATE};
 use http::{HeaderMap, HeaderValue};
 use log::debug;
 use once_cell::sync::Lazy;
+use percent_encoding::percent_decode_str;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Write;
@@ -318,10 +319,11 @@ fn canonicalize_resource(req: &impl SignableRequest, bucket: &str) -> String {
         .collect::<Vec<String>>()
         .join("&");
 
+    let path = percent_decode_str(req.path()).decode_utf8_lossy();
     if params_str.is_empty() {
-        format!("/{bucket}{}", req.path())
+        format!("/{bucket}{}", path)
     } else {
-        format!("/{bucket}{}?{}", req.path(), params_str)
+        format!("/{bucket}{}?{}", path, params_str)
     }
 }
 

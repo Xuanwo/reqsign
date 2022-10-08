@@ -1,6 +1,7 @@
 use anyhow::Result;
 use http::{Request, StatusCode};
 use log::{debug, warn};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqsign::credential::CredentialLoad;
 use reqsign::services::aliyun::loader;
 use reqsign::services::aliyun::oss::{Builder, Signer};
@@ -128,7 +129,11 @@ fn test_head_object_with_special_characters() -> Result<()> {
 
     let mut req = Request::new("");
     *req.method_mut() = http::Method::HEAD;
-    *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "!@#$%^&*()_+-=;:'><,/?.txt"))?;
+    *req.uri_mut() = http::Uri::from_str(&format!(
+        "{}/{}",
+        url,
+        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
+    ))?;
 
     signer.sign(&mut req).expect("sign request must success");
 
@@ -141,6 +146,41 @@ fn test_head_object_with_special_characters() -> Result<()> {
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    Ok(())
+}
+
+#[test]
+fn test_put_object_with_special_characters() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::PUT;
+    *req.uri_mut() = http::Uri::from_str(&format!(
+        "{}/{}",
+        url,
+        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
+    ))?;
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {:?}", resp.text()?);
+    assert_eq!(StatusCode::OK, status);
     Ok(())
 }
 
