@@ -42,6 +42,7 @@ async fn main() -> Result<()>{
 - Pure rust with minimal dependencies.
 - Test again official SDK and services.
 - Supported services
+  - Aliyun OSS: `reqsign::services::aliyun::oss::Signer`
   - AWS services (SigV4): `reqsign::services::aws::v4::Signer`
   - Azure Storage services: `reqsign::services::azure::storage::Signer`
   - Google services: `reqsign::services::google::Signer`
