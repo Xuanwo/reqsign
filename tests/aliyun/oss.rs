@@ -217,3 +217,38 @@ fn test_list_bucket() -> Result<()> {
     assert_eq!(StatusCode::OK, status);
     Ok(())
 }
+
+#[test]
+fn test_list_bucket_with_invalid_token() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::GET;
+    *req.uri_mut() = http::Uri::from_str(&format!(
+        "{}?list-type=2&delimiter=/&encoding-type=url&continuation-token={}",
+        url,
+        utf8_percent_encode("hello.txt", NON_ALPHANUMERIC)
+    ))?;
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text()?);
+    assert_eq!(StatusCode::BAD_REQUEST, status);
+    Ok(())
+}
