@@ -1,4 +1,5 @@
-use percent_encoding::{AsciiSet, NON_ALPHANUMERIC};
+use percent_encoding::AsciiSet;
+use percent_encoding::NON_ALPHANUMERIC;
 
 // Headers used in aws services.
 pub const X_AMZ_CONTENT_SHA_256: &str = "x-amz-content-sha256";

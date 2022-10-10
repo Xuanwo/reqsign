@@ -1,22 +1,33 @@
 //! Aliyun OSS Singer
 
-use crate::credential::{Credential, CredentialLoad, CredentialLoadChain};
-use crate::hash::base64_hmac_sha1;
-use crate::request::SignableRequest;
-use crate::time;
-use crate::time::Duration;
-use crate::time::{format_http_date, DateTime};
-use anyhow::{anyhow, Result};
-use http::header::{HeaderName, AUTHORIZATION, CONTENT_TYPE, DATE};
-use http::{HeaderMap, HeaderValue};
-use log::debug;
-use once_cell::sync::Lazy;
-use percent_encoding::percent_decode_str;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::mem;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use std::sync::RwLock;
+
+use anyhow::anyhow;
+use anyhow::Result;
+use http::header::HeaderName;
+use http::header::AUTHORIZATION;
+use http::header::CONTENT_TYPE;
+use http::header::DATE;
+use http::HeaderMap;
+use http::HeaderValue;
+use log::debug;
+use once_cell::sync::Lazy;
+use percent_encoding::percent_decode_str;
+
+use crate::credential::Credential;
+use crate::credential::CredentialLoad;
+use crate::credential::CredentialLoadChain;
+use crate::hash::base64_hmac_sha1;
+use crate::request::SignableRequest;
+use crate::time;
+use crate::time::format_http_date;
+use crate::time::DateTime;
+use crate::time::Duration;
 
 const CONTENT_MD5: &str = "content-md5";
 

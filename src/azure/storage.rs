@@ -1,23 +1,30 @@
 //! Azure Storage Singer
 
 use std::borrow::Cow;
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::fmt::Write;
-use std::fmt::{Debug, Formatter};
 use std::mem;
 use std::sync::Arc;
 use std::sync::RwLock;
 
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
+use anyhow::Result;
 use http::header::*;
 use http::HeaderMap;
 use log::debug;
 
 use super::constants::*;
 use super::loader::*;
-use crate::credential::{Credential, CredentialLoad, CredentialLoadChain};
-use crate::hash::{base64_decode, base64_hmac_sha256};
+use crate::credential::Credential;
+use crate::credential::CredentialLoad;
+use crate::credential::CredentialLoadChain;
+use crate::hash::base64_decode;
+use crate::hash::base64_hmac_sha256;
 use crate::request::SignableRequest;
-use crate::time::{self, format_http_date, DateTime};
+use crate::time::format_http_date;
+use crate::time::DateTime;
+use crate::time::{self};
 
 /// Builder for `Signer`.
 #[derive(Default)]
@@ -180,7 +187,9 @@ impl Signer {
     /// ```no_run
     /// use anyhow::Result;
     /// use reqsign::azure::storage::Signer;
-    /// use reqwest::{Client, Request, Url};
+    /// use reqwest::Client;
+    /// use reqwest::Request;
+    /// use reqwest::Url;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {

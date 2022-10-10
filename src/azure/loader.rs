@@ -2,7 +2,8 @@ use std::env;
 
 use anyhow::Result;
 
-use crate::credential::{Credential, CredentialLoad};
+use crate::credential::Credential;
+use crate::credential::CredentialLoad;
 
 /// Load credential from env values
 ///

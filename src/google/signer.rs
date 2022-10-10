@@ -1,18 +1,28 @@
 use std::env;
-use std::ops::{Add, Sub};
+use std::ops::Add;
+use std::ops::Sub;
 use std::sync::Arc;
 use std::sync::RwLock;
 
-use anyhow::{anyhow, Result};
-use http::{header, StatusCode};
-use jsonwebtoken::{Algorithm, EncodingKey, Header};
+use anyhow::anyhow;
+use anyhow::Result;
+use http::header;
+use http::StatusCode;
+use jsonwebtoken::Algorithm;
+use jsonwebtoken::EncodingKey;
+use jsonwebtoken::Header;
 use log::error;
 
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
-use super::credential::{Claims, Credential, CredentialLoader, Token};
+use super::credential::Claims;
+use super::credential::Credential;
+use super::credential::CredentialLoader;
+use super::credential::Token;
 use crate::hash::base64_decode;
 use crate::request::SignableRequest;
-use crate::time::{self, DateTime, Duration};
+use crate::time::DateTime;
+use crate::time::Duration;
+use crate::time::{self};
 
 /// Builder for Signer.
 #[derive(Default)]
@@ -164,7 +174,9 @@ impl Signer {
     /// ```no_run
     /// use anyhow::Result;
     /// use reqsign::google::Signer;
-    /// use reqwest::{Client, Request, Url};
+    /// use reqwest::Client;
+    /// use reqwest::Request;
+    /// use reqwest::Url;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {

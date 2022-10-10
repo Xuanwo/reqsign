@@ -92,9 +92,12 @@ pub fn parse_rfc3339(s: &str) -> Result<DateTime> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use time::Date;
+    use time::Month;
     use time::PrimitiveDateTime;
-    use time::{Date, Month, Time};
+    use time::Time;
+
+    use super::*;
 
     fn test_time() -> OffsetDateTime {
         let date = Date::from_calendar_date(2022, Month::March, 1).expect("must be valid date");

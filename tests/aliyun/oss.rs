@@ -1,14 +1,19 @@
+use std::env;
+use std::str::FromStr;
+
 use anyhow::Result;
-use http::{Request, StatusCode};
-use log::{debug, warn};
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use http::Request;
+use http::StatusCode;
+use log::debug;
+use log::warn;
+use percent_encoding::utf8_percent_encode;
+use percent_encoding::NON_ALPHANUMERIC;
 use reqsign::aliyun::loader;
-use reqsign::aliyun::oss::{Builder, Signer};
+use reqsign::aliyun::oss::Builder;
+use reqsign::aliyun::oss::Signer;
 use reqsign::credential::CredentialLoad;
 use reqwest::blocking::Client;
 use serde::Deserialize;
-use std::env;
-use std::str::FromStr;
 use ureq::Agent;
 
 fn init_signer() -> Option<Signer> {

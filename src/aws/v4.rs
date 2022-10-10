@@ -1,22 +1,36 @@
 //! AWS service sigv4 signer
 
 use std::borrow::Cow;
+use std::fmt::Debug;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::fmt::Write;
-use std::fmt::{Debug, Display, Formatter};
 
-use anyhow::{anyhow, Result};
-use http::{HeaderMap, HeaderValue};
+use anyhow::anyhow;
+use anyhow::Result;
+use http::HeaderMap;
+use http::HeaderValue;
 use log::debug;
-use percent_encoding::{percent_decode_str, utf8_percent_encode};
+use percent_encoding::percent_decode_str;
+use percent_encoding::utf8_percent_encode;
 
+use super::config::ConfigLoader;
 use super::constants::AWS_QUERY_ENCODE_SET;
 use super::constants::X_AMZ_CONTENT_SHA_256;
-use super::constants::{X_AMZ_DATE, X_AMZ_SECURITY_TOKEN};
-use super::loader::*;
+use super::constants::X_AMZ_DATE;
+use super::constants::X_AMZ_SECURITY_TOKEN;
+use super::credential::CredentialLoader;
+use super::region::RegionLoader;
 use crate::credential::Credential;
-use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
+use crate::hash::hex_hmac_sha256;
+use crate::hash::hex_sha256;
+use crate::hash::hmac_sha256;
 use crate::request::SignableRequest;
-use crate::time::{self, format_date, format_iso8601, DateTime, Duration};
+use crate::time::format_date;
+use crate::time::format_iso8601;
+use crate::time::DateTime;
+use crate::time::Duration;
+use crate::time::{self};
 
 /// Builder for `Signer`.
 #[derive(Default)]
@@ -295,7 +309,9 @@ impl Signer {
     /// ```rust
     /// use anyhow::Result;
     /// use reqsign::AwsV4Signer;
-    /// use reqwest::{Client, Request, Url};
+    /// use reqwest::Client;
+    /// use reqwest::Request;
+    /// use reqwest::Url;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
@@ -338,7 +354,9 @@ impl Signer {
     /// ```rust
     /// use anyhow::Result;
     /// use reqsign::AwsV4Signer;
-    /// use reqwest::{Client, Request, Url};
+    /// use reqwest::Client;
+    /// use reqwest::Request;
+    /// use reqwest::Url;
     /// use time::Duration;
     ///
     /// #[tokio::main]
@@ -592,15 +610,18 @@ fn generate_signing_key(secret: &str, time: DateTime, region: &str, service: &st
 
 #[cfg(test)]
 mod tests {
+    use std::time::SystemTime;
+
     use anyhow::Result;
     use aws_sigv4;
-    use aws_sigv4::http_request::{
-        PayloadChecksumKind, PercentEncodingMode, SignableBody, SignableRequest, SignatureLocation,
-        SigningSettings,
-    };
+    use aws_sigv4::http_request::PayloadChecksumKind;
+    use aws_sigv4::http_request::PercentEncodingMode;
+    use aws_sigv4::http_request::SignableBody;
+    use aws_sigv4::http_request::SignableRequest;
+    use aws_sigv4::http_request::SignatureLocation;
+    use aws_sigv4::http_request::SigningSettings;
     use aws_sigv4::SigningParams;
     use http::header;
-    use std::time::SystemTime;
 
     use super::*;
 
