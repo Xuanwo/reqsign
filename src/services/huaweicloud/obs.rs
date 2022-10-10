@@ -313,6 +313,7 @@ mod tests {
 
     use ::time::UtcOffset;
 
+    use crate::time::parse_rfc2822;
     use anyhow::Result;
     use http::Uri;
 
@@ -325,7 +326,7 @@ mod tests {
             .secret_key("123456")
             .bucket("bucket")
             .time(
-                time::parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+                parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
                     .to_offset(UtcOffset::from_hms(0, 0, 0)?),
             )
             .build()?;
@@ -363,7 +364,7 @@ mod tests {
             .secret_key("123456")
             .bucket("bucket")
             .time(
-                time::parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+                parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
                     .to_offset(UtcOffset::from_hms(0, 0, 0)?),
             )
             .build()?;
@@ -403,7 +404,7 @@ mod tests {
             .secret_key("123456")
             .bucket("bucket")
             .time(
-                time::parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+                parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
                     .to_offset(UtcOffset::from_hms(0, 0, 0)?),
             )
             .build()?;

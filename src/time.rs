@@ -1,7 +1,9 @@
 //! Time related utils.
 
 use anyhow::Result;
-use time::format_description::well_known::{Rfc2822, Rfc3339};
+#[cfg(test)]
+use time::format_description::well_known::Rfc2822;
+use time::format_description::well_known::Rfc3339;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::OffsetDateTime;
@@ -55,6 +57,7 @@ pub fn format_http_date(t: DateTime) -> String {
 /// Format time into RFC2822: `Tue, 01 Jul 2003 10:52:37 +0200`
 ///
 /// - [Reference](https://httpwg.org/specs/rfc7231.html#http.date)
+#[cfg(test)]
 pub fn format_rfc2822(t: DateTime) -> String {
     t.format(&Rfc2822).expect("time must be valid")
 }
@@ -71,6 +74,7 @@ pub fn format_rfc3339(t: DateTime) -> String {
 /// - `Tue, 1 Jul 2003 10:52:37 +0200`
 /// - `Tue, 01 Jul 2003 10:52:37 +0200`
 /// - `Tue, 1 Jul 2003 10:52:37 GMT`
+#[cfg(test)]
 pub fn parse_rfc2822(s: &str) -> Result<DateTime> {
     Ok(OffsetDateTime::parse(s, &Rfc2822)?)
 }

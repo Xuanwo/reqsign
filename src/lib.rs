@@ -49,9 +49,8 @@
 
 pub mod credential;
 pub mod services;
-pub mod time;
 
-pub(crate) mod dirs;
-pub(crate) mod hash;
-
+mod dirs;
+mod hash;
 mod request;
+mod time;
