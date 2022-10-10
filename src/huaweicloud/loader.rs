@@ -29,8 +29,8 @@ mod tests {
     use once_cell::sync::Lazy;
     use tokio::runtime::Runtime;
 
+    use super::super::constants::*;
     use super::*;
-    use crate::services::huaweicloud::constants::*;
 
     static TOKIO: Lazy<Runtime> = Lazy::new(|| Runtime::new().expect("runtime must be valid"));
 

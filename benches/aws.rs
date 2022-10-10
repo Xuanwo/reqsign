@@ -7,7 +7,7 @@ use aws_sigv4::SigningParams;
 use criterion::criterion_main;
 use criterion::{criterion_group, Criterion};
 
-use reqsign::services::aws::v4::Signer;
+use reqsign::aws::v4::Signer;
 
 criterion_group!(benches, bench);
 criterion_main!(benches);

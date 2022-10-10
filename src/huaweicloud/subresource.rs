@@ -56,7 +56,7 @@ static SUBRESOURCES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
     ])
 });
 
-pub(super) fn is_subresource_param(param: &str) -> bool {
+pub(crate) fn is_subresource_param(param: &str) -> bool {
     SUBRESOURCES.contains(param)
 }
 

@@ -10,13 +10,13 @@ use http::{HeaderMap, HeaderValue};
 use log::debug;
 
 use super::constants::CONTENT_MD5;
+use super::loader::EnvLoader;
+use super::subresource::is_subresource_param;
 use crate::credential::Credential;
 use crate::credential::CredentialLoad;
 use crate::credential::CredentialLoadChain;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
-use crate::services::huaweicloud::loader::EnvLoader;
-use crate::services::huaweicloud::subresource::is_subresource_param;
 use crate::time::{self, DateTime};
 
 /// Builder for `Signer`.
@@ -169,7 +169,7 @@ impl Signer {
     ///
     /// ```no_run
     /// use anyhow::Result;
-    /// use reqsign::services::huaweicloud::obs::Signer;
+    /// use reqsign::huaweicloud::obs::Signer;
     /// use reqwest::{Client, Request, Url};
     ///
     /// #[tokio::main]

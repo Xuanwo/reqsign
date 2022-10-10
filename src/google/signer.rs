@@ -163,7 +163,7 @@ impl Signer {
     ///
     /// ```no_run
     /// use anyhow::Result;
-    /// use reqsign::services::google::Signer;
+    /// use reqsign::google::Signer;
     /// use reqwest::{Client, Request, Url};
     ///
     /// #[tokio::main]

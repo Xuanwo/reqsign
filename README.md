@@ -15,7 +15,7 @@ Most API is simple. But they could be complicated when they are hidden from comp
 ## Quick Start
 
 ```rust
-use reqsign::services::aws::v4::Signer;
+use reqsign::aws::v4::Signer;
 use reqwest::{Client, Request, Url};
 use anyhow::Result;
 
@@ -42,11 +42,11 @@ async fn main() -> Result<()>{
 - Pure rust with minimal dependencies.
 - Test again official SDK and services.
 - Supported services
-  - Aliyun OSS: `reqsign::services::aliyun::oss::Signer`
-  - AWS services (SigV4): `reqsign::services::aws::v4::Signer`
-  - Azure Storage services: `reqsign::services::azure::storage::Signer`
-  - Google services: `reqsign::services::google::Signer`
-  - Huawei Cloud OBS: `reqsign::services::huaweicloud::obs::Singer`
+  - Aliyun OSS: `reqsign::aliyun::oss::Signer`
+  - AWS services (SigV4): `reqsign::aws::v4::Signer`
+  - Azure Storage services: `reqsign::azure::storage::Signer`
+  - Google services: `reqsign::google::Signer`
+  - Huawei Cloud OBS: `reqsign::huaweicloud::obs::Singer`
 
 ## Contributing
 

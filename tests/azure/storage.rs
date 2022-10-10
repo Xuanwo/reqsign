@@ -2,7 +2,7 @@ use anyhow::Result;
 use http::StatusCode;
 use log::{debug, warn};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use reqsign::services::azure::storage::Signer;
+use reqsign::azure::storage::Signer;
 use reqwest::blocking::Client;
 use std::env;
 use std::str::FromStr;
