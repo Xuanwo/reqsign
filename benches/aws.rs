@@ -7,7 +7,7 @@ use aws_sigv4::SigningParams;
 use criterion::criterion_main;
 use criterion::{criterion_group, Criterion};
 
-use reqsign::aws::v4::Signer;
+use reqsign::AwsV4Signer;
 
 criterion_group!(benches, bench);
 criterion_main!(benches);
@@ -16,7 +16,7 @@ pub fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("aws_v4");
 
     group.bench_function("reqsign", |b| {
-        let s = Signer::builder()
+        let s = AwsV4Signer::builder()
             .access_key("access_key_id")
             .secret_key("secret_access_key")
             .service("s3")

@@ -50,7 +50,11 @@
 pub mod credential;
 
 pub mod aliyun;
-pub mod aws;
+
+mod aws;
+pub use aws::v4::Builder as AwsV4Builder;
+pub use aws::v4::Signer as AwsV4Signer;
+
 pub mod azure;
 pub mod google;
 pub mod huaweicloud;
