@@ -2,7 +2,6 @@ use anyhow::Result;
 use http::{Request, StatusCode};
 use log::{debug, warn};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use reqsign::credential::CredentialLoad;
 use reqsign::services::aws::loader;
 use reqsign::services::aws::v4::Signer;
 use reqwest::blocking::Client;
@@ -80,11 +79,8 @@ fn test_signer_with_web_loader() -> Result<()> {
             ("AWS_WEB_IDENTITY_TOKEN_FILE", Some(&file_path)),
         ],
         || {
-            let l = loader::AssumeRoleWithWebIdentityLoader {};
-            let x = l
-                .load_credential()
-                .expect("load_credential must success")
-                .expect("credential must be valid");
+            let l = loader::CredentialLoader::default();
+            let x = l.load().expect("load_credential must success");
 
             assert!(x.is_valid());
         },
