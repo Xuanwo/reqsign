@@ -5,7 +5,9 @@
 //! ```rust
 //! use anyhow::Result;
 //! use reqsign::AwsV4Signer;
-//! use reqwest::{Client, Request, Url};
+//! use reqwest::Client;
+//! use reqwest::Request;
+//! use reqwest::Url;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {

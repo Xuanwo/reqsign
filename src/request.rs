@@ -1,11 +1,15 @@
 //! Provide common request trait for signing.
 
+use std::mem;
+use std::str::FromStr;
+
 use anyhow::Result;
 use http::header::HeaderName;
 use http::uri::PathAndQuery;
-use http::{HeaderMap, HeaderValue, Method, Uri};
-use std::mem;
-use std::str::FromStr;
+use http::HeaderMap;
+use http::HeaderValue;
+use http::Method;
+use http::Uri;
 
 /// Trait for all signable request.
 ///
@@ -309,8 +313,9 @@ impl SignableRequest for http_types::Request {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use anyhow::Result;
+
+    use super::*;
 
     #[test]
     fn test_http_request_apply_query() -> Result<()> {

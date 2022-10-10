@@ -1,5 +1,6 @@
-use once_cell::sync::Lazy;
 use std::collections::HashSet;
+
+use once_cell::sync::Lazy;
 
 // Please attention: the subsources are case sensitive.
 static SUBRESOURCES: Lazy<HashSet<&'static str>> = Lazy::new(|| {

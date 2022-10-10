@@ -1,11 +1,15 @@
 //! Provide Credential for most services.
 
-use anyhow::anyhow;
-use anyhow::Result;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::ops::Add;
 
-use crate::time::{self, DateTime, Duration};
+use anyhow::anyhow;
+use anyhow::Result;
+
+use crate::time::DateTime;
+use crate::time::Duration;
+use crate::time::{self};
 
 /// Credential that holds the access_key and secret_key.
 #[derive(Default, Clone)]

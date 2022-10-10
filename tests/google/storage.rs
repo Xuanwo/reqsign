@@ -1,9 +1,11 @@
+use std::env;
+
 use anyhow::Result;
 use http::StatusCode;
-use log::{debug, warn};
+use log::debug;
+use log::warn;
 use reqsign::google::Signer;
 use reqwest::blocking::Client;
-use std::env;
 
 fn init_signer() -> Option<Signer> {
     let _ = env_logger::builder().is_test(true).try_init();

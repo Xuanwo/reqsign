@@ -2,14 +2,17 @@
 
 use std::thread::sleep;
 
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
+use anyhow::Result;
 use backon::ExponentialBackoff;
 use log::warn;
 use serde::Deserialize;
 
 use crate::credential::Credential;
 use crate::credential::CredentialLoad;
-use crate::time::{format_rfc3339, now, parse_rfc3339};
+use crate::time::format_rfc3339;
+use crate::time::now;
+use crate::time::parse_rfc3339;
 
 /// Load credential via OIDC token
 #[derive(Clone, Debug)]

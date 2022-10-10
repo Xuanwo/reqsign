@@ -1,12 +1,14 @@
 use std::time::SystemTime;
 
-use aws_sigv4::http_request::{
-    PayloadChecksumKind, PercentEncodingMode, SignableBody, SignableRequest, SigningSettings,
-};
+use aws_sigv4::http_request::PayloadChecksumKind;
+use aws_sigv4::http_request::PercentEncodingMode;
+use aws_sigv4::http_request::SignableBody;
+use aws_sigv4::http_request::SignableRequest;
+use aws_sigv4::http_request::SigningSettings;
 use aws_sigv4::SigningParams;
+use criterion::criterion_group;
 use criterion::criterion_main;
-use criterion::{criterion_group, Criterion};
-
+use criterion::Criterion;
 use reqsign::AwsV4Signer;
 
 criterion_group!(benches, bench);

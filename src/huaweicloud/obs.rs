@@ -1,12 +1,19 @@
 //! Huawei Cloud Object Storage Service (OBS) signer
 use std::borrow::Cow;
+use std::fmt::Debug;
+use std::fmt::Formatter;
 use std::fmt::Write;
-use std::fmt::{Debug, Formatter};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use std::sync::RwLock;
 
-use anyhow::{anyhow, Result};
-use http::header::{HeaderName, AUTHORIZATION, CONTENT_TYPE, DATE};
-use http::{HeaderMap, HeaderValue};
+use anyhow::anyhow;
+use anyhow::Result;
+use http::header::HeaderName;
+use http::header::AUTHORIZATION;
+use http::header::CONTENT_TYPE;
+use http::header::DATE;
+use http::HeaderMap;
+use http::HeaderValue;
 use log::debug;
 
 use super::constants::CONTENT_MD5;
@@ -17,7 +24,8 @@ use crate::credential::CredentialLoad;
 use crate::credential::CredentialLoadChain;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
-use crate::time::{self, DateTime};
+use crate::time::DateTime;
+use crate::time::{self};
 
 /// Builder for `Signer`.
 #[derive(Default)]
@@ -170,7 +178,9 @@ impl Signer {
     /// ```no_run
     /// use anyhow::Result;
     /// use reqsign::huaweicloud::obs::Signer;
-    /// use reqwest::{Client, Request, Url};
+    /// use reqwest::Client;
+    /// use reqwest::Request;
+    /// use reqwest::Url;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
@@ -312,12 +322,11 @@ mod tests {
     use std::str::FromStr;
 
     use ::time::UtcOffset;
-
-    use crate::time::parse_rfc2822;
     use anyhow::Result;
     use http::Uri;
 
     use super::*;
+    use crate::time::parse_rfc2822;
 
     #[test]
     fn test_sign() -> Result<()> {
