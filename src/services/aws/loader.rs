@@ -6,6 +6,9 @@
 //! - ECS Container Credentials (IAM roles for tasks)
 //! - EC2 Instance Metadata Service (IAM Roles attached to instance)
 
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, RwLock};
 use std::thread::sleep;
 use std::{env, fs};
 
@@ -16,11 +19,642 @@ use log::warn;
 use quick_xml::de;
 use serde::Deserialize;
 
+use super::constants;
 use crate::credential::Credential;
-use crate::credential::CredentialLoad;
 use crate::credential::DummyLoader;
 use crate::dirs::expand_homedir;
 use crate::time::parse_rfc3339;
+
+#[derive(Clone, Default)]
+#[cfg_attr(test, derive(Debug))]
+struct Config {
+    /// `config_file` will be load from:
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: `AWS_CONFIG_FILE`
+    /// - default to: `~/.aws/config`
+    config_file: Option<String>,
+    /// `shared_credentials_file` will be loaded from:
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: `AWS_SHARED_CREDENTIALS_FILE`
+    /// - default to: `~/.aws/credentials`
+    shared_credentials_file: Option<String>,
+    /// `profile` will be loaded from:
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: `AWS_PROFILE`
+    /// - default to: `default`
+    profile: Option<String>,
+
+    /// `region` will be loaded from:
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: `AWS_REGION`
+    /// - profile config: `region`
+    region: Option<String>,
+    /// `access_key_id` will be loaded from
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: `AWS_ACCESS_KEY_ID`
+    /// - profile config: `aws_access_key_id`
+    access_key_id: Option<String>,
+    /// `secret_access_key` will be loaded from
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: `AWS_SECRET_ACCESS_KEY`
+    /// - profile config: `aws_secret_access_key`
+    secret_access_key: Option<String>,
+    /// `session_token` will be loaded from
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: `AWS_SESSION_TOKEN`
+    /// - profile config: `aws_session_token`
+    session_token: Option<String>,
+    /// `role_arn` value will be load from:
+    ///
+    /// - this field if it's `is_some`.
+    /// - env value: `AWS_ROLE_ARN`
+    /// - profile config: `role_arn`
+    role_arn: Option<String>,
+    /// `role_session_name` value will be load from:
+    ///
+    /// - this field if it's `is_some`.
+    /// - env value: `AWS_ROLE_SESSION_NAME`
+    /// - profile config: `role_session_name`
+    /// - default to `reqsign`.
+    role_session_name: Option<String>,
+    /// `external_id` value will be load from:
+    ///
+    /// - this field if it's `is_some`.
+    /// - profile config: `external_id`
+    #[allow(unused)]
+    external_id: Option<String>,
+    /// `web_identity_token_file` value will be loaded from:
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: `AWS_WEB_IDENTITY_TOKEN_FILE`
+    /// - profile config: `web_identity_token_file`
+    web_identity_token_file: Option<String>,
+}
+
+/// Config loader that will load config from different source.
+#[derive(Default)]
+#[cfg_attr(test, derive(Debug))]
+pub struct ConfigLoader {
+    config: Arc<RwLock<Config>>,
+
+    /// Mark whether we have read env or not.
+    read_env: AtomicBool,
+    /// Mark whether we have read profile or not.
+    read_profile: AtomicBool,
+}
+
+impl Clone for ConfigLoader {
+    fn clone(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            read_env: AtomicBool::from(self.read_env.load(Ordering::Relaxed)),
+            read_profile: AtomicBool::from(self.read_profile.load(Ordering::Relaxed)),
+        }
+    }
+}
+
+impl ConfigLoader {
+    fn load_via_env(&self) {
+        if self.read_env.load(Ordering::Relaxed) {
+            return;
+        }
+        self.read_env.store(true, Ordering::Relaxed);
+
+        let envs = env::vars().collect::<HashMap<_, _>>();
+        let mut config = { self.config.read().expect("lock must be valid").clone() };
+
+        if let Some(v) = envs.get(constants::AWS_CONFIG_FILE) {
+            config.config_file.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(constants::AWS_SHARED_CREDENTIALS_FILE) {
+            config.shared_credentials_file.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(constants::AWS_PROFILE) {
+            config.profile.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(constants::AWS_REGION) {
+            config.region.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(constants::AWS_ACCESS_KEY_ID) {
+            config.access_key_id.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(constants::AWS_SECRET_ACCESS_KEY) {
+            config.secret_access_key.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(constants::AWS_SESSION_TOKEN) {
+            config.session_token.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(constants::AWS_ROLE_ARN) {
+            config.role_arn.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(constants::AWS_ROLE_SESSION_NAME) {
+            config.role_session_name.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(constants::AWS_WEB_IDENTITY_TOKEN_FILE) {
+            config.web_identity_token_file.get_or_insert(v.clone());
+        }
+
+        *self.config.write().expect("lock must be valid") = config;
+    }
+
+    fn load_via_profile(&self) {
+        if self.read_profile.load(Ordering::Relaxed) {
+            return;
+        }
+        self.read_profile.store(true, Ordering::Relaxed);
+
+        self.load_via_profile_shared_credentials_file();
+        self.load_via_profile_config_file();
+    }
+
+    /// Only the following fields will exist in shared_credentials_file:
+    ///
+    /// - `aws_access_key_id`
+    /// - `aws_secret_access_key`
+    /// - `aws_session_token`
+    fn load_via_profile_shared_credentials_file(&self) {
+        let path = match expand_homedir(&self.shared_credentials_file()) {
+            Some(v) => v,
+            None => {
+                warn!("load_via_profile_shared_credentials_file failed while expand_homedir");
+
+                return;
+            }
+        };
+
+        if let Err(err) = fs::metadata(&path) {
+            warn!(
+                "load_via_profile_shared_credentials_file failed while check path {path}: {err:?}"
+            );
+
+            return;
+        }
+
+        let conf = match Ini::load_from_file(path) {
+            Ok(v) => v,
+            Err(err) => {
+                warn!("load_via_profile_shared_credentials_file failed while reading ini: {err:?}");
+
+                return;
+            }
+        };
+
+        let props = match conf.section(Some(&self.profile())) {
+            Some(v) => v,
+            None => {
+                warn!(
+                    "load_via_profile_shared_credentials_file failed: section {} is not exist",
+                    self.profile()
+                );
+
+                return;
+            }
+        };
+
+        let mut config = { self.config.read().expect("lock must be valid").clone() };
+        if let Some(v) = props.get("aws_access_key_id") {
+            config.access_key_id.get_or_insert(v.to_string());
+        }
+        if let Some(v) = props.get("aws_secret_access_key") {
+            config.secret_access_key.get_or_insert(v.to_string());
+        }
+        if let Some(v) = props.get("aws_session_token") {
+            config.session_token.get_or_insert(v.to_string());
+        }
+
+        *self.config.write().expect("lock must be valid") = config;
+    }
+
+    fn load_via_profile_config_file(&self) {
+        let path = match expand_homedir(&self.config_file()) {
+            Some(v) => v,
+            None => {
+                warn!("load_via_profile_config_file failed while expand_homedir");
+
+                return;
+            }
+        };
+
+        if let Err(err) = fs::metadata(&path) {
+            warn!("load_via_profile_config_file failed while check path {path}: {err:?}");
+
+            return;
+        }
+
+        let conf = match Ini::load_from_file(path) {
+            Ok(v) => v,
+            Err(err) => {
+                warn!("load_via_profile_config_file failed while reading ini: {err:?}");
+
+                return;
+            }
+        };
+
+        let props = match conf.section(Some(&self.profile())) {
+            Some(v) => v,
+            None => {
+                warn!(
+                    "load_via_profile_config_file failed: section {} is not exist",
+                    self.profile()
+                );
+
+                return;
+            }
+        };
+
+        let mut config = { self.config.read().expect("lock must be valid").clone() };
+
+        if let Some(v) = props.get("region") {
+            config.region.get_or_insert(v.to_string());
+        }
+        if let Some(v) = props.get("aws_access_key_id") {
+            config.access_key_id.get_or_insert(v.to_string());
+        }
+        if let Some(v) = props.get("aws_secret_access_key") {
+            config.secret_access_key.get_or_insert(v.to_string());
+        }
+        if let Some(v) = props.get("aws_session_token") {
+            config.session_token.get_or_insert(v.to_string());
+        }
+        if let Some(v) = props.get("role_arn") {
+            config.role_arn.get_or_insert(v.to_string());
+        }
+        if let Some(v) = props.get("role_session_name") {
+            config.role_session_name.get_or_insert(v.to_string());
+        }
+        if let Some(v) = props.get("web_identity_token_file") {
+            config.web_identity_token_file.get_or_insert(v.to_string());
+        }
+
+        *self.config.write().expect("lock must be valid") = config;
+    }
+
+    fn config_file(&self) -> String {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .config_file
+            .clone()
+            .unwrap_or_else(|| "~/.aws/config".to_string())
+    }
+
+    fn shared_credentials_file(&self) -> String {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .shared_credentials_file
+            .clone()
+            .unwrap_or_else(|| "~/.aws/credentials".to_string())
+    }
+
+    fn profile(&self) -> String {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .profile
+            .clone()
+            .unwrap_or_else(|| "default".to_string())
+    }
+
+    fn region(&self) -> Option<String> {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .region
+            .clone()
+    }
+
+    fn access_key_id(&self) -> Option<String> {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .access_key_id
+            .clone()
+    }
+
+    fn secret_access_key(&self) -> Option<String> {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .secret_access_key
+            .clone()
+    }
+
+    fn session_token(&self) -> Option<String> {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .session_token
+            .clone()
+    }
+
+    fn role_arn(&self) -> Option<String> {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .role_arn
+            .clone()
+    }
+
+    fn role_session_name(&self) -> String {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .role_session_name
+            .clone()
+            .unwrap_or_else(|| "reqsign".to_string())
+    }
+
+    #[allow(unused)]
+    fn external_id(&self) -> Option<String> {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .external_id
+            .clone()
+    }
+
+    fn web_identity_token_file(&self) -> Option<String> {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .web_identity_token_file
+            .clone()
+    }
+}
+
+/// CredentialLoader will load credential from different methods.
+#[cfg_attr(test, derive(Debug))]
+pub struct CredentialLoader {
+    credential: Arc<RwLock<Option<Credential>>>,
+
+    disable_env: bool,
+    disable_profile: bool,
+    #[allow(unused)]
+    disable_assume_role: bool,
+    disable_assume_role_with_web_identity: bool,
+
+    client: ureq::Agent,
+    config_loader: ConfigLoader,
+}
+
+impl Default for CredentialLoader {
+    fn default() -> Self {
+        Self {
+            credential: Arc::new(Default::default()),
+            disable_env: false,
+            disable_profile: false,
+            disable_assume_role: false,
+            disable_assume_role_with_web_identity: false,
+            client: ureq::Agent::new(),
+            config_loader: Default::default(),
+        }
+    }
+}
+
+impl CredentialLoader {
+    /// Disable load from env.
+    pub fn with_disable_env(mut self) -> Self {
+        self.disable_env = true;
+        self
+    }
+
+    /// Disable load from profile.
+    pub fn with_disable_profile(mut self) -> Self {
+        self.disable_profile = true;
+        self
+    }
+
+    /// Disable load from assume role with web identity.
+    pub fn with_disable_assume_role_with_web_identity(mut self) -> Self {
+        self.disable_assume_role_with_web_identity = true;
+        self
+    }
+
+    /// Set Credential.
+    pub fn with_credential(self, cred: Credential) -> Self {
+        *self.credential.write().expect("lock poisoned") = Some(cred);
+        self
+    }
+
+    /// Set config loader.
+    pub fn with_config_loader(mut self, cfg: ConfigLoader) -> Self {
+        self.config_loader = cfg;
+        self
+    }
+
+    /// Load credential.
+    pub fn load(&self) -> Option<Credential> {
+        // Return cached credential if it's valid.
+        match self.credential.read().expect("lock poisoned").clone() {
+            Some(cred) if cred.is_valid() => return Some(cred),
+            _ => (),
+        }
+
+        self.load_via_env()
+            .or_else(|| self.load_via_profile())
+            .or_else(|| self.load_via_assume_role_with_web_identity())
+            .map(|cred| {
+                let mut lock = self.credential.write().expect("lock poisoned");
+                *lock = Some(cred.clone());
+
+                cred
+            })
+    }
+
+    fn load_via_env(&self) -> Option<Credential> {
+        if self.disable_env {
+            return None;
+        }
+
+        self.config_loader.load_via_env();
+
+        if let (Some(ak), Some(sk)) = (
+            self.config_loader.access_key_id(),
+            self.config_loader.secret_access_key(),
+        ) {
+            let mut cred = Credential::new(&ak, &sk);
+            cred.set_security_token(self.config_loader.session_token().as_deref());
+            Some(cred)
+        } else {
+            None
+        }
+    }
+
+    fn load_via_profile(&self) -> Option<Credential> {
+        if self.disable_profile {
+            return None;
+        }
+
+        self.config_loader.load_via_profile();
+
+        if let (Some(ak), Some(sk)) = (
+            self.config_loader.access_key_id(),
+            self.config_loader.secret_access_key(),
+        ) {
+            let mut cred = Credential::new(&ak, &sk);
+            cred.set_security_token(self.config_loader.session_token().as_deref());
+            Some(cred)
+        } else {
+            None
+        }
+    }
+
+    #[allow(unused)]
+    fn load_via_assume_role(&self) -> Option<Credential> {
+        todo!()
+    }
+
+    fn load_via_assume_role_with_web_identity(&self) -> Option<Credential> {
+        if self.disable_assume_role_with_web_identity {
+            return None;
+        }
+
+        // Based on our user reports, AWS STS may need 10s to reach consistency
+        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
+        //
+        // Reference: <https://github.com/datafuselabs/opendal/issues/288>
+        let mut retry = ExponentialBackoff::default()
+            .with_max_times(4)
+            .with_jitter();
+
+        loop {
+            match self.load_via_assume_role_with_web_identity_inner() {
+                Ok(v) => return v,
+                Err(e) => match retry.next() {
+                    Some(dur) => {
+                        sleep(dur);
+                        continue;
+                    }
+                    None => {
+                        warn!("load credential via assume role with web identity failed: {e}");
+                        return None;
+                    }
+                },
+            }
+        }
+    }
+
+    fn load_via_assume_role_with_web_identity_inner(&self) -> Result<Option<Credential>> {
+        let (token_file, role_arn) = match (
+            self.config_loader.web_identity_token_file(),
+            self.config_loader.role_arn(),
+        ) {
+            (Some(token_file), Some(role_arn)) => (token_file, role_arn),
+            _ => return Ok(None),
+        };
+
+        let token = fs::read_to_string(&token_file)?;
+        let role_session_name = self.config_loader.role_session_name();
+
+        // Construct request to AWS STS Service.
+        let url = format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
+        let req = self.client.get(&url).set(
+            http::header::CONTENT_TYPE.as_str(),
+            "application/x-www-form-urlencoded",
+        );
+
+        let resp = req.call()?;
+        if resp.status() != http::StatusCode::OK {
+            let content = resp.into_string()?;
+            return Err(anyhow!("request to AWS STS Services failed: {content}"));
+        }
+
+        let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.into_string()?)?;
+        let resp_cred = resp.result.credentials;
+
+        let cred = Credential::new(&resp_cred.access_key_id, &resp_cred.secret_access_key)
+            .with_security_token(&resp_cred.session_token)
+            .with_expires_in(parse_rfc3339(&resp_cred.expiration)?);
+
+        cred.check()?;
+
+        Ok(Some(cred))
+    }
+}
+
+/// RegionLoader will load region from different sources.
+#[derive(Default)]
+#[cfg_attr(test, derive(Debug))]
+pub struct RegionLoader {
+    region: Arc<RwLock<Option<String>>>,
+
+    disable_env: bool,
+    disable_profile: bool,
+
+    config_loader: ConfigLoader,
+}
+
+impl RegionLoader {
+    /// Disable load from env.
+    pub fn with_disable_env(mut self) -> Self {
+        self.disable_env = true;
+        self
+    }
+
+    /// Disable load from profile.
+    pub fn with_disable_profile(mut self) -> Self {
+        self.disable_profile = true;
+        self
+    }
+
+    /// Set static region.
+    pub fn with_region(self, region: &str) -> Self {
+        *self.region.write().expect("lock poisoned") = Some(region.to_string());
+
+        self
+    }
+
+    /// Set config loader
+    pub fn with_config_loader(mut self, cfg: ConfigLoader) -> Self {
+        self.config_loader = cfg;
+        self
+    }
+
+    /// Load region.
+    pub fn load(&self) -> Option<String> {
+        // Return cached credential if it's valid.
+        if let Some(region) = self.region.read().expect("lock poisoned").clone() {
+            return Some(region);
+        }
+
+        self.load_via_env()
+            .or_else(|| self.load_via_profile())
+            .map(|region| {
+                let mut lock = self.region.write().expect("lock poisoned");
+                *lock = Some(region.clone());
+
+                region
+            })
+    }
+
+    fn load_via_env(&self) -> Option<String> {
+        if self.disable_env {
+            return None;
+        }
+
+        self.config_loader.load_via_env();
+
+        self.config_loader.region()
+    }
+
+    fn load_via_profile(&self) -> Option<String> {
+        if self.disable_profile {
+            return None;
+        }
+
+        self.config_loader.load_via_profile();
+
+        self.config_loader.region()
+    }
+}
 
 /// Loader trait will try to load region from different sources.
 pub trait RegionLoad: Send + Sync {
@@ -74,195 +708,6 @@ impl RegionLoad for DummyLoader {
     }
 }
 
-/// Load credential from env values
-///
-/// - `AWS_ACCESS_KEY_ID`
-/// - `AWS_SECRET_ACCESS_KEY`
-/// - `AWS_REGION`
-#[derive(Default, Clone, Debug)]
-pub struct EnvLoader {}
-
-impl CredentialLoad for EnvLoader {
-    fn load_credential(&self) -> Result<Option<Credential>> {
-        if let (Ok(ak), Ok(sk)) = (
-            env::var(super::constants::AWS_ACCESS_KEY_ID),
-            env::var(super::constants::AWS_SECRET_ACCESS_KEY),
-        ) {
-            Ok(Some(Credential::new(&ak, &sk)))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-impl RegionLoad for EnvLoader {
-    fn load_region(&self) -> Result<Option<String>> {
-        if let Ok(region) = env::var(super::constants::AWS_REGION) {
-            Ok(Some(region))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-/// Load credential from AWS profiles
-///
-/// ## Location of Profile Files
-///
-/// - The location of the config file will be loaded from the `AWS_CONFIG_FILE` environment variable
-/// with a fallback to `~/.aws/config`
-/// - The location of the credentials file will be loaded from the `AWS_SHARED_CREDENTIALS_FILE`
-/// environment variable with a fallback to `~/.aws/credentials`
-///
-/// `~` will be resolved by [`dirs-rs`](https://crates.io/crates/dirs).
-///
-/// ## TODO
-///
-/// - We only support `default` profile now, and `AWS_PROFILE` support should be added.
-#[derive(Default, Clone, Debug)]
-pub struct ProfileLoader {}
-
-/// Comment from [Where are configuration settings stored?](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html)
-///
-/// > You can keep all of your profile settings in a single file as the AWS
-/// > CLI can read credentials from the config file. If there are credentials
-/// > in both files for a profile sharing the same name, the keys in the
-/// > credentials file take precedence.
-impl CredentialLoad for ProfileLoader {
-    fn load_credential(&self) -> Result<Option<Credential>> {
-        let cred_path = env::var(super::constants::AWS_SHARED_CREDENTIALS_FILE)
-            .unwrap_or_else(|_| "~/.aws/credentials".to_string());
-        if let Some(cred_path) = expand_homedir(&cred_path) {
-            if fs::metadata(&cred_path).is_ok() {
-                let conf = Ini::load_from_file(cred_path)?;
-                if let Some(props) = conf.section(Some("default")) {
-                    if let (Some(ak), Some(sk)) = (
-                        props.get("aws_access_key_id"),
-                        props.get("aws_secret_access_key"),
-                    ) {
-                        return Ok(Some(Credential::new(ak, sk)));
-                    }
-                }
-            }
-        }
-
-        let cfg_path = env::var(super::constants::AWS_CONFIG_FILE)
-            .unwrap_or_else(|_| "~/.aws/config".to_string());
-        if let Some(cfg_path) = expand_homedir(&cfg_path) {
-            if fs::metadata(&cfg_path).is_ok() {
-                let conf = Ini::load_from_file(cfg_path)?;
-                if let Some(props) = conf.section(Some("default")) {
-                    if let (Some(ak), Some(sk)) = (
-                        props.get("aws_access_key_id"),
-                        props.get("aws_secret_access_key"),
-                    ) {
-                        return Ok(Some(Credential::new(ak, sk)));
-                    }
-                }
-            }
-        }
-
-        Ok(None)
-    }
-}
-
-impl RegionLoad for ProfileLoader {
-    fn load_region(&self) -> Result<Option<String>> {
-        let cfg_path = env::var(super::constants::AWS_CONFIG_FILE)
-            .unwrap_or_else(|_| "~/.aws/config".to_string());
-        if let Some(cfg_path) = expand_homedir(&cfg_path) {
-            if fs::metadata(&cfg_path).is_ok() {
-                let conf = Ini::load_from_file(cfg_path)?;
-                if let Some(props) = conf.section(Some("default")) {
-                    if let Some(region) = props.get("region") {
-                        return Ok(Some(region.to_string()));
-                    }
-                }
-            }
-        }
-
-        Ok(None)
-    }
-}
-
-/// Load credential via web identity token
-///
-/// ## TODO
-///
-/// - Explain how web identity token works
-/// - Support load web identity token file from aws config.
-#[derive(Default, Clone, Debug)]
-pub struct WebIdentityTokenLoader {}
-
-impl CredentialLoad for WebIdentityTokenLoader {
-    fn load_credential(&self) -> Result<Option<Credential>> {
-        // Based on our user reports, AWS STS may need 10s to reach consistency
-        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
-        //
-        // Reference: <https://github.com/datafuselabs/opendal/issues/288>
-        let mut retry = ExponentialBackoff::default()
-            .with_max_times(4)
-            .with_jitter();
-
-        loop {
-            match self.load_credential_inner() {
-                Ok(v) => return Ok(v),
-                Err(e) => {
-                    warn!("load credential from AWS STS Services failed: {e}");
-
-                    match retry.next() {
-                        Some(dur) => sleep(dur),
-                        None => {
-                            return Err(anyhow!(
-                            "load credential from AWS STS Services still failed after retry: {e}",
-                        ))
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-impl WebIdentityTokenLoader {
-    fn load_credential_inner(&self) -> Result<Option<Credential>> {
-        if let (Ok(token), Ok(role_arn)) = (
-            env::var(super::constants::AWS_WEB_IDENTITY_TOKEN_FILE),
-            env::var(super::constants::AWS_ROLE_ARN),
-        ) {
-            let token = fs::read_to_string(token)?.trim().to_string();
-            let role_session_name = env::var(super::constants::AWS_ROLE_SESSION_NAME)
-                .unwrap_or_else(|_| "reqsign".to_string());
-
-            // Construct request to AWS STS Service.
-            let url = format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
-            let req = ureq::Agent::new().get(&url).set(
-                http::header::CONTENT_TYPE.as_str(),
-                "application/x-www-form-urlencoded",
-            );
-
-            let resp = req.call()?;
-            if resp.status() != http::StatusCode::OK {
-                let content = resp.into_string()?;
-                return Err(anyhow!("request to AWS STS Services failed: {content}"));
-            }
-
-            let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.into_string()?)?;
-            let resp_cred = resp.result.credentials;
-
-            let cred = Credential::new(&resp_cred.access_key_id, &resp_cred.secret_access_key)
-                .with_security_token(&resp_cred.session_token)
-                .with_expires_in(parse_rfc3339(&resp_cred.expiration)?);
-
-            cred.check()?;
-
-            return Ok(Some(cred));
-        }
-
-        Ok(None)
-    }
-}
-
 #[derive(Default, Debug, Deserialize)]
 #[serde(default, rename_all = "PascalCase")]
 struct AssumeRoleWithWebIdentityResponse {
@@ -287,49 +732,52 @@ struct AssumeRoleWithWebIdentityCredentials {
 
 #[cfg(test)]
 mod tests {
-    use once_cell::sync::Lazy;
+    use log::debug;
     use quick_xml::de;
-    use tokio::runtime::Runtime;
 
     use super::*;
     use crate::services::aws::constants::*;
 
-    static TOKIO: Lazy<Runtime> = Lazy::new(|| Runtime::new().expect("runtime must be valid"));
-
     #[test]
     fn test_credential_env_loader_without_env() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         temp_env::with_vars_unset(vec![AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY], || {
-            TOKIO.block_on(async {
-                let l = EnvLoader {};
-                let x = l.load_credential().expect("load_credential must success");
-                assert!(x.is_none());
-            });
+            let l = CredentialLoader::default()
+                .with_disable_profile()
+                .with_disable_assume_role_with_web_identity();
+            let x = l.load();
+            assert!(x.is_none());
         });
     }
 
     #[test]
     fn test_credential_env_loader_with_env() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         temp_env::with_vars(
             vec![
                 (AWS_ACCESS_KEY_ID, Some("access_key_id")),
                 (AWS_SECRET_ACCESS_KEY, Some("secret_access_key")),
             ],
             || {
-                TOKIO.block_on(async {
-                    let l = EnvLoader {};
-                    let x = l
-                        .load_credential()
-                        .expect("load_credential must success")
-                        .expect("credential must be valid");
-                    assert_eq!("access_key_id", x.access_key());
-                    assert_eq!("secret_access_key", x.secret_key());
-                });
+                let l = CredentialLoader::default()
+                    .with_disable_profile()
+                    .with_disable_assume_role_with_web_identity();
+                let x = l.load();
+                debug!("current loader: {l:?}");
+
+                let x = x.expect("must load succeed");
+                assert_eq!("access_key_id", x.access_key());
+                assert_eq!("secret_access_key", x.secret_key());
             },
         );
     }
 
     #[test]
     fn test_credential_profile_loader_from_config() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         temp_env::with_vars(
             vec![
                 (
@@ -352,21 +800,18 @@ mod tests {
                 ),
             ],
             || {
-                TOKIO.block_on(async {
-                    let l = ProfileLoader {};
-                    let x = l
-                        .load_credential()
-                        .expect("load_credential must success")
-                        .expect("credential must be valid");
-                    assert_eq!("config_access_key_id", x.access_key());
-                    assert_eq!("config_secret_access_key", x.secret_key());
-                });
+                let l = CredentialLoader::default().with_disable_assume_role_with_web_identity();
+                let x = l.load().expect("load must success");
+                assert_eq!("config_access_key_id", x.access_key());
+                assert_eq!("config_secret_access_key", x.secret_key());
             },
         );
     }
 
     #[test]
     fn test_credential_profile_loader_from_shared() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         temp_env::with_vars(
             vec![
                 (
@@ -374,7 +819,7 @@ mod tests {
                     Some(format!(
                         "{}/testdata/services/aws/not_exist",
                         env::current_dir()
-                            .expect("current_dir must exist")
+                            .expect("load must exist")
                             .to_string_lossy()
                     )),
                 ),
@@ -383,21 +828,16 @@ mod tests {
                     Some(format!(
                         "{}/testdata/services/aws/default_credential",
                         env::current_dir()
-                            .expect("current_dir must exist")
+                            .expect("load must exist")
                             .to_string_lossy()
                     )),
                 ),
             ],
             || {
-                TOKIO.block_on(async {
-                    let l = ProfileLoader {};
-                    let x = l
-                        .load_credential()
-                        .expect("load_credential must success")
-                        .expect("credential must be valid");
-                    assert_eq!("shared_access_key_id", x.access_key());
-                    assert_eq!("shared_secret_access_key", x.secret_key());
-                });
+                let l = CredentialLoader::default().with_disable_assume_role_with_web_identity();
+                let x = l.load().expect("load must success");
+                assert_eq!("shared_access_key_id", x.access_key());
+                assert_eq!("shared_secret_access_key", x.secret_key());
             },
         );
     }
@@ -405,6 +845,8 @@ mod tests {
     /// AWS_SHARED_CREDENTIALS_FILE should be taken first.
     #[test]
     fn test_credential_profile_loader_from_both() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         temp_env::with_vars(
             vec![
                 (
@@ -427,46 +869,40 @@ mod tests {
                 ),
             ],
             || {
-                TOKIO.block_on(async {
-                    let l = ProfileLoader {};
-                    let x = l
-                        .load_credential()
-                        .expect("load_credential must success")
-                        .expect("credential must be valid");
-                    assert_eq!("shared_access_key_id", x.access_key());
-                    assert_eq!("shared_secret_access_key", x.secret_key());
-                });
+                let l = CredentialLoader::default().with_disable_assume_role_with_web_identity();
+                let x = l.load().expect("load must success");
+                assert_eq!("shared_access_key_id", x.access_key());
+                assert_eq!("shared_secret_access_key", x.secret_key());
             },
         );
     }
 
     #[test]
     fn test_region_env_loader_without_env() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         temp_env::with_vars_unset(vec![AWS_REGION], || {
-            TOKIO.block_on(async {
-                let l = EnvLoader {};
-                let x = l.load_region().expect("load_region must success");
-                assert!(x.is_none());
-            });
+            let l = RegionLoader::default();
+            let x = l.load();
+            assert!(x.is_none());
         });
     }
 
     #[test]
     fn test_region_env_loader_with_env() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         temp_env::with_vars(vec![(AWS_REGION, Some("test"))], || {
-            TOKIO.block_on(async {
-                let l = EnvLoader {};
-                let x = l
-                    .load_region()
-                    .expect("load_credential must success")
-                    .expect("region must be valid");
-                assert_eq!("test", x);
-            });
+            let l = RegionLoader::default();
+            let x = l.load().expect("load must success");
+            assert_eq!("test", x);
         });
     }
 
     #[test]
     fn test_region_profile_loader() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         temp_env::with_vars(
             vec![(
                 AWS_CONFIG_FILE,
@@ -478,20 +914,17 @@ mod tests {
                 )),
             )],
             || {
-                TOKIO.block_on(async {
-                    let l = ProfileLoader {};
-                    let x = l
-                        .load_region()
-                        .expect("load_credential must success")
-                        .expect("region must be valid");
-                    assert_eq!("test", x);
-                });
+                let l = RegionLoader::default();
+                let x = l.load().expect("load must success");
+                assert_eq!("test", x);
             },
         );
     }
 
     #[test]
     fn test_parse_assume_role_with_web_identity_response() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         let content = r#"<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
   <AssumeRoleWithWebIdentityResult>
     <Audience>test_audience</Audience>

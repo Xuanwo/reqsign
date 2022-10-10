@@ -3,9 +3,6 @@
 use std::borrow::Cow;
 use std::fmt::Write;
 use std::fmt::{Debug, Display, Formatter};
-use std::mem;
-use std::sync::Arc;
-use std::sync::RwLock;
 
 use anyhow::{anyhow, Result};
 use http::{HeaderMap, HeaderValue};
@@ -15,7 +12,7 @@ use percent_encoding::{percent_decode_str, utf8_percent_encode};
 use super::constants::AWS_QUERY_ENCODE_SET;
 use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::loader::*;
-use crate::credential::{Credential, CredentialLoad, CredentialLoadChain};
+use crate::credential::Credential;
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
 use crate::services::aws::constants::{X_AMZ_DATE, X_AMZ_SECURITY_TOKEN};
@@ -28,10 +25,10 @@ pub struct Builder {
     region: Option<String>,
     credential: Credential,
 
-    region_load: RegionLoadChain,
-    credential_load: CredentialLoadChain,
-
     allow_anonymous: bool,
+    disable_load_from_env: bool,
+    disable_load_from_profile: bool,
+    disable_load_from_assume_role_with_web_identity: bool,
 
     time: Option<DateTime>,
 }
@@ -48,14 +45,6 @@ impl Builder {
     /// If not set, we will try to load via `region_loader`.
     pub fn region(&mut self, region: &str) -> &mut Self {
         self.region = Some(region.to_string());
-        self
-    }
-
-    /// Specify region load behavior
-    ///
-    /// If not set, we will use the default region loader.
-    pub fn region_loader(&mut self, region: RegionLoadChain) -> &mut Self {
-        self.region_load = region;
         self
     }
 
@@ -86,17 +75,27 @@ impl Builder {
         self
     }
 
-    /// Specify credential load behavior
-    ///
-    /// If not set, we will use the default credential loader.
-    pub fn credential_loader(&mut self, credential: CredentialLoadChain) -> &mut Self {
-        self.credential_load = credential;
-        self
-    }
-
     /// Allow anonymous request if credential is not loaded.
     pub fn allow_anonymous(&mut self) -> &mut Self {
         self.allow_anonymous = true;
+        self
+    }
+
+    /// Disable load from env.
+    pub fn disable_load_from_env(&mut self) -> &mut Self {
+        self.disable_load_from_env = true;
+        self
+    }
+
+    /// Disable load from profile.
+    pub fn disable_load_from_profile(&mut self) -> &mut Self {
+        self.disable_load_from_profile = true;
+        self
+    }
+
+    /// Disable load from assume role with web identity.
+    pub fn disable_load_from_assume_role_with_web_identity(&mut self) -> &mut Self {
+        self.disable_load_from_assume_role_with_web_identity = true;
         self
     }
 
@@ -122,43 +121,42 @@ impl Builder {
             .ok_or_else(|| anyhow!("service is required"))?;
         debug!("signer: service: {:?}", service);
 
-        let credential = if self.credential.is_valid() {
-            Some(self.credential.clone())
-        } else {
-            // Make sure credential load chain has been set before checking.
-            if self.credential_load.is_empty() {
-                self.credential_load
-                    .push(EnvLoader::default())
-                    .push(ProfileLoader::default())
-                    .push(WebIdentityTokenLoader::default());
-            }
+        let cfg = ConfigLoader::default();
 
-            self.credential_load.load_credential()?
-        };
-        debug!("signer credential: {:?}", &credential);
+        let mut cred_loader = CredentialLoader::default().with_config_loader(cfg.clone());
+        if self.credential.is_valid() {
+            cred_loader = cred_loader.with_credential(self.credential.clone());
+        }
+        if self.disable_load_from_env {
+            cred_loader = cred_loader.with_disable_env();
+        }
+        if self.disable_load_from_profile {
+            cred_loader = cred_loader.with_disable_profile();
+        }
+        if self.disable_load_from_assume_role_with_web_identity {
+            cred_loader = cred_loader.with_disable_assume_role_with_web_identity();
+        }
 
-        let region = match &self.region {
-            Some(region) => region.to_string(),
-            None => {
-                // Make sure region load chain has been set before checking.
-                if self.region_load.is_empty() {
-                    self.region_load
-                        .push(EnvLoader::default())
-                        .push(ProfileLoader::default());
-                }
+        let mut region_loader = RegionLoader::default().with_config_loader(cfg);
+        if let Some(region) = &self.region {
+            region_loader = region_loader.with_region(region);
+        }
+        if self.disable_load_from_env {
+            region_loader = region_loader.with_disable_env();
+        }
+        if self.disable_load_from_profile {
+            region_loader = region_loader.with_disable_profile();
+        }
 
-                self.region_load
-                    .load_region()?
-                    .ok_or_else(|| anyhow!("region is required"))?
-            }
-        };
+        let region = region_loader
+            .load()
+            .ok_or_else(|| anyhow!("region is missing"))?;
         debug!("signer region: {}", &region);
 
         Ok(Signer {
             service: service.to_string(),
             region,
-            credential: Arc::new(RwLock::new(credential)),
-            credential_load: mem::take(&mut self.credential_load),
+            credential_loader: cred_loader,
             allow_anonymous: self.allow_anonymous,
             time: self.time,
         })
@@ -171,8 +169,7 @@ impl Builder {
 pub struct Signer {
     service: String,
     region: String,
-    credential: Arc<RwLock<Option<Credential>>>,
-    credential_load: CredentialLoadChain,
+    credential_loader: CredentialLoader,
 
     /// Allow anonymous request if credential is not loaded.
     allow_anonymous: bool,
@@ -192,26 +189,8 @@ impl Signer {
     ///
     /// This function should never be exported to avoid credential leaking by
     /// mistake.
-    fn credential(&self) -> Result<Option<Credential>> {
-        // Return cached credential if it's valid.
-        match self.credential.read().expect("lock poisoned").clone() {
-            None => return Ok(None),
-            Some(cred) => {
-                if cred.is_valid() {
-                    return Ok(Some(cred));
-                }
-            }
-        }
-
-        if let Some(cred) = self.credential_load.load_credential()? {
-            let mut lock = self.credential.write().expect("lock poisoned");
-            *lock = Some(cred.clone());
-            Ok(Some(cred))
-        } else {
-            // We used to get credential correctly, but now we can't.
-            // Something must happened in the running environment.
-            Err(anyhow!("credential should be loaded but not"))
-        }
+    fn credential(&self) -> Option<Credential> {
+        self.credential_loader.load()
     }
 
     fn canonicalize(
@@ -338,7 +317,7 @@ impl Signer {
     /// }
     /// ```
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential()? {
+        if let Some(cred) = self.credential() {
             let creq = self.canonicalize(req, SigningMethod::Header, &cred)?;
             let creq = self.calculate(creq, &cred)?;
             return self.apply(req, creq);
@@ -382,7 +361,7 @@ impl Signer {
     /// }
     /// ```
     pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
-        if let Some(cred) = self.credential()? {
+        if let Some(cred) = self.credential() {
             let creq = self.canonicalize(req, SigningMethod::Query(expire), &cred)?;
             let creq = self.calculate(creq, &cred)?;
             return self.apply(req, creq);
@@ -828,7 +807,7 @@ mod tests {
                 .time(now)
                 .build()?;
 
-            let cred = signer.credential()?.expect("credential must be valid");
+            let cred = signer.credential().expect("credential must be valid");
             let creq = signer.canonicalize(&req, SigningMethod::Header, &cred)?;
             let actual = signer.calculate(creq, &cred)?;
             signer.apply(&mut req, actual).expect("must apply success");
@@ -894,7 +873,7 @@ mod tests {
                 .time(now)
                 .build()?;
 
-            let cred = signer.credential()?.expect("credential must be valid");
+            let cred = signer.credential().expect("credential must be valid");
             let creq =
                 signer.canonicalize(&req, SigningMethod::Query(Duration::hours(1)), &cred)?;
             let actual = signer.calculate(creq, &cred)?;
@@ -961,7 +940,7 @@ mod tests {
                 .time(now)
                 .build()?;
 
-            let cred = signer.credential()?.expect("credential must be valid");
+            let cred = signer.credential().expect("credential must be valid");
             let creq = signer.canonicalize(&req, SigningMethod::Header, &cred)?;
             let actual = signer.calculate(creq, &cred)?;
             signer.apply(&mut req, actual).expect("must apply success");
@@ -1029,7 +1008,7 @@ mod tests {
                 .time(now)
                 .build()?;
 
-            let cred = signer.credential()?.expect("credential must be valid");
+            let cred = signer.credential().expect("credential must be valid");
             let creq =
                 signer.canonicalize(&req, SigningMethod::Query(Duration::hours(1)), &cred)?;
             let actual = signer.calculate(creq, &cred)?;
