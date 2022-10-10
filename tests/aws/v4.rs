@@ -80,7 +80,7 @@ fn test_signer_with_web_loader() -> Result<()> {
             ("AWS_WEB_IDENTITY_TOKEN_FILE", Some(&file_path)),
         ],
         || {
-            let l = loader::WebIdentityTokenLoader {};
+            let l = loader::AssumeRoleWithWebIdentityLoader {};
             let x = l
                 .load_credential()
                 .expect("load_credential must success")

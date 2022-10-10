@@ -130,7 +130,7 @@ impl Builder {
                 self.credential_load
                     .push(EnvLoader::default())
                     .push(ProfileLoader::default())
-                    .push(WebIdentityTokenLoader::default());
+                    .push(AssumeRoleWithWebIdentityLoader::default());
             }
 
             self.credential_load.load_credential()?

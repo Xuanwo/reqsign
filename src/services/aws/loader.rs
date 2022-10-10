@@ -192,9 +192,9 @@ impl RegionLoad for ProfileLoader {
 /// - Explain how web identity token works
 /// - Support load web identity token file from aws config.
 #[derive(Default, Clone, Debug)]
-pub struct WebIdentityTokenLoader {}
+pub struct AssumeRoleWithWebIdentityLoader {}
 
-impl CredentialLoad for WebIdentityTokenLoader {
+impl CredentialLoad for AssumeRoleWithWebIdentityLoader {
     fn load_credential(&self) -> Result<Option<Credential>> {
         // Based on our user reports, AWS STS may need 10s to reach consistency
         // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
@@ -224,7 +224,7 @@ impl CredentialLoad for WebIdentityTokenLoader {
     }
 }
 
-impl WebIdentityTokenLoader {
+impl AssumeRoleWithWebIdentityLoader {
     fn load_credential_inner(&self) -> Result<Option<Credential>> {
         if let (Ok(token), Ok(role_arn)) = (
             env::var(super::constants::AWS_WEB_IDENTITY_TOKEN_FILE),
