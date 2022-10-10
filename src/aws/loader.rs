@@ -21,7 +21,6 @@ use serde::Deserialize;
 
 use super::constants;
 use crate::credential::Credential;
-use crate::credential::DummyLoader;
 use crate::dirs::expand_homedir;
 use crate::time::parse_rfc3339;
 
@@ -656,58 +655,6 @@ impl RegionLoader {
     }
 }
 
-/// Loader trait will try to load region from different sources.
-pub trait RegionLoad: Send + Sync {
-    /// Load region from sources.
-    ///
-    /// - If succeed, return `Ok(Some(region))`
-    /// - If not found, return `Ok(None)`
-    /// - If unexpected errors happened, return `Err(err)`
-    fn load_region(&self) -> Result<Option<String>>;
-}
-
-/// RegionLoadChain will try to load region via the insert order.
-///
-/// - If found, return directly.
-/// - If not found, keep going and try next one.
-/// - If meeting error, return directly.
-#[derive(Default)]
-pub struct RegionLoadChain {
-    loaders: Vec<Box<dyn RegionLoad + 'static>>,
-}
-
-impl RegionLoadChain {
-    /// Check if this chain is empty.
-    pub fn is_empty(&self) -> bool {
-        self.loaders.is_empty()
-    }
-
-    /// Insert new loaders into chain.
-    pub fn push(&mut self, l: impl RegionLoad + 'static) -> &mut Self {
-        self.loaders.push(Box::new(l));
-
-        self
-    }
-}
-
-impl RegionLoad for RegionLoadChain {
-    fn load_region(&self) -> Result<Option<String>> {
-        for l in self.loaders.iter() {
-            if let Some(r) = l.load_region()? {
-                return Ok(Some(r));
-            }
-        }
-
-        Ok(None)
-    }
-}
-
-impl RegionLoad for DummyLoader {
-    fn load_region(&self) -> Result<Option<String>> {
-        Ok(None)
-    }
-}
-
 #[derive(Default, Debug, Deserialize)]
 #[serde(default, rename_all = "PascalCase")]
 struct AssumeRoleWithWebIdentityResponse {
@@ -732,8 +679,11 @@ struct AssumeRoleWithWebIdentityCredentials {
 
 #[cfg(test)]
 mod tests {
+    use http::Request;
     use log::debug;
     use quick_xml::de;
+    use reqwest::blocking::Client;
+    use std::str::FromStr;
 
     use super::constants::*;
     use super::*;
@@ -919,6 +869,63 @@ mod tests {
                 assert_eq!("test", x);
             },
         );
+    }
+
+    #[test]
+    fn test_signer_with_web_loader() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        dotenv::from_filename(".env").ok();
+
+        if env::var("REQSIGN_AWS_V4_TEST").is_err()
+            || env::var("REQSIGN_AWS_V4_TEST").unwrap() != "on"
+        {
+            return Ok(());
+        }
+
+        let role_arn = env::var("REQSIGN_AWS_ROLE_ARN").expect("REQSIGN_AWS_ROLE_ARN not exist");
+        let idp_url = env::var("REQSIGN_AWS_IDP_URL").expect("REQSIGN_AWS_IDP_URL not exist");
+        let idp_content = base64::decode(
+            env::var("REQSIGN_AWS_IDP_BODY").expect("REQSIGN_AWS_IDP_BODY not exist"),
+        )?;
+
+        let mut req = Request::new(idp_content);
+        *req.method_mut() = http::Method::POST;
+        *req.uri_mut() = http::Uri::from_str(&idp_url)?;
+        req.headers_mut()
+            .insert(http::header::CONTENT_TYPE, "application/json".parse()?);
+
+        #[derive(Deserialize)]
+        struct Token {
+            access_token: String,
+        }
+        let token = Client::new()
+            .execute(req.try_into()?)?
+            .json::<Token>()?
+            .access_token;
+
+        let file_path = format!(
+            "{}/testdata/services/aws/web_identity_token_file",
+            env::current_dir()
+                .expect("current_dir must exist")
+                .to_string_lossy()
+        );
+        fs::write(&file_path, token)?;
+
+        temp_env::with_vars(
+            vec![
+                ("AWS_ROLE_ARN", Some(&role_arn)),
+                ("AWS_WEB_IDENTITY_TOKEN_FILE", Some(&file_path)),
+            ],
+            || {
+                let l = CredentialLoader::default();
+                let x = l.load().expect("load_credential must success");
+
+                assert!(x.is_valid());
+            },
+        );
+
+        Ok(())
     }
 
     #[test]

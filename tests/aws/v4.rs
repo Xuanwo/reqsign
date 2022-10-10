@@ -2,15 +2,13 @@ use anyhow::Result;
 use http::{Request, StatusCode};
 use log::{debug, warn};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use reqsign::aws::loader;
-use reqsign::aws::v4::Signer;
+use reqsign::AwsV4Signer;
 use reqwest::blocking::Client;
-use serde::Deserialize;
+use std::env;
 use std::str::FromStr;
-use std::{env, fs};
 use time::Duration;
 
-fn init_signer() -> Option<Signer> {
+fn init_signer() -> Option<AwsV4Signer> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -20,7 +18,7 @@ fn init_signer() -> Option<Signer> {
         return None;
     }
 
-    let mut builder = Signer::builder();
+    let mut builder = AwsV4Signer::builder();
     builder
         .service(&env::var("REQSIGN_AWS_V4_SERVICE").expect("env REQSIGN_AWS_V4_SERVICE must set"));
     builder.region(&env::var("REQSIGN_AWS_V4_REGION").expect("env REQSIGN_AWS_V4_REGION must set"));
@@ -32,61 +30,6 @@ fn init_signer() -> Option<Signer> {
     );
 
     Some(builder.build().expect("signer must be valid"))
-}
-
-#[test]
-fn test_signer_with_web_loader() -> Result<()> {
-    let _ = env_logger::builder().is_test(true).try_init();
-
-    dotenv::from_filename(".env").ok();
-
-    if env::var("REQSIGN_AWS_V4_TEST").is_err() || env::var("REQSIGN_AWS_V4_TEST").unwrap() != "on"
-    {
-        return Ok(());
-    }
-
-    let role_arn = env::var("REQSIGN_AWS_ROLE_ARN").expect("REQSIGN_AWS_ROLE_ARN not exist");
-    let idp_url = env::var("REQSIGN_AWS_IDP_URL").expect("REQSIGN_AWS_IDP_URL not exist");
-    let idp_content =
-        base64::decode(env::var("REQSIGN_AWS_IDP_BODY").expect("REQSIGN_AWS_IDP_BODY not exist"))?;
-
-    let mut req = Request::new(idp_content);
-    *req.method_mut() = http::Method::POST;
-    *req.uri_mut() = http::Uri::from_str(&idp_url)?;
-    req.headers_mut()
-        .insert(http::header::CONTENT_TYPE, "application/json".parse()?);
-
-    #[derive(Deserialize)]
-    struct Token {
-        access_token: String,
-    }
-    let token = Client::new()
-        .execute(req.try_into()?)?
-        .json::<Token>()?
-        .access_token;
-
-    let file_path = format!(
-        "{}/testdata/services/aws/web_identity_token_file",
-        env::current_dir()
-            .expect("current_dir must exist")
-            .to_string_lossy()
-    );
-    fs::write(&file_path, token)?;
-
-    temp_env::with_vars(
-        vec![
-            ("AWS_ROLE_ARN", Some(&role_arn)),
-            ("AWS_WEB_IDENTITY_TOKEN_FILE", Some(&file_path)),
-        ],
-        || {
-            let l = loader::CredentialLoader::default();
-            let x = l.load().expect("load_credential must success");
-
-            assert!(x.is_valid());
-        },
-    );
-
-    Ok(())
 }
 
 #[test]

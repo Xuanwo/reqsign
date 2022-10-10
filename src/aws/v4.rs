@@ -294,13 +294,13 @@ impl Signer {
     ///
     /// ```rust
     /// use anyhow::Result;
-    /// use reqsign::aws::v4::Signer;
+    /// use reqsign::AwsV4Signer;
     /// use reqwest::{Client, Request, Url};
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = Signer::builder()
+    ///     let signer = AwsV4Signer::builder()
     ///         .service("s3")
     ///         .region("test")
     ///         .allow_anonymous()
@@ -337,14 +337,14 @@ impl Signer {
     ///
     /// ```rust
     /// use anyhow::Result;
-    /// use reqsign::aws::v4::Signer;
+    /// use reqsign::AwsV4Signer;
     /// use reqwest::{Client, Request, Url};
     /// use time::Duration;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = Signer::builder()
+    ///     let signer = AwsV4Signer::builder()
     ///         .service("s3")
     ///         .region("test")
     ///         .allow_anonymous()
