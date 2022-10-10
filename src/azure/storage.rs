@@ -179,7 +179,7 @@ impl Signer {
     ///
     /// ```no_run
     /// use anyhow::Result;
-    /// use reqsign::services::azure::storage::Signer;
+    /// use reqsign::azure::storage::Signer;
     /// use reqwest::{Client, Request, Url};
     ///
     /// #[tokio::main]

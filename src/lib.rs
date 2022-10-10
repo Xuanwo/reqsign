@@ -4,7 +4,7 @@
 //!
 //! ```rust
 //! use anyhow::Result;
-//! use reqsign::services::aws::v4::Signer;
+//! use reqsign::aws::v4::Signer;
 //! use reqwest::{Client, Request, Url};
 //!
 //! #[tokio::main]
@@ -29,11 +29,11 @@
 //!
 //! # Available Services
 //!
-//! - [Aliyun OSS][crate::services::aliyun::oss::Signer] for Aliyun OSS.
-//! - [AWS SigV4][crate::services::aws::v4::Signer] for AWS services like S3.
-//! - [Azure Storage][crate::services::azure::storage::Signer] for Azure Storage services like Azure Blob Service.
-//! - [Google][crate::services::google::Signer] for All google cloud services like Google Cloud Storage Service.
-//! - [Huawei Cloud OBS][crate::services::huaweicloud::obs::Signer] for Huawei Cloud Object Storage Service (OBS).
+//! - [Aliyun OSS][crate::aliyun::oss::Signer] for Aliyun OSS.
+//! - [AWS SigV4][crate::aws::v4::Signer] for AWS services like S3.
+//! - [Azure Storage][crate::azure::storage::Signer] for Azure Storage services like Azure Blob Service.
+//! - [Google][crate::google::Signer] for All google cloud services like Google Cloud Storage Service.
+//! - [Huawei Cloud OBS][crate::huaweicloud::obs::Signer] for Huawei Cloud Object Storage Service (OBS).
 //!
 //! # Features
 //!
@@ -48,7 +48,12 @@
 #![warn(missing_docs)]
 
 pub mod credential;
-pub mod services;
+
+pub mod aliyun;
+pub mod aws;
+pub mod azure;
+pub mod google;
+pub mod huaweicloud;
 
 mod dirs;
 mod hash;

@@ -735,8 +735,8 @@ mod tests {
     use log::debug;
     use quick_xml::de;
 
+    use super::constants::*;
     use super::*;
-    use crate::services::aws::constants::*;
 
     #[test]
     fn test_credential_env_loader_without_env() {

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use http::StatusCode;
 use log::{debug, warn};
-use reqsign::services::google::Signer;
+use reqsign::google::Signer;
 use reqwest::blocking::Client;
 use std::env;
 

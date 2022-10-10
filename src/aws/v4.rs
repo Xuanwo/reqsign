@@ -11,11 +11,11 @@ use percent_encoding::{percent_decode_str, utf8_percent_encode};
 
 use super::constants::AWS_QUERY_ENCODE_SET;
 use super::constants::X_AMZ_CONTENT_SHA_256;
+use super::constants::{X_AMZ_DATE, X_AMZ_SECURITY_TOKEN};
 use super::loader::*;
 use crate::credential::Credential;
 use crate::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use crate::request::SignableRequest;
-use crate::services::aws::constants::{X_AMZ_DATE, X_AMZ_SECURITY_TOKEN};
 use crate::time::{self, format_date, format_iso8601, DateTime, Duration};
 
 /// Builder for `Signer`.
@@ -294,7 +294,7 @@ impl Signer {
     ///
     /// ```rust
     /// use anyhow::Result;
-    /// use reqsign::services::aws::v4::Signer;
+    /// use reqsign::aws::v4::Signer;
     /// use reqwest::{Client, Request, Url};
     ///
     /// #[tokio::main]
@@ -337,7 +337,7 @@ impl Signer {
     ///
     /// ```rust
     /// use anyhow::Result;
-    /// use reqsign::services::aws::v4::Signer;
+    /// use reqsign::aws::v4::Signer;
     /// use reqwest::{Client, Request, Url};
     /// use time::Duration;
     ///
