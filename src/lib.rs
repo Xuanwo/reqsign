@@ -4,13 +4,13 @@
 //!
 //! ```rust
 //! use anyhow::Result;
-//! use reqsign::aws::v4::Signer;
+//! use reqsign::AwsV4Signer;
 //! use reqwest::{Client, Request, Url};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
 //!     // Signer can load region and credentials from environment by default.
-//!     let signer = Signer::builder()
+//!     let signer = AwsV4Signer::builder()
 //!         .service("s3")
 //!         .region("test")
 //!         .allow_anonymous()
@@ -30,7 +30,7 @@
 //! # Available Services
 //!
 //! - [Aliyun OSS][crate::aliyun::oss::Signer] for Aliyun OSS.
-//! - [AWS SigV4][crate::aws::v4::Signer] for AWS services like S3.
+//! - [AWS SigV4][crate::AwsV4Signer] for AWS services like S3.
 //! - [Azure Storage][crate::azure::storage::Signer] for Azure Storage services like Azure Blob Service.
 //! - [Google][crate::google::Signer] for All google cloud services like Google Cloud Storage Service.
 //! - [Huawei Cloud OBS][crate::huaweicloud::obs::Signer] for Huawei Cloud Object Storage Service (OBS).
