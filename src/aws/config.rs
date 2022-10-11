@@ -9,7 +9,7 @@ use std::sync::RwLock;
 use ini::Ini;
 use log::warn;
 
-use crate::aws::constants;
+use super::constants::*;
 use crate::dirs::expand_homedir;
 
 #[derive(Clone, Default)]
@@ -18,56 +18,56 @@ struct Config {
     /// `config_file` will be load from:
     ///
     /// - this field if it's `is_some`
-    /// - env value: `AWS_CONFIG_FILE`
+    /// - env value: [`AWS_CONFIG_FILE`]
     /// - default to: `~/.aws/config`
     config_file: Option<String>,
     /// `shared_credentials_file` will be loaded from:
     ///
     /// - this field if it's `is_some`
-    /// - env value: `AWS_SHARED_CREDENTIALS_FILE`
+    /// - env value: [`AWS_SHARED_CREDENTIALS_FILE`]
     /// - default to: `~/.aws/credentials`
     shared_credentials_file: Option<String>,
     /// `profile` will be loaded from:
     ///
     /// - this field if it's `is_some`
-    /// - env value: `AWS_PROFILE`
+    /// - env value: [`AWS_PROFILE`]
     /// - default to: `default`
     profile: Option<String>,
 
     /// `region` will be loaded from:
     ///
     /// - this field if it's `is_some`
-    /// - env value: `AWS_REGION`
+    /// - env value: [`AWS_REGION`]
     /// - profile config: `region`
     region: Option<String>,
     /// `access_key_id` will be loaded from
     ///
     /// - this field if it's `is_some`
-    /// - env value: `AWS_ACCESS_KEY_ID`
+    /// - env value: [`AWS_ACCESS_KEY_ID`]
     /// - profile config: `aws_access_key_id`
     access_key_id: Option<String>,
     /// `secret_access_key` will be loaded from
     ///
     /// - this field if it's `is_some`
-    /// - env value: `AWS_SECRET_ACCESS_KEY`
+    /// - env value: [`AWS_SECRET_ACCESS_KEY`]
     /// - profile config: `aws_secret_access_key`
     secret_access_key: Option<String>,
     /// `session_token` will be loaded from
     ///
     /// - this field if it's `is_some`
-    /// - env value: `AWS_SESSION_TOKEN`
+    /// - env value: [`AWS_SESSION_TOKEN`]
     /// - profile config: `aws_session_token`
     session_token: Option<String>,
     /// `role_arn` value will be load from:
     ///
     /// - this field if it's `is_some`.
-    /// - env value: `AWS_ROLE_ARN`
+    /// - env value: [`AWS_ROLE_ARN`]
     /// - profile config: `role_arn`
     role_arn: Option<String>,
     /// `role_session_name` value will be load from:
     ///
     /// - this field if it's `is_some`.
-    /// - env value: `AWS_ROLE_SESSION_NAME`
+    /// - env value: [`AWS_ROLE_SESSION_NAME`]
     /// - profile config: `role_session_name`
     /// - default to `reqsign`.
     role_session_name: Option<String>,
@@ -80,7 +80,7 @@ struct Config {
     /// `web_identity_token_file` value will be loaded from:
     ///
     /// - this field if it's `is_some`
-    /// - env value: `AWS_WEB_IDENTITY_TOKEN_FILE`
+    /// - env value: [`AWS_WEB_IDENTITY_TOKEN_FILE`]
     /// - profile config: `web_identity_token_file`
     web_identity_token_file: Option<String>,
 }
@@ -117,34 +117,34 @@ impl ConfigLoader {
         let envs = env::vars().collect::<HashMap<_, _>>();
         let mut config = { self.config.read().expect("lock must be valid").clone() };
 
-        if let Some(v) = envs.get(constants::AWS_CONFIG_FILE) {
+        if let Some(v) = envs.get(AWS_CONFIG_FILE) {
             config.config_file.get_or_insert(v.clone());
         }
-        if let Some(v) = envs.get(constants::AWS_SHARED_CREDENTIALS_FILE) {
+        if let Some(v) = envs.get(AWS_SHARED_CREDENTIALS_FILE) {
             config.shared_credentials_file.get_or_insert(v.clone());
         }
-        if let Some(v) = envs.get(constants::AWS_PROFILE) {
+        if let Some(v) = envs.get(AWS_PROFILE) {
             config.profile.get_or_insert(v.clone());
         }
-        if let Some(v) = envs.get(constants::AWS_REGION) {
+        if let Some(v) = envs.get(AWS_REGION) {
             config.region.get_or_insert(v.clone());
         }
-        if let Some(v) = envs.get(constants::AWS_ACCESS_KEY_ID) {
+        if let Some(v) = envs.get(AWS_ACCESS_KEY_ID) {
             config.access_key_id.get_or_insert(v.clone());
         }
-        if let Some(v) = envs.get(constants::AWS_SECRET_ACCESS_KEY) {
+        if let Some(v) = envs.get(AWS_SECRET_ACCESS_KEY) {
             config.secret_access_key.get_or_insert(v.clone());
         }
-        if let Some(v) = envs.get(constants::AWS_SESSION_TOKEN) {
+        if let Some(v) = envs.get(AWS_SESSION_TOKEN) {
             config.session_token.get_or_insert(v.clone());
         }
-        if let Some(v) = envs.get(constants::AWS_ROLE_ARN) {
+        if let Some(v) = envs.get(AWS_ROLE_ARN) {
             config.role_arn.get_or_insert(v.clone());
         }
-        if let Some(v) = envs.get(constants::AWS_ROLE_SESSION_NAME) {
+        if let Some(v) = envs.get(AWS_ROLE_SESSION_NAME) {
             config.role_session_name.get_or_insert(v.clone());
         }
-        if let Some(v) = envs.get(constants::AWS_WEB_IDENTITY_TOKEN_FILE) {
+        if let Some(v) = envs.get(AWS_WEB_IDENTITY_TOKEN_FILE) {
             config.web_identity_token_file.get_or_insert(v.clone());
         }
 

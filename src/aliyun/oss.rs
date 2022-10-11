@@ -3,9 +3,6 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Write;
-use std::mem;
-use std::sync::Arc;
-use std::sync::RwLock;
 
 use anyhow::anyhow;
 use anyhow::Result;
@@ -19,9 +16,8 @@ use log::debug;
 use once_cell::sync::Lazy;
 use percent_encoding::percent_decode_str;
 
+use super::credential::CredentialLoader;
 use crate::credential::Credential;
-use crate::credential::CredentialLoad;
-use crate::credential::CredentialLoadChain;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
 use crate::time;
@@ -34,14 +30,12 @@ const CONTENT_MD5: &str = "content-md5";
 /// Builder for `Signer`
 #[derive(Default)]
 pub struct Builder {
-    credential: Credential,
-    credential_load: CredentialLoadChain,
-    allow_anonymous: bool,
-
     bucket: String,
-    provider_arn: Option<String>,
-    role_arn: Option<String>,
-    oidc_token: Option<String>,
+    credential: Credential,
+
+    disable_load_from_env: bool,
+    disable_load_from_assume_role_with_oidc: bool,
+    allow_anonymous: bool,
 
     time: Option<DateTime>,
 }
@@ -52,6 +46,7 @@ impl Builder {
         self.bucket = bucket.to_string();
         self
     }
+
     /// Specify access key id.
     ///
     /// If not set, we will try to load via `credential_loader`.
@@ -68,29 +63,15 @@ impl Builder {
         self
     }
 
-    /// Specify provider arn.
-    pub fn provider_arn(&mut self, provider_arn: &str) -> &mut Self {
-        self.provider_arn = Some(provider_arn.to_string());
+    /// Disable load from env.
+    pub fn disable_load_from_env(&mut self) -> &mut Self {
+        self.disable_load_from_env = true;
         self
     }
 
-    /// Specify role arn.
-    pub fn role_arn(&mut self, role_arn: &str) -> &mut Self {
-        self.role_arn = Some(role_arn.to_string());
-        self
-    }
-
-    /// Specify oidc token.
-    pub fn oidc_token(&mut self, token: &str) -> &mut Self {
-        self.oidc_token = Some(token.to_string());
-        self
-    }
-
-    /// Specify credential load behavior
-    ///
-    /// If not set, we will use the default credential loader.
-    pub fn credential_loader(&mut self, credential: CredentialLoadChain) -> &mut Self {
-        self.credential_load = credential;
+    /// Disable load from assume role with oidc.
+    pub fn disable_load_from_assume_role_with_oidc(&mut self) -> &mut Self {
+        self.disable_load_from_assume_role_with_oidc = true;
         self
     }
 
@@ -120,17 +101,20 @@ impl Builder {
             return Err(anyhow!("bucket is required"));
         }
 
-        let credential = if self.credential.is_valid() {
-            Some(self.credential.clone())
-        } else {
-            self.credential_load.load_credential()?
-        };
-        debug!("signer credential: {:?}", &credential);
+        let mut cred_loader = CredentialLoader::default();
+        if self.credential.is_valid() {
+            cred_loader = cred_loader.with_credential(self.credential.clone());
+        }
+        if self.disable_load_from_env {
+            cred_loader = cred_loader.with_disable_env();
+        }
+        if self.disable_load_from_assume_role_with_oidc {
+            cred_loader = cred_loader.with_disable_assume_role_with_oidc();
+        }
 
         Ok(Signer {
             bucket: self.bucket.to_string(),
-            credential: Arc::new(RwLock::new(credential)),
-            credential_load: mem::take(&mut self.credential_load),
+            credential_loader: cred_loader,
             allow_anonymous: self.allow_anonymous,
             time: self.time,
         })
@@ -140,8 +124,7 @@ impl Builder {
 /// Singer for Aliyun OSS.
 pub struct Signer {
     bucket: String,
-    credential: Arc<RwLock<Option<Credential>>>,
-    credential_load: CredentialLoadChain,
+    credential_loader: CredentialLoader,
 
     /// Allow anonymous request if credential is not loaded.
     allow_anonymous: bool,
@@ -155,26 +138,8 @@ impl Signer {
     ///
     /// This function should never be exported to avoid credential leaking by
     /// mistake.
-    fn credential(&self) -> Result<Option<Credential>> {
-        // Return cached credential if it's valid.
-        match self.credential.read().expect("lock poisoned").clone() {
-            None => return Ok(None),
-            Some(cred) => {
-                if cred.is_valid() {
-                    return Ok(Some(cred));
-                }
-            }
-        }
-
-        if let Some(cred) = self.credential_load.load_credential()? {
-            let mut lock = self.credential.write().expect("lock poisoned");
-            *lock = Some(cred.clone());
-            Ok(Some(cred))
-        } else {
-            // We used to get credential correctly, but now we can't.
-            // Something must happened in the running environment.
-            Err(anyhow!("credential should be loaded but not"))
-        }
+    fn credential(&self) -> Option<Credential> {
+        self.credential_loader.load()
     }
 
     /// Calculate signing requests via SignableRequest.
@@ -205,7 +170,7 @@ impl Signer {
 
     /// Signing request with header.
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential()? {
+        if let Some(cred) = self.credential() {
             let sig = self.calculate(req, &cred)?;
             return self.apply(req, &sig);
         }
