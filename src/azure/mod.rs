@@ -4,4 +4,3 @@
 pub mod storage;
 
 mod constants;
-mod loader;

@@ -7,10 +7,10 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign::azure::storage::Signer;
+use reqsign::AzureStorageSigner;
 use reqwest::blocking::Client;
 
-fn init_signer() -> Option<Signer> {
+fn init_signer() -> Option<AzureStorageSigner> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -21,7 +21,7 @@ fn init_signer() -> Option<Signer> {
         return None;
     }
 
-    let mut builder = Signer::builder();
+    let mut builder = AzureStorageSigner::builder();
     builder.account_name(
         &env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
             .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),

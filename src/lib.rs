@@ -33,7 +33,7 @@
 //!
 //! - [Aliyun OSS][crate::AliyunOssSigner] for Aliyun OSS.
 //! - [AWS SigV4][crate::AwsV4Signer] for AWS services like S3.
-//! - [Azure Storage][crate::azure::storage::Signer] for Azure Storage services like Azure Blob Service.
+//! - [Azure Storage][crate::AzureStorageSigner] for Azure Storage services like Azure Blob Service.
 //! - [Google][crate::google::Signer] for All google cloud services like Google Cloud Storage Service.
 //! - [Huawei Cloud OBS][crate::huaweicloud::obs::Signer] for Huawei Cloud Object Storage Service (OBS).
 //!
@@ -59,7 +59,10 @@ mod aws;
 pub use aws::v4::Builder as AwsV4Builder;
 pub use aws::v4::Signer as AwsV4Signer;
 
-pub mod azure;
+mod azure;
+pub use azure::storage::Builder as AzureStorageBuilder;
+pub use azure::storage::Signer as AzureStorageSigner;
+
 pub mod google;
 pub mod huaweicloud;
 
