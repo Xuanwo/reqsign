@@ -5,7 +5,6 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::fmt::Write;
 
-use super::credential::CredentialLoader;
 use anyhow::anyhow;
 use anyhow::Result;
 use http::header::*;
@@ -13,6 +12,7 @@ use http::HeaderMap;
 use log::debug;
 
 use super::super::constants::*;
+use super::credential::CredentialLoader;
 use crate::credential::Credential;
 use crate::hash::base64_decode;
 use crate::hash::base64_hmac_sha256;

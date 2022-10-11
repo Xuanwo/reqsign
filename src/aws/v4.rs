@@ -38,6 +38,9 @@ pub struct Builder {
     service: Option<String>,
     region: Option<String>,
     credential: Credential,
+    external_id: Option<String>,
+    role_arn: Option<String>,
+    role_session_name: Option<String>,
 
     allow_anonymous: bool,
     disable_load_from_env: bool,
@@ -89,6 +92,30 @@ impl Builder {
         self
     }
 
+    /// Set role arn for this signer.
+    pub fn role_arn(&mut self, v: &str) -> &mut Self {
+        if !v.is_empty() {
+            self.role_arn = Some(v.to_string())
+        }
+        self
+    }
+
+    /// Set role session name for this signer.
+    pub fn role_session_name(&mut self, v: &str) -> &mut Self {
+        if !v.is_empty() {
+            self.role_session_name = Some(v.to_string())
+        }
+        self
+    }
+
+    /// Set external id for this signer.
+    pub fn external_id(&mut self, v: &str) -> &mut Self {
+        if !v.is_empty() {
+            self.external_id = Some(v.to_string())
+        }
+        self
+    }
+
     /// Allow anonymous request if credential is not loaded.
     pub fn allow_anonymous(&mut self) -> &mut Self {
         self.allow_anonymous = true;
@@ -136,6 +163,15 @@ impl Builder {
         debug!("signer: service: {:?}", service);
 
         let cfg = ConfigLoader::default();
+        if let Some(v) = &self.role_arn {
+            cfg.set_role_arn(v);
+        }
+        if let Some(v) = &self.role_session_name {
+            cfg.set_role_session_name(v);
+        }
+        if let Some(v) = &self.external_id {
+            cfg.set_external_id(v);
+        }
 
         let mut cred_loader = CredentialLoader::default().with_config_loader(cfg.clone());
         if self.credential.is_valid() {

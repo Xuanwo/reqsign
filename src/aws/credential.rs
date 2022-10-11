@@ -1,9 +1,11 @@
+use std::fmt::Write;
 use std::fs;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::thread::sleep;
 
 use anyhow::anyhow;
+use anyhow::Result;
 use backon::ExponentialBackoff;
 use log::warn;
 use quick_xml::de;
@@ -20,7 +22,6 @@ pub struct CredentialLoader {
 
     disable_env: bool,
     disable_profile: bool,
-    #[allow(unused)]
     disable_assume_role: bool,
     disable_assume_role_with_web_identity: bool,
 
@@ -83,6 +84,7 @@ impl CredentialLoader {
 
         self.load_via_env()
             .or_else(|| self.load_via_profile())
+            .or_else(|| self.load_via_assume_role())
             .or_else(|| self.load_via_assume_role_with_web_identity())
             .map(|cred| {
                 let mut lock = self.credential.write().expect("lock poisoned");
@@ -130,9 +132,69 @@ impl CredentialLoader {
         }
     }
 
-    #[allow(unused)]
     fn load_via_assume_role(&self) -> Option<Credential> {
-        todo!()
+        if self.disable_assume_role {
+            return None;
+        }
+
+        // Based on our user reports, AWS STS may need 10s to reach consistency
+        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
+        //
+        // Reference: <https://github.com/datafuselabs/opendal/issues/288>
+        let mut retry = ExponentialBackoff::default()
+            .with_max_times(4)
+            .with_jitter();
+
+        loop {
+            match self.load_via_assume_role_inner() {
+                Ok(v) => return v,
+                Err(e) => match retry.next() {
+                    Some(dur) => {
+                        sleep(dur);
+                        continue;
+                    }
+                    None => {
+                        warn!("load credential via assume role failed: {e}");
+                        return None;
+                    }
+                },
+            }
+        }
+    }
+
+    fn load_via_assume_role_inner(&self) -> Result<Option<Credential>> {
+        let role_arn = match self.config_loader.role_arn() {
+            Some(role_arn) => role_arn,
+            None => return Ok(None),
+        };
+        let role_session_name = self.config_loader.role_session_name();
+
+        // Construct request to AWS STS Service.
+        let mut url = format!("https://sts.amazonaws.com/?Action=AssumeRole&RoleArn={role_arn}&Version=2011-06-15&RoleSessionName={role_session_name}");
+        if let Some(external_id) = self.config_loader.external_id() {
+            write!(url, "&ExternalId={external_id}")?;
+        }
+        let req = self.client.get(&url).set(
+            http::header::CONTENT_TYPE.as_str(),
+            "application/x-www-form-urlencoded",
+        );
+
+        let resp = req.call()?;
+        if resp.status() != http::StatusCode::OK {
+            let content = resp.into_string()?;
+            return Err(anyhow!("request to AWS STS Services failed: {content}"));
+        }
+
+        let resp: AssumeRoleResponse = de::from_str(&resp.into_string()?)?;
+        let resp_cred = resp.result.credentials;
+
+        let cred = Credential::new(&resp_cred.access_key_id, &resp_cred.secret_access_key)
+            .with_security_token(&resp_cred.session_token)
+            .with_expires_in(parse_rfc3339(&resp_cred.expiration)?);
+
+        cred.check()?;
+
+        Ok(Some(cred))
     }
 
     fn load_via_assume_role_with_web_identity(&self) -> Option<Credential> {
@@ -165,7 +227,7 @@ impl CredentialLoader {
         }
     }
 
-    fn load_via_assume_role_with_web_identity_inner(&self) -> anyhow::Result<Option<Credential>> {
+    fn load_via_assume_role_with_web_identity_inner(&self) -> Result<Option<Credential>> {
         let (token_file, role_arn) = match (
             self.config_loader.web_identity_token_file(),
             self.config_loader.role_arn(),
@@ -219,6 +281,28 @@ struct AssumeRoleWithWebIdentityResult {
 #[derive(Default, Debug, Deserialize)]
 #[serde(default, rename_all = "PascalCase")]
 struct AssumeRoleWithWebIdentityCredentials {
+    access_key_id: String,
+    secret_access_key: String,
+    session_token: String,
+    expiration: String,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct AssumeRoleResponse {
+    #[serde(rename = "AssumeRoleResult")]
+    result: AssumeRoleResult,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct AssumeRoleResult {
+    credentials: AssumeRoleCredentials,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct AssumeRoleCredentials {
     access_key_id: String,
     secret_access_key: String,
     session_token: String,
@@ -470,6 +554,59 @@ mod tests {
         );
         assert_eq!(&resp.result.credentials.session_token, "session_token");
         assert_eq!(&resp.result.credentials.expiration, "2022-05-25T11:45:17Z");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_assume_role_response() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let content = r#"<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+  <AssumeRoleResult>
+  <SourceIdentity>Alice</SourceIdentity>
+    <AssumedRoleUser>
+      <Arn>arn:aws:sts::123456789012:assumed-role/demo/TestAR</Arn>
+      <AssumedRoleId>ARO123EXAMPLE123:TestAR</AssumedRoleId>
+    </AssumedRoleUser>
+    <Credentials>
+      <AccessKeyId>ASIAIOSFODNN7EXAMPLE</AccessKeyId>
+      <SecretAccessKey>wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY</SecretAccessKey>
+      <SessionToken>
+       AQoDYXdzEPT//////////wEXAMPLEtc764bNrC9SAPBSM22wDOk4x4HIZ8j4FZTwdQW
+       LWsKWHGBuFqwAeMicRXmxfpSPfIeoIYRqTflfKD8YUuwthAx7mSEI/qkPpKPi/kMcGd
+       QrmGdeehM4IC1NtBmUpp2wUE8phUZampKsburEDy0KPkyQDYwT7WZ0wq5VSXDvp75YU
+       9HFvlRd8Tx6q6fE8YQcHNVXAkiY9q6d+xo0rKwT38xVqr7ZD0u0iPPkUL64lIZbqBAz
+       +scqKmlzm8FDrypNC9Yjc8fPOLn9FX9KSYvKTr4rvx3iSIlTJabIQwj2ICCR/oLxBA==
+      </SessionToken>
+      <Expiration>2019-11-09T13:34:41Z</Expiration>
+    </Credentials>
+    <PackedPolicySize>6</PackedPolicySize>
+  </AssumeRoleResult>
+  <ResponseMetadata>
+    <RequestId>c6104cbe-af31-11e0-8154-cbc7ccf896c7</RequestId>
+  </ResponseMetadata>
+</AssumeRoleResponse>"#;
+
+        let resp: AssumeRoleResponse = de::from_str(content).expect("xml deserialize must success");
+
+        assert_eq!(
+            &resp.result.credentials.access_key_id,
+            "ASIAIOSFODNN7EXAMPLE"
+        );
+        assert_eq!(
+            &resp.result.credentials.secret_access_key,
+            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY"
+        );
+        assert_eq!(
+            &resp.result.credentials.session_token,
+            "AQoDYXdzEPT//////////wEXAMPLEtc764bNrC9SAPBSM22wDOk4x4HIZ8j4FZTwdQW
+       LWsKWHGBuFqwAeMicRXmxfpSPfIeoIYRqTflfKD8YUuwthAx7mSEI/qkPpKPi/kMcGd
+       QrmGdeehM4IC1NtBmUpp2wUE8phUZampKsburEDy0KPkyQDYwT7WZ0wq5VSXDvp75YU
+       9HFvlRd8Tx6q6fE8YQcHNVXAkiY9q6d+xo0rKwT38xVqr7ZD0u0iPPkUL64lIZbqBAz
+       +scqKmlzm8FDrypNC9Yjc8fPOLn9FX9KSYvKTr4rvx3iSIlTJabIQwj2ICCR/oLxBA=="
+        );
+        assert_eq!(&resp.result.credentials.expiration, "2019-11-09T13:34:41Z");
 
         Ok(())
     }

@@ -1,5 +1,7 @@
+use std::sync::Arc;
+use std::sync::RwLock;
+
 use crate::credential::Credential;
-use std::sync::{Arc, RwLock};
 
 /// CredentialLoader will load credential from different methods.
 #[derive(Default)]
