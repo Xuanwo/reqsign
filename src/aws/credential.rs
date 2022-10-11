@@ -9,7 +9,7 @@ use log::warn;
 use quick_xml::de;
 use serde::Deserialize;
 
-use crate::aws::config::ConfigLoader;
+use super::config::ConfigLoader;
 use crate::credential::Credential;
 use crate::time::parse_rfc3339;
 

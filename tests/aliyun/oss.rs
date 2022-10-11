@@ -8,15 +8,11 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign::aliyun::loader;
-use reqsign::aliyun::oss::Builder;
-use reqsign::aliyun::oss::Signer;
-use reqsign::credential::CredentialLoad;
+use reqsign::AliyunOssBuilder;
+use reqsign::AliyunOssSigner;
 use reqwest::blocking::Client;
-use serde::Deserialize;
-use ureq::Agent;
 
-fn init_signer() -> Option<Signer> {
+fn init_signer() -> Option<AliyunOssSigner> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -27,7 +23,7 @@ fn init_signer() -> Option<Signer> {
         return None;
     }
 
-    let mut builder = Builder::default();
+    let mut builder = AliyunOssBuilder::default();
     builder.bucket(
         &env::var("REQSIGN_ALIYUN_OSS_BUCKET").expect("env REQSIGN_ALIYUN_OSS_BUCKET must set"),
     );
@@ -41,53 +37,6 @@ fn init_signer() -> Option<Signer> {
     );
 
     Some(builder.build().expect("signer must be valid"))
-}
-
-#[test]
-fn test_signer_with_oidc() -> Result<()> {
-    let _ = env_logger::builder().is_test(true).try_init();
-
-    dotenv::from_filename(".env").ok();
-
-    if env::var("REQSIGN_ALIYUN_OSS_TEST").is_err()
-        || env::var("REQSIGN_ALIYUN_OSS_TEST").unwrap() != "on"
-    {
-        return Ok(());
-    }
-
-    let provider_arn =
-        env::var("REQSIGN_ALIYUN_PROVIDER_ARN").expect("REQSIGN_ALIYUN_PROVIDER_ARN not exist");
-    let role_arn = env::var("REQSIGN_ALIYUN_ROLE_ARN").expect("REQSIGN_ALIYUN_ROLE_ARN not exist");
-    let idp_url = env::var("REQSIGN_ALIYUN_IDP_URL").expect("REQSIGN_ALIYUN_IDP_URL not exist");
-    let idp_content =
-        env::var("REQSIGN_ALIYUN_IDP_BODY").expect("REQSIGN_ALIYUN_IDP_BODY not exist");
-
-    let mut req = Request::new(idp_content);
-    *req.method_mut() = http::Method::POST;
-    *req.uri_mut() = http::Uri::from_str(&idp_url)?;
-    req.headers_mut().insert(
-        http::header::CONTENT_TYPE,
-        "application/x-www-form-urlencoded".parse()?,
-    );
-
-    #[derive(Deserialize)]
-    struct Token {
-        id_token: String,
-    }
-    let token = Client::new()
-        .execute(req.try_into()?)?
-        .json::<Token>()?
-        .id_token;
-
-    let l = loader::OidcTokenLoader::new(Agent::new(), &provider_arn, &role_arn, &token);
-    let x = l
-        .load_credential()
-        .expect("load_credential must success")
-        .expect("credential must be valid");
-
-    assert!(x.is_valid());
-
-    Ok(())
 }
 
 #[test]
