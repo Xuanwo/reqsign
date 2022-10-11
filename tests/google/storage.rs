@@ -4,10 +4,10 @@ use anyhow::Result;
 use http::StatusCode;
 use log::debug;
 use log::warn;
-use reqsign::google::Signer;
+use reqsign::GoogleSigner;
 use reqwest::blocking::Client;
 
-fn init_signer() -> Option<Signer> {
+fn init_signer() -> Option<GoogleSigner> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -17,7 +17,7 @@ fn init_signer() -> Option<Signer> {
         return None;
     }
 
-    let mut builder = Signer::builder();
+    let mut builder = GoogleSigner::builder();
     builder.scope(
         &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE")
             .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE must set"),

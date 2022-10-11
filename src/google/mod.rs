@@ -2,7 +2,7 @@
 
 mod constants;
 mod credential;
-mod signer;
 
+mod signer;
 pub use signer::Builder;
 pub use signer::Signer;
