@@ -35,7 +35,7 @@
 //! - [AWS SigV4][crate::AwsV4Signer] for AWS services like S3.
 //! - [Azure Storage][crate::AzureStorageSigner] for Azure Storage services like Azure Blob Service.
 //! - [Google][crate::GoogleSigner] for All google cloud services like Google Cloud Storage Service.
-//! - [Huawei Cloud OBS][crate::huaweicloud::obs::Signer] for Huawei Cloud Object Storage Service (OBS).
+//! - [Huawei Cloud OBS][crate::HuaweicloudObsSigner] for Huawei Cloud Object Storage Service (OBS).
 //!
 //! # Features
 //!
@@ -67,7 +67,9 @@ mod google;
 pub use google::Builder as GoogleBuilder;
 pub use google::Signer as GoogleSigner;
 
-pub mod huaweicloud;
+mod huaweicloud;
+pub use huaweicloud::obs::Builder as HuaweicloudObsBuilder;
+pub use huaweicloud::obs::Signer as HuaweicloudObsSigner;
 
 mod dirs;
 mod hash;

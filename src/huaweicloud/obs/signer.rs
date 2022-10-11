@@ -3,8 +3,6 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::fmt::Write;
-use std::sync::Arc;
-use std::sync::RwLock;
 
 use anyhow::anyhow;
 use anyhow::Result;
@@ -16,12 +14,10 @@ use http::HeaderMap;
 use http::HeaderValue;
 use log::debug;
 
-use super::constants::CONTENT_MD5;
-use super::loader::EnvLoader;
+use super::super::constants::*;
+use super::credential::CredentialLoader;
 use super::subresource::is_subresource_param;
 use crate::credential::Credential;
-use crate::credential::CredentialLoad;
-use crate::credential::CredentialLoadChain;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
 use crate::time::DateTime;
@@ -31,7 +27,6 @@ use crate::time::{self};
 #[derive(Default)]
 pub struct Builder {
     credential: Credential,
-    credential_load: CredentialLoadChain,
 
     time: Option<DateTime>,
     bucket: Option<String>,
@@ -47,14 +42,6 @@ impl Builder {
     /// Specify secret key.
     pub fn secret_key(&mut self, secret_key: &str) -> &mut Self {
         self.credential.set_secret_key(secret_key);
-        self
-    }
-
-    /// Specify credential load behavior
-    ///
-    /// If not set, we will use the default credential loader.
-    pub fn credential_loader(&mut self, credential_load: CredentialLoadChain) -> &mut Self {
-        self.credential_load = credential_load;
         self
     }
 
@@ -81,36 +68,21 @@ impl Builder {
     ///
     /// The builder should not be used anymore.
     pub fn build(&mut self) -> Result<Signer> {
-        let credential = if self.credential.is_valid() {
-            Some(self.credential.clone())
-        } else {
-            if self.credential_load.is_empty() {
-                self.credential_load.push(EnvLoader::default());
-            }
-            self.credential_load.load_credential()?
-        };
-
-        debug!("signer credential: {:?}", &credential);
+        let mut cred_loader = CredentialLoader::default();
+        if self.credential.is_valid() {
+            cred_loader = cred_loader.with_credential(self.credential.clone());
+        }
 
         let bucket = self
             .bucket
             .clone()
             .ok_or_else(|| anyhow!("bucket should not be none"))?;
 
-        match credential {
-            None => Err(anyhow!("credential is none")),
-            Some(cred) => {
-                if cred.is_valid() {
-                    Ok(Signer {
-                        credential: Arc::new(RwLock::new(cred)),
-                        time: self.time,
-                        bucket,
-                    })
-                } else {
-                    Err(anyhow!("credential is invalid"))
-                }
-            }
-        }
+        Ok(Signer {
+            credential_loader: cred_loader,
+            time: self.time,
+            bucket,
+        })
     }
 }
 
@@ -118,7 +90,7 @@ impl Builder {
 ///
 /// - [User Signature Authentication](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0009.html)
 pub struct Signer {
-    credential: Arc<RwLock<Credential>>,
+    credential_loader: CredentialLoader,
     time: Option<DateTime>,
     bucket: String,
 }
@@ -135,8 +107,8 @@ impl Signer {
         Builder::default()
     }
 
-    fn credential(&self) -> Credential {
-        self.credential.read().expect("lock poisoned").clone()
+    fn credential(&self) -> Option<Credential> {
+        self.credential_loader.load()
     }
 
     fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
@@ -202,8 +174,12 @@ impl Signer {
     /// }
     /// ```
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
+        let cred = match self.credential() {
+            None => return Err(anyhow!("credential not found")),
+            Some(cred) => cred,
+        };
+
         self.apply_before(req)?;
-        let cred = self.credential();
         let sig = self.calculate(req, &cred)?;
         self.apply(req, &sig)
     }

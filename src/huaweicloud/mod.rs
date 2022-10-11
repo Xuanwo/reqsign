@@ -5,5 +5,3 @@
 pub mod obs;
 
 mod constants;
-mod loader;
-mod subresource;
