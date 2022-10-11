@@ -6,6 +6,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::RwLock;
 
+use anyhow::{anyhow, Result};
 use ini::Ini;
 use log::warn;
 
@@ -75,7 +76,6 @@ struct Config {
     ///
     /// - this field if it's `is_some`.
     /// - profile config: `external_id`
-    #[allow(unused)]
     external_id: Option<String>,
     /// `web_identity_token_file` value will be loaded from:
     ///
@@ -157,8 +157,13 @@ impl ConfigLoader {
         }
         self.read_profile.store(true, Ordering::Relaxed);
 
-        self.load_via_profile_shared_credentials_file();
-        self.load_via_profile_config_file();
+        // Ignore all errors happened internally.
+        let _ = self
+            .load_via_profile_shared_credentials_file()
+            .map_err(|err| warn!("load_via_profile_shared_credentials_file failed: {err:?}"));
+        let _ = self.load_via_profile_config_file().map_err(|err| {
+            warn!("load_via_profile_config_file failed: {err:?}");
+        });
     }
 
     /// Only the following fields will exist in shared_credentials_file:
@@ -166,44 +171,17 @@ impl ConfigLoader {
     /// - `aws_access_key_id`
     /// - `aws_secret_access_key`
     /// - `aws_session_token`
-    fn load_via_profile_shared_credentials_file(&self) {
-        let path = match expand_homedir(&self.shared_credentials_file()) {
-            Some(v) => v,
-            None => {
-                warn!("load_via_profile_shared_credentials_file failed while expand_homedir");
+    fn load_via_profile_shared_credentials_file(&self) -> Result<()> {
+        let path = expand_homedir(&self.shared_credentials_file())
+            .ok_or_else(|| anyhow!("expand homedir failed"))?;
 
-                return;
-            }
-        };
+        let _ = fs::metadata(&path)?;
 
-        if let Err(err) = fs::metadata(&path) {
-            warn!(
-                "load_via_profile_shared_credentials_file failed while check path {path}: {err:?}"
-            );
+        let conf = Ini::load_from_file(path)?;
 
-            return;
-        }
-
-        let conf = match Ini::load_from_file(path) {
-            Ok(v) => v,
-            Err(err) => {
-                warn!("load_via_profile_shared_credentials_file failed while reading ini: {err:?}");
-
-                return;
-            }
-        };
-
-        let props = match conf.section(Some(&self.profile())) {
-            Some(v) => v,
-            None => {
-                warn!(
-                    "load_via_profile_shared_credentials_file failed: section {} is not exist",
-                    self.profile()
-                );
-
-                return;
-            }
-        };
+        let props = conf
+            .section(Some(&self.profile()))
+            .ok_or_else(|| anyhow!("section {} is not found", self.profile()))?;
 
         let mut config = { self.config.read().expect("lock must be valid").clone() };
         if let Some(v) = props.get("aws_access_key_id") {
@@ -217,44 +195,21 @@ impl ConfigLoader {
         }
 
         *self.config.write().expect("lock must be valid") = config;
+
+        Ok(())
     }
 
-    fn load_via_profile_config_file(&self) {
-        let path = match expand_homedir(&self.config_file()) {
-            Some(v) => v,
-            None => {
-                warn!("load_via_profile_config_file failed while expand_homedir");
+    fn load_via_profile_config_file(&self) -> Result<()> {
+        let path =
+            expand_homedir(&self.config_file()).ok_or_else(|| anyhow!("expand homedir failed"))?;
 
-                return;
-            }
-        };
+        let _ = fs::metadata(&path)?;
 
-        if let Err(err) = fs::metadata(&path) {
-            warn!("load_via_profile_config_file failed while check path {path}: {err:?}");
+        let conf = Ini::load_from_file(path)?;
 
-            return;
-        }
-
-        let conf = match Ini::load_from_file(path) {
-            Ok(v) => v,
-            Err(err) => {
-                warn!("load_via_profile_config_file failed while reading ini: {err:?}");
-
-                return;
-            }
-        };
-
-        let props = match conf.section(Some(&self.profile())) {
-            Some(v) => v,
-            None => {
-                warn!(
-                    "load_via_profile_config_file failed: section {} is not exist",
-                    self.profile()
-                );
-
-                return;
-            }
-        };
+        let props = conf
+            .section(Some(&self.profile()))
+            .ok_or_else(|| anyhow!("section {} is not found", self.profile()))?;
 
         let mut config = { self.config.read().expect("lock must be valid").clone() };
 
@@ -281,6 +236,8 @@ impl ConfigLoader {
         }
 
         *self.config.write().expect("lock must be valid") = config;
+
+        Ok(())
     }
 
     fn config_file(&self) -> String {
@@ -350,6 +307,14 @@ impl ConfigLoader {
             .clone()
     }
 
+    pub fn set_role_arn(&self, v: &str) {
+        self.config
+            .write()
+            .expect("lock must be valid")
+            .role_arn
+            .replace(v.to_string());
+    }
+
     pub fn role_session_name(&self) -> String {
         self.config
             .read()
@@ -359,13 +324,28 @@ impl ConfigLoader {
             .unwrap_or_else(|| "reqsign".to_string())
     }
 
-    #[allow(unused)]
+    pub fn set_role_session_name(&self, v: &str) {
+        self.config
+            .write()
+            .expect("lock must be valid")
+            .role_session_name
+            .replace(v.to_string());
+    }
+
     pub fn external_id(&self) -> Option<String> {
         self.config
             .read()
             .expect("lock must be valid")
             .external_id
             .clone()
+    }
+
+    pub fn set_external_id(&self, v: &str) {
+        self.config
+            .write()
+            .expect("lock must be valid")
+            .external_id
+            .replace(v.to_string());
     }
 
     pub fn web_identity_token_file(&self) -> Option<String> {
