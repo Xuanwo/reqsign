@@ -149,7 +149,7 @@ impl Signer {
     ///
     /// ```no_run
     /// use anyhow::Result;
-    /// use reqsign::huaweicloud::obs::Signer;
+    /// use reqsign::HuaweicloudObsSigner;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
@@ -157,7 +157,7 @@ impl Signer {
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = Signer::builder()
+    ///     let signer = HuaweicloudObsSigner::builder()
     ///         .access_key("access_key")
     ///         .secret_key("123456")
     ///         .bucket("bucket")

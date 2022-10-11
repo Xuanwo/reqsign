@@ -173,7 +173,7 @@ impl Signer {
     ///
     /// ```no_run
     /// use anyhow::Result;
-    /// use reqsign::google::Signer;
+    /// use reqsign::GoogleSigner;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
@@ -181,7 +181,7 @@ impl Signer {
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = Signer::builder()
+    ///     let signer = GoogleSigner::builder()
     ///         .scope("https://www.googleapis.com/auth/devstorage.read_only")
     ///         .credential_from_path("/path/to/credential/file")
     ///         .build()?;
