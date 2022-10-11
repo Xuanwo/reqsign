@@ -4,21 +4,16 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::fmt::Write;
-use std::mem;
-use std::sync::Arc;
-use std::sync::RwLock;
 
+use super::credential::CredentialLoader;
 use anyhow::anyhow;
 use anyhow::Result;
 use http::header::*;
 use http::HeaderMap;
 use log::debug;
 
-use super::constants::*;
-use super::loader::*;
+use super::super::constants::*;
 use crate::credential::Credential;
-use crate::credential::CredentialLoad;
-use crate::credential::CredentialLoadChain;
 use crate::hash::base64_decode;
 use crate::hash::base64_hmac_sha256;
 use crate::request::SignableRequest;
@@ -30,7 +25,6 @@ use crate::time::{self};
 #[derive(Default)]
 pub struct Builder {
     credential: Credential,
-    credential_load: CredentialLoadChain,
 
     time: Option<DateTime>,
 }
@@ -45,14 +39,6 @@ impl Builder {
     /// Specify account key.
     pub fn account_key(&mut self, account_key: &str) -> &mut Self {
         self.credential.set_secret_key(account_key);
-        self
-    }
-
-    /// Specify credential load behavior
-    ///
-    /// If not set, we will use the default credential loader.
-    pub fn credential_loader(&mut self, credential_load: CredentialLoadChain) -> &mut Self {
-        self.credential_load = credential_load;
         self
     }
 
@@ -72,21 +58,13 @@ impl Builder {
     ///
     /// The builder should not be used anymore.
     pub fn build(&mut self) -> Result<Signer> {
-        let credential = if self.credential.is_valid() {
-            Some(self.credential.clone())
-        } else {
-            // Make sure credential load chain has been set before checking.
-            if self.credential_load.is_empty() {
-                self.credential_load.push(EnvLoader::default());
-            }
-
-            self.credential_load.load_credential()?
-        };
-        debug!("signer credential: {:?}", &credential);
+        let mut cred_loader = CredentialLoader::default();
+        if self.credential.is_valid() {
+            cred_loader = cred_loader.with_credential(self.credential.clone());
+        }
 
         Ok(Signer {
-            credential: Arc::new(RwLock::new(credential)),
-            credential_load: mem::take(&mut self.credential_load),
+            credential_loader: cred_loader,
 
             time: self.time,
             allow_anonymous: false,
@@ -98,8 +76,7 @@ impl Builder {
 ///
 /// - [Authorize with Shared Key](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
 pub struct Signer {
-    credential: Arc<RwLock<Option<Credential>>>,
-    credential_load: CredentialLoadChain,
+    credential_loader: CredentialLoader,
 
     /// Allow anonymous request if credential is not loaded.
     allow_anonymous: bool,
@@ -124,26 +101,8 @@ impl Signer {
     ///
     /// This function should never be exported to avoid credential leaking by
     /// mistake.
-    fn credential(&self) -> Result<Option<Credential>> {
-        // Return cached credential if it's valid.
-        match self.credential.read().expect("lock poisoned").clone() {
-            None => return Ok(None),
-            Some(cred) => {
-                if cred.is_valid() {
-                    return Ok(Some(cred));
-                }
-            }
-        }
-
-        if let Some(cred) = self.credential_load.load_credential()? {
-            let mut lock = self.credential.write().expect("lock poisoned");
-            *lock = Some(cred.clone());
-            Ok(Some(cred))
-        } else {
-            // We used to get credential correctly, but now we can't.
-            // Something must happened in the running environment.
-            Err(anyhow!("credential should be loaded but not"))
-        }
+    fn credential(&self) -> Option<Credential> {
+        self.credential_loader.load()
     }
 
     /// Calculate signing requests via SignableRequest.
@@ -162,11 +121,11 @@ impl Signer {
     /// Apply signed results to requests.
     pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
         req.insert_header(
-            HeaderName::from_static(super::constants::X_MS_DATE),
+            HeaderName::from_static(X_MS_DATE),
             format_http_date(output.signed_time).parse()?,
         )?;
         req.insert_header(
-            HeaderName::from_static(super::constants::X_MS_VERSION),
+            HeaderName::from_static(X_MS_VERSION),
             AZURE_VERSION.parse()?,
         )?;
         req.insert_header(AUTHORIZATION, {
@@ -186,7 +145,7 @@ impl Signer {
     ///
     /// ```no_run
     /// use anyhow::Result;
-    /// use reqsign::azure::storage::Signer;
+    /// use reqsign::AzureStorageSigner;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
@@ -194,7 +153,7 @@ impl Signer {
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = Signer::builder()
+    ///     let signer = AzureStorageSigner::builder()
     ///         .account_name("account_name")
     ///         .account_key("YWNjb3VudF9rZXkK")
     ///         .build()?;
@@ -210,7 +169,7 @@ impl Signer {
     /// }
     /// ```
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential()? {
+        if let Some(cred) = self.credential() {
             let sig = self.calculate(req, &cred)?;
             return self.apply(req, &sig);
         }
@@ -310,16 +269,10 @@ fn canonicalize_header(req: &impl SignableRequest, now: DateTime) -> Result<Stri
         .collect::<Vec<(String, String)>>();
 
     // Insert x_ms_date header.
-    headers.push((
-        super::constants::X_MS_DATE.to_lowercase(),
-        format_http_date(now),
-    ));
+    headers.push((X_MS_DATE.to_lowercase(), format_http_date(now)));
 
     // Insert x_ms_version header.
-    headers.push((
-        super::constants::X_MS_VERSION.to_lowercase(),
-        super::constants::AZURE_VERSION.to_string(),
-    ));
+    headers.push((X_MS_VERSION.to_lowercase(), AZURE_VERSION.to_string()));
 
     // Sort via header name.
     headers.sort_by(|x, y| x.0.cmp(&y.0));
