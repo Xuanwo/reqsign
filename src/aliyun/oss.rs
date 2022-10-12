@@ -152,6 +152,7 @@ impl Signer {
             access_key_id: cred.access_key().to_string(),
             signature,
             signed_time: now,
+            security_token: cred.security_token().map(|v| v.to_string()),
         })
     }
 
@@ -164,6 +165,14 @@ impl Signer {
 
             value
         })?;
+        if let Some(token) = &output.security_token {
+            req.insert_header("x-oss-security-token".parse()?, {
+                let mut value: HeaderValue = token.parse()?;
+                value.set_sensitive(true);
+
+                value
+            })?;
+        }
 
         Ok(())
     }
@@ -193,6 +202,7 @@ struct SignedOutput {
     access_key_id: String,
     signature: String,
     signed_time: DateTime,
+    security_token: Option<String>,
 }
 
 /// Construct string to sign.
