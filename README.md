@@ -22,7 +22,7 @@ use anyhow::Result;
 #[tokio::main]
 async fn main() -> Result<()>{
     // Signer will load region and credentials from environment by default.
-    let signer = Signer::builder().service("s3").build()?;
+    let signer = AwsV4Signer::builder().service("s3").build()?;
     // Construct request
     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
     let mut req = reqwest::Request::new(http::Method::GET, url);
@@ -42,7 +42,7 @@ async fn main() -> Result<()>{
 - Pure rust with minimal dependencies.
 - Test again official SDK and services.
 - Supported services
-  - Aliyun OSS: `reqsign::aliyun::oss::Signer`
+  - Aliyun OSS: `reqsign::AliyunOssSigner`
   - AWS services (SigV4): `reqsign::AwsV4Signer`
   - Azure Storage services: `reqsign::AzureStorageSigner`
   - Google services: `reqsign::GoogleSigner`
