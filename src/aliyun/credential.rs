@@ -66,19 +66,42 @@ impl CredentialLoader {
             _ => (),
         }
 
-        self.load_via_env()
-            .or_else(|| self.load_via_assume_role_with_oidc())
-            .map(|cred| {
-                let mut lock = self.credential.write().expect("lock poisoned");
-                *lock = Some(cred.clone());
+        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
+        let mut retry = ExponentialBackoff::default()
+            .with_max_times(4)
+            .with_jitter();
 
-                cred
-            })
+        let cred = loop {
+            let cred = self
+                .load_via_env()
+                .or_else(|_| self.load_via_assume_role_with_oidc());
+
+            match cred {
+                Ok(cred) => break cred,
+                Err(err) => match retry.next() {
+                    Some(dur) => {
+                        sleep(dur);
+                        continue;
+                    }
+                    None => {
+                        warn!("load credential still failed after retry: {err:?}");
+                        return None;
+                    }
+                },
+            }
+        };
+
+        cred.map(|cred| {
+            let mut lock = self.credential.write().expect("lock poisoned");
+            *lock = Some(cred.clone());
+
+            cred
+        })
     }
 
-    fn load_via_env(&self) -> Option<Credential> {
+    fn load_via_env(&self) -> Result<Option<Credential>> {
         if self.disable_env {
-            return None;
+            return Ok(None);
         }
 
         self.config_loader.load_via_env();
@@ -89,42 +112,17 @@ impl CredentialLoader {
         ) {
             let mut cred = Credential::new(&ak, &sk);
             cred.set_security_token(self.config_loader.security_token().as_deref());
-            Some(cred)
+            Ok(Some(cred))
         } else {
-            None
+            Ok(None)
         }
     }
 
-    fn load_via_assume_role_with_oidc(&self) -> Option<Credential> {
+    fn load_via_assume_role_with_oidc(&self) -> Result<Option<Credential>> {
         if self.disable_assume_role_with_oidc {
-            return None;
+            return Ok(None);
         }
 
-        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
-        //
-        // Reference: <https://github.com/datafuselabs/opendal/issues/288>
-        let mut retry = ExponentialBackoff::default()
-            .with_max_times(4)
-            .with_jitter();
-
-        loop {
-            match self.load_via_assume_role_with_oidc_inner() {
-                Ok(v) => return v,
-                Err(e) => match retry.next() {
-                    Some(dur) => {
-                        sleep(dur);
-                        continue;
-                    }
-                    None => {
-                        warn!("load credential via assume role with oidc failed: {e}");
-                        return None;
-                    }
-                },
-            }
-        }
-    }
-
-    fn load_via_assume_role_with_oidc_inner(&self) -> Result<Option<Credential>> {
         let (token_file, role_arn, provider_arn) = match (
             self.config_loader.oidc_token_file(),
             self.config_loader.role_arn(),
