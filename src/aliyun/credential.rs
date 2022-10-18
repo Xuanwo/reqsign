@@ -72,36 +72,39 @@ impl CredentialLoader {
             .with_jitter();
 
         let cred = loop {
-            let cred = self
-                .load_via_env()
-                .or_else(|_| self.load_via_assume_role_with_oidc());
+            let cred = self.load_via_env().or_else(|| {
+                self.load_via_assume_role_with_oidc()
+                    .map_err(|err| {
+                        warn!("load credential via assume role with oidc failed: {err:?}");
+                        err
+                    })
+                    .unwrap_or_default()
+            });
 
             match cred {
-                Ok(cred) => break cred,
-                Err(err) => match retry.next() {
+                Some(cred) => break cred,
+                None => match retry.next() {
                     Some(dur) => {
                         sleep(dur);
                         continue;
                     }
                     None => {
-                        warn!("load credential still failed after retry: {err:?}");
+                        warn!("load credential still failed after retry");
                         return None;
                     }
                 },
             }
         };
 
-        cred.map(|cred| {
-            let mut lock = self.credential.write().expect("lock poisoned");
-            *lock = Some(cred.clone());
+        let mut lock = self.credential.write().expect("lock poisoned");
+        *lock = Some(cred.clone());
 
-            cred
-        })
+        Some(cred)
     }
 
-    fn load_via_env(&self) -> Result<Option<Credential>> {
+    fn load_via_env(&self) -> Option<Credential> {
         if self.disable_env {
-            return Ok(None);
+            return None;
         }
 
         self.config_loader.load_via_env();
@@ -112,9 +115,9 @@ impl CredentialLoader {
         ) {
             let mut cred = Credential::new(&ak, &sk);
             cred.set_security_token(self.config_loader.security_token().as_deref());
-            Ok(Some(cred))
+            Some(cred)
         } else {
-            Ok(None)
+            None
         }
     }
 
