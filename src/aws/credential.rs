@@ -82,16 +82,56 @@ impl CredentialLoader {
             _ => (),
         }
 
-        self.load_via_env()
-            .or_else(|| self.load_via_profile())
-            .or_else(|| self.load_via_assume_role())
-            .or_else(|| self.load_via_assume_role_with_web_identity())
-            .map(|cred| {
-                let mut lock = self.credential.write().expect("lock poisoned");
-                *lock = Some(cred.clone());
+        // Based on our user reports, AWS STS may need 10s to reach consistency
+        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
+        //
+        // Reference: <https://github.com/datafuselabs/opendal/issues/288>
+        let mut retry = ExponentialBackoff::default()
+            .with_max_times(4)
+            .with_jitter();
 
-                cred
-            })
+        let cred = loop {
+            let cred = self
+                .load_via_env()
+                .or_else(|| self.load_via_profile())
+                .or_else(|| {
+                    self.load_via_assume_role()
+                        .map_err(|err| {
+                            warn!("load credential via assume role failed: {err:?}");
+                            err
+                        })
+                        .unwrap_or_default()
+                })
+                .or_else(|| {
+                    self.load_via_assume_role_with_web_identity()
+                        .map_err(|err| {
+                            warn!(
+                                "load credential via assume role with web identity failed: {err:?}"
+                            );
+                            err
+                        })
+                        .unwrap_or_default()
+                });
+
+            match cred {
+                Some(cred) => break cred,
+                None => match retry.next() {
+                    Some(dur) => {
+                        sleep(dur);
+                        continue;
+                    }
+                    None => {
+                        warn!("load credential still failed after retry");
+                        return None;
+                    }
+                },
+            }
+        };
+
+        let mut lock = self.credential.write().expect("lock poisoned");
+        *lock = Some(cred.clone());
+
+        Some(cred)
     }
 
     fn load_via_env(&self) -> Option<Credential> {
@@ -132,37 +172,11 @@ impl CredentialLoader {
         }
     }
 
-    fn load_via_assume_role(&self) -> Option<Credential> {
+    fn load_via_assume_role(&self) -> Result<Option<Credential>> {
         if self.disable_assume_role {
-            return None;
+            return Ok(None);
         }
 
-        // Based on our user reports, AWS STS may need 10s to reach consistency
-        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
-        //
-        // Reference: <https://github.com/datafuselabs/opendal/issues/288>
-        let mut retry = ExponentialBackoff::default()
-            .with_max_times(4)
-            .with_jitter();
-
-        loop {
-            match self.load_via_assume_role_inner() {
-                Ok(v) => return v,
-                Err(e) => match retry.next() {
-                    Some(dur) => {
-                        sleep(dur);
-                        continue;
-                    }
-                    None => {
-                        warn!("load credential via assume role failed: {e}");
-                        return None;
-                    }
-                },
-            }
-        }
-    }
-
-    fn load_via_assume_role_inner(&self) -> Result<Option<Credential>> {
         let role_arn = match self.config_loader.role_arn() {
             Some(role_arn) => role_arn,
             None => return Ok(None),
@@ -197,37 +211,11 @@ impl CredentialLoader {
         Ok(Some(cred))
     }
 
-    fn load_via_assume_role_with_web_identity(&self) -> Option<Credential> {
+    fn load_via_assume_role_with_web_identity(&self) -> Result<Option<Credential>> {
         if self.disable_assume_role_with_web_identity {
-            return None;
+            return Ok(None);
         }
 
-        // Based on our user reports, AWS STS may need 10s to reach consistency
-        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
-        //
-        // Reference: <https://github.com/datafuselabs/opendal/issues/288>
-        let mut retry = ExponentialBackoff::default()
-            .with_max_times(4)
-            .with_jitter();
-
-        loop {
-            match self.load_via_assume_role_with_web_identity_inner() {
-                Ok(v) => return v,
-                Err(e) => match retry.next() {
-                    Some(dur) => {
-                        sleep(dur);
-                        continue;
-                    }
-                    None => {
-                        warn!("load credential via assume role with web identity failed: {e}");
-                        return None;
-                    }
-                },
-            }
-        }
-    }
-
-    fn load_via_assume_role_with_web_identity_inner(&self) -> Result<Option<Credential>> {
         let (token_file, role_arn) = match (
             self.config_loader.web_identity_token_file(),
             self.config_loader.role_arn(),
