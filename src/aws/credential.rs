@@ -1,5 +1,7 @@
 use std::fmt::Write;
 use std::fs;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::thread::sleep;
@@ -7,6 +9,7 @@ use std::thread::sleep;
 use anyhow::anyhow;
 use anyhow::Result;
 use backon::ExponentialBackoff;
+use log::info;
 use log::warn;
 use quick_xml::de;
 use serde::Deserialize;
@@ -19,7 +22,9 @@ use crate::time::parse_rfc3339;
 #[cfg_attr(test, derive(Debug))]
 pub struct CredentialLoader {
     credential: Arc<RwLock<Option<Credential>>>,
+    credential_loaded: AtomicBool,
 
+    allow_anonymous: bool,
     disable_env: bool,
     disable_profile: bool,
     disable_assume_role: bool,
@@ -33,6 +38,8 @@ impl Default for CredentialLoader {
     fn default() -> Self {
         Self {
             credential: Arc::new(Default::default()),
+            credential_loaded: AtomicBool::default(),
+            allow_anonymous: false,
             disable_env: false,
             disable_profile: false,
             disable_assume_role: false,
@@ -44,6 +51,15 @@ impl Default for CredentialLoader {
 }
 
 impl CredentialLoader {
+    /// Allow anonymous.
+    ///
+    /// By enabling this option, CredentialLoader will not retry after
+    /// loading credential failed.
+    pub fn with_allow_anonymous(mut self) -> Self {
+        self.allow_anonymous = true;
+        self
+    }
+
     /// Disable load from env.
     pub fn with_disable_env(mut self) -> Self {
         self.disable_env = true;
@@ -64,6 +80,7 @@ impl CredentialLoader {
 
     /// Set Credential.
     pub fn with_credential(self, cred: Credential) -> Self {
+        self.credential_loaded.store(true, Ordering::Relaxed);
         *self.credential.write().expect("lock poisoned") = Some(cred);
         self
     }
@@ -76,10 +93,13 @@ impl CredentialLoader {
 
     /// Load credential.
     pub fn load(&self) -> Option<Credential> {
-        // Return cached credential if it's valid.
-        match self.credential.read().expect("lock poisoned").clone() {
-            Some(cred) if cred.is_valid() => return Some(cred),
-            _ => (),
+        // Return cached credential if it has been loaded at least once.
+        if self.credential_loaded.load(Ordering::Relaxed) {
+            match self.credential.read().expect("lock poisoned").clone() {
+                Some(cred) if cred.is_valid() => return Some(cred),
+                None if self.allow_anonymous => return None,
+                _ => (),
+            }
         }
 
         // Based on our user reports, AWS STS may need 10s to reach consistency
@@ -114,7 +134,16 @@ impl CredentialLoader {
                 });
 
             match cred {
-                Some(cred) => break cred,
+                Some(cred) => {
+                    self.credential_loaded.store(true, Ordering::Relaxed);
+                    break cred;
+                }
+                None if self.allow_anonymous => {
+                    info!("load credential failed but we allowing anonymous access");
+
+                    self.credential_loaded.store(true, Ordering::Relaxed);
+                    return None;
+                }
                 None => match retry.next() {
                     Some(dur) => {
                         sleep(dur);
