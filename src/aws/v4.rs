@@ -177,6 +177,9 @@ impl Builder {
         if self.credential.is_valid() {
             cred_loader = cred_loader.with_credential(self.credential.clone());
         }
+        if self.allow_anonymous {
+            cred_loader = cred_loader.with_allow_anonymous();
+        }
         if self.disable_load_from_env {
             cred_loader = cred_loader.with_disable_env();
         }
