@@ -46,7 +46,7 @@ time = { version = "0.3", features = ["macros", "formatting", "parsing"] }
 ureq = "2.5"
 
 [dev-dependencies]
-aws-sigv4 = "0.49"
+aws-sigv4 = "0.51"
 criterion = { version = "0.4", features = ["async_tokio", "html_reports"] }
 dotenv = "0.15"
 env_logger = "0.9"
