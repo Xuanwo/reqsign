@@ -77,7 +77,7 @@ impl Builder {
         };
 
         let credential_content = match &self.credential {
-            CredentialLoader::Path(v) => std::fs::read(&v)?,
+            CredentialLoader::Path(v) => std::fs::read(v)?,
             CredentialLoader::Content(v) => base64_decode(v),
             CredentialLoader::None => match env::var(GOOGLE_APPLICATION_CREDENTIALS) {
                 Ok(v) => std::fs::read(&v)?,
