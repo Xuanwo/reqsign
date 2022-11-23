@@ -258,8 +258,10 @@ impl CredentialLoader {
         let token = fs::read_to_string(&token_file)?;
         let role_session_name = self.config_loader.role_session_name();
 
+        let endpoint = self.sts_endpoint()?;
+
         // Construct request to AWS STS Service.
-        let url = format!("https://sts.amazonaws.com/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
+        let url = format!("https://{endpoint}/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
         let req = self.client.get(&url).set(
             http::header::CONTENT_TYPE.as_str(),
             "application/x-www-form-urlencoded",
