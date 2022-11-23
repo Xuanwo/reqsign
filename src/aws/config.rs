@@ -42,6 +42,13 @@ struct Config {
     /// - env value: [`AWS_REGION`]
     /// - profile config: `region`
     region: Option<String>,
+    /// `sts_regional_endpoints` will be loaded from:
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: [`AWS_STS_REGIONAL_ENDPOINTS`]
+    /// - profile config: `sts_regional_endpoints`
+    /// - default to `legacy`
+    sts_regional_endpoints: Option<String>,
     /// `access_key_id` will be loaded from
     ///
     /// - this field if it's `is_some`
@@ -130,6 +137,9 @@ impl ConfigLoader {
         if let Some(v) = envs.get(AWS_REGION) {
             config.region.get_or_insert(v.clone());
         }
+        if let Some(v) = envs.get(AWS_STS_REGIONAL_ENDPOINTS) {
+            config.sts_regional_endpoints.get_or_insert(v.clone());
+        }
         if let Some(v) = envs.get(AWS_ACCESS_KEY_ID) {
             config.access_key_id.get_or_insert(v.clone());
         }
@@ -217,6 +227,9 @@ impl ConfigLoader {
         if let Some(v) = props.get("region") {
             config.region.get_or_insert(v.to_string());
         }
+        if let Some(v) = props.get("sts_regional_endpoints") {
+            config.sts_regional_endpoints.get_or_insert(v.to_string());
+        }
         if let Some(v) = props.get("aws_access_key_id") {
             config.access_key_id.get_or_insert(v.to_string());
         }
@@ -276,6 +289,14 @@ impl ConfigLoader {
             .clone()
     }
 
+    pub fn sts_regional_endpoints(&self) -> String {
+        self.config
+            .read()
+            .expect("lock must be valid")
+            .sts_regional_endpoints
+            .clone()
+            .unwrap_or_else(|| "legacy".to_string())
+    }
     pub fn access_key_id(&self) -> Option<String> {
         self.config
             .read()
