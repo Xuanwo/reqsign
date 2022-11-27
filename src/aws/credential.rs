@@ -27,6 +27,7 @@ pub struct CredentialLoader {
     allow_anonymous: bool,
     disable_env: bool,
     disable_profile: bool,
+    disable_imds_v2: bool,
     disable_assume_role: bool,
     disable_assume_role_with_web_identity: bool,
 
@@ -42,6 +43,7 @@ impl Default for CredentialLoader {
             allow_anonymous: false,
             disable_env: false,
             disable_profile: false,
+            disable_imds_v2: false,
             disable_assume_role: false,
             disable_assume_role_with_web_identity: false,
             client: ureq::Agent::new(),
@@ -114,6 +116,14 @@ impl CredentialLoader {
             let cred = self
                 .load_via_env()
                 .or_else(|| self.load_via_profile())
+                .or_else(|| {
+                    self.load_via_imds_v2()
+                        .map_err(|err| {
+                            warn!("load credential via imds v2 failed: {err:?}");
+                            err
+                        })
+                        .unwrap_or_default()
+                })
                 .or_else(|| {
                     self.load_via_assume_role()
                         .map_err(|err| {
@@ -199,6 +209,76 @@ impl CredentialLoader {
         } else {
             None
         }
+    }
+
+    fn load_via_imds_v2(&self) -> Result<Option<Credential>> {
+        if self.disable_imds_v2 {
+            return Ok(None);
+        }
+
+        // Get ec2 metadata token
+        let url = "http://169.254.169.254/latest/api/token";
+        let req = self.client.put(url);
+        let resp = req.call()?;
+        if resp.status() != http::StatusCode::OK {
+            let content = resp.into_string()?;
+            return Err(anyhow!(
+                "request to AWS EC2 Metadata Services failed: {content}"
+            ));
+        }
+        let ec2_token = resp.into_string()?;
+
+        // List all credentials that node has.
+        let url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/";
+        let req = self
+            .client
+            .get(url)
+            .set("x-aws-ec2-metadata-token", &ec2_token);
+        let resp = req.call()?;
+        if resp.status() != http::StatusCode::OK {
+            let content = resp.into_string()?;
+            return Err(anyhow!(
+                "request to AWS EC2 Metadata Services failed: {content}"
+            ));
+        }
+        let content = resp.into_string()?;
+        let credential_list: Vec<_> = content.split('\n').collect();
+        // credential list is empty, return None directly.
+        if credential_list.is_empty() {
+            return Ok(None);
+        }
+        let role_name = credential_list[0];
+
+        // Get the credentials via role_name.
+        let url =
+            format!("http://169.254.169.254/latest/meta-data/iam/security-credentials/{role_name}");
+        let req = self
+            .client
+            .get(&url)
+            .set("x-aws-ec2-metadata-token", &ec2_token);
+        let resp = req.call()?;
+        if resp.status() != http::StatusCode::OK {
+            let content = resp.into_string()?;
+            return Err(anyhow!(
+                "request to AWS EC2 Metadata Services failed: {content}"
+            ));
+        }
+
+        let content = resp.into_string()?;
+        let resp: Ec2MetadataIamSecurityCredentials = de::from_str(&content)?;
+        if resp.code != "Success" {
+            return Err(anyhow!(
+                "request to AWS EC2 Metadata Services failed: {content}"
+            ));
+        }
+
+        let cred = Credential::new(&resp.access_key_id, &resp.secret_access_key)
+            .with_security_token(&resp.token)
+            .with_expires_in(parse_rfc3339(&resp.expiration)?);
+
+        cred.check()?;
+
+        Ok(Some(cred))
     }
 
     fn load_via_assume_role(&self) -> Result<Option<Credential>> {
@@ -361,6 +441,17 @@ struct AssumeRoleCredentials {
     secret_access_key: String,
     session_token: String,
     expiration: String,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct Ec2MetadataIamSecurityCredentials {
+    access_key_id: String,
+    secret_access_key: String,
+    token: String,
+    expiration: String,
+
+    code: String,
 }
 
 #[cfg(test)]
