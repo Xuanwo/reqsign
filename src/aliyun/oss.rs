@@ -15,6 +15,7 @@ use http::HeaderValue;
 use log::debug;
 use once_cell::sync::Lazy;
 use percent_encoding::percent_decode_str;
+use percent_encoding::utf8_percent_encode;
 
 use super::credential::CredentialLoader;
 use crate::credential::Credential;
@@ -196,7 +197,11 @@ impl Signer {
                     "&Expires={}",
                     (output.signed_time + expire).unix_timestamp()
                 )?;
-                write!(query, "&Signature={}", output.signature)?;
+                write!(
+                    query,
+                    "&Signature={}",
+                    utf8_percent_encode(&output.signature, percent_encoding::NON_ALPHANUMERIC)
+                )?;
                 if let Some(token) = &output.security_token {
                     write!(query, "&security-token={}", token)?;
                 }
