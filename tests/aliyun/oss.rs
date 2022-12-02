@@ -11,6 +11,7 @@ use percent_encoding::NON_ALPHANUMERIC;
 use reqsign::AliyunOssBuilder;
 use reqsign::AliyunOssSigner;
 use reqwest::blocking::Client;
+use time::Duration;
 
 fn init_signer() -> Option<AliyunOssSigner> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -55,6 +56,39 @@ fn test_get_object() -> Result<()> {
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
     signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text()?);
+    assert_eq!(StatusCode::NOT_FOUND, status);
+    Ok(())
+}
+
+#[test]
+fn test_get_object_with_query_sign() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::GET;
+    *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
+
+    signer
+        .sign_query(&mut req, Duration::seconds(3600))
+        .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 

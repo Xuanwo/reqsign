@@ -15,6 +15,7 @@ use http::HeaderValue;
 use log::debug;
 use once_cell::sync::Lazy;
 use percent_encoding::percent_decode_str;
+use percent_encoding::utf8_percent_encode;
 
 use super::credential::CredentialLoader;
 use crate::credential::Credential;
@@ -143,35 +144,70 @@ impl Signer {
     }
 
     /// Calculate signing requests via SignableRequest.
-    fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
+    fn calculate(
+        &self,
+        req: &impl SignableRequest,
+        method: SigningMethod,
+        cred: &Credential,
+    ) -> Result<SignedOutput> {
         let now = self.time.unwrap_or_else(time::now);
-        let string_to_sign = string_to_sign(req, cred, now, &self.bucket)?;
+        let string_to_sign = string_to_sign(req, cred, now, method, &self.bucket)?;
         let signature = base64_hmac_sha1(cred.secret_key().as_bytes(), string_to_sign.as_bytes());
 
         Ok(SignedOutput {
             access_key_id: cred.access_key().to_string(),
             signature,
             signed_time: now,
+            signing_method: method,
             security_token: cred.security_token().map(|v| v.to_string()),
         })
     }
 
     fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
-        req.insert_header(DATE, format_http_date(output.signed_time).parse()?)?;
-        req.insert_header(AUTHORIZATION, {
-            let mut value: HeaderValue =
-                format!("OSS {}:{}", output.access_key_id, output.signature).parse()?;
-            value.set_sensitive(true);
+        match output.signing_method {
+            SigningMethod::Header => {
+                req.insert_header(DATE, format_http_date(output.signed_time).parse()?)?;
+                req.insert_header(AUTHORIZATION, {
+                    let mut value: HeaderValue =
+                        format!("OSS {}:{}", output.access_key_id, output.signature).parse()?;
+                    value.set_sensitive(true);
 
-            value
-        })?;
-        if let Some(token) = &output.security_token {
-            req.insert_header("x-oss-security-token".parse()?, {
-                let mut value: HeaderValue = token.parse()?;
-                value.set_sensitive(true);
+                    value
+                })?;
+                if let Some(token) = &output.security_token {
+                    req.insert_header("x-oss-security-token".parse()?, {
+                        let mut value: HeaderValue = token.parse()?;
+                        value.set_sensitive(true);
 
-                value
-            })?;
+                        value
+                    })?;
+                }
+            }
+            SigningMethod::Query(expire) => {
+                req.insert_header(DATE, format_http_date(output.signed_time).parse()?)?;
+                let mut query = if let Some(query) = req.query() {
+                    query.to_string() + "&"
+                } else {
+                    "".to_string()
+                };
+
+                write!(query, "OSSAccessKeyId={}", output.access_key_id)?;
+                write!(
+                    query,
+                    "&Expires={}",
+                    (output.signed_time + expire).unix_timestamp()
+                )?;
+                write!(
+                    query,
+                    "&Signature={}",
+                    utf8_percent_encode(&output.signature, percent_encoding::NON_ALPHANUMERIC)
+                )?;
+                if let Some(token) = &output.security_token {
+                    write!(query, "&security-token={}", token)?;
+                }
+
+                req.set_query(&query)?;
+            }
         }
 
         Ok(())
@@ -180,7 +216,7 @@ impl Signer {
     /// Signing request with header.
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         if let Some(cred) = self.credential() {
-            let sig = self.calculate(req, &cred)?;
+            let sig = self.calculate(req, SigningMethod::Header, &cred)?;
             return self.apply(req, &sig);
         }
 
@@ -193,15 +229,35 @@ impl Signer {
     }
 
     /// Signing request with query.
-    pub fn sign_query(&self, _: &mut impl SignableRequest, _: Duration) -> Result<()> {
-        todo!()
+    pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
+        if let Some(cred) = self.credential() {
+            let sig = self.calculate(req, SigningMethod::Query(expire), &cred)?;
+            return self.apply(req, &sig);
+        }
+
+        if self.allow_anonymous {
+            debug!("credential not found and anonymous is allowed, skipping signing.");
+            return Ok(());
+        }
+
+        Err(anyhow!("credential not found"))
     }
+}
+
+/// SigningMethod is the method that used in signing.
+#[derive(Copy, Clone)]
+pub enum SigningMethod {
+    /// Signing with header.
+    Header,
+    /// Signing with query.
+    Query(Duration),
 }
 
 struct SignedOutput {
     access_key_id: String,
     signature: String,
     signed_time: DateTime,
+    signing_method: SigningMethod,
     security_token: Option<String>,
 }
 
@@ -221,6 +277,7 @@ fn string_to_sign(
     req: &impl SignableRequest,
     cred: &Credential,
     now: DateTime,
+    method: SigningMethod,
     bucket: &str,
 ) -> Result<String> {
     #[inline]
@@ -236,7 +293,15 @@ fn string_to_sign(
     writeln!(&mut s, "{}", req.method().as_str())?;
     writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_MD5.parse()?)?)?;
     writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_TYPE)?)?;
-    writeln!(&mut s, "{}", format_http_date(now))?;
+    match method {
+        SigningMethod::Header => {
+            writeln!(&mut s, "{}", format_http_date(now))?;
+        }
+        SigningMethod::Query(expires) => {
+            writeln!(&mut s, "{}", (now + expires).unix_timestamp())?;
+        }
+    }
+
     {
         let headers = canonicalize_header(req, cred)?;
         if !headers.is_empty() {
