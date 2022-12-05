@@ -45,6 +45,8 @@ pub struct Builder {
     allow_anonymous: bool,
     disable_load_from_env: bool,
     disable_load_from_profile: bool,
+    disable_load_from_imds_v2: bool,
+    disable_load_from_assume_role: bool,
     disable_load_from_assume_role_with_web_identity: bool,
 
     time: Option<DateTime>,
@@ -134,6 +136,18 @@ impl Builder {
         self
     }
 
+    /// Disable load from imds_v2.
+    pub fn disable_load_from_imds_v2(mut self) -> Self {
+        self.disable_load_from_imds_v2 = true;
+        self
+    }
+
+    /// Disable load from assume role.
+    pub fn disable_load_from_assume_role(mut self) -> Self {
+        self.disable_load_from_assume_role = true;
+        self
+    }
+
     /// Disable load from assume role with web identity.
     pub fn disable_load_from_assume_role_with_web_identity(&mut self) -> &mut Self {
         self.disable_load_from_assume_role_with_web_identity = true;
@@ -185,6 +199,12 @@ impl Builder {
         }
         if self.disable_load_from_profile {
             cred_loader = cred_loader.with_disable_profile();
+        }
+        if self.disable_load_from_imds_v2 {
+            cred_loader = cred_loader.with_disable_imds_v2();
+        }
+        if self.disable_load_from_assume_role {
+            cred_loader = cred_loader.with_disable_assume_role();
         }
         if self.disable_load_from_assume_role_with_web_identity {
             cred_loader = cred_loader.with_disable_assume_role_with_web_identity();
