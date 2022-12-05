@@ -74,6 +74,18 @@ impl CredentialLoader {
         self
     }
 
+    /// Disable load from imds_v2.
+    pub fn with_disable_imds_v2(mut self) -> Self {
+        self.disable_imds_v2 = true;
+        self
+    }
+
+    /// Disable load from assume role.
+    pub fn with_disable_assume_role(mut self) -> Self {
+        self.disable_assume_role = true;
+        self
+    }
+
     /// Disable load from assume role with web identity.
     pub fn with_disable_assume_role_with_web_identity(mut self) -> Self {
         self.disable_assume_role_with_web_identity = true;
