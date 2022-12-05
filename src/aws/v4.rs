@@ -137,13 +137,13 @@ impl Builder {
     }
 
     /// Disable load from imds_v2.
-    pub fn disable_load_from_imds_v2(mut self) -> Self {
+    pub fn disable_load_from_imds_v2(&mut self) -> &mut Self {
         self.disable_load_from_imds_v2 = true;
         self
     }
 
     /// Disable load from assume role.
-    pub fn disable_load_from_assume_role(mut self) -> Self {
+    pub fn disable_load_from_assume_role(&mut self) -> &mut Self {
         self.disable_load_from_assume_role = true;
         self
     }
