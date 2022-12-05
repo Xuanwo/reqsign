@@ -37,6 +37,13 @@ pub struct CredentialLoader {
 
 impl Default for CredentialLoader {
     fn default() -> Self {
+        let client = ureq::AgentBuilder::new()
+            // Set overall timeout per-request to 32s.
+            //
+            // TODO: make this a config while needed.
+            .timeout(std::time::Duration::from_secs(32))
+            .build();
+
         Self {
             credential: Arc::new(Default::default()),
             credential_loaded: AtomicBool::default(),
@@ -46,7 +53,7 @@ impl Default for CredentialLoader {
             disable_imds_v2: false,
             disable_assume_role: false,
             disable_assume_role_with_web_identity: false,
-            client: ureq::Agent::new(),
+            client,
             config_loader: Default::default(),
         }
     }
