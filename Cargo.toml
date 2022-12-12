@@ -23,7 +23,7 @@ name = "aws"
 [dependencies]
 anyhow = "1"
 backon = "0.2"
-base64 = "0.13"
+base64 = "0.20"
 bytes = "1"
 dirs = "4"
 form_urlencoded = "1"
