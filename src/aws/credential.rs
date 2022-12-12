@@ -237,7 +237,10 @@ impl CredentialLoader {
 
         // Get ec2 metadata token
         let url = "http://169.254.169.254/latest/api/token";
-        let req = self.client.put(url);
+        let req = self
+            .client
+            .put(url)
+            .set("x-aws-ec2-metadata-token-ttl-seconds", "60");
         let resp = req.call()?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.into_string()?;
@@ -284,7 +287,7 @@ impl CredentialLoader {
         }
 
         let content = resp.into_string()?;
-        let resp: Ec2MetadataIamSecurityCredentials = de::from_str(&content)?;
+        let resp: Ec2MetadataIamSecurityCredentials = serde_json::from_str(&content)?;
         if resp.code != "Success" {
             return Err(anyhow!(
                 "request to AWS EC2 Metadata Services failed: {content}"
