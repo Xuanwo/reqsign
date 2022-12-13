@@ -22,7 +22,7 @@ fn init_signer() -> Option<GoogleSigner> {
         &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE")
             .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE must set"),
     );
-    builder.credential_from_content(
+    builder.credential_content(
         &env::var("REQSIGN_GOOGLE_CREDENTIAL").expect("env REQSIGN_GOOGLE_CREDENTIAL must set"),
     );
 
