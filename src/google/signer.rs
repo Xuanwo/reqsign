@@ -162,7 +162,6 @@ impl Signer {
     ///     // Signer will load region and credentials from environment by default.
     ///     let signer = GoogleSigner::builder()
     ///         .scope("https://www.googleapis.com/auth/devstorage.read_only")
-    ///         .credential_from_path("/path/to/credential/file")
     ///         .build()?;
     ///
     ///     // Construct request
