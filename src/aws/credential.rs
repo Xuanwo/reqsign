@@ -113,6 +113,13 @@ impl CredentialLoader {
     }
 
     /// Load credential.
+    ///
+    /// Resolution order:
+    /// 1. Environment variables
+    /// 2. Shared config (`~/.aws/config`, `~/.aws/credentials`)
+    /// 3. Web Identity Tokens
+    /// 4. ECS (IAM Roles for Tasks) & General HTTP credentials:
+    /// 5. EC2 IMDSv2
     pub fn load(&self) -> Option<Credential> {
         // Return cached credential if it has been loaded at least once.
         if self.credential_loaded.load(Ordering::Relaxed) {
@@ -136,9 +143,11 @@ impl CredentialLoader {
                 .load_via_env()
                 .or_else(|| self.load_via_profile())
                 .or_else(|| {
-                    self.load_via_imds_v2()
+                    self.load_via_assume_role_with_web_identity()
                         .map_err(|err| {
-                            warn!("load credential via imds v2 failed: {err:?}");
+                            warn!(
+                                "load credential via assume role with web identity failed: {err:?}"
+                            );
                             err
                         })
                         .unwrap_or_default()
@@ -152,11 +161,9 @@ impl CredentialLoader {
                         .unwrap_or_default()
                 })
                 .or_else(|| {
-                    self.load_via_assume_role_with_web_identity()
+                    self.load_via_imds_v2()
                         .map_err(|err| {
-                            warn!(
-                                "load credential via assume role with web identity failed: {err:?}"
-                            );
+                            warn!("load credential via imds v2 failed: {err:?}");
                             err
                         })
                         .unwrap_or_default()
