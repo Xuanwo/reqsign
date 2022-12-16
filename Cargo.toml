@@ -6,7 +6,7 @@ documentation = "https://docs.rs/reqsign"
 edition = "2021"
 license = "Apache-2.0"
 name = "reqsign"
-version = "0.7.0"
+version = "0.7.1"
 
 [package.metadata.docs.rs]
 all-features = true
