@@ -29,6 +29,9 @@ use crate::time::DateTime;
 
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 
+/// Token is the authentication methods used by google services.
+///
+/// Most of the time, they will be exchanged via application credentials.
 #[derive(Clone, Deserialize, Default)]
 #[serde(default)]
 pub struct Token {
@@ -39,11 +42,25 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn access_token(&self) -> &str {
+    /// Create a new token.
+    ///
+    /// scope will looks like: `https://www.googleapis.com/auth/devstorage.read_only`.
+    pub fn new(access_token: &str, expires_in: usize, scope: &str) -> Self {
+        Self {
+            access_token: access_token.to_string(),
+            scope: scope.to_string(),
+            expires_in,
+            token_type: "Bearer".to_string(),
+        }
+    }
+
+    /// Notes: don't allow get token from reqsign.
+    pub(crate) fn access_token(&self) -> &str {
         &self.access_token
     }
 
-    pub fn expires_in(&self) -> usize {
+    /// Notes: don't allow get expires_in from reqsign.
+    pub(crate) fn expires_in(&self) -> usize {
         self.expires_in
     }
 }
@@ -112,6 +129,16 @@ impl Credential {
     }
 }
 
+/// TokenLoader will be used to load token.
+pub trait TokenLoader: 'static + Debug {
+    /// load_token is the only function in token loeader trait.
+    ///
+    /// - `Ok(Some(Token))` indicates there is a valid token.
+    /// - `Ok(None)` indicates no token loaded, try next one.
+    /// - `Err(err)` indicates error happened, try next one.
+    fn load_token(&self) -> Result<Option<Token>>;
+}
+
 /// CredentialLoader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
 pub struct CredentialLoader {
@@ -127,6 +154,7 @@ pub struct CredentialLoader {
 
     service_account: Option<String>,
     scope: String,
+    customed_token_loader: Option<Box<dyn TokenLoader>>,
 
     client: ureq::Agent,
 }
@@ -152,6 +180,7 @@ impl Default for CredentialLoader {
             service_account: None,
             // Default to read-only if not set.
             scope: "read-only".to_string(),
+            customed_token_loader: None,
             client,
         }
     }
@@ -204,6 +233,12 @@ impl CredentialLoader {
         self
     }
 
+    /// Build credential loader with given customed token loader.
+    pub fn with_customed_token_loader(mut self, f: Box<dyn TokenLoader>) -> Self {
+        self.customed_token_loader = Some(f);
+        self
+    }
+
     /// Build credential loader from given path.
     pub fn from_path(path: &str) -> Result<Self> {
         let cred = Self::load_from_file(path)?;
@@ -238,12 +273,16 @@ impl CredentialLoader {
 
         let token = loop {
             let token = self
-                .exchange_token_via_credential()
-                .map_err(|err| {
-                    warn!("exchange token via credential failed: {err:?}");
-                    err
-                })
+                .exchange_token_via_customed_token_loader()
                 .unwrap_or_default()
+                .or_else(|| {
+                    self.exchange_token_via_credential()
+                        .map_err(|err| {
+                            warn!("exchange token via credential failed: {err:?}");
+                            err
+                        })
+                        .unwrap_or_default()
+                })
                 .or_else(|| {
                     self.exchange_token_via_vm_metadata()
                         .map_err(|err| {
@@ -283,6 +322,13 @@ impl CredentialLoader {
         *lock = Some((token.clone(), expire_in));
 
         Some(token)
+    }
+
+    fn exchange_token_via_customed_token_loader(&self) -> Result<Option<Token>> {
+        match &self.customed_token_loader {
+            Some(f) => f.load_token(),
+            None => Ok(None),
+        }
     }
 
     /// Exchange token via Google OAuth2 Service.

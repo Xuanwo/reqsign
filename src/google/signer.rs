@@ -6,6 +6,7 @@ use log::debug;
 
 use super::credential::CredentialLoader;
 use super::credential::Token;
+use super::credential::TokenLoader;
 use crate::request::SignableRequest;
 
 /// Builder for Signer.
@@ -21,6 +22,7 @@ pub struct Builder {
     disable_load_from_env: bool,
     disable_load_from_well_known_location: bool,
     disable_load_from_vm_metadata: bool,
+    customed_token_loader: Option<Box<dyn TokenLoader>>,
 }
 
 impl Builder {
@@ -76,6 +78,14 @@ impl Builder {
         self
     }
 
+    /// Set customed token loader for builder.
+    ///
+    /// We will load token from customed_token_loader first if set.
+    pub fn customed_token_loader(&mut self, f: impl TokenLoader) -> &mut Self {
+        self.customed_token_loader = Some(Box::new(f));
+        self
+    }
+
     /// Use exising information to build a new signer.
     ///
     ///
@@ -109,6 +119,9 @@ impl Builder {
         }
         if let Some(acc) = &self.service_account {
             cred_loader = cred_loader.with_service_account(acc);
+        }
+        if let Some(f) = self.customed_token_loader.take() {
+            cred_loader = cred_loader.with_customed_token_loader(f);
         }
 
         Ok(Signer {
@@ -200,5 +213,36 @@ impl Signer {
         }
 
         Err(anyhow!("token not found"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use reqwest::blocking::Client;
+
+    use super::*;
+
+    #[derive(Debug)]
+    struct TestLoader {
+        client: Client,
+    }
+
+    impl TokenLoader for TestLoader {
+        fn load_token(&self) -> Result<Option<Token>> {
+            self.client.get("https://xuanwo.io").send()?;
+            Ok(None)
+        }
+    }
+
+    #[test]
+    fn test_with_customed_token_loader() -> Result<()> {
+        let client = Client::default();
+
+        let _ = Builder::default()
+            .scope("test")
+            .customed_token_loader(TestLoader { client })
+            .build()?;
+
+        Ok(())
     }
 }
