@@ -1,6 +1,6 @@
 # reqsign &emsp; [![Build Status]][actions] [![Latest Version]][crates.io] [![Crate Downloads]][crates.io]
 
-[Build Status]: https://img.shields.io/github/workflow/status/Xuanwo/reqsign/CI/main
+[Build Status]: https://img.shields.io/github/actions/workflow/status/Xuanwo/reqsign/ci.yml?branch=main
 [actions]: https://github.com/Xuanwo/reqsign/actions?query=branch%3Amain
 [Latest Version]: https://img.shields.io/crates/v/reqsign.svg
 [crates.io]: https://crates.io/crates/reqsign
