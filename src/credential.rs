@@ -121,7 +121,7 @@ impl Debug for Credential {
 }
 
 /// Loader trait will try to load credential from different sources.
-pub trait CredentialLoad: Send + Sync {
+pub trait CredentialLoad: 'static + Send + Sync + Debug {
     /// Load credential from sources.
     ///
     /// - If succeed, return `Ok(Some(cred))`
@@ -135,7 +135,7 @@ pub trait CredentialLoad: Send + Sync {
 /// - If found, return directly.
 /// - If not found, keep going and try next one.
 /// - If meeting error, return directly.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct CredentialLoadChain {
     loaders: Vec<Box<dyn CredentialLoad>>,
 }
@@ -169,6 +169,7 @@ impl CredentialLoad for CredentialLoadChain {
 /// DummyLoader always returns `Ok(None)`.
 ///
 /// It's useful when users don't want to load credential/region from env.
+#[derive(Debug)]
 pub struct DummyLoader {}
 
 impl CredentialLoad for DummyLoader {

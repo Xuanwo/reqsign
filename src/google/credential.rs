@@ -129,8 +129,8 @@ impl Credential {
     }
 }
 
-/// TokenLoader will be used to load token.
-pub trait TokenLoader: 'static + Debug {
+/// TokenLoad will be used to load token.
+pub trait TokenLoad: 'static + Debug {
     /// load_token is the only function in token loeader trait.
     ///
     /// - `Ok(Some(Token))` indicates there is a valid token.
@@ -154,7 +154,7 @@ pub struct CredentialLoader {
 
     service_account: Option<String>,
     scope: String,
-    customed_token_loader: Option<Box<dyn TokenLoader>>,
+    customed_token_loader: Option<Box<dyn TokenLoad>>,
 
     client: ureq::Agent,
 }
@@ -234,7 +234,7 @@ impl CredentialLoader {
     }
 
     /// Build credential loader with given customed token loader.
-    pub fn with_customed_token_loader(mut self, f: Box<dyn TokenLoader>) -> Self {
+    pub fn with_customed_token_loader(mut self, f: Box<dyn TokenLoad>) -> Self {
         self.customed_token_loader = Some(f);
         self
     }

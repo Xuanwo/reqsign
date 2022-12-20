@@ -67,7 +67,7 @@ mod google;
 pub use google::Builder as GoogleBuilder;
 pub use google::Signer as GoogleSigner;
 pub use google::Token as GoogleToken;
-pub use google::TokenLoader as GoogleTokenLoader;
+pub use google::TokenLoad as GoogleTokenLoad;
 
 mod huaweicloud;
 pub use huaweicloud::obs::Builder as HuaweicloudObsBuilder;

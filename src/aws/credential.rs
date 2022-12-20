@@ -16,6 +16,7 @@ use serde::Deserialize;
 
 use super::config::ConfigLoader;
 use crate::credential::Credential;
+use crate::credential::CredentialLoad;
 use crate::time::parse_rfc3339;
 
 /// CredentialLoader will load credential from different methods.
@@ -30,6 +31,7 @@ pub struct CredentialLoader {
     disable_imds_v2: bool,
     disable_assume_role: bool,
     disable_assume_role_with_web_identity: bool,
+    customed_credential_loader: Option<Box<dyn CredentialLoad>>,
 
     client: ureq::Agent,
     config_loader: ConfigLoader,
@@ -53,6 +55,7 @@ impl Default for CredentialLoader {
             disable_imds_v2: false,
             disable_assume_role: false,
             disable_assume_role_with_web_identity: false,
+            customed_credential_loader: None,
             client,
             config_loader: Default::default(),
         }
@@ -99,6 +102,12 @@ impl CredentialLoader {
         self
     }
 
+    /// Set customed credential loader.
+    pub fn with_customed_credential_loader(mut self, f: Box<dyn CredentialLoad>) -> Self {
+        self.customed_credential_loader = Some(f);
+        self
+    }
+
     /// Set Credential.
     pub fn with_credential(self, cred: Credential) -> Self {
         self.credential_loaded.store(true, Ordering::Relaxed);
@@ -140,7 +149,13 @@ impl CredentialLoader {
 
         let cred = loop {
             let cred = self
-                .load_via_env()
+                .load_via_customed_credential_load()
+                .map_err(|err| {
+                    warn!("load credential via customed credential load failed: {err:?}");
+                    err
+                })
+                .unwrap_or_default()
+                .or_else(|| self.load_via_env())
                 .or_else(|| self.load_via_profile())
                 .or_else(|| {
                     self.load_via_assume_role_with_web_identity()
@@ -197,6 +212,14 @@ impl CredentialLoader {
         *lock = Some(cred.clone());
 
         Some(cred)
+    }
+
+    fn load_via_customed_credential_load(&self) -> Result<Option<Credential>> {
+        if let Some(loader) = &self.customed_credential_loader {
+            loader.load_credential()
+        } else {
+            Ok(None)
+        }
     }
 
     fn load_via_env(&self) -> Option<Credential> {
