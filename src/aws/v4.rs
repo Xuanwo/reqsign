@@ -22,6 +22,7 @@ use super::constants::X_AMZ_SECURITY_TOKEN;
 use super::credential::CredentialLoader;
 use super::region::RegionLoader;
 use crate::credential::Credential;
+use crate::credential::CredentialLoad;
 use crate::hash::hex_hmac_sha256;
 use crate::hash::hex_sha256;
 use crate::hash::hmac_sha256;
@@ -48,6 +49,7 @@ pub struct Builder {
     disable_load_from_imds_v2: bool,
     disable_load_from_assume_role: bool,
     disable_load_from_assume_role_with_web_identity: bool,
+    customed_loader: Option<Box<dyn CredentialLoad>>,
 
     time: Option<DateTime>,
 }
@@ -154,6 +156,12 @@ impl Builder {
         self
     }
 
+    /// Add a customed credential loader
+    pub fn customed_credential_loader(&mut self, f: impl CredentialLoad) -> &mut Self {
+        self.customed_loader = Some(Box::new(f));
+        self
+    }
+
     /// Specify the signing time.
     ///
     /// # Note
@@ -208,6 +216,9 @@ impl Builder {
         }
         if self.disable_load_from_assume_role_with_web_identity {
             cred_loader = cred_loader.with_disable_assume_role_with_web_identity();
+        }
+        if let Some(loader) = self.customed_loader.take() {
+            cred_loader = cred_loader.with_customed_credential_loader(loader);
         }
 
         let mut region_loader = RegionLoader::default().with_config_loader(cfg);
