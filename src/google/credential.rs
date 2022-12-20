@@ -130,7 +130,7 @@ impl Credential {
 }
 
 /// TokenLoad will be used to load token.
-pub trait TokenLoad: 'static + Debug {
+pub trait TokenLoad: 'static + Debug + Send + Sync {
     /// load_token is the only function in token loeader trait.
     ///
     /// - `Ok(Some(Token))` indicates there is a valid token.
