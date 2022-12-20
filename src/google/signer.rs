@@ -6,7 +6,7 @@ use log::debug;
 
 use super::credential::CredentialLoader;
 use super::credential::Token;
-use super::credential::TokenLoader;
+use super::credential::TokenLoad;
 use crate::request::SignableRequest;
 
 /// Builder for Signer.
@@ -22,7 +22,7 @@ pub struct Builder {
     disable_load_from_env: bool,
     disable_load_from_well_known_location: bool,
     disable_load_from_vm_metadata: bool,
-    customed_token_loader: Option<Box<dyn TokenLoader>>,
+    customed_token_loader: Option<Box<dyn TokenLoad>>,
 }
 
 impl Builder {
@@ -81,7 +81,7 @@ impl Builder {
     /// Set customed token loader for builder.
     ///
     /// We will load token from customed_token_loader first if set.
-    pub fn customed_token_loader(&mut self, f: impl TokenLoader) -> &mut Self {
+    pub fn customed_token_loader(&mut self, f: impl TokenLoad) -> &mut Self {
         self.customed_token_loader = Some(Box::new(f));
         self
     }
@@ -227,7 +227,7 @@ mod tests {
         client: Client,
     }
 
-    impl TokenLoader for TestLoader {
+    impl TokenLoad for TestLoader {
         fn load_token(&self) -> Result<Option<Token>> {
             self.client.get("https://xuanwo.io").send()?;
             Ok(None)
