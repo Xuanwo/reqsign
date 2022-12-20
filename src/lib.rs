@@ -66,6 +66,8 @@ pub use azure::storage::Signer as AzureStorageSigner;
 mod google;
 pub use google::Builder as GoogleBuilder;
 pub use google::Signer as GoogleSigner;
+pub use google::Token as GoogleToken;
+pub use google::TokenLoader as GoogleTokenLoader;
 
 mod huaweicloud;
 pub use huaweicloud::obs::Builder as HuaweicloudObsBuilder;
