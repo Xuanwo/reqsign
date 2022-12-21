@@ -211,7 +211,9 @@ impl CredentialLoader {
             self.config_loader.secret_access_key(),
         ) {
             let mut cred = Credential::new(&ak, &sk);
-            cred.set_security_token(self.config_loader.session_token().as_deref());
+            if let Some(tk) = self.config_loader.session_token() {
+                cred.set_security_token(&tk);
+            }
             Some(cred)
         } else {
             None
@@ -230,7 +232,9 @@ impl CredentialLoader {
             self.config_loader.secret_access_key(),
         ) {
             let mut cred = Credential::new(&ak, &sk);
-            cred.set_security_token(self.config_loader.session_token().as_deref());
+            if let Some(tk) = self.config_loader.session_token() {
+                cred.set_security_token(&tk);
+            }
             Some(cred)
         } else {
             None

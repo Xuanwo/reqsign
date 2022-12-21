@@ -90,7 +90,7 @@ impl Builder {
     /// Security token always come with an expires in, be aware to refresh
     /// expired security_token
     pub fn security_token(&mut self, security_token: &str) -> &mut Self {
-        self.credential.set_security_token(Some(security_token));
+        self.credential.set_security_token(security_token);
         self
     }
 

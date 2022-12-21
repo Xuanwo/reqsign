@@ -114,7 +114,9 @@ impl CredentialLoader {
             self.config_loader.access_key_secret(),
         ) {
             let mut cred = Credential::new(&ak, &sk);
-            cred.set_security_token(self.config_loader.security_token().as_deref());
+            if let Some(tk) = self.config_loader.security_token() {
+                cred.set_security_token(&tk);
+            }
             Some(cred)
         } else {
             None

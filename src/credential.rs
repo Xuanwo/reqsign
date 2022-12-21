@@ -56,8 +56,8 @@ impl Credential {
         self.security_token.as_deref()
     }
     /// Set security_token
-    pub fn set_security_token(&mut self, token: Option<&str>) -> &mut Self {
-        self.security_token = token.map(|v| v.to_string());
+    pub fn set_security_token(&mut self, token: &str) -> &mut Self {
+        self.security_token = Some(token.to_string());
         self
     }
     /// Build a credential with security_token

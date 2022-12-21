@@ -42,6 +42,14 @@ impl Builder {
         self
     }
 
+    /// Specify a Shared Access Signature (SAS) token.
+    /// * ref: [Grant limited access to Azure Storage resources using shared access signatures (SAS)](https://docs.microsoft.com/azure/storage/common/storage-sas-overview)
+    /// * ref: [Create SAS tokens for storage containers](https://docs.microsoft.com/azure/applied-ai-services/form-recognizer/create-sas-tokens)
+    pub fn security_token(&mut self, security_token: &str) -> &mut Self {
+        self.credential.set_security_token(security_token);
+        self
+    }
+
     /// Specify the signing time.
     ///
     /// # Note
