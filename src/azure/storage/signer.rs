@@ -115,34 +115,52 @@ impl Signer {
 
     /// Calculate signing requests via SignableRequest.
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        let now = self.time.unwrap_or_else(time::now);
-        let string_to_sign = string_to_sign(req, cred, now)?;
-        let auth = base64_hmac_sha256(&base64_decode(cred.secret_key()), string_to_sign.as_bytes());
+        if let Some(sas_token) = cred.security_token() {
+            // The SAS token already contains an auth signature so we don't need to
+            // construct one
+            Ok(SignedOutput::SharedAccessSignature(sas_token.to_owned()))
+        } else {
+            let now = self.time.unwrap_or_else(time::now);
+            let string_to_sign = string_to_sign(req, cred, now)?;
+            let auth = base64_hmac_sha256(&base64_decode(cred.secret_key()), string_to_sign.as_bytes());
 
-        Ok(SignedOutput {
-            account_name: cred.access_key().to_string(),
-            signed_time: now,
-            signature: auth,
-        })
+            Ok(SignedOutput::SharedKey {
+                account_name: cred.access_key().to_string(),
+                signed_time: now,
+                signature: auth,
+            })
+        }
     }
 
     /// Apply signed results to requests.
     pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
-        req.insert_header(
-            HeaderName::from_static(X_MS_DATE),
-            format_http_date(output.signed_time).parse()?,
-        )?;
-        req.insert_header(
-            HeaderName::from_static(X_MS_VERSION),
-            AZURE_VERSION.parse()?,
-        )?;
-        req.insert_header(AUTHORIZATION, {
-            let mut value: HeaderValue =
-                format!("SharedKey {}:{}", &output.account_name, &output.signature).parse()?;
-            value.set_sensitive(true);
+        match output {
+            SignedOutput::SharedAccessSignature(sas_token) => {
+                // The SAS token is itself a query string
+                return req.set_query(sas_token)
+            }
+            SignedOutput::SharedKey {
+                account_name,
+                signed_time,
+                signature,
+            } => {
+                req.insert_header(
+                    HeaderName::from_static(X_MS_DATE),
+                    format_http_date(*signed_time).parse()?,
+                )?;
+                req.insert_header(
+                    HeaderName::from_static(X_MS_VERSION),
+                    AZURE_VERSION.parse()?,
+                )?;
+                req.insert_header(AUTHORIZATION, {
+                    let mut value: HeaderValue =
+                        format!("SharedKey {}:{}", account_name, signature).parse()?;
+                    value.set_sensitive(true);
 
-            value
-        })?;
+                    value
+                })?;
+            }
+        }
 
         Ok(())
     }
@@ -192,10 +210,13 @@ impl Signer {
 }
 
 /// Singed output carries result of this signing.
-pub struct SignedOutput {
-    account_name: String,
-    signed_time: DateTime,
-    signature: String,
+pub enum SignedOutput {
+    SharedKey {
+        account_name: String,
+        signed_time: DateTime,
+        signature: String,
+    },
+    SharedAccessSignature(String)
 }
 
 /// Construct string to sign
@@ -317,4 +338,28 @@ fn canonicalize_resource(req: &impl SignableRequest, cred: &Credential) -> Strin
             .collect::<Vec<String>>()
             .join("\n")
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use http::{Request};
+
+    use crate::AzureStorageSigner;
+
+    #[test]
+    pub fn test_sas_url() {
+        let signer = AzureStorageSigner::builder()
+            .security_token("sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
+            .build()
+            .unwrap();
+        // Construct request
+        let mut req = Request::builder()
+            .uri("https://test.blob.core.windows.net/testbucket/testblob")
+            .body(())
+            .unwrap();
+
+        // Signing request with Signer
+        assert!(signer.sign(&mut req).is_ok());
+        assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob?sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
+    }
 }

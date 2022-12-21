@@ -79,7 +79,7 @@ impl Credential {
 
     /// is current cred is valid?
     pub fn is_valid(&self) -> bool {
-        if self.access_key.is_empty() || self.secret_key.is_empty() {
+        if (self.access_key.is_empty() || self.secret_key.is_empty()) && self.security_token.is_none() {
             return false;
         }
         // Take 120s as buffer to avoid edge cases.
