@@ -56,8 +56,8 @@ impl Credential {
         self.security_token.as_deref()
     }
     /// Set security_token
-    pub fn set_security_token(&mut self, token: Option<&str>) -> &mut Self {
-        self.security_token = token.map(|v| v.to_string());
+    pub fn set_security_token(&mut self, token: &str) -> &mut Self {
+        self.security_token = Some(token.to_string());
         self
     }
     /// Build a credential with security_token
@@ -79,7 +79,9 @@ impl Credential {
 
     /// is current cred is valid?
     pub fn is_valid(&self) -> bool {
-        if self.access_key.is_empty() || self.secret_key.is_empty() {
+        if (self.access_key.is_empty() || self.secret_key.is_empty())
+            && self.security_token.is_none()
+        {
             return false;
         }
         // Take 120s as buffer to avoid edge cases.
