@@ -122,7 +122,8 @@ impl Signer {
         } else {
             let now = self.time.unwrap_or_else(time::now);
             let string_to_sign = string_to_sign(req, cred, now)?;
-            let auth = base64_hmac_sha256(&base64_decode(cred.secret_key()), string_to_sign.as_bytes());
+            let auth =
+                base64_hmac_sha256(&base64_decode(cred.secret_key()), string_to_sign.as_bytes());
 
             Ok(SignedOutput::SharedKey {
                 account_name: cred.access_key().to_string(),
@@ -137,7 +138,7 @@ impl Signer {
         match output {
             SignedOutput::SharedAccessSignature(sas_token) => {
                 // The SAS token is itself a query string
-                return req.set_query(sas_token)
+                return req.set_query(sas_token);
             }
             SignedOutput::SharedKey {
                 account_name,
@@ -216,7 +217,7 @@ pub enum SignedOutput {
         signed_time: DateTime,
         signature: String,
     },
-    SharedAccessSignature(String)
+    SharedAccessSignature(String),
 }
 
 /// Construct string to sign
@@ -342,7 +343,7 @@ fn canonicalize_resource(req: &impl SignableRequest, cred: &Credential) -> Strin
 
 #[cfg(test)]
 mod tests {
-    use http::{Request};
+    use http::Request;
 
     use crate::AzureStorageSigner;
 
