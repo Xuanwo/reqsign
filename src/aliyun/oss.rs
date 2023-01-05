@@ -203,7 +203,11 @@ impl Signer {
                     utf8_percent_encode(&output.signature, percent_encoding::NON_ALPHANUMERIC)
                 )?;
                 if let Some(token) = &output.security_token {
-                    write!(query, "&security-token={}", token)?;
+                    write!(
+                        query,
+                        "&security-token={}",
+                        utf8_percent_encode(token, percent_encoding::NON_ALPHANUMERIC)
+                    )?;
                 }
 
                 req.set_query(&query)?;
