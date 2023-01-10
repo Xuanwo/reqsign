@@ -189,6 +189,7 @@ struct AssumeRoleWithOidcCredentials {
 mod tests {
     use std::env;
     use std::str::FromStr;
+    use time::Duration;
 
     use http::Request;
     use reqwest::blocking::Client;
@@ -296,6 +297,86 @@ mod tests {
             },
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_signer_with_oidc_query() -> Result<()> {
+        let _ = env_logger::builder().try_init();
+
+        use log::debug;
+
+        dotenv::from_filename(".env").ok();
+
+        if env::var("REQSIGN_ALIYUN_OSS_TEST").is_err()
+            || env::var("REQSIGN_ALIYUN_OSS_TEST").unwrap() != "on"
+        {
+            panic!("test not enabled");
+        }
+
+        let provider_arn =
+            env::var("REQSIGN_ALIYUN_PROVIDER_ARN").expect("REQSIGN_ALIYUN_PROVIDER_ARN not exist");
+        let role_arn =
+            env::var("REQSIGN_ALIYUN_ROLE_ARN").expect("REQSIGN_ALIYUN_ROLE_ARN not exist");
+        let idp_url = env::var("REQSIGN_ALIYUN_IDP_URL").expect("REQSIGN_ALIYUN_IDP_URL not exist");
+        let idp_content =
+            env::var("REQSIGN_ALIYUN_IDP_BODY").expect("REQSIGN_ALIYUN_IDP_BODY not exist");
+
+        let mut req = Request::new(idp_content);
+        *req.method_mut() = http::Method::POST;
+        *req.uri_mut() = http::Uri::from_str(&idp_url)?;
+        req.headers_mut().insert(
+            http::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded".parse()?,
+        );
+
+        #[derive(Deserialize)]
+        struct Token {
+            id_token: String,
+        }
+        let token = Client::new()
+            .execute(req.try_into()?)?
+            .json::<Token>()?
+            .id_token;
+
+        let file_path = format!(
+            "{}/testdata/services/aliyun/oidc_token_file",
+            env::current_dir()
+                .expect("current_dir must exist")
+                .to_string_lossy()
+        );
+        fs::write(&file_path, token)?;
+
+        temp_env::with_vars(
+            vec![
+                (ALIBABA_CLOUD_ROLE_ARN, Some(&role_arn)),
+                (ALIBABA_CLOUD_OIDC_PROVIDER_ARN, Some(&provider_arn)),
+                (ALIBABA_CLOUD_OIDC_TOKEN_FILE, Some(&file_path)),
+            ],
+            || {
+                let mut builder = super::super::oss::Builder::default();
+                builder.bucket(
+                    &env::var("REQSIGN_ALIYUN_OSS_BUCKET")
+                        .expect("env REQSIGN_ALIYUN_OSS_BUCKET must set"),
+                );
+                let signer = builder.build().expect("must succeed");
+
+                let url = &env::var("REQSIGN_ALIYUN_OSS_URL")
+                    .expect("env REQSIGN_ALIYUN_OSS_URL must set");
+
+                let mut req = Request::new("");
+                *req.method_mut() = http::Method::GET;
+                *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))
+                    .expect("must valid");
+
+                signer
+                    .sign_query(&mut req, Duration::seconds(3600))
+                    .expect("sign request must success");
+
+                debug!("signed request url: {:?}", req.uri().to_string());
+                debug!("signed request: {:?}", req);
+            },
+        );
         Ok(())
     }
 }
