@@ -191,12 +191,12 @@ impl Signer {
                     "".to_string()
                 };
 
-                write!(query, "OSSAccessKeyId={}", output.access_key_id)?;
                 write!(
                     query,
                     "&Expires={}",
                     (output.signed_time + expire).unix_timestamp()
                 )?;
+                write!(query, "OSSAccessKeyId={}", output.access_key_id)?;
                 write!(
                     query,
                     "&Signature={}",
