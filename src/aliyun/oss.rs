@@ -202,6 +202,7 @@ impl Signer {
                     "&Signature={}",
                     utf8_percent_encode(&output.signature, percent_encoding::NON_ALPHANUMERIC)
                 )?;
+
                 if let Some(token) = &output.security_token {
                     write!(
                         query,
@@ -249,7 +250,7 @@ impl Signer {
 }
 
 /// SigningMethod is the method that used in signing.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum SigningMethod {
     /// Signing with header.
     Header,
@@ -307,12 +308,16 @@ fn string_to_sign(
     }
 
     {
-        let headers = canonicalize_header(req, cred)?;
+        let headers = canonicalize_header(req, method, cred)?;
         if !headers.is_empty() {
             writeln!(&mut s, "{headers}",)?;
         }
     }
-    write!(&mut s, "{}", canonicalize_resource(req, bucket))?;
+    write!(
+        &mut s,
+        "{}",
+        canonicalize_resource(req, bucket, method, cred)
+    )?;
 
     debug!("string to sign: {}", &s);
     Ok(s)
@@ -323,7 +328,11 @@ fn string_to_sign(
 /// # Reference
 ///
 /// [Building CanonicalizedOSSHeaders](https://help.aliyun.com/document_detail/31951.html#section-w2k-sw2-xdb)
-fn canonicalize_header(req: &impl SignableRequest, cred: &Credential) -> Result<String> {
+fn canonicalize_header(
+    req: &impl SignableRequest,
+    method: SigningMethod,
+    cred: &Credential,
+) -> Result<String> {
     let mut headers = req
         .headers()
         .iter()
@@ -338,10 +347,12 @@ fn canonicalize_header(req: &impl SignableRequest, cred: &Credential) -> Result<
         })
         .collect::<Vec<(String, String)>>();
 
-    // Insert security token
-    if let Some(token) = cred.security_token() {
-        headers.push(("x-oss-security-token".to_string(), token.to_string()))
-    };
+    if method == SigningMethod::Header {
+        // Insert security token
+        if let Some(token) = cred.security_token() {
+            headers.push(("x-oss-security-token".to_string(), token.to_string()))
+        };
+    }
 
     // Sort via header name.
     headers.sort_by(|x, y| x.0.cmp(&y.0));
@@ -360,11 +371,24 @@ fn canonicalize_header(req: &impl SignableRequest, cred: &Credential) -> Result<
 /// # Reference
 ///
 /// [Building CanonicalizedResource](https://help.aliyun.com/document_detail/31951.html#section-w2k-sw2-xdb)
-fn canonicalize_resource(req: &impl SignableRequest, bucket: &str) -> String {
+fn canonicalize_resource(
+    req: &impl SignableRequest,
+    bucket: &str,
+    method: SigningMethod,
+    cred: &Credential,
+) -> String {
     let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
         form_urlencoded::parse(req.query().unwrap_or_default().as_bytes())
             .filter(|(k, _)| is_sub_resource(k))
             .collect();
+
+    if let SigningMethod::Query(_) = method {
+        // Insert security token
+        if let Some(token) = cred.security_token() {
+            params.push((Cow::from("security-token"), Cow::from(token)))
+        };
+    }
+
     // Sort by param name
     params.sort();
 
