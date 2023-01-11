@@ -516,6 +516,8 @@ mod tests {
     use std::str::FromStr;
 
     use anyhow::Result;
+    use base64::prelude::BASE64_STANDARD;
+    use base64::Engine;
     use http::Request;
     use log::debug;
     use quick_xml::de;
@@ -677,9 +679,8 @@ mod tests {
 
         let role_arn = env::var("REQSIGN_AWS_ROLE_ARN").expect("REQSIGN_AWS_ROLE_ARN not exist");
         let idp_url = env::var("REQSIGN_AWS_IDP_URL").expect("REQSIGN_AWS_IDP_URL not exist");
-        let idp_content = base64::decode(
-            env::var("REQSIGN_AWS_IDP_BODY").expect("REQSIGN_AWS_IDP_BODY not exist"),
-        )?;
+        let idp_content = BASE64_STANDARD
+            .decode(env::var("REQSIGN_AWS_IDP_BODY").expect("REQSIGN_AWS_IDP_BODY not exist"))?;
 
         let mut req = Request::new(idp_content);
         *req.method_mut() = http::Method::POST;

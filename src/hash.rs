@@ -1,5 +1,7 @@
 //! Hash related utils.
 
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
 use hmac::Hmac;
 use hmac::Mac;
 use sha1::Sha1;
@@ -8,12 +10,14 @@ use sha2::Sha256;
 
 /// Base64 encode
 pub fn base64_encode(content: &[u8]) -> String {
-    base64::encode(content)
+    BASE64_STANDARD.encode(content)
 }
 
 // Base64 decode
 pub fn base64_decode(content: &str) -> Vec<u8> {
-    base64::decode(content).expect("base64 decode must success")
+    BASE64_STANDARD
+        .decode(content)
+        .expect("base64 decode must success")
 }
 
 /// SHA256 hash.
