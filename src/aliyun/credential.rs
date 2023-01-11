@@ -139,7 +139,7 @@ impl CredentialLoader {
             _ => return Ok(None),
         };
 
-        let token = fs::read_to_string(&token_file)?;
+        let token = fs::read_to_string(token_file)?;
         let role_session_name = self.config_loader.role_session_name();
 
         // Construct request to Aliyun STS Service.
