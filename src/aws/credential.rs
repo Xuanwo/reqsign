@@ -54,6 +54,12 @@ impl CredentialLoader {
         }
     }
 
+    /// Specify the client that used for sending http requests.
+    pub fn with_client(mut self, client: ureq::Agent) -> Self {
+        self.client = client;
+        self
+    }
+
     /// Allow anonymous.
     ///
     /// By enabling this option, CredentialLoader will not retry after
