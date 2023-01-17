@@ -38,6 +38,8 @@ fn init_signer() -> Option<AwsV4Signer> {
             &env::var("REQSIGN_AWS_V4_SECRET_KEY").expect("env REQSIGN_AWS_V4_SECRET_KEY must set"),
         );
 
+        // Make sure all value has been loaded.
+        loader.load();
         loader
     });
 

@@ -52,6 +52,14 @@ impl Builder {
     }
 
     /// Set the config loader used by builder.
+    ///
+    /// # Notes
+    ///
+    /// Signer will only read data from it, it's your responsible to decide
+    /// whether or not to call `ConfigLoader::load()`.
+    ///
+    /// If `load` is called, ConfigLoader will load config from current env.
+    /// If not, ConfigLoader will only use static config that set by users.
     pub fn config_loader(&mut self, cfg: ConfigLoader) -> &mut Self {
         self.config_loader = cfg;
         self
