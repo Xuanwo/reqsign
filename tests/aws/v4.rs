@@ -8,6 +8,7 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
+use reqsign::AwsConfigLoader;
 use reqsign::AwsV4Signer;
 use reqwest::blocking::Client;
 use time::Duration;
@@ -25,13 +26,20 @@ fn init_signer() -> Option<AwsV4Signer> {
     let mut builder = AwsV4Signer::builder();
     builder
         .service(&env::var("REQSIGN_AWS_V4_SERVICE").expect("env REQSIGN_AWS_V4_SERVICE must set"));
-    builder.region(&env::var("REQSIGN_AWS_V4_REGION").expect("env REQSIGN_AWS_V4_REGION must set"));
-    builder.access_key(
-        &env::var("REQSIGN_AWS_V4_ACCESS_KEY").expect("env REQSIGN_AWS_V4_ACCESS_KEY must set"),
-    );
-    builder.secret_key(
-        &env::var("REQSIGN_AWS_V4_SECRET_KEY").expect("env REQSIGN_AWS_V4_SECRET_KEY must set"),
-    );
+    builder.config_loader({
+        let loader = AwsConfigLoader::default();
+        loader.set_region(
+            &env::var("REQSIGN_AWS_V4_REGION").expect("env REQSIGN_AWS_V4_REGION must set"),
+        );
+        loader.set_access_key_id(
+            &env::var("REQSIGN_AWS_V4_ACCESS_KEY").expect("env REQSIGN_AWS_V4_ACCESS_KEY must set"),
+        );
+        loader.set_secret_access_key(
+            &env::var("REQSIGN_AWS_V4_SECRET_KEY").expect("env REQSIGN_AWS_V4_SECRET_KEY must set"),
+        );
+
+        loader
+    });
 
     Some(builder.build().expect("signer must be valid"))
 }

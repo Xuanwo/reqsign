@@ -56,6 +56,8 @@ pub use aliyun::oss::Builder as AliyunOssBuilder;
 pub use aliyun::oss::Signer as AliyunOssSigner;
 
 mod aws;
+pub use aws::config::ConfigLoader as AwsConfigLoader;
+pub use aws::credential::CredentialLoader as AwsCredentialLoader;
 pub use aws::v4::Builder as AwsV4Builder;
 pub use aws::v4::Signer as AwsV4Signer;
 

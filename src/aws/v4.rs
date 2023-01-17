@@ -22,7 +22,6 @@ use super::constants::X_AMZ_SECURITY_TOKEN;
 use super::credential::CredentialLoader;
 use super::region::RegionLoader;
 use crate::credential::Credential;
-use crate::credential::CredentialLoad;
 use crate::hash::hex_hmac_sha256;
 use crate::hash::hex_sha256;
 use crate::hash::hmac_sha256;
@@ -37,19 +36,10 @@ use crate::time::{self};
 #[derive(Default)]
 pub struct Builder {
     service: Option<String>,
-    region: Option<String>,
-    credential: Credential,
-    external_id: Option<String>,
-    role_arn: Option<String>,
-    role_session_name: Option<String>,
 
+    config_loader: ConfigLoader,
+    credential_loader: Option<CredentialLoader>,
     allow_anonymous: bool,
-    disable_load_from_env: bool,
-    disable_load_from_profile: bool,
-    disable_load_from_imds_v2: bool,
-    disable_load_from_assume_role: bool,
-    disable_load_from_assume_role_with_web_identity: bool,
-    customed_loader: Option<Box<dyn CredentialLoad>>,
 
     time: Option<DateTime>,
 }
@@ -61,62 +51,9 @@ impl Builder {
         self
     }
 
-    /// Specify region.
-    ///
-    /// If not set, we will try to load via `region_loader`.
-    pub fn region(&mut self, region: &str) -> &mut Self {
-        self.region = Some(region.to_string());
-        self
-    }
-
-    /// Specify access key id.
-    ///
-    /// If not set, we will try to load via `credential_loader`.
-    pub fn access_key(&mut self, access_key: &str) -> &mut Self {
-        self.credential.set_access_key(access_key);
-        self
-    }
-
-    /// Specify secret access key.
-    ///
-    /// If not set, we will try to load via `credential_loader`.
-    pub fn secret_key(&mut self, secret_key: &str) -> &mut Self {
-        self.credential.set_secret_key(secret_key);
-        self
-    }
-
-    /// Specify security token.
-    ///
-    /// # Warning
-    ///
-    /// Security token always come with an expires in, be aware to refresh
-    /// expired security_token
-    pub fn security_token(&mut self, security_token: &str) -> &mut Self {
-        self.credential.set_security_token(security_token);
-        self
-    }
-
-    /// Set role arn for this signer.
-    pub fn role_arn(&mut self, v: &str) -> &mut Self {
-        if !v.is_empty() {
-            self.role_arn = Some(v.to_string())
-        }
-        self
-    }
-
-    /// Set role session name for this signer.
-    pub fn role_session_name(&mut self, v: &str) -> &mut Self {
-        if !v.is_empty() {
-            self.role_session_name = Some(v.to_string())
-        }
-        self
-    }
-
-    /// Set external id for this signer.
-    pub fn external_id(&mut self, v: &str) -> &mut Self {
-        if !v.is_empty() {
-            self.external_id = Some(v.to_string())
-        }
+    /// Set the config loader used by builder.
+    pub fn config_loader(&mut self, cfg: ConfigLoader) -> &mut Self {
+        self.config_loader = cfg;
         self
     }
 
@@ -126,39 +63,9 @@ impl Builder {
         self
     }
 
-    /// Disable load from env.
-    pub fn disable_load_from_env(&mut self) -> &mut Self {
-        self.disable_load_from_env = true;
-        self
-    }
-
-    /// Disable load from profile.
-    pub fn disable_load_from_profile(&mut self) -> &mut Self {
-        self.disable_load_from_profile = true;
-        self
-    }
-
-    /// Disable load from imds_v2.
-    pub fn disable_load_from_imds_v2(&mut self) -> &mut Self {
-        self.disable_load_from_imds_v2 = true;
-        self
-    }
-
-    /// Disable load from assume role.
-    pub fn disable_load_from_assume_role(&mut self) -> &mut Self {
-        self.disable_load_from_assume_role = true;
-        self
-    }
-
-    /// Disable load from assume role with web identity.
-    pub fn disable_load_from_assume_role_with_web_identity(&mut self) -> &mut Self {
-        self.disable_load_from_assume_role_with_web_identity = true;
-        self
-    }
-
-    /// Add a customed credential loader
-    pub fn customed_credential_loader(&mut self, f: impl CredentialLoad) -> &mut Self {
-        self.customed_loader = Some(Box::new(f));
+    /// Set credential loader
+    pub fn credential_loader(&mut self, cred: CredentialLoader) -> &mut Self {
+        self.credential_loader = Some(cred);
         self
     }
 
@@ -184,53 +91,18 @@ impl Builder {
             .ok_or_else(|| anyhow!("service is required"))?;
         debug!("signer: service: {:?}", service);
 
-        let cfg = ConfigLoader::default();
-        if let Some(v) = &self.role_arn {
-            cfg.set_role_arn(v);
-        }
-        if let Some(v) = &self.role_session_name {
-            cfg.set_role_session_name(v);
-        }
-        if let Some(v) = &self.external_id {
-            cfg.set_external_id(v);
-        }
+        let cred_loader = match self.credential_loader.take() {
+            Some(cred) => cred,
+            None => {
+                let mut loader = CredentialLoader::new(self.config_loader.clone());
+                if self.allow_anonymous {
+                    loader = loader.with_allow_anonymous();
+                }
+                loader
+            }
+        };
 
-        let mut cred_loader = CredentialLoader::default().with_config_loader(cfg.clone());
-        if self.credential.is_valid() {
-            cred_loader = cred_loader.with_credential(self.credential.clone());
-        }
-        if self.allow_anonymous {
-            cred_loader = cred_loader.with_allow_anonymous();
-        }
-        if self.disable_load_from_env {
-            cred_loader = cred_loader.with_disable_env();
-        }
-        if self.disable_load_from_profile {
-            cred_loader = cred_loader.with_disable_profile();
-        }
-        if self.disable_load_from_imds_v2 {
-            cred_loader = cred_loader.with_disable_imds_v2();
-        }
-        if self.disable_load_from_assume_role {
-            cred_loader = cred_loader.with_disable_assume_role();
-        }
-        if self.disable_load_from_assume_role_with_web_identity {
-            cred_loader = cred_loader.with_disable_assume_role_with_web_identity();
-        }
-        if let Some(loader) = self.customed_loader.take() {
-            cred_loader = cred_loader.with_customed_credential_loader(loader);
-        }
-
-        let mut region_loader = RegionLoader::default().with_config_loader(cfg);
-        if let Some(region) = &self.region {
-            region_loader = region_loader.with_region(region);
-        }
-        if self.disable_load_from_env {
-            region_loader = region_loader.with_disable_env();
-        }
-        if self.disable_load_from_profile {
-            region_loader = region_loader.with_disable_profile();
-        }
+        let region_loader = RegionLoader::new(self.config_loader.clone());
 
         let region = region_loader
             .load()
@@ -354,6 +226,11 @@ impl Signer {
         }
 
         Ok(creq)
+    }
+
+    /// Get the region of this signer.
+    pub fn region(&self) -> &str {
+        &self.region
     }
 
     /// Apply signed results to requests.
@@ -891,9 +768,13 @@ mod tests {
             let mut req = req_fn();
 
             let signer = Signer::builder()
-                .access_key("access_key_id")
-                .secret_key("secret_access_key")
-                .region("test")
+                .config_loader({
+                    let cfg = ConfigLoader::default();
+                    cfg.set_region("test");
+                    cfg.set_access_key_id("access_key_id");
+                    cfg.set_secret_access_key("secret_access_key");
+                    cfg
+                })
                 .service("s3")
                 .time(now)
                 .build()?;
@@ -957,9 +838,13 @@ mod tests {
             let mut req = req_fn();
 
             let signer = Signer::builder()
-                .access_key("access_key_id")
-                .secret_key("secret_access_key")
-                .region("test")
+                .config_loader({
+                    let cfg = ConfigLoader::default();
+                    cfg.set_region("test");
+                    cfg.set_access_key_id("access_key_id");
+                    cfg.set_secret_access_key("secret_access_key");
+                    cfg
+                })
                 .service("s3")
                 .time(now)
                 .build()?;
@@ -1023,10 +908,14 @@ mod tests {
             let mut req = req_fn();
 
             let signer = Signer::builder()
-                .access_key("access_key_id")
-                .secret_key("secret_access_key")
-                .region("test")
-                .security_token("security_token")
+                .config_loader({
+                    let cfg = ConfigLoader::default();
+                    cfg.set_region("test");
+                    cfg.set_access_key_id("access_key_id");
+                    cfg.set_secret_access_key("secret_access_key");
+                    cfg.set_session_token("security_token");
+                    cfg
+                })
                 .service("s3")
                 .time(now)
                 .build()?;
@@ -1091,10 +980,14 @@ mod tests {
             let mut req = req_fn();
 
             let signer = Signer::builder()
-                .access_key("access_key_id")
-                .secret_key("secret_access_key")
-                .region("test")
-                .security_token("security_token")
+                .config_loader({
+                    let cfg = ConfigLoader::default();
+                    cfg.set_region("test");
+                    cfg.set_access_key_id("access_key_id");
+                    cfg.set_secret_access_key("secret_access_key");
+                    cfg.set_session_token("security_token");
+                    cfg
+                })
                 .service("s3")
                 .time(now)
                 .build()?;
