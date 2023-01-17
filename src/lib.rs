@@ -61,6 +61,7 @@ pub use aws::config::ConfigLoader as AwsConfigLoader;
 pub use aws::credential::CredentialLoader as AwsCredentialLoader;
 pub use aws::v4::Builder as AwsV4Builder;
 pub use aws::v4::Signer as AwsV4Signer;
+pub use credential::CredentialLoad as AwsCredentialLoad;
 
 mod azure;
 pub use azure::storage::Builder as AzureStorageBuilder;

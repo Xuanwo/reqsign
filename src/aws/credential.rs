@@ -27,7 +27,7 @@ pub struct CredentialLoader {
 
     allow_anonymous: bool,
     disable_ec2_metadata: bool,
-    customed_credential_loader: Option<Box<dyn CredentialLoad>>,
+    customed_credential_loader: Option<Arc<dyn CredentialLoad>>,
 
     client: ureq::Agent,
     config_loader: ConfigLoader,
@@ -78,7 +78,7 @@ impl CredentialLoader {
     /// Set customed credential loader.
     ///
     /// This loader will be used first.
-    pub fn with_customed_credential_loader(mut self, f: Box<dyn CredentialLoad>) -> Self {
+    pub fn with_customed_credential_loader(mut self, f: Arc<dyn CredentialLoad>) -> Self {
         self.customed_credential_loader = Some(f);
         self
     }
