@@ -263,6 +263,7 @@ impl Signer {
     ///
     /// ```rust
     /// use anyhow::Result;
+    /// use reqsign::AwsConfigLoader;
     /// use reqsign::AwsV4Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
@@ -272,8 +273,12 @@ impl Signer {
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
     ///     let signer = AwsV4Signer::builder()
+    ///         .config_loader({
+    ///             let cfg = AwsConfigLoader::with_loaded();
+    ///             cfg.set_region("test");
+    ///             cfg
+    ///         })
     ///         .service("s3")
-    ///         .region("test")
     ///         .allow_anonymous()
     ///         .build()?;
     ///     // Construct request
@@ -308,6 +313,7 @@ impl Signer {
     ///
     /// ```rust
     /// use anyhow::Result;
+    /// use reqsign::AwsConfigLoader;
     /// use reqsign::AwsV4Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
@@ -318,8 +324,12 @@ impl Signer {
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
     ///     let signer = AwsV4Signer::builder()
+    ///         .config_loader({
+    ///             let cfg = AwsConfigLoader::with_loaded();
+    ///             cfg.set_region("test");
+    ///             cfg
+    ///         })
     ///         .service("s3")
-    ///         .region("test")
     ///         .allow_anonymous()
     ///         .build()?;
     ///     // Construct request
