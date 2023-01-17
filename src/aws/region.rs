@@ -66,7 +66,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         temp_env::with_vars_unset(vec![AWS_REGION], || {
-            let l = RegionLoader::new(ConfigLoader::default());
+            let l = RegionLoader::new(ConfigLoader::with_loaded());
             let x = l.load();
             assert!(x.is_none());
         });
@@ -77,7 +77,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         temp_env::with_vars(vec![(AWS_REGION, Some("test"))], || {
-            let l = RegionLoader::new(ConfigLoader::default());
+            let l = RegionLoader::new(ConfigLoader::with_loaded());
             let x = l.load().expect("load must success");
             assert_eq!("test", x);
         });
@@ -98,7 +98,7 @@ mod tests {
                 )),
             )],
             || {
-                let l = RegionLoader::new(ConfigLoader::default());
+                let l = RegionLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load must success");
                 assert_eq!("test", x);
             },
