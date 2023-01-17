@@ -209,6 +209,10 @@ impl CredentialLoader {
     }
 
     fn load_via_imds_v2(&self) -> Result<Option<Credential>> {
+        if self.disable_ec2_metadata {
+            return Ok(None);
+        }
+
         // Get ec2 metadata token
         let url = "http://169.254.169.254/latest/api/token";
         let req = self
@@ -479,7 +483,7 @@ mod tests {
                 (AWS_SECRET_ACCESS_KEY, Some("secret_access_key")),
             ],
             || {
-                let l = CredentialLoader::new(ConfigLoader::default());
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load();
                 debug!("current loader: {l:?}");
 
@@ -518,7 +522,7 @@ mod tests {
                 ),
             ],
             || {
-                let l = CredentialLoader::new(ConfigLoader::default());
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load must success");
                 assert_eq!("config_access_key_id", x.access_key());
                 assert_eq!("config_secret_access_key", x.secret_key());
@@ -554,7 +558,7 @@ mod tests {
                 ),
             ],
             || {
-                let l = CredentialLoader::new(ConfigLoader::default());
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load must success");
                 assert_eq!("shared_access_key_id", x.access_key());
                 assert_eq!("shared_secret_access_key", x.secret_key());
@@ -591,7 +595,7 @@ mod tests {
                 ),
             ],
             || {
-                let l = CredentialLoader::new(ConfigLoader::default());
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load must success");
                 assert_eq!("shared_access_key_id", x.access_key());
                 assert_eq!("shared_secret_access_key", x.secret_key());
@@ -645,7 +649,7 @@ mod tests {
                 ("AWS_WEB_IDENTITY_TOKEN_FILE", Some(&file_path)),
             ],
             || {
-                let l = CredentialLoader::new(ConfigLoader::default());
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load_credential must success");
 
                 assert!(x.is_valid());

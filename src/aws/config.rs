@@ -116,6 +116,13 @@ impl Clone for ConfigLoader {
 }
 
 impl ConfigLoader {
+    /// Create a ConfigLoader with loaded has been called.
+    pub fn with_loaded() -> Self {
+        let cfg = ConfigLoader::default();
+        cfg.load();
+        cfg
+    }
+
     /// Load will load config from env or profile.
     pub fn load(&self) {
         self.load_via_env();
