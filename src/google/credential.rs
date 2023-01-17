@@ -23,11 +23,10 @@ use serde::Deserialize;
 use serde::Serialize;
 use time::Duration;
 
+use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
 use crate::time::now;
 use crate::time::DateTime;
-
-use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 
 /// Token is the authentication methods used by google services.
 ///

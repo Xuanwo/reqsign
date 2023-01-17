@@ -1,7 +1,6 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use http::header;
-
 use log::debug;
 
 use super::credential::CredentialLoader;

@@ -189,10 +189,10 @@ struct AssumeRoleWithOidcCredentials {
 mod tests {
     use std::env;
     use std::str::FromStr;
-    use time::Duration;
 
     use http::Request;
     use reqwest::blocking::Client;
+    use time::Duration;
 
     use super::super::constants::*;
     use super::*;

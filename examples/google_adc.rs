@@ -1,8 +1,10 @@
+use std::env;
+use std::process::exit;
+
 use anyhow::Result;
 use log::debug;
 use reqsign::GoogleBuilder;
 use reqwest::blocking::Client;
-use std::{env, process::exit};
 
 fn main() -> Result<()> {
     if env::var("RUST_LOG").is_err() {

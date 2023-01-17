@@ -2,8 +2,9 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```no_run
 //! use anyhow::Result;
+//! use reqsign::AwsConfigLoader;
 //! use reqsign::AwsV4Signer;
 //! use reqwest::Client;
 //! use reqwest::Request;
@@ -13,8 +14,8 @@
 //! async fn main() -> Result<()> {
 //!     // Signer can load region and credentials from environment by default.
 //!     let signer = AwsV4Signer::builder()
+//!         .config_loader(AwsConfigLoader::with_loaded())
 //!         .service("s3")
-//!         .region("test")
 //!         .allow_anonymous()
 //!         .build()?;
 //!     // Construct request
@@ -56,6 +57,8 @@ pub use aliyun::oss::Builder as AliyunOssBuilder;
 pub use aliyun::oss::Signer as AliyunOssSigner;
 
 mod aws;
+pub use aws::config::ConfigLoader as AwsConfigLoader;
+pub use aws::credential::CredentialLoader as AwsCredentialLoader;
 pub use aws::v4::Builder as AwsV4Builder;
 pub use aws::v4::Signer as AwsV4Signer;
 

@@ -26,19 +26,16 @@ pub struct CredentialLoader {
     credential_loaded: AtomicBool,
 
     allow_anonymous: bool,
-    disable_env: bool,
-    disable_profile: bool,
-    disable_imds_v2: bool,
-    disable_assume_role: bool,
-    disable_assume_role_with_web_identity: bool,
+    disable_ec2_metadata: bool,
     customed_credential_loader: Option<Box<dyn CredentialLoad>>,
 
     client: ureq::Agent,
     config_loader: ConfigLoader,
 }
 
-impl Default for CredentialLoader {
-    fn default() -> Self {
+impl CredentialLoader {
+    /// Create a new CredentialLoader
+    pub fn new(cfg: ConfigLoader) -> Self {
         let client = ureq::AgentBuilder::new()
             // Set overall timeout per-request to 32s.
             //
@@ -50,19 +47,13 @@ impl Default for CredentialLoader {
             credential: Arc::new(Default::default()),
             credential_loaded: AtomicBool::default(),
             allow_anonymous: false,
-            disable_env: false,
-            disable_profile: false,
-            disable_imds_v2: false,
-            disable_assume_role: false,
-            disable_assume_role_with_web_identity: false,
+            disable_ec2_metadata: false,
             customed_credential_loader: None,
             client,
-            config_loader: Default::default(),
+            config_loader: cfg,
         }
     }
-}
 
-impl CredentialLoader {
     /// Allow anonymous.
     ///
     /// By enabling this option, CredentialLoader will not retry after
@@ -72,52 +63,17 @@ impl CredentialLoader {
         self
     }
 
-    /// Disable load from env.
-    pub fn with_disable_env(mut self) -> Self {
-        self.disable_env = true;
-        self
-    }
-
-    /// Disable load from profile.
-    pub fn with_disable_profile(mut self) -> Self {
-        self.disable_profile = true;
-        self
-    }
-
-    /// Disable load from imds_v2.
-    pub fn with_disable_imds_v2(mut self) -> Self {
-        self.disable_imds_v2 = true;
-        self
-    }
-
-    /// Disable load from assume role.
-    pub fn with_disable_assume_role(mut self) -> Self {
-        self.disable_assume_role = true;
-        self
-    }
-
-    /// Disable load from assume role with web identity.
-    pub fn with_disable_assume_role_with_web_identity(mut self) -> Self {
-        self.disable_assume_role_with_web_identity = true;
+    /// Disable load from ec2 metadata.
+    pub fn with_disable_ec2_metadata(mut self) -> Self {
+        self.disable_ec2_metadata = true;
         self
     }
 
     /// Set customed credential loader.
+    ///
+    /// This loader will be used first.
     pub fn with_customed_credential_loader(mut self, f: Box<dyn CredentialLoad>) -> Self {
         self.customed_credential_loader = Some(f);
-        self
-    }
-
-    /// Set Credential.
-    pub fn with_credential(self, cred: Credential) -> Self {
-        self.credential_loaded.store(true, Ordering::Relaxed);
-        *self.credential.write().expect("lock poisoned") = Some(cred);
-        self
-    }
-
-    /// Set config loader.
-    pub fn with_config_loader(mut self, cfg: ConfigLoader) -> Self {
-        self.config_loader = cfg;
         self
     }
 
@@ -223,12 +179,6 @@ impl CredentialLoader {
     }
 
     fn load_via_env(&self) -> Option<Credential> {
-        if self.disable_env {
-            return None;
-        }
-
-        self.config_loader.load_via_env();
-
         if let (Some(ak), Some(sk)) = (
             self.config_loader.access_key_id(),
             self.config_loader.secret_access_key(),
@@ -244,12 +194,6 @@ impl CredentialLoader {
     }
 
     fn load_via_profile(&self) -> Option<Credential> {
-        if self.disable_profile {
-            return None;
-        }
-
-        self.config_loader.load_via_profile();
-
         if let (Some(ak), Some(sk)) = (
             self.config_loader.access_key_id(),
             self.config_loader.secret_access_key(),
@@ -265,7 +209,7 @@ impl CredentialLoader {
     }
 
     fn load_via_imds_v2(&self) -> Result<Option<Credential>> {
-        if self.disable_imds_v2 {
+        if self.disable_ec2_metadata {
             return Ok(None);
         }
 
@@ -338,10 +282,6 @@ impl CredentialLoader {
     }
 
     fn load_via_assume_role(&self) -> Result<Option<Credential>> {
-        if self.disable_assume_role {
-            return Ok(None);
-        }
-
         let role_arn = match self.config_loader.role_arn() {
             Some(role_arn) => role_arn,
             None => return Ok(None),
@@ -379,10 +319,6 @@ impl CredentialLoader {
     }
 
     fn load_via_assume_role_with_web_identity(&self) -> Result<Option<Credential>> {
-        if self.disable_assume_role_with_web_identity {
-            return Ok(None);
-        }
-
         let (token_file, role_arn) = match (
             self.config_loader.web_identity_token_file(),
             self.config_loader.role_arn(),
@@ -531,9 +467,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         temp_env::with_vars_unset(vec![AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY], || {
-            let l = CredentialLoader::default()
-                .with_disable_profile()
-                .with_disable_assume_role_with_web_identity();
+            let l = CredentialLoader::new(ConfigLoader::default()).with_disable_ec2_metadata();
             let x = l.load();
             assert!(x.is_none());
         });
@@ -549,9 +483,7 @@ mod tests {
                 (AWS_SECRET_ACCESS_KEY, Some("secret_access_key")),
             ],
             || {
-                let l = CredentialLoader::default()
-                    .with_disable_profile()
-                    .with_disable_assume_role_with_web_identity();
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load();
                 debug!("current loader: {l:?}");
 
@@ -568,6 +500,8 @@ mod tests {
 
         temp_env::with_vars(
             vec![
+                (AWS_ACCESS_KEY_ID, None),
+                (AWS_SECRET_ACCESS_KEY, None),
                 (
                     AWS_CONFIG_FILE,
                     Some(format!(
@@ -588,7 +522,7 @@ mod tests {
                 ),
             ],
             || {
-                let l = CredentialLoader::default().with_disable_assume_role_with_web_identity();
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load must success");
                 assert_eq!("config_access_key_id", x.access_key());
                 assert_eq!("config_secret_access_key", x.secret_key());
@@ -602,6 +536,8 @@ mod tests {
 
         temp_env::with_vars(
             vec![
+                (AWS_ACCESS_KEY_ID, None),
+                (AWS_SECRET_ACCESS_KEY, None),
                 (
                     AWS_CONFIG_FILE,
                     Some(format!(
@@ -622,7 +558,7 @@ mod tests {
                 ),
             ],
             || {
-                let l = CredentialLoader::default().with_disable_assume_role_with_web_identity();
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load must success");
                 assert_eq!("shared_access_key_id", x.access_key());
                 assert_eq!("shared_secret_access_key", x.secret_key());
@@ -637,6 +573,8 @@ mod tests {
 
         temp_env::with_vars(
             vec![
+                (AWS_ACCESS_KEY_ID, None),
+                (AWS_SECRET_ACCESS_KEY, None),
                 (
                     AWS_CONFIG_FILE,
                     Some(format!(
@@ -657,7 +595,7 @@ mod tests {
                 ),
             ],
             || {
-                let l = CredentialLoader::default().with_disable_assume_role_with_web_identity();
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load must success");
                 assert_eq!("shared_access_key_id", x.access_key());
                 assert_eq!("shared_secret_access_key", x.secret_key());
@@ -711,7 +649,7 @@ mod tests {
                 ("AWS_WEB_IDENTITY_TOKEN_FILE", Some(&file_path)),
             ],
             || {
-                let l = CredentialLoader::default();
+                let l = CredentialLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load_credential must success");
 
                 assert!(x.is_valid());

@@ -116,7 +116,20 @@ impl Clone for ConfigLoader {
 }
 
 impl ConfigLoader {
-    pub fn load_via_env(&self) {
+    /// Create a ConfigLoader with loaded has been called.
+    pub fn with_loaded() -> Self {
+        let cfg = ConfigLoader::default();
+        cfg.load();
+        cfg
+    }
+
+    /// Load will load config from env or profile.
+    pub fn load(&self) {
+        self.load_via_env();
+        self.load_via_profile();
+    }
+
+    fn load_via_env(&self) {
         if self.read_env.load(Ordering::Relaxed) {
             return;
         }
@@ -162,7 +175,7 @@ impl ConfigLoader {
         *self.config.write().expect("lock must be valid") = config;
     }
 
-    pub fn load_via_profile(&self) {
+    fn load_via_profile(&self) {
         if self.read_profile.load(Ordering::Relaxed) {
             return;
         }
@@ -281,6 +294,9 @@ impl ConfigLoader {
             .unwrap_or_else(|| "default".to_string())
     }
 
+    /// Get the region from current config.
+    ///
+    /// Returns `None` if not exist.
     pub fn region(&self) -> Option<String> {
         self.config
             .read()
@@ -289,6 +305,16 @@ impl ConfigLoader {
             .clone()
     }
 
+    /// Set the region into current config.
+    pub fn set_region(&self, v: &str) {
+        self.config
+            .write()
+            .expect("lock must be valid")
+            .region
+            .replace(v.to_string());
+    }
+
+    /// Get the sts_regional_endpoints from current config.
     pub fn sts_regional_endpoints(&self) -> String {
         self.config
             .read()
@@ -297,6 +323,8 @@ impl ConfigLoader {
             .clone()
             .unwrap_or_else(|| "legacy".to_string())
     }
+
+    /// Get the access_key_id from current config.
     pub fn access_key_id(&self) -> Option<String> {
         self.config
             .read()
@@ -305,6 +333,16 @@ impl ConfigLoader {
             .clone()
     }
 
+    /// Set the access_key_id into current config.
+    pub fn set_access_key_id(&self, v: &str) {
+        self.config
+            .write()
+            .expect("lock must be valid")
+            .access_key_id
+            .replace(v.to_string());
+    }
+
+    /// Get the secret_access_key from current config.
     pub fn secret_access_key(&self) -> Option<String> {
         self.config
             .read()
@@ -313,6 +351,16 @@ impl ConfigLoader {
             .clone()
     }
 
+    /// Set the secret_access_key into current config.
+    pub fn set_secret_access_key(&self, v: &str) {
+        self.config
+            .write()
+            .expect("lock must be valid")
+            .secret_access_key
+            .replace(v.to_string());
+    }
+
+    /// Get the session_token from current config.
     pub fn session_token(&self) -> Option<String> {
         self.config
             .read()
@@ -321,6 +369,16 @@ impl ConfigLoader {
             .clone()
     }
 
+    /// Set the session_token into current config.
+    pub fn set_session_token(&self, v: &str) {
+        self.config
+            .write()
+            .expect("lock must be valid")
+            .session_token
+            .replace(v.to_string());
+    }
+
+    /// Get the role_arn from current config.
     pub fn role_arn(&self) -> Option<String> {
         self.config
             .read()
@@ -329,6 +387,7 @@ impl ConfigLoader {
             .clone()
     }
 
+    /// Set role_arn into config.
     pub fn set_role_arn(&self, v: &str) {
         self.config
             .write()
@@ -337,6 +396,7 @@ impl ConfigLoader {
             .replace(v.to_string());
     }
 
+    /// Get role_session_name from current config.
     pub fn role_session_name(&self) -> String {
         self.config
             .read()
@@ -346,6 +406,7 @@ impl ConfigLoader {
             .unwrap_or_else(|| "reqsign".to_string())
     }
 
+    /// Set role_session_name into current config.
     pub fn set_role_session_name(&self, v: &str) {
         self.config
             .write()
@@ -354,6 +415,7 @@ impl ConfigLoader {
             .replace(v.to_string());
     }
 
+    /// Get external_id from current config.
     pub fn external_id(&self) -> Option<String> {
         self.config
             .read()
@@ -362,6 +424,7 @@ impl ConfigLoader {
             .clone()
     }
 
+    /// Set external_id into current config.
     pub fn set_external_id(&self, v: &str) {
         self.config
             .write()
@@ -370,6 +433,7 @@ impl ConfigLoader {
             .replace(v.to_string());
     }
 
+    /// Get web_identity_token_file from current config.
     pub fn web_identity_token_file(&self) -> Option<String> {
         self.config
             .read()

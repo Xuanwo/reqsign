@@ -12,41 +12,20 @@ use std::sync::RwLock;
 use crate::aws::config::ConfigLoader;
 
 /// RegionLoader will load region from different sources.
-#[derive(Default)]
 #[cfg_attr(test, derive(Debug))]
 pub struct RegionLoader {
     region: Arc<RwLock<Option<String>>>,
-
-    disable_env: bool,
-    disable_profile: bool,
 
     config_loader: ConfigLoader,
 }
 
 impl RegionLoader {
-    /// Disable load from env.
-    pub fn with_disable_env(mut self) -> Self {
-        self.disable_env = true;
-        self
-    }
-
-    /// Disable load from profile.
-    pub fn with_disable_profile(mut self) -> Self {
-        self.disable_profile = true;
-        self
-    }
-
-    /// Set static region.
-    pub fn with_region(self, region: &str) -> Self {
-        *self.region.write().expect("lock poisoned") = Some(region.to_string());
-
-        self
-    }
-
-    /// Set config loader
-    pub fn with_config_loader(mut self, cfg: ConfigLoader) -> Self {
-        self.config_loader = cfg;
-        self
+    /// Create a new region loader.
+    pub fn new(cfg: ConfigLoader) -> Self {
+        Self {
+            region: Arc::default(),
+            config_loader: cfg,
+        }
     }
 
     /// Load region.
@@ -67,22 +46,10 @@ impl RegionLoader {
     }
 
     fn load_via_env(&self) -> Option<String> {
-        if self.disable_env {
-            return None;
-        }
-
-        self.config_loader.load_via_env();
-
         self.config_loader.region()
     }
 
     fn load_via_profile(&self) -> Option<String> {
-        if self.disable_profile {
-            return None;
-        }
-
-        self.config_loader.load_via_profile();
-
         self.config_loader.region()
     }
 }
@@ -99,7 +66,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         temp_env::with_vars_unset(vec![AWS_REGION], || {
-            let l = RegionLoader::default();
+            let l = RegionLoader::new(ConfigLoader::with_loaded());
             let x = l.load();
             assert!(x.is_none());
         });
@@ -110,7 +77,7 @@ mod tests {
         let _ = env_logger::builder().is_test(true).try_init();
 
         temp_env::with_vars(vec![(AWS_REGION, Some("test"))], || {
-            let l = RegionLoader::default();
+            let l = RegionLoader::new(ConfigLoader::with_loaded());
             let x = l.load().expect("load must success");
             assert_eq!("test", x);
         });
@@ -131,7 +98,7 @@ mod tests {
                 )),
             )],
             || {
-                let l = RegionLoader::default();
+                let l = RegionLoader::new(ConfigLoader::with_loaded());
                 let x = l.load().expect("load must success");
                 assert_eq!("test", x);
             },
