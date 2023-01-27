@@ -117,8 +117,7 @@ impl CredentialLoader {
                     err
                 })
                 .unwrap_or_default()
-                .or_else(|| self.load_via_env())
-                .or_else(|| self.load_via_profile())
+                .or_else(|| self.load_via_config())
                 .or_else(|| {
                     self.load_via_assume_role_with_web_identity()
                         .map_err(|err| {
@@ -184,22 +183,7 @@ impl CredentialLoader {
         }
     }
 
-    fn load_via_env(&self) -> Option<Credential> {
-        if let (Some(ak), Some(sk)) = (
-            self.config_loader.access_key_id(),
-            self.config_loader.secret_access_key(),
-        ) {
-            let mut cred = Credential::new(&ak, &sk);
-            if let Some(tk) = self.config_loader.session_token() {
-                cred.set_security_token(&tk);
-            }
-            Some(cred)
-        } else {
-            None
-        }
-    }
-
-    fn load_via_profile(&self) -> Option<Credential> {
+    fn load_via_config(&self) -> Option<Credential> {
         if let (Some(ak), Some(sk)) = (
             self.config_loader.access_key_id(),
             self.config_loader.secret_access_key(),

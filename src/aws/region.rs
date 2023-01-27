@@ -35,21 +35,15 @@ impl RegionLoader {
             return Some(region);
         }
 
-        self.load_via_env()
-            .or_else(|| self.load_via_profile())
-            .map(|region| {
-                let mut lock = self.region.write().expect("lock poisoned");
-                *lock = Some(region.clone());
+        self.load_via_env().map(|region| {
+            let mut lock = self.region.write().expect("lock poisoned");
+            *lock = Some(region.clone());
 
-                region
-            })
+            region
+        })
     }
 
     fn load_via_env(&self) -> Option<String> {
-        self.config_loader.region()
-    }
-
-    fn load_via_profile(&self) -> Option<String> {
         self.config_loader.region()
     }
 }
