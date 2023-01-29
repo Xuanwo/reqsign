@@ -311,7 +311,7 @@ mod tests {
         if env::var("REQSIGN_ALIYUN_OSS_TEST").is_err()
             || env::var("REQSIGN_ALIYUN_OSS_TEST").unwrap() != "on"
         {
-            panic!("test not enabled");
+            return Ok(());
         }
 
         let provider_arn =
