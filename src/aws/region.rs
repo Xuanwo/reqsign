@@ -35,7 +35,7 @@ impl RegionLoader {
             return Some(region);
         }
 
-        self.load_via_env().map(|region| {
+        self.load_via_config().map(|region| {
             let mut lock = self.region.write().expect("lock poisoned");
             *lock = Some(region.clone());
 
@@ -43,7 +43,7 @@ impl RegionLoader {
         })
     }
 
-    fn load_via_env(&self) -> Option<String> {
+    fn load_via_config(&self) -> Option<String> {
         self.config_loader.region()
     }
 }
