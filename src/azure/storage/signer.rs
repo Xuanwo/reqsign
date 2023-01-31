@@ -70,8 +70,7 @@ impl Builder {
         let mut allow_anonymous = false;
         if self.credential.is_valid() {
             cred_loader = cred_loader.with_credential(self.credential.clone());
-        }
-        else {
+        } else {
             // If the credential is not valid, assume we want anonymous access.
             allow_anonymous = true;
         }
@@ -371,9 +370,7 @@ mod tests {
 
     #[test]
     pub fn test_anonymous() {
-        let signer = AzureStorageSigner::builder()
-            .build()
-            .unwrap();
+        let signer = AzureStorageSigner::builder().build().unwrap();
         // Construct request
         let mut req = Request::builder()
             .uri("https://test.blob.core.windows.net/testbucket/testblob")
@@ -382,6 +379,9 @@ mod tests {
 
         // Signing request with Signer
         assert!(signer.sign(&mut req).is_ok());
-        assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob")
+        assert_eq!(
+            req.uri(),
+            "https://test.blob.core.windows.net/testbucket/testblob"
+        )
     }
 }
