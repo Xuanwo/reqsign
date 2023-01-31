@@ -1,40 +1,40 @@
 //! AWS service sigv4 signer
 
-use std::borrow::Cow;
+
 use std::fmt::Debug;
-use std::fmt::Display;
+
 use std::fmt::Formatter;
 use std::fmt::Write;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use http::HeaderMap;
+
 use http::HeaderValue;
 use log::debug;
-use percent_encoding::percent_decode_str;
-use percent_encoding::utf8_percent_encode;
+
+
 
 use super::config::ConfigLoader;
-use super::constants::AWS_QUERY_ENCODE_SET;
-use super::constants::X_AMZ_CONTENT_SHA_256;
-use super::constants::X_AMZ_DATE;
-use super::constants::X_AMZ_SECURITY_TOKEN;
+
+
+
+
 use super::credential::CredentialLoader;
 use super::region::RegionLoader;
 use crate::credential::Credential;
 use crate::hash::hex_hmac_sha256;
 use crate::hash::hex_sha256;
-use crate::hash::hmac_sha256;
+
 use crate::request::SignableRequest;
 use crate::time::format_date;
 use crate::time::format_iso8601;
 use crate::time::DateTime;
 use crate::time::Duration;
-use crate::time::{self};
+
 
 use crate::utils::SigningMethod;
 use crate::utils::{
-    generate_signing_key, normalize_header_value, CanonicalRequest, SigningAlgorithm,
+    generate_signing_key, CanonicalRequest, SigningAlgorithm,
     SigningKeyFlavor,
 };
 

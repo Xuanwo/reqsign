@@ -1,8 +1,8 @@
 //! AWS service sigv4 signer
 
-use std::borrow::Cow;
+
 use std::fmt::Debug;
-use std::fmt::Display;
+
 use std::fmt::Formatter;
 use std::fmt::Write;
 
@@ -10,23 +10,23 @@ use anyhow::anyhow;
 use anyhow::Result;
 use http::HeaderValue;
 use log::debug;
-use rsa::pkcs1v15::SigningKey;
 
-use super::credential::CredentialLoader;
+
+
 use crate::credential::Credential;
-use crate::hash::hex_hmac_sha256;
-use crate::hash::hex_sha256;
+
+
 use crate::request::SignableRequest;
-use crate::time::format_date;
-use crate::time::format_iso8601;
+
+
 use crate::time::DateTime;
 use crate::time::Duration;
-use crate::time::{self};
+
 
 use crate::utils::CanonicalRequest;
 use crate::utils::SigningAlgorithm;
 use crate::utils::SigningMethod;
-use crate::utils::{generate_signing_key, normalize_header_value, SigningKeyFlavor};
+
 
 use rsa;
 use serde::Deserialize;
@@ -43,8 +43,7 @@ mod rsa_deserialize {
     {
         let s = String::deserialize(deserializer)?;
         Ok(rsa::RsaPrivateKey::from_pkcs8_pem(&s)
-            .map_err(serde::de::Error::custom)?
-            .into())
+            .map_err(serde::de::Error::custom)?)
     }
 }
 

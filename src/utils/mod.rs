@@ -175,7 +175,7 @@ impl CanonicalRequest {
             SigningAlgorithm::Goog4Hmac => "Goog",
             SigningAlgorithm::Goog4Rsa => "Goog",
         };
-        return format!("X-{prefix}-{header_name}");
+        format!("X-{prefix}-{header_name}")
     }
 
     pub(crate) fn build_headers(&mut self, cred: &Credential) -> Result<()> {
