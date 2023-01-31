@@ -1,6 +1,5 @@
 //! AWS service sigv4 signer
 
-
 use std::fmt::Debug;
 
 use std::fmt::Formatter;
@@ -12,12 +11,7 @@ use anyhow::Result;
 use http::HeaderValue;
 use log::debug;
 
-
-
 use super::config::ConfigLoader;
-
-
-
 
 use super::credential::CredentialLoader;
 use super::region::RegionLoader;
@@ -31,12 +25,8 @@ use crate::time::format_iso8601;
 use crate::time::DateTime;
 use crate::time::Duration;
 
-
 use crate::utils::SigningMethod;
-use crate::utils::{
-    generate_signing_key, CanonicalRequest, SigningAlgorithm,
-    SigningKeyFlavor,
-};
+use crate::utils::{generate_signing_key, CanonicalRequest, SigningAlgorithm, SigningKeyFlavor};
 
 /// Builder for `Signer`.
 #[derive(Default)]

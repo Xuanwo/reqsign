@@ -68,10 +68,6 @@ pub use azure::storage::Builder as AzureStorageBuilder;
 pub use azure::storage::Signer as AzureStorageSigner;
 
 mod google;
-pub use google::v4::Authentication as GoogleV4Authentication;
-pub use google::v4::Builder as GoogleV4Builder;
-pub use google::v4::Config as GoogleV4Config;
-pub use google::v4::Signer as GoogleV4Signer;
 pub use google::Builder as GoogleBuilder;
 pub use google::Signer as GoogleSigner;
 pub use google::Token as GoogleToken;

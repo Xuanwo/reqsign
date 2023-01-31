@@ -3,7 +3,6 @@
 mod constants;
 mod credential;
 mod signer;
-pub mod v4;
 
 pub use credential::Token;
 pub use credential::TokenLoad;
