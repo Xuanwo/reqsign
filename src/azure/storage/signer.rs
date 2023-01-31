@@ -25,11 +25,17 @@ use crate::time::{self};
 #[derive(Default)]
 pub struct Builder {
     credential: Credential,
+    use_anonymous: bool,
 
     time: Option<DateTime>,
 }
 
 impl Builder {
+    /// Use anonymous access
+    pub fn use_anonymous(&mut self, value: bool) -> &mut Self {
+        self.use_anonymous = value;
+        self
+    }
     /// Specify account name.
     pub fn account_name(&mut self, account_name: &str) -> &mut Self {
         self.credential.set_access_key(account_name);
@@ -66,20 +72,24 @@ impl Builder {
     ///
     /// The builder should not be used anymore.
     pub fn build(&mut self) -> Result<Signer> {
+        if self.use_anonymous {
+            return Ok(Signer {
+                credential_loader: CredentialLoader::default(),
+                time: self.time,
+                allow_anonymous: true,
+            });
+        }
+
         let mut cred_loader = CredentialLoader::default();
-        let mut allow_anonymous = false;
         if self.credential.is_valid() {
             cred_loader = cred_loader.with_credential(self.credential.clone());
-        } else {
-            // If the credential is not valid, assume we want anonymous access.
-            allow_anonymous = true;
         }
 
         Ok(Signer {
             credential_loader: cred_loader,
 
             time: self.time,
-            allow_anonymous: allow_anonymous,
+            allow_anonymous: false,
         })
     }
 }
@@ -370,7 +380,10 @@ mod tests {
 
     #[test]
     pub fn test_anonymous() {
-        let signer = AzureStorageSigner::builder().build().unwrap();
+        let signer = AzureStorageSigner::builder()
+            .use_anonymous(true)
+            .build()
+            .unwrap();
         // Construct request
         let mut req = Request::builder()
             .uri("https://test.blob.core.windows.net/testbucket/testblob")
