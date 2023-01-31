@@ -67,15 +67,20 @@ impl Builder {
     /// The builder should not be used anymore.
     pub fn build(&mut self) -> Result<Signer> {
         let mut cred_loader = CredentialLoader::default();
+        let mut allow_anonymous = false;
         if self.credential.is_valid() {
             cred_loader = cred_loader.with_credential(self.credential.clone());
+        }
+        else {
+            // If the credential is not valid, assume we want anonymous access.
+            allow_anonymous = true;
         }
 
         Ok(Signer {
             credential_loader: cred_loader,
 
             time: self.time,
-            allow_anonymous: false,
+            allow_anonymous: allow_anonymous,
         })
     }
 }
@@ -362,5 +367,21 @@ mod tests {
         // Signing request with Signer
         assert!(signer.sign(&mut req).is_ok());
         assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob?sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
+    }
+
+    #[test]
+    pub fn test_anonymous() {
+        let signer = AzureStorageSigner::builder()
+            .build()
+            .unwrap();
+        // Construct request
+        let mut req = Request::builder()
+            .uri("https://test.blob.core.windows.net/testbucket/testblob")
+            .body(())
+            .unwrap();
+
+        // Signing request with Signer
+        assert!(signer.sign(&mut req).is_ok());
+        assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob")
     }
 }
