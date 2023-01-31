@@ -6,7 +6,11 @@ use log::debug;
 use super::credential::CredentialLoader;
 use super::credential::Token;
 use super::credential::TokenLoad;
+use crate::credential::Credential;
 use crate::request::SignableRequest;
+use crate::utils::CanonicalRequest;
+use crate::utils::SigningAlgorithm;
+use crate::utils::SigningMethod;
 
 /// Builder for Signer.
 #[derive(Default)]
@@ -155,7 +159,7 @@ impl Signer {
     /// This function should never be exported to avoid credential leaking by
     /// mistake.
     fn token(&self) -> Option<Token> {
-        self.credential_loader.load()
+        self.credential_loader.load_token()
     }
 
     /// Signing request.
@@ -212,6 +216,40 @@ impl Signer {
         }
 
         Err(anyhow!("token not found"))
+    }
+
+    fn canonicalize(
+        &self,
+        req: &impl SignableRequest,
+        method: SigningMethod,
+        cred: &Credential,
+    ) -> Result<CanonicalRequest> {
+        let mut creq = CanonicalRequest::new(
+            req,
+            method,
+            None,
+            SigningAlgorithm::Goog4Rsa,
+            "europe-west3".to_string(),
+            "storage".to_string(),
+        )?;
+        creq.build_headers(cred)?;
+        creq.build_query(cred)?;
+
+        debug!("calculated canonical request: {creq}");
+        Ok(creq)
+    }
+
+    pub fn sign_v4(&self, req: &mut impl SignableRequest) -> Result<()> {
+        let credential = self
+            .credential_loader
+            .load_credential()
+            .expect("Did not find credentials for google.");
+        let v4cred: Credential = credential.into();
+        let mut creq = self.canonicalize(req, SigningMethod::Header, &v4cred)?;
+        println!("Canonicalized!");
+        let signature = creq.calculate_signature(&v4cred, "europe-west3", "storage")?;
+        println!("Signature {}", signature);
+        Ok(())
     }
 }
 

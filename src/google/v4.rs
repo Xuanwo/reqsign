@@ -8,25 +8,14 @@ use std::fmt::Write;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use http::HeaderMap;
 use http::HeaderValue;
 use log::debug;
-use percent_encoding::percent_decode_str;
-use percent_encoding::utf8_percent_encode;
 use rsa::pkcs1v15::SigningKey;
-use super::constants::GOOG_QUERY_ENCODE_SET;
-use super::constants::GOOG_URI_ENCODE_SET;
-use super::constants::X_GOOG_DATE;
-use super::constants::X_GOOG_CONTENT_SHA_256;
-use super::constants::X_GOOG_SECURITY_TOKEN;
 
-// use super::config::ConfigLoader;
 use super::credential::CredentialLoader;
-// use super::region::RegionLoader;
 use crate::credential::Credential;
 use crate::hash::hex_hmac_sha256;
 use crate::hash::hex_sha256;
-use crate::hash::hmac_sha256;
 use crate::request::SignableRequest;
 use crate::time::format_date;
 use crate::time::format_iso8601;
@@ -34,14 +23,19 @@ use crate::time::DateTime;
 use crate::time::Duration;
 use crate::time::{self};
 
+use crate::utils::CanonicalRequest;
+use crate::utils::SigningAlgorithm;
+use crate::utils::SigningMethod;
+use crate::utils::{generate_signing_key, normalize_header_value, SigningKeyFlavor};
+
 use rsa;
 use serde::Deserialize;
 
 // implement serde deserialization for rsa::RsaPrivateKey
 mod rsa_deserialize {
+    use rsa;
     use rsa::pkcs8::DecodePrivateKey;
     use serde::{Deserialize, Deserializer};
-    use rsa;
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<rsa::RsaPrivateKey, D::Error>
     where
@@ -51,7 +45,7 @@ mod rsa_deserialize {
         Ok(rsa::RsaPrivateKey::from_pkcs8_pem(&s)
             .map_err(serde::de::Error::custom)?
             .into())
-    }    
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -79,7 +73,7 @@ pub struct GoogleHmac {
 #[derive(Debug, Clone)]
 pub enum Authentication {
     Rsa(GoogleAuthentication),
-    Hmac(GoogleHmac)
+    Hmac(GoogleHmac),
 }
 
 impl Authentication {
@@ -136,7 +130,6 @@ pub struct Builder {
 
     time: Option<DateTime>,
 }
-
 
 impl Builder {
     /// Specify service like "s3".
@@ -220,7 +213,6 @@ impl Builder {
     }
 }
 
-
 /// Singer that implement AWS SigV4.
 ///
 /// - [Signature Version 4 signing process](https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html)
@@ -229,7 +221,6 @@ pub struct Signer {
     region: String,
     config: Config,
     // credential_loader: CredentialLoader,
-
     /// Allow anonymous request if credential is not loaded.
     allow_anonymous: bool,
 
@@ -261,9 +252,16 @@ impl Signer {
         method: SigningMethod,
         cred: &Credential,
     ) -> Result<CanonicalRequest> {
-        let mut creq = CanonicalRequest::new(req, method, self.time)?;
+        let mut creq = CanonicalRequest::new(
+            req,
+            method,
+            self.time,
+            SigningAlgorithm::Goog4Rsa,
+            "europe-west3".to_string(),
+            "storage".to_string(),
+        )?;
         creq.build_headers(cred)?;
-        creq.build_query(cred, &self.service, &self.region, &self.algorithm_string())?;
+        creq.build_query(cred)?;
 
         debug!("calculated canonical request: {creq}");
         Ok(creq)
@@ -271,63 +269,21 @@ impl Signer {
 
     /// Calculate signing requests via SignableRequest.
     fn calculate(&self, mut creq: CanonicalRequest, cred: &Credential) -> Result<CanonicalRequest> {
-        let encoded_req = hex_sha256(creq.to_string().as_bytes());
+        let signature = creq.calculate_signature(cred, &self.region, &self.service)?;
 
-        // NOTE: google also allows /auto/storage/ ... (no region)
-        // Scope: "20220313/<region>/<service>/aws4_request"
-        let scope = format!(
-            "{}/{}/{}/goog4_request",
-            format_date(creq.signing_time),
-            self.region,
-            self.service
+        println!(
+            "calculated signature: {signature} (len: {})",
+            signature.len()
         );
-        debug!("calculated scope: {scope}");
 
-        // StringToSign:
-        //
-        // GOOG4-HMAC-SHA256
-        // 20220313T072004Z
-        // 20220313/<region>/<service>/aws4_request
-        // <hashed_canonical_request>
-        let string_to_sign = {
-            let mut f = String::new();
-            writeln!(f, "{}", self.algorithm_string())?;
-            writeln!(f, "{}", format_iso8601(creq.signing_time))?;
-            writeln!(f, "{}", &scope)?;
-            write!(f, "{}", &encoded_req)?;
-            f
-        };
-        debug!("calculated string to sign: {string_to_sign}");
-
-        let signature = match &self.config.authentication {
-            Authentication::Rsa(rsa) => {
-                use rsa::signature::RandomizedSigner;
-                let mut rng = rand::thread_rng();
-                let signing_key = SigningKey::<rsa::sha2::Sha256>::new_with_prefix(rsa.private_key.clone());
-                let signature = signing_key.sign_with_rng(&mut rng, string_to_sign.as_bytes());
-                signature.to_string()   
-            }
-            Authentication::Hmac(hmac) => {
-                let signing_key = generate_signing_key(
-                    hmac.secret_key.as_str(),
-                    creq.signing_time,
-                    &self.region,
-                    &self.service,
-                    SigningKeyFlavor::Google
-                );
-                hex_hmac_sha256(&signing_key, string_to_sign.as_bytes())
-            }
-        };
-
-        println!("calculated signature: {signature} (len: {})", signature.len());
-
+        // TODO fold into CanonicalRequest?
         match creq.signing_method {
             SigningMethod::Header => {
                 let mut authorization = HeaderValue::from_str(&format!(
                     "{} Credential={}/{}, SignedHeaders={}, Signature={}",
                     self.algorithm_string(),
                     cred.access_key(),
-                    scope,
+                    creq.scope, // TODO refactor
                     creq.signed_headers().join(";"),
                     signature
                 ))?;
@@ -418,10 +374,7 @@ impl Signer {
     }
 
     fn credential(&self) -> Option<Credential> {
-        Some(Credential::new(
-            self.config.authentication.access_key(),
-            ""
-        ))
+        Some(Credential::new(self.config.authentication.access_key(), ""))
     }
 
     /// Signing request with query.
@@ -480,220 +433,4 @@ impl Debug for Signer {
             self.region, self.service, self.allow_anonymous
         )
     }
-}
-
-/// SigningMethod is the method that used in signing.
-#[derive(Copy, Clone)]
-pub enum SigningMethod {
-    /// Signing with header.
-    Header,
-    /// Signing with query.
-    Query(Duration),
-}
-
-#[derive(Clone)]
-struct CanonicalRequest {
-    method: http::Method,
-    path: String,
-    query: Option<String>,
-    headers: HeaderMap,
-
-    signing_host: String,
-    signing_method: SigningMethod,
-    signing_time: DateTime,
-}
-
-impl CanonicalRequest {
-    fn new(
-        req: &impl SignableRequest,
-        method: SigningMethod,
-        now: Option<DateTime>,
-    ) -> Result<Self> {
-        let mut canonical_headers = HeaderMap::with_capacity(req.headers().len());
-        // Header names and values need to be normalized according to Step 4 of https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
-        // Using append instead of insert means this will not clobber headers that have the same lowercase name
-        for (name, value) in req.headers().iter() {
-            // The user agent header should not be canonical because it may be altered by proxies
-            if name == http::header::USER_AGENT {
-                continue;
-            }
-            canonical_headers.append(name, normalize_header_value(value));
-        }
-
-        Ok(CanonicalRequest {
-            method: req.method(),
-            path: percent_decode_str(req.path()).decode_utf8()?.to_string(),
-            query: req.query().map(|v| v.to_string()),
-            headers: req.headers(),
-
-            signing_host: req.host_port(),
-            signing_method: method,
-            signing_time: now.unwrap_or_else(time::now),
-        })
-    }
-
-    fn build_headers(&mut self, cred: &Credential) -> Result<()> {
-        // Insert HOST header if not present.
-        if self.headers.get(&http::header::HOST).is_none() {
-            let header = HeaderValue::try_from(self.signing_host.to_string())?;
-            self.headers.insert(http::header::HOST, header);
-        }
-
-        if matches!(self.signing_method, SigningMethod::Header) {
-            // Insert DATE header if not present.
-            if self.headers.get(X_GOOG_DATE).is_none() {
-                let date_header = HeaderValue::try_from(format_iso8601(self.signing_time))?;
-                self.headers.insert(X_GOOG_DATE, date_header);
-            }
-
-            // Insert X_GOOG_CONTENT_SHA_256 header if not present.
-            if self.headers.get(X_GOOG_CONTENT_SHA_256).is_none() {
-                self.headers.insert(
-                    X_GOOG_CONTENT_SHA_256,
-                    HeaderValue::from_static("UNSIGNED-PAYLOAD"),
-                );
-            }
-
-            // Insert X_GOOG_SECURITY_TOKEN header if security token exists.
-            if let Some(token) = cred.security_token() {
-                let mut value = HeaderValue::from_str(token)?;
-                // Set token value sensitive to valid leaking.
-                value.set_sensitive(true);
-
-                self.headers.insert(X_GOOG_SECURITY_TOKEN, value);
-            }
-        }
-
-        Ok(())
-    }
-
-    fn signed_headers(&self) -> Vec<&str> {
-        let mut signed_headers = self.headers.keys().map(|v| v.as_str()).collect::<Vec<_>>();
-        signed_headers.sort_unstable();
-
-        signed_headers
-    }
-
-    fn build_query(&mut self, cred: &Credential, service: &str, region: &str, algorithm_string: &str) -> Result<()> {
-        let query = self.query.take().unwrap_or_default();
-        let mut params: Vec<_> = form_urlencoded::parse(query.as_bytes()).collect();
-
-        if let SigningMethod::Query(expire) = self.signing_method {
-            params.push(("X-Goog-Algorithm".into(), algorithm_string.into()));
-            params.push((
-                "X-Goog-Credential".into(),
-                Cow::Owned(format!(
-                    "{}/{}/{}/{}/goog4_request",
-                    cred.access_key(),
-                    format_date(self.signing_time),
-                    region,
-                    service
-                )),
-            ));
-            params.push((
-                "X-Goog-Date".into(),
-                Cow::Owned(format_iso8601(self.signing_time)),
-            ));
-            params.push((
-                "X-Goog-Expires".into(),
-                Cow::Owned(expire.whole_seconds().to_string()),
-            ));
-            params.push((
-                "X-Goog-SignedHeaders".into(),
-                self.signed_headers().join(";").into(),
-            ));
-
-            // TOOD unsure if this is needed
-            if let Some(token) = cred.security_token() {
-                params.push(("X-Goog-Security-Token".into(), token.into()));
-            }
-        }
-        // Sort by param name
-        params.sort();
-
-        if params.is_empty() {
-            return Ok(());
-        }
-
-        let param = params
-            .iter()
-            .map(|(k, v)| {
-                (
-                    utf8_percent_encode(k, &GOOG_QUERY_ENCODE_SET),
-                    utf8_percent_encode(v, &GOOG_QUERY_ENCODE_SET),
-                )
-            })
-            .map(|(k, v)| format!("{k}={v}"))
-            .collect::<Vec<String>>()
-            .join("&");
-        self.query = Some(param);
-
-        Ok(())
-    }
-}
-
-impl Display for CanonicalRequest {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", self.method)?;
-        writeln!(
-            f,
-            "{}",
-            utf8_percent_encode(&self.path, &GOOG_URI_ENCODE_SET)
-        )?;
-        writeln!(f, "{}", self.query.as_ref().unwrap_or(&"".to_string()))?;
-
-        let signed_headers = self.signed_headers();
-        for header in signed_headers.iter() {
-            let value = &self.headers[*header];
-            writeln!(
-                f,
-                "{}:{}",
-                header,
-                value.to_str().expect("header value must be valid")
-            )?;
-        }
-        writeln!(f)?;
-        writeln!(f, "{}", signed_headers.join(";"))?;
-        // TODO: we should support user specify payload hash.
-        write!(f, "UNSIGNED-PAYLOAD")?;
-
-        Ok(())
-    }
-}
-
-fn normalize_header_value(header_value: &HeaderValue) -> HeaderValue {
-    let bs = header_value.as_bytes();
-
-    let starting_index = bs.iter().position(|b| *b != b' ').unwrap_or(0);
-    let ending_offset = bs.iter().rev().position(|b| *b != b' ').unwrap_or(0);
-    let ending_index = bs.len() - ending_offset;
-
-    // This can't fail because we started with a valid HeaderValue and then only trimmed spaces
-    HeaderValue::from_bytes(&bs[starting_index..ending_index]).expect("invalid header value")
-}
-
-enum SigningKeyFlavor {
-    Aws, 
-    Google
-}
-
-fn generate_signing_key(secret: &str, time: DateTime, region: &str, service: &str, signing_key_flavor: SigningKeyFlavor) -> Vec<u8> {
-    // Sign secret
-    let secret = match signing_key_flavor {
-        SigningKeyFlavor::Aws => format!("AWS4{}", secret),
-        SigningKeyFlavor::Google => format!("GOOG4{}", secret)
-    };
-    // Sign date
-    let sign_date = hmac_sha256(secret.as_bytes(), format_date(time).as_bytes());
-    // Sign region
-    let sign_region = hmac_sha256(sign_date.as_slice(), region.as_bytes());
-    // Sign service
-    let sign_service = hmac_sha256(sign_region.as_slice(), service.as_bytes());
-    // Sign request
-    let sign_request = match signing_key_flavor {
-        SigningKeyFlavor::Aws => hmac_sha256(sign_service.as_slice(), "aws4_request".as_bytes()),
-        SigningKeyFlavor::Google => hmac_sha256(sign_service.as_slice(), "goog4_request".as_bytes())
-    };
-
-    sign_request
 }

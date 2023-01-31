@@ -23,6 +23,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use time::Duration;
 
+use crate::credential::Credential as AwsCredential;
+
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
 use crate::time::now;
@@ -125,6 +127,12 @@ impl Credential {
 
     pub fn private_key(&self) -> &str {
         &self.private_key
+    }
+}
+
+impl From<Credential> for AwsCredential {
+    fn from(item: Credential) -> Self {
+        AwsCredential::new(item.client_email(), item.private_key())
     }
 }
 
@@ -254,7 +262,7 @@ impl CredentialLoader {
     }
 
     /// Load token from CredentialLoader.
-    pub fn load(&self) -> Option<Token> {
+    pub fn load_token(&self) -> Option<Token> {
         // Return cached credential if it has been loaded at least once.
         if self.token_loaded.load(Ordering::Relaxed) {
             match self.token.read().expect("lock poisoned").clone() {
@@ -395,7 +403,7 @@ impl CredentialLoader {
         Ok(Some(token))
     }
 
-    fn load_credential(&self) -> Option<Credential> {
+    pub fn load_credential(&self) -> Option<Credential> {
         // Return cached credential if it has been loaded at least once.
         if self.credential_loaded.load(Ordering::Relaxed) {
             if let Some(cred) = self.credential.read().expect("lock poisoned").clone() {

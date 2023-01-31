@@ -4,9 +4,9 @@ use percent_encoding::NON_ALPHANUMERIC;
 // Env values used in google services.
 pub const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
 
-pub const X_GOOG_DATE : &str = "x-goog-date";
-pub const X_GOOG_CONTENT_SHA_256 : &str = "x-goog-content-sha256";
-pub const X_GOOG_SECURITY_TOKEN : &str = "x-goog-security-token";
+pub const X_GOOG_DATE: &str = "x-goog-date";
+pub const X_GOOG_CONTENT_SHA_256: &str = "x-goog-content-sha256";
+pub const X_GOOG_SECURITY_TOKEN: &str = "x-goog-security-token";
 
 /// AsciiSet for [AWS UriEncode](https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html)
 ///
