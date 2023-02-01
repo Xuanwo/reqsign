@@ -25,15 +25,15 @@ use crate::time::{self};
 #[derive(Default)]
 pub struct Builder {
     credential: Credential,
-    use_anonymous: bool,
+    allow_anonymous: bool,
 
     time: Option<DateTime>,
 }
 
 impl Builder {
-    /// Use anonymous access
-    pub fn use_anonymous(&mut self, value: bool) -> &mut Self {
-        self.use_anonymous = value;
+    /// Allow anonymous access
+    pub fn allow_anonymous(&mut self, value: bool) -> &mut Self {
+        self.allow_anonymous = value;
         self
     }
     /// Specify account name.
@@ -72,7 +72,7 @@ impl Builder {
     ///
     /// The builder should not be used anymore.
     pub fn build(&mut self) -> Result<Signer> {
-        if self.use_anonymous {
+        if self.allow_anonymous {
             return Ok(Signer {
                 credential_loader: CredentialLoader::default(),
                 time: self.time,
