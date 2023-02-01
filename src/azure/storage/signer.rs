@@ -381,7 +381,7 @@ mod tests {
     #[test]
     pub fn test_anonymous() {
         let signer = AzureStorageSigner::builder()
-            .use_anonymous(true)
+            .allow_anonymous(true)
             .build()
             .unwrap();
         // Construct request
