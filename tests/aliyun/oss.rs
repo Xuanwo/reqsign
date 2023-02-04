@@ -186,8 +186,7 @@ fn test_list_bucket() -> Result<()> {
     let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!(
-        "{}?list-type=2&delimiter=/&encoding-type=url",
-        url
+        "{url}?list-type=2&delimiter=/&encoding-type=url"
     ))?;
 
     signer.sign(&mut req).expect("sign request must success");

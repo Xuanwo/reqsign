@@ -162,7 +162,7 @@ impl Signer {
                 )?;
                 req.insert_header(AUTHORIZATION, {
                     let mut value: HeaderValue =
-                        format!("SharedKey {}:{}", account_name, signature).parse()?;
+                        format!("SharedKey {account_name}:{signature}").parse()?;
                     value.set_sensitive(true);
 
                     value
@@ -317,7 +317,7 @@ fn canonicalize_header(req: &impl SignableRequest, now: DateTime) -> Result<Stri
     Ok(headers
         .iter()
         // Format into "name:value"
-        .map(|(k, v)| format!("{}:{}", k, v))
+        .map(|(k, v)| format!("{k}:{v}"))
         .collect::<Vec<String>>()
         // Join via "\n"
         .join("\n"))
@@ -342,7 +342,7 @@ fn canonicalize_resource(req: &impl SignableRequest, cred: &Credential) -> Strin
         req.path(),
         params
             .iter()
-            .map(|(k, v)| format!("{}:{}", k, v))
+            .map(|(k, v)| format!("{k}:{v}"))
             .collect::<Vec<String>>()
             .join("\n")
     )

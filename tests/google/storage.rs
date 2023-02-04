@@ -74,7 +74,7 @@ fn test_list_objects() -> Result<()> {
 
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
-    builder = builder.uri(format!("{}/o", url));
+    builder = builder.uri(format!("{url}/o"));
     let mut req = builder.body("")?;
 
     signer.sign(&mut req).expect("sign request must success");
