@@ -23,8 +23,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use time::Duration;
 
-use crate::credential::Credential as AwsCredential;
-
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
 use crate::time::now;
@@ -127,12 +125,6 @@ impl Credential {
 
     pub fn private_key(&self) -> &str {
         &self.private_key
-    }
-}
-
-impl From<Credential> for AwsCredential {
-    fn from(item: Credential) -> Self {
-        AwsCredential::new(item.client_email(), item.private_key())
     }
 }
 

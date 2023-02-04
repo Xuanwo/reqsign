@@ -380,6 +380,8 @@ mod tests {
     use aws_sigv4::SigningParams;
     use http::header;
 
+    use crate::time;
+
     use super::*;
 
     fn test_get_request() -> http::Request<&'static str> {

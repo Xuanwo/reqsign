@@ -12,6 +12,9 @@ use crate::utils::CanonicalRequest;
 use crate::utils::SigningAlgorithm;
 use crate::utils::SigningMethod;
 
+use crate::credential::Credential as AwsCredential;
+use crate::time::Duration;
+
 /// Builder for Signer.
 #[derive(Default)]
 pub struct Builder {
@@ -229,7 +232,8 @@ impl Signer {
             method,
             None,
             SigningAlgorithm::Goog4Rsa,
-            "europe-west3".to_string(),
+            // TODO load these variables properly
+            "auto".to_string(),
             "storage".to_string(),
         )?;
         creq.build_headers(cred)?;
@@ -239,16 +243,16 @@ impl Signer {
         Ok(creq)
     }
 
-    pub fn sign_v4(&self, req: &mut impl SignableRequest) -> Result<()> {
+    /// Signing request with query.
+    pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
         let credential = self
             .credential_loader
             .load_credential()
             .expect("Did not find credentials for google.");
-        let v4cred: Credential = credential.into();
-        let mut creq = self.canonicalize(req, SigningMethod::Header, &v4cred)?;
-        println!("Canonicalized!");
-        let signature = creq.calculate_signature(&v4cred, "europe-west3", "storage")?;
-        println!("Signature {}", signature);
+        // transform credential to v4 credential
+        let v4cred = AwsCredential::new(credential.client_email(), credential.private_key());
+        let mut creq = self.canonicalize(req, SigningMethod::Query(expire), &v4cred)?;
+        let _signature = creq.calculate_signature(&v4cred, "europe-west3", "storage")?;
         Ok(())
     }
 }

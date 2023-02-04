@@ -102,6 +102,7 @@ pub enum SigningMethod {
 }
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub(crate) enum SigningAlgorithm {
     Aws4Hmac,
     Goog4Hmac,
