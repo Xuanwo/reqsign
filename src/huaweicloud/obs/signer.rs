@@ -225,7 +225,7 @@ fn string_to_sign(req: &impl SignableRequest, _cred: &Credential, bucket: &str) 
     writeln!(&mut s, "{}", get_or_default(&h, &DATE)?)?;
     let canonicalize_header = canonicalize_header(req)?;
     if !canonicalize_header.is_empty() {
-        writeln!(&mut s, "{}", canonicalize_header)?;
+        writeln!(&mut s, "{canonicalize_header}")?;
     }
     write!(&mut s, "{}", canonicalize_resource(req, bucket)?)?;
 
@@ -258,7 +258,7 @@ fn canonicalize_header(req: &impl SignableRequest) -> Result<String> {
     Ok(headers
         .iter()
         // Format into "name:value"
-        .map(|(k, v)| format!("{}:{}", k, v))
+        .map(|(k, v)| format!("{k}:{v}"))
         .collect::<Vec<String>>()
         // Join via "\n"
         .join("\n"))
@@ -270,7 +270,7 @@ fn canonicalize_header(req: &impl SignableRequest) -> Result<String> {
 fn canonicalize_resource(req: &impl SignableRequest, bucket: &str) -> Result<String> {
     let mut s = String::new();
 
-    write!(&mut s, "/{}", bucket)?;
+    write!(&mut s, "/{bucket}")?;
     write!(&mut s, "{}", req.path())?;
 
     let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
@@ -282,12 +282,12 @@ fn canonicalize_resource(req: &impl SignableRequest, bucket: &str) -> Result<Str
 
     let params_str = params
         .iter()
-        .map(|(k, v)| format!("{}={}", k, v))
+        .map(|(k, v)| format!("{k}={v}"))
         .collect::<Vec<String>>()
         .join("&");
 
     if !params_str.is_empty() {
-        write!(s, "?{}", params_str)?;
+        write!(s, "?{params_str}")?;
     }
 
     Ok(s.to_string())

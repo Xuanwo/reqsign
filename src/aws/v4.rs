@@ -552,7 +552,7 @@ fn normalize_header_value(header_value: &HeaderValue) -> HeaderValue {
 
 fn generate_signing_key(secret: &str, time: DateTime, region: &str, service: &str) -> Vec<u8> {
     // Sign secret
-    let secret = format!("AWS4{}", secret);
+    let secret = format!("AWS4{secret}");
     // Sign date
     let sign_date = hmac_sha256(secret.as_bytes(), format_date(time).as_bytes());
     // Sign region

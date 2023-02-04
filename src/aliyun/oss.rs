@@ -360,7 +360,7 @@ fn canonicalize_header(
     Ok(headers
         .iter()
         // Format into "name:value"
-        .map(|(k, v)| format!("{}:{}", k, v))
+        .map(|(k, v)| format!("{k}:{v}"))
         .collect::<Vec<String>>()
         // Join via "\n"
         .join("\n"))
@@ -394,15 +394,15 @@ fn canonicalize_resource(
 
     let params_str = params
         .iter()
-        .map(|(k, v)| format!("{}={}", k, v))
+        .map(|(k, v)| format!("{k}={v}"))
         .collect::<Vec<String>>()
         .join("&");
 
     let path = percent_decode_str(req.path()).decode_utf8_lossy();
     if params_str.is_empty() {
-        format!("/{bucket}{}", path)
+        format!("/{bucket}{path}")
     } else {
-        format!("/{bucket}{}?{}", path, params_str)
+        format!("/{bucket}{path}?{params_str}")
     }
 }
 

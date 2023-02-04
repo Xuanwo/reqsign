@@ -121,7 +121,7 @@ fn test_list_blobs() -> Result<()> {
     ] {
         let mut builder = http::Request::builder();
         builder = builder.method(http::Method::GET);
-        builder = builder.uri(format!("{}?{}", url, query));
+        builder = builder.uri(format!("{url}?{query}"));
         let mut req = builder.body("")?;
 
         signer.sign(&mut req).expect("sign request must success");
