@@ -36,6 +36,7 @@ impl Builder {
         self.allow_anonymous = value;
         self
     }
+
     /// Specify account name.
     pub fn account_name(&mut self, account_name: &str) -> &mut Self {
         self.credential.set_access_key(account_name);
@@ -72,14 +73,6 @@ impl Builder {
     ///
     /// The builder should not be used anymore.
     pub fn build(&mut self) -> Result<Signer> {
-        if self.allow_anonymous {
-            return Ok(Signer {
-                credential_loader: CredentialLoader::default(),
-                time: self.time,
-                allow_anonymous: true,
-            });
-        }
-
         let mut cred_loader = CredentialLoader::default();
         if self.credential.is_valid() {
             cred_loader = cred_loader.with_credential(self.credential.clone());
@@ -89,7 +82,7 @@ impl Builder {
             credential_loader: cred_loader,
 
             time: self.time,
-            allow_anonymous: false,
+            allow_anonymous: self.allow_anonymous,
         })
     }
 }
