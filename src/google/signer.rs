@@ -6,7 +6,9 @@ use log::debug;
 use super::credential::CredentialLoader;
 use super::credential::Token;
 use super::credential::TokenLoad;
+use super::v4;
 use crate::request::SignableRequest;
+use crate::time::Duration;
 
 /// Builder for Signer.
 #[derive(Default)]
@@ -212,6 +214,49 @@ impl Signer {
         }
 
         Err(anyhow!("token not found"))
+    }
+
+    /// Sign the query with a duration.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use time::Duration;
+    /// use anyhow::Result;
+    /// use reqsign::GoogleSigner;
+    /// use reqwest::{Client, Url};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<()> {
+    ///     // Signer will load region and credentials from environment by default.
+    ///     let signer = GoogleSigner::builder()
+    ///         .credential_path("/Users/wolfv/Downloads/noted-throne-361708-bf95cdbf3fea.json")
+    ///         .scope("storage")
+    ///         .build()?;
+    ///
+    ///     // Construct request
+    ///     let url = Url::parse("https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md")?;
+    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///
+    ///     // Signing request with Signer
+    ///     signer.sign_query(&mut req, Duration::hours(1))?;
+    ///
+    ///     println!("signed request: {:?}", req);
+    ///     // Sending already signed request.
+    ///     let resp = Client::new().execute(req).await?;
+    ///     println!("resp got status: {}", resp.status());
+    ///     println!("resp got body: {}", resp.text().await?);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn sign_query(&self, query: &mut impl SignableRequest, duration: Duration) -> Result<()> {
+        let credentials = self.credential_loader.load_credential().unwrap();
+        let v4_signer = v4::Signer::builder()
+            // TODO set this from outside?
+            .service("storage")
+            .region("auto")
+            .credential(credentials)
+            .build()?;
+        v4_signer.sign_query(query, duration)
     }
 }
 

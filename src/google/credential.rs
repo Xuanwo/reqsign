@@ -395,7 +395,7 @@ impl CredentialLoader {
         Ok(Some(token))
     }
 
-    fn load_credential(&self) -> Option<Credential> {
+    pub fn load_credential(&self) -> Option<Credential> {
         // Return cached credential if it has been loaded at least once.
         if self.credential_loaded.load(Ordering::Relaxed) {
             if let Some(cred) = self.credential.read().expect("lock poisoned").clone() {
