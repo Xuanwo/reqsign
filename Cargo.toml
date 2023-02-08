@@ -25,7 +25,7 @@ name = "aws"
 
 [dependencies]
 anyhow = "1"
-backon = "0.2"
+backon = "0.4"
 base64 = "0.21"
 bytes = "1"
 dirs = "4"

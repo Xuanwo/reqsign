@@ -8,7 +8,8 @@ use std::thread::sleep;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use backon::ExponentialBackoff;
+use backon::BackoffBuilder;
+use backon::ExponentialBuilder;
 use log::info;
 use log::warn;
 use quick_xml::de;
@@ -105,9 +106,10 @@ impl CredentialLoader {
         // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
         //
         // Reference: <https://github.com/datafuselabs/opendal/issues/288>
-        let mut retry = ExponentialBackoff::default()
+        let mut retry = ExponentialBuilder::default()
             .with_max_times(4)
-            .with_jitter();
+            .with_jitter()
+            .build();
 
         let cred = loop {
             let cred = self

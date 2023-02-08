@@ -10,7 +10,8 @@ use std::thread::sleep;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use backon::ExponentialBackoff;
+use backon::BackoffBuilder;
+use backon::ExponentialBuilder;
 use http::header;
 use http::StatusCode;
 use jsonwebtoken::Algorithm;
@@ -266,9 +267,10 @@ impl CredentialLoader {
             }
         }
 
-        let mut retry = ExponentialBackoff::default()
+        let mut retry = ExponentialBuilder::default()
             .with_max_times(4)
-            .with_jitter();
+            .with_jitter()
+            .build();
 
         let token = loop {
             let token = self
