@@ -211,38 +211,8 @@ impl Signer {
         Ok(())
     }
 
-    /// Signing request with query.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use anyhow::Result;
-    /// use reqsign::AwsConfigLoader;
-    /// use reqsign::AwsV4Signer;
-    /// use reqwest::Client;
-    /// use reqwest::Request;
-    /// use reqwest::Url;
-    /// use time::Duration;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<()> {
-    ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = AwsV4Signer::builder()
-    ///         .config_loader(AwsConfigLoader::with_loaded())
-    ///         .service("s3")
-    ///         .allow_anonymous()
-    ///         .build()?;
-    ///     // Construct request
-    ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
-    ///     // Signing request with Signer
-    ///     signer.sign_query(&mut req, Duration::hours(1))?;
-    ///     // Sending already signed request.
-    ///     let resp = Client::new().execute(req).await?;
-    ///     println!("resp got status: {}", resp.status());
-    ///     Ok(())
-    /// }
-    /// ```
+    /// Implementation for signing request with query.
+    /// Example can be found in signer.rs / sign_query
     pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
         let credential = self.credential().as_ref().unwrap();
         let creq = self.canonicalize(req, SigningMethod::Query(expire), credential)?;
@@ -416,4 +386,51 @@ fn normalize_header_value(header_value: &HeaderValue) -> HeaderValue {
 
     // This can't fail because we started with a valid HeaderValue and then only trimmed spaces
     HeaderValue::from_bytes(&bs[starting_index..ending_index]).expect("invalid header value")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::google::{credential::CredentialLoader, v4::Signer};
+    use crate::request::SignableRequest;
+    use crate::time::parse_rfc2822;
+    use anyhow::Result;
+    use time::UtcOffset;
+
+    #[test]
+    fn test_sign_query_deterministic() -> Result<()> {
+        let credential_path = format!(
+            "{}/testdata/services/google/testbucket_credential.json",
+            std::env::current_dir()
+                .expect("current_dir must exist")
+                .to_string_lossy()
+        );
+
+        let credential_loader = CredentialLoader::from_path(&credential_path).unwrap();
+        let credentials = credential_loader.load_credential().unwrap();
+
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md"
+            .parse()
+            .expect("url must be valid");
+
+        let time_offset = parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+            .to_offset(UtcOffset::from_hms(0, 0, 0)?);
+
+        let v4_signer = Signer::builder()
+            // TODO set this from outside?
+            .service("storage")
+            .region("auto")
+            .time(time_offset)
+            .credential(credentials)
+            .build()?;
+
+        v4_signer.sign_query(&mut req, time::Duration::hours(1))?;
+
+        let query = req.query().unwrap();
+        assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));
+        assert!(query.contains("X-Goog-Credential"));
+        assert!(query == "X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=testbucket-reqsign-account%40iam-testbucket-reqsign-project.iam.gserviceaccount.com%2F20220815%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20220815T165012Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&X-Goog-Signature=9F423139DB223D818F2D4D6BCA4916DD1EE5AEB8E72D99EC60E8B903DC3CF0586C27A0F821C8CB20C6BB76C776E63134DAFF5957E7862BB89926F18E0D3618E4EE40EF8DBEC64D87F5AD4CAF6FE4C2BC3239E1076A33BE3113D6E0D1AF263C16FA5E1C9590C8F8E4E2CA2FED11533607B5AFE84B53E2E00CB320E0BC853C138EBBDCFEC3E9219C73551478EE12AABBD2576686F887738A21DC5AE00DFF3D481BD08F642342C8CCB476E74C8FEA0C02BA6FEFD61300218D6E216EAD4B59F3351E456601DF38D1CC1B4CE639D2748739933672A08B5FEBBED01B5BC0785E81A865EE0252A0C5AE239061F3F5DB4AFD8CC676646750C762A277FBFDE70A85DFDF33");
+        Ok(())
+    }
 }
