@@ -5,7 +5,8 @@ use std::thread::sleep;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use backon::ExponentialBackoff;
+use backon::BackoffBuilder;
+use backon::ExponentialBuilder;
 use log::warn;
 use serde::Deserialize;
 
@@ -67,9 +68,10 @@ impl CredentialLoader {
         }
 
         // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
-        let mut retry = ExponentialBackoff::default()
+        let mut retry = ExponentialBuilder::default()
             .with_max_times(4)
-            .with_jitter();
+            .with_jitter()
+            .build();
 
         let cred = loop {
             let cred = self.load_via_env().or_else(|| {
