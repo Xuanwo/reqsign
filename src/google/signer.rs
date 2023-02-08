@@ -289,4 +289,34 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_sign_query() -> Result<()> {
+        let credential_path = format!(
+            "{}/testdata/services/google/testbucket_credential.json",
+            std::env::current_dir()
+                .expect("current_dir must exist")
+                .to_string_lossy()
+        );
+
+        let signer = Signer::builder()
+            .credential_path(&credential_path)
+            .scope("storage")
+            .build()?;
+
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md"
+            .parse()
+            .expect("url must be valid");
+
+        signer.sign_query(&mut req, time::Duration::hours(1))?;
+
+        let query = req.query().unwrap();
+        println!("query: {}", query);
+        assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));
+        assert!(query.contains("X-Goog-Credential"));
+
+        Ok(())
+    }
 }
