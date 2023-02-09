@@ -313,7 +313,6 @@ mod tests {
         signer.sign_query(&mut req, time::Duration::hours(1))?;
 
         let query = req.query().unwrap();
-        println!("query: {}", query);
         assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));
         assert!(query.contains("X-Goog-Credential"));
 
