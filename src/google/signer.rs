@@ -6,7 +6,9 @@ use log::debug;
 use super::credential::CredentialLoader;
 use super::credential::Token;
 use super::credential::TokenLoad;
+use super::v4;
 use crate::request::SignableRequest;
+use crate::time::Duration;
 
 /// Builder for Signer.
 #[derive(Default)]
@@ -213,6 +215,49 @@ impl Signer {
 
         Err(anyhow!("token not found"))
     }
+
+    /// Sign the query with a duration.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use time::Duration;
+    /// use anyhow::Result;
+    /// use reqsign::GoogleSigner;
+    /// use reqwest::{Client, Url};
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<()> {
+    ///     // Signer will load region and credentials from environment by default.
+    ///     let signer = GoogleSigner::builder()
+    ///         .credential_path("/Users/wolfv/Downloads/noted-throne-361708-bf95cdbf3fea.json")
+    ///         .scope("storage")
+    ///         .build()?;
+    ///
+    ///     // Construct request
+    ///     let url = Url::parse("https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md")?;
+    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///
+    ///     // Signing request with Signer
+    ///     signer.sign_query(&mut req, Duration::hours(1))?;
+    ///
+    ///     println!("signed request: {:?}", req);
+    ///     // Sending already signed request.
+    ///     let resp = Client::new().execute(req).await?;
+    ///     println!("resp got status: {}", resp.status());
+    ///     println!("resp got body: {}", resp.text().await?);
+    ///     Ok(())
+    /// }
+    /// ```
+    pub fn sign_query(&self, query: &mut impl SignableRequest, duration: Duration) -> Result<()> {
+        let credentials = self.credential_loader.load_credential().unwrap();
+        let v4_signer = v4::Signer::builder()
+            // TODO set this from outside?
+            .service("storage")
+            .region("auto")
+            .credential(credentials)
+            .build()?;
+        v4_signer.sign_query(query, duration)
+    }
 }
 
 #[cfg(test)]
@@ -241,6 +286,35 @@ mod tests {
             .scope("test")
             .customed_token_loader(TestLoader { client })
             .build()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sign_query() -> Result<()> {
+        let credential_path = format!(
+            "{}/testdata/services/google/testbucket_credential.json",
+            std::env::current_dir()
+                .expect("current_dir must exist")
+                .to_string_lossy()
+        );
+
+        let signer = Signer::builder()
+            .credential_path(&credential_path)
+            .scope("storage")
+            .build()?;
+
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md"
+            .parse()
+            .expect("url must be valid");
+
+        signer.sign_query(&mut req, time::Duration::hours(1))?;
+
+        let query = req.query().unwrap();
+        assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));
+        assert!(query.contains("X-Goog-Credential"));
 
         Ok(())
     }
