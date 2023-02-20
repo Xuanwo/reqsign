@@ -394,7 +394,13 @@ fn canonicalize_resource(
 
     let params_str = params
         .iter()
-        .map(|(k, v)| format!("{k}={v}"))
+        .map(|(k, v)| {
+            if v == "" {
+                format!("{k}")
+            } else {
+                format!("{k}={v}")
+            }
+        })
         .collect::<Vec<String>>()
         .join("&");
 
