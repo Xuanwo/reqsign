@@ -72,6 +72,48 @@ fn test_get_object() -> Result<()> {
 }
 
 #[test]
+fn test_delete_objects() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
+
+    let mut req = Request::new(
+        r#"<Delete>
+<Object>
+ <Key>sample1.txt</Key>
+ </Object>
+ <Object>
+   <Key>sample2.txt</Key>
+ </Object>
+ </Delete>"#,
+    );
+    *req.method_mut() = http::Method::POST;
+    *req.uri_mut() = http::Uri::from_str(&format!("{}/?delete", url))?;
+    req.headers_mut()
+        .insert("CONTENT-MD5", "WOctCY1SS662e7ziElh4cw==".parse().unwrap());
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text()?);
+    assert_eq!(StatusCode::OK, status);
+    Ok(())
+}
+
+#[test]
 fn test_get_object_with_query_sign() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
