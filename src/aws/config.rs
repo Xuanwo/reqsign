@@ -9,7 +9,7 @@ use std::sync::RwLock;
 use anyhow::anyhow;
 use anyhow::Result;
 use ini::Ini;
-use log::warn;
+use log::debug;
 
 use super::constants::*;
 use crate::dirs::expand_homedir;
@@ -184,9 +184,9 @@ impl ConfigLoader {
         // Ignore all errors happened internally.
         let _ = self
             .load_via_profile_shared_credentials_file()
-            .map_err(|err| warn!("load_via_profile_shared_credentials_file failed: {err:?}"));
+            .map_err(|err| debug!("load_via_profile_shared_credentials_file failed: {err:?}"));
         let _ = self.load_via_profile_config_file().map_err(|err| {
-            warn!("load_via_profile_config_file failed: {err:?}");
+            debug!("load_via_profile_config_file failed: {err:?}");
         });
     }
 
