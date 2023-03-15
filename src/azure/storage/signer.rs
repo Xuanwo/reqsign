@@ -17,9 +17,9 @@ use crate::credential::Credential;
 use crate::hash::base64_decode;
 use crate::hash::base64_hmac_sha256;
 use crate::request::SignableRequest;
+use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
-use crate::time::{self};
 
 /// Builder for `Signer`.
 #[derive(Default)]
@@ -69,7 +69,7 @@ impl Builder {
         self
     }
 
-    /// Use exising information to build a new signer.
+    /// Use existing information to build a new signer.
     ///
     /// The builder should not be used anymore.
     pub fn build(&mut self) -> Result<Signer> {
@@ -122,13 +122,32 @@ impl Signer {
 
     /// Calculate signing requests via SignableRequest.
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
+        self.calculate_req(req, cred, false)
+    }
+
+    /// Calculate signing requests via SignableRequest.
+    /// for batch request's sub request
+    pub fn calculate_sub_req(
+        &self,
+        req: &impl SignableRequest,
+        cred: &Credential,
+    ) -> Result<SignedOutput> {
+        self.calculate_req(req, cred, true)
+    }
+
+    fn calculate_req(
+        &self,
+        req: &impl SignableRequest,
+        cred: &Credential,
+        is_sub_req: bool,
+    ) -> Result<SignedOutput> {
         if let Some(sas_token) = cred.security_token() {
             // The SAS token already contains an auth signature so we don't need to
             // construct one
             Ok(SignedOutput::SharedAccessSignature(sas_token.to_owned()))
         } else {
             let now = self.time.unwrap_or_else(time::now);
-            let string_to_sign = string_to_sign(req, cred, now)?;
+            let string_to_sign = string_to_sign(req, cred, now, is_sub_req)?;
             let auth =
                 base64_hmac_sha256(&base64_decode(cred.secret_key()), string_to_sign.as_bytes());
 
@@ -142,6 +161,24 @@ impl Signer {
 
     /// Apply signed results to requests.
     pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
+        self.apply_req(req, output, false)
+    }
+
+    /// Apply signed results to requests.
+    pub fn apply_sub_req(
+        &self,
+        req: &mut impl SignableRequest,
+        output: &SignedOutput,
+    ) -> Result<()> {
+        self.apply_req(req, output, true)
+    }
+
+    fn apply_req(
+        &self,
+        req: &mut impl SignableRequest,
+        output: &SignedOutput,
+        is_sub_req: bool,
+    ) -> Result<()> {
         match output {
             SignedOutput::SharedAccessSignature(sas_token) => {
                 // The SAS token is itself a query string
@@ -156,10 +193,14 @@ impl Signer {
                     HeaderName::from_static(X_MS_DATE),
                     format_http_date(*signed_time).parse()?,
                 )?;
-                req.insert_header(
-                    HeaderName::from_static(X_MS_VERSION),
-                    AZURE_VERSION.parse()?,
-                )?;
+
+                if !is_sub_req {
+                    req.insert_header(
+                        HeaderName::from_static(X_MS_VERSION),
+                        AZURE_VERSION.parse()?,
+                    )?;
+                }
+
                 req.insert_header(AUTHORIZATION, {
                     let mut value: HeaderValue =
                         format!("SharedKey {account_name}:{signature}").parse()?;
@@ -215,6 +256,21 @@ impl Signer {
 
         Err(anyhow!("credential not found"))
     }
+
+    /// Signing sub request in batch.
+    pub fn sign_sub_req(&self, sub_req: &mut impl SignableRequest) -> Result<()> {
+        if let Some(cred) = self.credential() {
+            let sig = self.calculate_sub_req(sub_req, &cred)?;
+            return self.apply_sub_req(sub_req, &sig);
+        }
+
+        if self.allow_anonymous {
+            debug!("credential not found and anonymous is allowed, skipping signing.");
+            return Ok(());
+        }
+
+        Err(anyhow!("credential not found"))
+    }
 }
 
 /// Singed output carries result of this signing.
@@ -247,11 +303,19 @@ pub enum SignedOutput {
 /// CanonicalizedHeaders +
 /// CanonicalizedResource;
 /// ```
+/// ## Note
+/// For sub-requests of batch API, requests should be signed without `x-ms-version` header.
+/// Set the `sub_req` to `ture` for such.
 ///
 /// ## Reference
 ///
 /// - [Blob, Queue, and File Services (Shared Key authorization)](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
-fn string_to_sign(req: &impl SignableRequest, cred: &Credential, now: DateTime) -> Result<String> {
+fn string_to_sign(
+    req: &impl SignableRequest,
+    cred: &Credential,
+    now: DateTime,
+    sub_req: bool,
+) -> Result<String> {
     #[inline]
     fn get_or_default<'a>(h: &'a HeaderMap, key: &'a HeaderName) -> Result<&'a str> {
         match h.get(key) {
@@ -279,7 +343,7 @@ fn string_to_sign(req: &impl SignableRequest, cred: &Credential, now: DateTime) 
     writeln!(&mut s, "{}", get_or_default(&h, &IF_NONE_MATCH)?)?;
     writeln!(&mut s, "{}", get_or_default(&h, &IF_UNMODIFIED_SINCE)?)?;
     writeln!(&mut s, "{}", get_or_default(&h, &RANGE)?)?;
-    writeln!(&mut s, "{}", canonicalize_header(req, now)?)?;
+    writeln!(&mut s, "{}", canonicalize_header(req, now, sub_req)?)?;
     write!(&mut s, "{}", canonicalize_resource(req, cred))?;
 
     debug!("string to sign: {}", &s);
@@ -290,7 +354,11 @@ fn string_to_sign(req: &impl SignableRequest, cred: &Credential, now: DateTime) 
 /// ## Reference
 ///
 /// - [Constructing the canonicalized headers string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string)
-fn canonicalize_header(req: &impl SignableRequest, now: DateTime) -> Result<String> {
+fn canonicalize_header(
+    req: &impl SignableRequest,
+    now: DateTime,
+    is_sub_req: bool,
+) -> Result<String> {
     let mut headers = req
         .headers()
         .iter()
@@ -308,8 +376,10 @@ fn canonicalize_header(req: &impl SignableRequest, now: DateTime) -> Result<Stri
     // Insert x_ms_date header.
     headers.push((X_MS_DATE.to_lowercase(), format_http_date(now)));
 
-    // Insert x_ms_version header.
-    headers.push((X_MS_VERSION.to_lowercase(), AZURE_VERSION.to_string()));
+    if !is_sub_req {
+        // Insert x_ms_version header.
+        headers.push((X_MS_VERSION.to_lowercase(), AZURE_VERSION.to_string()));
+    }
 
     // Sort via header name.
     headers.sort_by(|x, y| x.0.cmp(&y.0));
