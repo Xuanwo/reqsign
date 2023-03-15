@@ -17,15 +17,16 @@ use crate::credential::Credential;
 use crate::hash::base64_decode;
 use crate::hash::base64_hmac_sha256;
 use crate::request::SignableRequest;
+use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
-use crate::time::{self};
 
 /// Builder for `Signer`.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Builder {
     credential: Credential,
     allow_anonymous: bool,
+    omit_service_version: bool,
 
     time: Option<DateTime>,
 }
@@ -49,6 +50,12 @@ impl Builder {
         self
     }
 
+    /// set the signer to omitting service version
+    pub fn omit_service_version(&mut self) -> &mut Self {
+        self.omit_service_version = true;
+        self
+    }
+
     /// Specify a Shared Access Signature (SAS) token.
     /// * ref: [Grant limited access to Azure Storage resources using shared access signatures (SAS)](https://docs.microsoft.com/azure/storage/common/storage-sas-overview)
     /// * ref: [Create SAS tokens for storage containers](https://docs.microsoft.com/azure/applied-ai-services/form-recognizer/create-sas-tokens)
@@ -69,7 +76,7 @@ impl Builder {
         self
     }
 
-    /// Use exising information to build a new signer.
+    /// Use existing information to build a new signer.
     ///
     /// The builder should not be used anymore.
     pub fn build(&mut self) -> Result<Signer> {
@@ -81,6 +88,7 @@ impl Builder {
         Ok(Signer {
             credential_loader: cred_loader,
 
+            omit_service_version: self.omit_service_version,
             time: self.time,
             allow_anonymous: self.allow_anonymous,
         })
@@ -93,6 +101,8 @@ impl Builder {
 pub struct Signer {
     credential_loader: CredentialLoader,
 
+    /// whether to omit service version or not
+    omit_service_version: bool,
     /// Allow anonymous request if credential is not loaded.
     allow_anonymous: bool,
     time: Option<DateTime>,
@@ -120,15 +130,14 @@ impl Signer {
         self.credential_loader.load()
     }
 
-    /// Calculate signing requests via SignableRequest.
-    pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
+    fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
         if let Some(sas_token) = cred.security_token() {
             // The SAS token already contains an auth signature so we don't need to
             // construct one
             Ok(SignedOutput::SharedAccessSignature(sas_token.to_owned()))
         } else {
             let now = self.time.unwrap_or_else(time::now);
-            let string_to_sign = string_to_sign(req, cred, now)?;
+            let string_to_sign = string_to_sign(req, cred, now, self.omit_service_version)?;
             let auth =
                 base64_hmac_sha256(&base64_decode(cred.secret_key()), string_to_sign.as_bytes());
 
@@ -156,10 +165,14 @@ impl Signer {
                     HeaderName::from_static(X_MS_DATE),
                     format_http_date(*signed_time).parse()?,
                 )?;
-                req.insert_header(
-                    HeaderName::from_static(X_MS_VERSION),
-                    AZURE_VERSION.parse()?,
-                )?;
+
+                if !self.omit_service_version {
+                    req.insert_header(
+                        HeaderName::from_static(X_MS_VERSION),
+                        AZURE_VERSION.parse()?,
+                    )?;
+                }
+
                 req.insert_header(AUTHORIZATION, {
                     let mut value: HeaderValue =
                         format!("SharedKey {account_name}:{signature}").parse()?;
@@ -247,11 +260,19 @@ pub enum SignedOutput {
 /// CanonicalizedHeaders +
 /// CanonicalizedResource;
 /// ```
+/// ## Note
+/// For sub-requests of batch API, requests should be signed without `x-ms-version` header.
+/// Set the `omit_service_version` to `ture` for such.
 ///
 /// ## Reference
 ///
 /// - [Blob, Queue, and File Services (Shared Key authorization)](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
-fn string_to_sign(req: &impl SignableRequest, cred: &Credential, now: DateTime) -> Result<String> {
+fn string_to_sign(
+    req: &impl SignableRequest,
+    cred: &Credential,
+    now: DateTime,
+    omit_service_version: bool,
+) -> Result<String> {
     #[inline]
     fn get_or_default<'a>(h: &'a HeaderMap, key: &'a HeaderName) -> Result<&'a str> {
         match h.get(key) {
@@ -279,7 +300,11 @@ fn string_to_sign(req: &impl SignableRequest, cred: &Credential, now: DateTime) 
     writeln!(&mut s, "{}", get_or_default(&h, &IF_NONE_MATCH)?)?;
     writeln!(&mut s, "{}", get_or_default(&h, &IF_UNMODIFIED_SINCE)?)?;
     writeln!(&mut s, "{}", get_or_default(&h, &RANGE)?)?;
-    writeln!(&mut s, "{}", canonicalize_header(req, now)?)?;
+    writeln!(
+        &mut s,
+        "{}",
+        canonicalize_header(req, now, omit_service_version)?
+    )?;
     write!(&mut s, "{}", canonicalize_resource(req, cred))?;
 
     debug!("string to sign: {}", &s);
@@ -290,7 +315,11 @@ fn string_to_sign(req: &impl SignableRequest, cred: &Credential, now: DateTime) 
 /// ## Reference
 ///
 /// - [Constructing the canonicalized headers string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string)
-fn canonicalize_header(req: &impl SignableRequest, now: DateTime) -> Result<String> {
+fn canonicalize_header(
+    req: &impl SignableRequest,
+    now: DateTime,
+    omit_service_version: bool,
+) -> Result<String> {
     let mut headers = req
         .headers()
         .iter()
@@ -308,8 +337,10 @@ fn canonicalize_header(req: &impl SignableRequest, now: DateTime) -> Result<Stri
     // Insert x_ms_date header.
     headers.push((X_MS_DATE.to_lowercase(), format_http_date(now)));
 
-    // Insert x_ms_version header.
-    headers.push((X_MS_VERSION.to_lowercase(), AZURE_VERSION.to_string()));
+    if !omit_service_version {
+        // Insert x_ms_version header.
+        headers.push((X_MS_VERSION.to_lowercase(), AZURE_VERSION.to_string()));
+    }
 
     // Sort via header name.
     headers.sort_by(|x, y| x.0.cmp(&y.0));
