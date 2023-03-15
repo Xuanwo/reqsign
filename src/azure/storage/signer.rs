@@ -22,10 +22,11 @@ use crate::time::format_http_date;
 use crate::time::DateTime;
 
 /// Builder for `Signer`.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Builder {
     credential: Credential,
     allow_anonymous: bool,
+    is_batch: bool,
 
     time: Option<DateTime>,
 }
@@ -46,6 +47,12 @@ impl Builder {
     /// Specify account key.
     pub fn account_key(&mut self, account_key: &str) -> &mut Self {
         self.credential.set_secret_key(account_key);
+        self
+    }
+
+    /// is this signer used for batch API's sub-requests
+    pub fn is_batch(&mut self) -> &mut Self {
+        self.is_batch = true;
         self
     }
 
@@ -81,6 +88,7 @@ impl Builder {
         Ok(Signer {
             credential_loader: cred_loader,
 
+            is_batch: self.is_batch,
             time: self.time,
             allow_anonymous: self.allow_anonymous,
         })
@@ -93,6 +101,8 @@ impl Builder {
 pub struct Signer {
     credential_loader: CredentialLoader,
 
+    /// whether for signing sub request of batch API
+    is_batch: bool,
     /// Allow anonymous request if credential is not loaded.
     allow_anonymous: bool,
     time: Option<DateTime>,
@@ -122,17 +132,7 @@ impl Signer {
 
     /// Calculate signing requests via SignableRequest.
     pub fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        self.calculate_req(req, cred, false)
-    }
-
-    /// Calculate signing requests via SignableRequest.
-    /// for batch request's sub request
-    pub fn calculate_sub_req(
-        &self,
-        req: &impl SignableRequest,
-        cred: &Credential,
-    ) -> Result<SignedOutput> {
-        self.calculate_req(req, cred, true)
+        self.calculate_req(req, cred, self.is_batch)
     }
 
     fn calculate_req(
@@ -161,16 +161,7 @@ impl Signer {
 
     /// Apply signed results to requests.
     pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
-        self.apply_req(req, output, false)
-    }
-
-    /// Apply signed results to requests.
-    pub fn apply_sub_req(
-        &self,
-        req: &mut impl SignableRequest,
-        output: &SignedOutput,
-    ) -> Result<()> {
-        self.apply_req(req, output, true)
+        self.apply_req(req, output, self.is_batch)
     }
 
     fn apply_req(
@@ -247,21 +238,6 @@ impl Signer {
         if let Some(cred) = self.credential() {
             let sig = self.calculate(req, &cred)?;
             return self.apply(req, &sig);
-        }
-
-        if self.allow_anonymous {
-            debug!("credential not found and anonymous is allowed, skipping signing.");
-            return Ok(());
-        }
-
-        Err(anyhow!("credential not found"))
-    }
-
-    /// Signing sub request in batch.
-    pub fn sign_sub_req(&self, sub_req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential() {
-            let sig = self.calculate_sub_req(sub_req, &cred)?;
-            return self.apply_sub_req(sub_req, &sig);
         }
 
         if self.allow_anonymous {
