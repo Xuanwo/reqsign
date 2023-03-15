@@ -50,7 +50,7 @@ impl Builder {
         self
     }
 
-    /// is this signer used for batch API's sub-requests
+    /// set the signer to omitting service version
     pub fn omit_service_version(&mut self) -> &mut Self {
         self.omit_service_version = true;
         self
