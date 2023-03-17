@@ -137,7 +137,7 @@ impl Signer {
             SigningMethod::Header => {
                 req.insert_header(DATE, format_http_date(output.signed_time).parse()?)?;
                 req.insert_header(AUTHORIZATION, {
-                    let mut value: HeaderValue = format!("{}", output.signature).parse()?;
+                    let mut value: HeaderValue = output.signature.to_string().parse()?;
                     value.set_sensitive(true);
                     value
                 })?;
@@ -266,7 +266,7 @@ impl Signer {
             keys.push(k.to_string());
         }
         keys.sort();
-        return keys.join(";");
+        keys.join(";")
     }
 
     fn get_http_parameters(&self, req: &impl SignableRequest) -> String {
@@ -293,7 +293,7 @@ impl Signer {
             let v = encoded_data.get(&key).unwrap();
             res.push(vec![key, v.to_string()].join("="));
         }
-        return res.join("&");
+        res.join("&")
     }
 
     fn get_header_list(&self, req: &impl SignableRequest) -> String {
@@ -303,7 +303,7 @@ impl Signer {
             keys.push(k.to_string());
         }
         keys.sort();
-        return keys.join(";");
+        keys.join(";")
     }
 
     fn get_heades(&self, req: &impl SignableRequest) -> String {
@@ -318,7 +318,7 @@ impl Signer {
             let v = encoded_data.get(&key).unwrap();
             res.push(vec![key, v.to_string()].join("="));
         }
-        return res.join("&");
+        res.join("&")
     }
 
     fn get_http_string(&self, req: &impl SignableRequest) -> String {
@@ -337,11 +337,11 @@ impl Signer {
     fn get_string_to_sign(&self, http_string: &str, key_time: &str) -> String {
         let mut s = vec!["sha1".to_string(), key_time.to_string()];
         let mut hasher = Sha1::new();
-        hasher.update(&http_string);
+        hasher.update(http_string);
         let result = hasher.finalize();
         let digest: Vec<String> = result
             .as_slice()
-            .into_iter()
+            .iter()
             .map(|x| format!("{:02x?}", x))
             .collect();
         s.push(digest.join(""));

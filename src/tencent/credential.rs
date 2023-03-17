@@ -27,7 +27,7 @@ impl CredentialLoader {
     pub fn load(&self) -> Option<Credential> {
         // Return cached credential if it's valid.
         match self.credential.read().expect("lock poisoned").clone() {
-            Some(cred) if cred.is_valid() => return Some(cred),
+            Some(cred) if cred.is_valid() => Some(cred),
             _ => None,
         }
     }
