@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
+use super::credential::CredentialLoader;
 use crate::credential::Credential;
 use crate::request::SignableRequest;
 use crate::time;
@@ -20,7 +21,6 @@ use http::HeaderValue;
 use log::debug;
 use percent_encoding::{percent_decode_str, utf8_percent_encode};
 use sha1::{Digest, Sha1};
-use super::credential::CredentialLoader;
 
 /// Builder for `Signer`
 #[derive(Default)]
@@ -225,8 +225,12 @@ impl Signer {
         let mut res = HashMap::new();
         for (k, v) in data.iter() {
             res.insert(
-                utf8_percent_encode(k.as_str(),percent_encoding::NON_ALPHANUMERIC).to_string().to_lowercase(),
-                utf8_percent_encode(v.to_str().unwrap(),percent_encoding::NON_ALPHANUMERIC).to_string().to_lowercase(),
+                utf8_percent_encode(k.as_str(), percent_encoding::NON_ALPHANUMERIC)
+                    .to_string()
+                    .to_lowercase(),
+                utf8_percent_encode(v.to_str().unwrap(), percent_encoding::NON_ALPHANUMERIC)
+                    .to_string()
+                    .to_lowercase(),
             );
         }
         res
@@ -235,7 +239,10 @@ impl Signer {
     fn encode_map(&self, data: &HashMap<String, String>) -> HashMap<String, String> {
         let mut res: HashMap<String, String> = HashMap::new();
         for (k, v) in data.iter() {
-            res.insert(utf8_percent_encode(k,percent_encoding::NON_ALPHANUMERIC).to_string(), utf8_percent_encode(v,percent_encoding::NON_ALPHANUMERIC).to_string());
+            res.insert(
+                utf8_percent_encode(k, percent_encoding::NON_ALPHANUMERIC).to_string(),
+                utf8_percent_encode(v, percent_encoding::NON_ALPHANUMERIC).to_string(),
+            );
         }
         res
     }
@@ -315,7 +322,9 @@ impl Signer {
     }
 
     fn get_http_string(&self, req: &impl SignableRequest) -> String {
-        let path = percent_decode_str(req.path()).decode_utf8_lossy().to_string();
+        let path = percent_decode_str(req.path())
+            .decode_utf8_lossy()
+            .to_string();
         let s = vec![
             req.method().to_string().to_lowercase(),
             path,
