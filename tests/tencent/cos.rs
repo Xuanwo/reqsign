@@ -1,0 +1,278 @@
+use std::env;
+use std::str::FromStr;
+
+use anyhow::Result;
+use http::header::AUTHORIZATION;
+use http::Request;
+use http::StatusCode;
+use log::debug;
+use log::warn;
+use percent_encoding::utf8_percent_encode;
+use percent_encoding::NON_ALPHANUMERIC;
+use reqsign::TencentCosBuilder;
+use reqsign::TencentCosSigner;
+use reqwest::blocking::Client;
+use time::Duration;
+
+fn init_signer() -> Option<TencentCosSigner> {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    dotenv::from_filename(".env").ok();
+    if env::var("REQSIGN_TENCENT_COS_TEST").is_err()
+        || env::var("REQSIGN_TENCENT_COS_TEST").unwrap() != "on"
+    {
+        return None;
+    }
+    let mut builder = TencentCosBuilder::default();
+    builder.access_key_id(
+        &env::var("REQSIGN_TENCENT_COS_ACCESS_KEY")
+            .expect("env REQSIGN_TENCENT_COS_ACCESS_KEY must set"),
+    );
+    builder.access_key_secret(
+        &env::var("REQSIGN_TENCENT_COS_SECRET_KEY")
+            .expect("env REQSIGN_TENCENT_COS_SECRET_KEY must set"),
+    );
+
+    Some(builder.build().expect("signer must be valid"))
+}
+
+#[test]
+fn test_get_object() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_TENCENT_COS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::GET;
+    *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req.headers().get(AUTHORIZATION));
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text()?);
+    assert_eq!(StatusCode::NOT_FOUND, status);
+    Ok(())
+}
+
+#[test]
+fn test_delete_objects() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_TENCENT_COS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
+
+    let mut req = Request::new(
+        r#"<Delete>
+<Object>
+ <Key>sample1.txt</Key>
+ </Object>
+ <Object>
+   <Key>sample2.txt</Key>
+ </Object>
+ </Delete>"#,
+    );
+    *req.method_mut() = http::Method::POST;
+    *req.uri_mut() = http::Uri::from_str(&format!("{}/?delete", url))?;
+    req.headers_mut()
+        .insert("CONTENT-MD5", "WOctCY1SS662e7ziElh4cw==".parse().unwrap());
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text()?);
+    assert_eq!(StatusCode::OK, status);
+    Ok(())
+}
+
+#[test]
+fn test_get_object_with_query_sign() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_TENCENT_COS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::GET;
+    *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
+
+    signer
+        .sign_query(&mut req, Duration::seconds(3600))
+        .expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text()?);
+    assert_eq!(StatusCode::NOT_FOUND, status);
+    Ok(())
+}
+
+#[test]
+fn test_head_object_with_special_characters() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_TENCENT_COS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::HEAD;
+    *req.uri_mut() = http::Uri::from_str(&format!(
+        "{}/{}",
+        url,
+        utf8_percent_encode("not-exist-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
+    ))?;
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
+
+    debug!("got response: {:?}", resp);
+    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    Ok(())
+}
+
+#[test]
+fn test_put_object_with_special_characters() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_TENCENT_COS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::PUT;
+    *req.uri_mut() = http::Uri::from_str(&format!(
+        "{}/{}",
+        url,
+        utf8_percent_encode("put-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
+    ))?;
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {:?}", resp.text()?);
+    assert_eq!(StatusCode::OK, status);
+    Ok(())
+}
+
+#[test]
+fn test_list_bucket() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_TENCENT_COS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::GET;
+    *req.uri_mut() =
+        http::Uri::from_str(&format!("{url}?list-type=2&delimiter=/&encoding-type=url"))?;
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text()?);
+    assert_eq!(StatusCode::OK, status);
+    Ok(())
+}
+
+#[test]
+fn test_list_bucket_with_invalid_token() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_TENCENT_COS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::GET;
+    *req.uri_mut() = http::Uri::from_str(&format!(
+        "{}?list-type=2&delimiter=/&encoding-type=url&continuation-token={}",
+        url,
+        utf8_percent_encode("hello.txt", NON_ALPHANUMERIC)
+    ))?;
+
+    signer.sign(&mut req).expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must success");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text()?);
+    assert_eq!(StatusCode::BAD_REQUEST, status);
+    Ok(())
+}
