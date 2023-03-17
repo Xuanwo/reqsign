@@ -77,6 +77,10 @@ mod huaweicloud;
 pub use huaweicloud::obs::Builder as HuaweicloudObsBuilder;
 pub use huaweicloud::obs::Signer as HuaweicloudObsSigner;
 
+mod tencent;
+pub use tencent::cos::Builder as TencentCosBuilder;
+pub use tencent::cos::Signer as TencentCosSigner;
+
 mod dirs;
 mod hash;
 mod request;
