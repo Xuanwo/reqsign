@@ -49,7 +49,6 @@ time = { version = "0.3", features = ["macros", "formatting", "parsing"] }
 ureq = { version = "2.5", default-features = false }
 rand = "0.8.5"
 rsa = { version = "0.8.1", features = ["sha2"] }
-chrono = "0.4.24"
 urlencoding = "2.1.2"
 ring = "0.16.20"
 digest = "0.10.6"

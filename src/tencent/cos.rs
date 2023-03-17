@@ -5,7 +5,6 @@ use std::fmt::Write;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use chrono::Utc;
 use http::header::AUTHORIZATION;
 use http::header::DATE;
 use http::HeaderMap;
@@ -208,7 +207,7 @@ impl Signer {
     }
 
     fn get_key_time(&self, valid_seconds: u32) -> String {
-        let start = Utc::now().timestamp();
+        let start = time::now().unix_timestamp();
         let end = start + valid_seconds as i64;
         format!("{};{}", start, end)
     }
