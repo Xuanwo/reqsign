@@ -1,6 +1,6 @@
 //! Tencent COS Singer
 
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use std::fmt::Write;
 
 use anyhow::anyhow;
@@ -19,9 +19,9 @@ use urlencoding::{decode, encode};
 use crate::credential::Credential;
 use crate::request::SignableRequest;
 use crate::time;
+use crate::time::format_http_date;
 use crate::time::DateTime;
 use crate::time::Duration;
-use crate::time::format_http_date;
 
 use super::credential::CredentialLoader;
 
@@ -140,8 +140,7 @@ impl Signer {
             SigningMethod::Header => {
                 req.insert_header(DATE, format_http_date(output.signed_time).parse()?)?;
                 req.insert_header(AUTHORIZATION, {
-                    let mut value: HeaderValue =
-                        format!("{}", output.signature).parse()?;
+                    let mut value: HeaderValue = format!("{}", output.signature).parse()?;
                     value.set_sensitive(true);
                     value
                 })?;
@@ -161,10 +160,7 @@ impl Signer {
                 } else {
                     "".to_string()
                 };
-                write!(
-                    query,
-                    "&{}", &output.signature
-                )?;
+                write!(query, "&{}", &output.signature)?;
 
                 if let Some(token) = &output.security_token {
                     write!(
@@ -234,7 +230,10 @@ impl Signer {
     fn encode_data(&self, data: &HeaderMap) -> HashMap<String, String> {
         let mut res = HashMap::new();
         for (k, v) in data.iter() {
-            res.insert(encode(k.as_str()).to_string().to_lowercase(), encode(v.to_str().unwrap()).to_string());
+            res.insert(
+                encode(k.as_str()).to_string().to_lowercase(),
+                encode(v.to_str().unwrap()).to_string(),
+            );
         }
         res
     }
@@ -255,7 +254,12 @@ impl Signer {
         let query = option.unwrap();
         let mut keys: Vec<String> = Vec::new();
         let mut m = HashMap::new();
-        let _ = form_urlencoded::parse(query.as_bytes()).map(|(key, val)| m.insert(key.to_string().to_lowercase(), val.to_string().to_lowercase()));
+        let _ = form_urlencoded::parse(query.as_bytes()).map(|(key, val)| {
+            m.insert(
+                key.to_string().to_lowercase(),
+                val.to_string().to_lowercase(),
+            )
+        });
         let encoded_data = self.encode_map(&m);
         for k in encoded_data.keys() {
             keys.push(k.to_string());
@@ -272,7 +276,12 @@ impl Signer {
         let query = option.unwrap();
         let mut keys: Vec<String> = Vec::new();
         let mut m = HashMap::new();
-        let _ = form_urlencoded::parse(query.as_bytes()).map(|(key, val)| m.insert(key.to_string().to_lowercase(), val.to_string().to_lowercase()));
+        let _ = form_urlencoded::parse(query.as_bytes()).map(|(key, val)| {
+            m.insert(
+                key.to_string().to_lowercase(),
+                val.to_string().to_lowercase(),
+            )
+        });
         let encoded_data = self.encode_map(&m);
         for k in encoded_data.keys() {
             keys.push(k.to_string());
@@ -337,7 +346,13 @@ impl Signer {
     /// Set customed credential loader.
     /// https://cloud.tencent.com/document/product/436/7778
     /// This loader will be used first.
-    pub fn get_signature(&self, req: &impl SignableRequest, secret_key: &str, secret_id: &str, valid_seconds: u32) -> String {
+    pub fn get_signature(
+        &self,
+        req: &impl SignableRequest,
+        secret_key: &str,
+        secret_id: &str,
+        valid_seconds: u32,
+    ) -> String {
         let key_time = self.get_key_time(valid_seconds);
         debug!("key_time: {}", key_time);
         let sign_key = self.get_sign_key(&key_time, secret_key);
@@ -346,7 +361,7 @@ impl Signer {
         //UrlParamList
         let param_list = self.get_url_param_list(req);
         debug!("param_list: {}", param_list);
-//HttpParameters
+        //HttpParameters
         let header_list = self.get_header_list(req);
         debug!("header_list: {}", header_list);
         let http_string = self.get_http_string(req);
