@@ -3,24 +3,24 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use anyhow::anyhow;
-use anyhow::Result;
-use http::header::AUTHORIZATION;
-use http::header::DATE;
-use http::HeaderMap;
-use http::HeaderValue;
-use log::debug;
-use percent_encoding::utf8_percent_encode;
-use ring::hmac;
-use sha1::{Digest, Sha1};
-use urlencoding::{decode, encode};
-
 use crate::credential::Credential;
 use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
 use crate::time::Duration;
+use anyhow::anyhow;
+use anyhow::Result;
+use hmac::Hmac;
+use hmac::Mac;
+use http::header::AUTHORIZATION;
+use http::header::DATE;
+use http::HeaderMap;
+use http::HeaderValue;
+use log::debug;
+use percent_encoding::utf8_percent_encode;
+use sha1::{Digest, Sha1};
+use urlencoding::{decode, encode};
 
 use super::credential::CredentialLoader;
 
@@ -213,13 +213,10 @@ impl Signer {
     }
 
     fn get_sign_key(&self, data: &str, sign_key: &str) -> String {
-        let key = hmac::Key::new(
-            hmac::HMAC_SHA1_FOR_LEGACY_USE_ONLY,
-            sign_key.to_string().as_bytes(),
-        );
-        let signature = hmac::sign(&key, data.as_bytes());
+        let mut h = Hmac::<Sha1>::new_from_slice(sign_key.as_bytes()).expect("invalid key length");
+        h.update(data.as_bytes());
+        let signature = h.finalize().into_bytes().to_vec();
         let s: Vec<String> = signature
-            .as_ref()
             .into_iter()
             .map(|x| format!("{:02x?}", x))
             .collect();
