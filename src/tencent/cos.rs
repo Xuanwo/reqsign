@@ -90,13 +90,6 @@ impl Builder {
         if self.credential.is_valid() {
             cred_loader = cred_loader.with_credential(self.credential.clone());
         }
-        if self.disable_load_from_env {
-            cred_loader = cred_loader.with_disable_env();
-        }
-        if self.disable_load_from_assume_role_with_oidc {
-            cred_loader = cred_loader.with_disable_assume_role_with_oidc();
-        }
-
         Ok(Signer {
             credential_loader: cred_loader,
             allow_anonymous: self.allow_anonymous,
