@@ -11,6 +11,8 @@ use http::HeaderValue;
 use http::Method;
 use http::Uri;
 
+use crate::ctx::SigningContext;
+
 /// Trait for all signable request.
 ///
 /// Any request type that implement this trait can be used by signers as input.
@@ -82,6 +84,14 @@ pub trait SignableRequest {
     ///
     /// This function SHOULD append full query.
     fn set_query(&mut self, query: &str) -> Result<()>;
+
+    fn build(&mut self) -> Result<SigningContext> {
+        todo!()
+    }
+
+    fn apply(&mut self, _ctx: SigningContext) -> Result<()> {
+        todo!()
+    }
 }
 
 /// Implement `SignableRequest` for [`http::Request`]
@@ -132,6 +142,52 @@ impl<T> SignableRequest for http::Request<T> {
                 .path_and_query
                 .unwrap_or_else(|| PathAndQuery::from_static("/"));
 
+            pq = PathAndQuery::from_str(&format!("{}?{}", pq.path(), query))?;
+
+            Some(pq)
+        };
+
+        *this.uri_mut() = Uri::from_parts(parts)?;
+
+        Ok(())
+    }
+
+    fn build(&mut self) -> Result<SigningContext> {
+        let this = self as &mut http::Request<T>;
+
+        Ok(SigningContext {
+            method: this.method().clone(),
+            host: this.host().to_string(),
+            port: this.port(),
+            path: this.uri().path().to_string(),
+            query: this.uri().query().map(|v| v.to_string()),
+
+            // Take the headers out of the request to avoid copy.
+            // We will return it back when apply the context.
+            headers: mem::take(this.headers_mut()),
+        })
+    }
+
+    fn apply(&mut self, mut ctx: SigningContext) -> Result<()> {
+        let this = self as &mut http::Request<T>;
+
+        // Return headers back.
+        mem::swap(this.headers_mut(), &mut ctx.headers);
+
+        // If query is empty, we don't need to set it.
+        let query = match ctx.query.take() {
+            Some(v) => v,
+            None => return Ok(()),
+        };
+
+        let mut parts = mem::take(this.uri_mut()).into_parts();
+
+        parts.path_and_query = {
+            let mut pq = parts
+                .path_and_query
+                .unwrap_or_else(|| PathAndQuery::from_static("/"));
+
+            // There is no way to construct a PathAndQuery without parse.
             pq = PathAndQuery::from_str(&format!("{}?{}", pq.path(), query))?;
 
             Some(pq)
