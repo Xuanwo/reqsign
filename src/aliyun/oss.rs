@@ -231,8 +231,11 @@ fn string_to_sign(
 ) -> Result<String> {
     let mut s = String::new();
     s.write_str(ctx.method.as_str())?;
+    s.write_str("\n")?;
     s.write_str(ctx.header_get_or_default(&CONTENT_MD5.parse()?)?)?;
+    s.write_str("\n")?;
     s.write_str(ctx.header_get_or_default(&CONTENT_TYPE)?)?;
+    s.write_str("\n")?;
     match method {
         SigningMethod::Header => {
             writeln!(&mut s, "{}", format_http_date(now))?;
