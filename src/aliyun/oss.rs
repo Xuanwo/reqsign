@@ -1,24 +1,22 @@
 //! Aliyun OSS Singer
 
-use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Write;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use http::header::HeaderName;
 use http::header::AUTHORIZATION;
 use http::header::CONTENT_TYPE;
 use http::header::DATE;
-use http::HeaderMap;
 use http::HeaderValue;
 use log::debug;
 use once_cell::sync::Lazy;
-use percent_encoding::percent_decode_str;
 use percent_encoding::utf8_percent_encode;
 
 use super::credential::CredentialLoader;
 use crate::credential::Credential;
+use crate::ctx::SigningContext;
+use crate::ctx::SigningMethod;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
 use crate::time;
@@ -143,86 +141,49 @@ impl Signer {
         self.credential_loader.load()
     }
 
-    /// Calculate signing requests via SignableRequest.
-    fn calculate(
+    /// Building a signing context.
+    fn build(
         &self,
-        req: &impl SignableRequest,
+        req: &mut impl SignableRequest,
         method: SigningMethod,
         cred: &Credential,
-    ) -> Result<SignedOutput> {
+    ) -> Result<SigningContext> {
         let now = self.time.unwrap_or_else(time::now);
-        let string_to_sign = string_to_sign(req, cred, now, method, &self.bucket)?;
+        let mut ctx = req.build()?;
+
+        let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
         let signature = base64_hmac_sha1(cred.secret_key().as_bytes(), string_to_sign.as_bytes());
 
-        Ok(SignedOutput {
-            access_key_id: cred.access_key().to_string(),
-            signature,
-            signed_time: now,
-            signing_method: method,
-            security_token: cred.security_token().map(|v| v.to_string()),
-        })
-    }
-
-    fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
-        match output.signing_method {
+        match method {
             SigningMethod::Header => {
-                req.insert_header(DATE, format_http_date(output.signed_time).parse()?)?;
-                req.insert_header(AUTHORIZATION, {
+                ctx.headers.insert(DATE, format_http_date(now).parse()?);
+                ctx.headers.insert(AUTHORIZATION, {
                     let mut value: HeaderValue =
-                        format!("OSS {}:{}", output.access_key_id, output.signature).parse()?;
+                        format!("OSS {}:{}", cred.access_key(), signature).parse()?;
                     value.set_sensitive(true);
 
                     value
-                })?;
-                if let Some(token) = &output.security_token {
-                    req.insert_header("x-oss-security-token".parse()?, {
-                        let mut value: HeaderValue = token.parse()?;
-                        value.set_sensitive(true);
-
-                        value
-                    })?;
-                }
+                });
             }
             SigningMethod::Query(expire) => {
-                req.insert_header(DATE, format_http_date(output.signed_time).parse()?)?;
-                let mut query = if let Some(query) = req.query() {
-                    query.to_string() + "&"
-                } else {
-                    "".to_string()
-                };
-
-                write!(query, "OSSAccessKeyId={}", output.access_key_id)?;
-                write!(
-                    query,
-                    "&Expires={}",
-                    (output.signed_time + expire).unix_timestamp()
-                )?;
-                write!(
-                    query,
-                    "&Signature={}",
-                    utf8_percent_encode(&output.signature, percent_encoding::NON_ALPHANUMERIC)
-                )?;
-
-                if let Some(token) = &output.security_token {
-                    write!(
-                        query,
-                        "&security-token={}",
-                        utf8_percent_encode(token, percent_encoding::NON_ALPHANUMERIC)
-                    )?;
-                }
-
-                req.set_query(&query)?;
+                ctx.headers.insert(DATE, format_http_date(now).parse()?);
+                ctx.query_push("OSSAccessKeyId", cred.access_key());
+                ctx.query_push("Expires", (now + expire).unix_timestamp().to_string());
+                ctx.query_push(
+                    "Signature",
+                    utf8_percent_encode(&signature, percent_encoding::NON_ALPHANUMERIC).to_string(),
+                )
             }
         }
 
-        Ok(())
+        Ok(ctx)
     }
 
     /// Signing request with header.
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         if let Some(cred) = self.credential() {
-            let sig = self.calculate(req, SigningMethod::Header, &cred)?;
-            return self.apply(req, &sig);
+            let ctx = self.build(req, SigningMethod::Header, &cred)?;
+            return req.apply(ctx);
         }
 
         if self.allow_anonymous {
@@ -236,8 +197,8 @@ impl Signer {
     /// Signing request with query.
     pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
         if let Some(cred) = self.credential() {
-            let sig = self.calculate(req, SigningMethod::Query(expire), &cred)?;
-            return self.apply(req, &sig);
+            let ctx = self.build(req, SigningMethod::Query(expire), &cred)?;
+            return req.apply(ctx);
         }
 
         if self.allow_anonymous {
@@ -247,23 +208,6 @@ impl Signer {
 
         Err(anyhow!("credential not found"))
     }
-}
-
-/// SigningMethod is the method that used in signing.
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub enum SigningMethod {
-    /// Signing with header.
-    Header,
-    /// Signing with query.
-    Query(Duration),
-}
-
-struct SignedOutput {
-    access_key_id: String,
-    signature: String,
-    signed_time: DateTime,
-    signing_method: SigningMethod,
-    security_token: Option<String>,
 }
 
 /// Construct string to sign.
@@ -279,25 +223,16 @@ struct SignedOutput {
 /// + CanonicalizedResource
 /// ```
 fn string_to_sign(
-    req: &impl SignableRequest,
+    ctx: &mut SigningContext,
     cred: &Credential,
     now: DateTime,
     method: SigningMethod,
     bucket: &str,
 ) -> Result<String> {
-    #[inline]
-    fn get_or_default<'a>(h: &'a HeaderMap, key: &'a HeaderName) -> Result<&'a str> {
-        match h.get(key) {
-            Some(v) => Ok(v.to_str()?),
-            None => Ok(""),
-        }
-    }
-
-    let h = req.headers();
     let mut s = String::new();
-    writeln!(&mut s, "{}", req.method().as_str())?;
-    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_MD5.parse()?)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_TYPE)?)?;
+    s.write_str(ctx.method.as_str())?;
+    s.write_str(ctx.header_get_or_default(&CONTENT_MD5.parse()?)?)?;
+    s.write_str(ctx.header_get_or_default(&CONTENT_TYPE)?)?;
     match method {
         SigningMethod::Header => {
             writeln!(&mut s, "{}", format_http_date(now))?;
@@ -308,7 +243,7 @@ fn string_to_sign(
     }
 
     {
-        let headers = canonicalize_header(req, method, cred)?;
+        let headers = canonicalize_header(ctx, method, cred)?;
         if !headers.is_empty() {
             writeln!(&mut s, "{headers}",)?;
         }
@@ -316,7 +251,7 @@ fn string_to_sign(
     write!(
         &mut s,
         "{}",
-        canonicalize_resource(req, bucket, method, cred)
+        canonicalize_resource(ctx, bucket, method, cred)
     )?;
 
     debug!("string to sign: {}", &s);
@@ -329,30 +264,18 @@ fn string_to_sign(
 ///
 /// [Building CanonicalizedOSSHeaders](https://help.aliyun.com/document_detail/31951.html#section-w2k-sw2-xdb)
 fn canonicalize_header(
-    req: &impl SignableRequest,
+    ctx: &mut SigningContext,
     method: SigningMethod,
     cred: &Credential,
 ) -> Result<String> {
-    let mut headers = req
-        .headers()
-        .iter()
-        // Filter all header that starts with "x-ms-"
-        .filter(|(k, _)| k.as_str().starts_with("x-oss-"))
-        // Convert all header name to lowercase
-        .map(|(k, v)| {
-            (
-                k.as_str().to_lowercase(),
-                v.to_str().expect("must be valid header").to_string(),
-            )
-        })
-        .collect::<Vec<(String, String)>>();
-
     if method == SigningMethod::Header {
         // Insert security token
         if let Some(token) = cred.security_token() {
-            headers.push(("x-oss-security-token".to_string(), token.to_string()))
-        };
+            ctx.headers.insert("x-oss-security-token", token.parse()?);
+        }
     }
+
+    let mut headers = ctx.headers_to_vec_with_prefix("x-oss-");
 
     // Sort via header name.
     headers.sort_by(|x, y| x.0.cmp(&y.0));
@@ -372,22 +295,20 @@ fn canonicalize_header(
 ///
 /// [Building CanonicalizedResource](https://help.aliyun.com/document_detail/31951.html#section-w2k-sw2-xdb)
 fn canonicalize_resource(
-    req: &impl SignableRequest,
+    ctx: &mut SigningContext,
     bucket: &str,
     method: SigningMethod,
     cred: &Credential,
 ) -> String {
-    let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
-        form_urlencoded::parse(req.query().unwrap_or_default().as_bytes())
-            .filter(|(k, _)| is_sub_resource(k))
-            .collect();
-
     if let SigningMethod::Query(_) = method {
         // Insert security token
         if let Some(token) = cred.security_token() {
-            params.push((Cow::from("security-token"), Cow::from(token)))
+            ctx.query
+                .push(("security-token".to_string(), token.to_string()));
         };
     }
+
+    let mut params = ctx.query_to_vec_with_filter(is_sub_resource);
 
     // Sort by param name
     params.sort();
@@ -395,8 +316,8 @@ fn canonicalize_resource(
     let params_str = params
         .iter()
         .map(|(k, v)| {
-            if v == "" {
-                format!("{k}")
+            if v.is_empty() {
+                k.to_string()
             } else {
                 format!("{k}={v}")
             }
@@ -404,11 +325,10 @@ fn canonicalize_resource(
         .collect::<Vec<String>>()
         .join("&");
 
-    let path = percent_decode_str(req.path()).decode_utf8_lossy();
     if params_str.is_empty() {
-        format!("/{bucket}{path}")
+        format!("/{bucket}{}", ctx.path_percent_decoded())
     } else {
-        format!("/{bucket}{path}?{params_str}")
+        format!("/{bucket}{}?{params_str}", ctx.path_percent_decoded())
     }
 }
 
