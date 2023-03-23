@@ -81,6 +81,7 @@ mod tencent;
 pub use tencent::cos::Builder as TencentCosBuilder;
 pub use tencent::cos::Signer as TencentCosSigner;
 
+mod ctx;
 mod dirs;
 mod hash;
 mod request;

@@ -23,6 +23,10 @@ reqwest_request = ["reqwest"]
 harness = false
 name = "aws"
 
+[[bench]]
+harness = false
+name = "oss"
+
 [dependencies]
 anyhow = "1"
 backon = "0.4"
