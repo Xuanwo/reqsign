@@ -1,19 +1,28 @@
-use http::{HeaderMap, Method};
+use http::{uri::Authority, HeaderMap, Method};
+use time::Duration;
 
 pub struct SigningContext {
     pub method: Method,
-    pub host: String,
-    pub port: Option<usize>,
+    pub authority: Authority,
     pub path: String,
-    pub query: Option<String>,
+    pub query: Vec<(String, String)>,
     pub headers: HeaderMap,
 }
 
 impl SigningContext {
-    pub fn host_port(&self) -> String {
-        match self.port {
-            Some(port) => format!("{}:{}", self.host, port),
-            None => self.host.clone(),
-        }
+    pub fn query_size(&self) -> usize {
+        self.query
+            .iter()
+            .map(|(k, v)| k.len() + v.len())
+            .sum::<usize>()
     }
+}
+
+/// SigningMethod is the method that used in signing.
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum SigningMethod {
+    /// Signing with header.
+    Header,
+    /// Signing with query.
+    Query(Duration),
 }
