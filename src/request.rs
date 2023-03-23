@@ -8,6 +8,7 @@ use anyhow::anyhow;
 use anyhow::Result;
 use http::header::HeaderName;
 use http::uri::PathAndQuery;
+use http::uri::Scheme;
 use http::HeaderMap;
 use http::HeaderValue;
 use http::Method;
@@ -164,6 +165,7 @@ impl<T> SignableRequest for http::Request<T> {
 
         Ok(SigningContext {
             method: this.method().clone(),
+            scheme: uri.scheme.unwrap_or(Scheme::HTTP),
             authority: uri
                 .authority
                 .ok_or_else(|| anyhow!("request without authority is invalid for signing"))?,
@@ -192,6 +194,8 @@ impl<T> SignableRequest for http::Request<T> {
         mem::swap(this.headers_mut(), &mut ctx.headers);
 
         let mut parts = mem::take(this.uri_mut()).into_parts();
+        // Return scheme bakc.
+        parts.scheme = Some(ctx.scheme);
         // Return authority back.
         parts.authority = Some(ctx.authority);
         // Build path and query.

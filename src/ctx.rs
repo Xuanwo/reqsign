@@ -1,11 +1,16 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
-use http::{header::HeaderName, uri::Authority, HeaderMap, Method};
+use http::{
+    header::HeaderName,
+    uri::{Authority, Scheme},
+    HeaderMap, Method,
+};
 use time::Duration;
 
 pub struct SigningContext {
     pub method: Method,
+    pub scheme: Scheme,
     pub authority: Authority,
     pub path: String,
     pub query: Vec<(String, String)>,
