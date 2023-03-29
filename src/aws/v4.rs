@@ -623,8 +623,6 @@ mod tests {
 
     fn compare_request(name: &str, l: &http::Request<&str>, r: &http::Request<&str>) {
         fn format_headers(req: &http::Request<&str>) -> Vec<String> {
-            use crate::request::SignableRequest;
-
             let mut hs = req
                 .headers()
                 .iter()
@@ -632,8 +630,8 @@ mod tests {
                 .collect::<Vec<_>>();
 
             // Insert host if original request doesn't have it.
-            if !hs.contains(&format!("host:{}", req.host_port())) {
-                hs.push(format!("host:{}", req.host_port()))
+            if !hs.contains(&format!("host:{}", req.uri().authority().unwrap())) {
+                hs.push(format!("host:{}", req.uri().authority().unwrap()))
             }
 
             hs.sort();

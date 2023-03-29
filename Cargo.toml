@@ -15,7 +15,6 @@ all-features = true
 rustls = ["reqwest?/rustls-tls", "ureq/tls"]
 native-tls = ["reqwest?/default-tls", "ureq/native-tls"]
 
-http_types_request = ["http-types"]
 reqwest_blocking_request = ["reqwest/blocking"]
 reqwest_request = ["reqwest"]
 
@@ -37,7 +36,6 @@ form_urlencoded = "1"
 hex = "0.4"
 hmac = "0.12"
 http = "0.2"
-http-types = { version = "2", optional = true }
 jsonwebtoken = "8"
 log = "0.4"
 once_cell = "1"

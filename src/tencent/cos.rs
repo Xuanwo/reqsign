@@ -126,26 +126,26 @@ impl Signer {
             SigningMethod::Header => {
                 let signature = build_signature(&mut ctx, cred, now, Duration::hours(1));
 
-                req.insert_header(DATE, format_http_date(now).parse()?)?;
-                req.insert_header(AUTHORIZATION, {
+                ctx.headers.insert(DATE, format_http_date(now).parse()?);
+                ctx.headers.insert(AUTHORIZATION, {
                     let mut value: HeaderValue = signature.parse()?;
                     value.set_sensitive(true);
                     value
-                })?;
+                });
 
                 if let Some(token) = cred.security_token() {
-                    req.insert_header("x-cos-security-token".parse()?, {
+                    ctx.headers.insert("x-cos-security-token", {
                         let mut value: HeaderValue = token.parse()?;
                         value.set_sensitive(true);
 
                         value
-                    })?;
+                    });
                 }
             }
             SigningMethod::Query(expire) => {
                 let signature = build_signature(&mut ctx, cred, now, expire);
 
-                req.insert_header(DATE, format_http_date(now).parse()?)?;
+                ctx.headers.insert(DATE, format_http_date(now).parse()?);
                 ctx.query_append(&signature);
 
                 if let Some(token) = cred.security_token() {

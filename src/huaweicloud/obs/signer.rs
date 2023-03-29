@@ -391,14 +391,14 @@ mod tests {
 
         let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt";
         let mut req = http::Request::get(Uri::from_str(get_req)?).body(())?;
-        req.insert_header(
+        req.headers_mut().insert(
             HeaderName::from_str("Content-MD5")?,
             HeaderValue::from_str("abc")?,
-        )?;
-        req.insert_header(
+        );
+        req.headers_mut().insert(
             HeaderName::from_str("Content-Type")?,
             HeaderValue::from_str("text/plain")?,
-        )?;
+        );
 
         // Signing request with Signer
         signer.sign(&mut req)?;
@@ -430,14 +430,14 @@ mod tests {
         let get_req =
             "http://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt?name=hello&abc=def";
         let mut req = http::Request::get(Uri::from_str(get_req)?).body(())?;
-        req.insert_header(
+        req.headers_mut().insert(
             HeaderName::from_str("Content-MD5")?,
             HeaderValue::from_str("abc")?,
-        )?;
-        req.insert_header(
+        );
+        req.headers_mut().insert(
             HeaderName::from_str("Content-Type")?,
             HeaderValue::from_str("text/plain")?,
-        )?;
+        );
 
         // Signing request with Signer
         signer.sign(&mut req)?;
@@ -469,14 +469,14 @@ mod tests {
 
         let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com?name=hello&abc=def";
         let mut req = http::Request::get(Uri::from_str(get_req)?).body(())?;
-        req.insert_header(
+        req.headers_mut().insert(
             HeaderName::from_str("Content-MD5")?,
             HeaderValue::from_str("abc")?,
-        )?;
-        req.insert_header(
+        );
+        req.headers_mut().insert(
             HeaderName::from_str("Content-Type")?,
             HeaderValue::from_str("text/plain")?,
-        )?;
+        );
 
         // Signing request with Signer
         signer.sign(&mut req)?;
