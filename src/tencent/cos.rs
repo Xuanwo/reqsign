@@ -3,13 +3,6 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use super::credential::CredentialLoader;
-use crate::credential::Credential;
-use crate::request::SignableRequest;
-use crate::time;
-use crate::time::format_http_date;
-use crate::time::DateTime;
-use crate::time::Duration;
 use anyhow::anyhow;
 use anyhow::Result;
 use hmac::Hmac;
@@ -19,8 +12,18 @@ use http::header::DATE;
 use http::HeaderMap;
 use http::HeaderValue;
 use log::debug;
-use percent_encoding::{percent_decode_str, utf8_percent_encode};
-use sha1::{Digest, Sha1};
+use percent_encoding::percent_decode_str;
+use percent_encoding::utf8_percent_encode;
+use sha1::Digest;
+use sha1::Sha1;
+
+use super::credential::CredentialLoader;
+use crate::credential::Credential;
+use crate::request::SignableRequest;
+use crate::time;
+use crate::time::format_http_date;
+use crate::time::DateTime;
+use crate::time::Duration;
 
 /// Builder for `Signer`
 #[derive(Default)]

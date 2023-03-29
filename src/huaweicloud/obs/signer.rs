@@ -1,4 +1,5 @@
 //! Huawei Cloud Object Storage Service (OBS) signer
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::fmt::Write;
@@ -10,10 +11,8 @@ use http::header::CONTENT_TYPE;
 use http::header::DATE;
 use http::HeaderValue;
 use log::debug;
-
 use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
-use std::collections::HashSet;
 
 use super::super::constants::*;
 use super::credential::CredentialLoader;
@@ -371,7 +370,8 @@ mod tests {
 
     use ::time::UtcOffset;
     use anyhow::Result;
-    use http::{header::HeaderName, Uri};
+    use http::header::HeaderName;
+    use http::Uri;
 
     use super::*;
     use crate::time::parse_rfc2822;
