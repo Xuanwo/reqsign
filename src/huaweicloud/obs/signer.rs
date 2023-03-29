@@ -273,6 +273,7 @@ fn canonicalize_header(
 
     Ok(SigningContext::header_to_string(
         ctx.header_to_vec_with_prefix("x-obs-"),
+        ":",
         "\n",
     ))
 }

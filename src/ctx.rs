@@ -130,7 +130,7 @@ impl SigningContext {
     /// ```shell
     /// [(a, b), (c, d)] => "a:b\nc:d"
     /// ```
-    pub fn header_to_string(mut headers: Vec<(String, String)>, sep: &str) -> String {
+    pub fn header_to_string(mut headers: Vec<(String, String)>, sep: &str, join: &str) -> String {
         let mut s = String::with_capacity(16);
 
         // Sort via header name.
@@ -138,7 +138,7 @@ impl SigningContext {
 
         for (idx, (k, v)) in headers.into_iter().enumerate() {
             if idx != 0 {
-                s.push('\n');
+                s.push_str(join);
             }
 
             s.push_str(&k);
