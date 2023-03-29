@@ -53,20 +53,13 @@ jobs:
           args: --all-features
 
   unit:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-11
-          - windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Install cargo-nextest
+        run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
       - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-features -- --show-output
+        run: cargo nextest run --no-fail-fast
         env:
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full

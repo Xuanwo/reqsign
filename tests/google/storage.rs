@@ -6,6 +6,7 @@ use log::debug;
 use log::warn;
 use reqsign::GoogleSigner;
 use reqwest::blocking::Client;
+use time::Duration;
 
 fn init_signer() -> Option<GoogleSigner> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -88,5 +89,44 @@ fn test_list_objects() -> Result<()> {
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::OK, resp.status());
+    Ok(())
+}
+
+#[test]
+fn test_get_object_with_query() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
+        return Ok(());
+    }
+    let signer = signer.unwrap();
+
+    let url = &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_URL")
+        .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_URL must set");
+
+    let mut builder = http::Request::builder();
+    builder = builder.method(http::Method::GET);
+    builder = builder.uri(format!(
+        "{}/{}",
+        url.replace("storage/v1/b/", ""),
+        "not_exist_file"
+    ));
+    let mut req = builder.body("")?;
+
+    signer
+        .sign_query(&mut req, Duration::hours(1))
+        .expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .expect("request must succeed");
+
+    let code = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got body: {}", resp.text().unwrap_or_default());
+    assert_eq!(StatusCode::NOT_FOUND, code);
     Ok(())
 }
