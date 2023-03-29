@@ -106,7 +106,11 @@ fn test_get_object_with_query() -> Result<()> {
 
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
-    builder = builder.uri(format!("{}/o/{}", url, "not_exist_file"));
+    builder = builder.uri(format!(
+        "{}/{}",
+        url.replace("storage/v1/b/", ""),
+        "not_exist_file"
+    ));
     let mut req = builder.body("")?;
 
     signer
@@ -120,7 +124,9 @@ fn test_get_object_with_query() -> Result<()> {
         .execute(req.try_into()?)
         .expect("request must succeed");
 
+    let code = resp.status();
     debug!("got response: {:?}", resp);
-    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    debug!("got body: {}", resp.text().unwrap_or_default());
+    assert_eq!(StatusCode::NOT_FOUND, code);
     Ok(())
 }

@@ -282,9 +282,13 @@ impl Signer {
         let string_to_sign = {
             let mut f = String::new();
             f.push_str("GOOG4-RSA-SHA256");
+            f.push('\n');
             f.push_str(&format_iso8601(now));
+            f.push('\n');
             f.push_str(&scope);
+            f.push('\n');
             f.push_str(&encoded_req);
+
             f
         };
         debug!("calculated string to sign: {string_to_sign}");
@@ -402,18 +406,23 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
 
     // Insert method
     f.push_str(ctx.method.as_str());
+    f.push('\n');
+
     // Insert encoded path
     let path = percent_decode_str(&ctx.path).decode_utf8()?;
     f.push_str(&Cow::from(utf8_percent_encode(
         &path,
         &super::constants::GOOG_URI_ENCODE_SET,
     )));
+    f.push('\n');
+
     // Insert query
     f.push_str(&SigningContext::query_to_string(
         ctx.query.clone(),
         "=",
         "&",
     ));
+    f.push('\n');
 
     // Insert signed headers
     let signed_headers = ctx.header_name_to_vec_sorted();
@@ -422,11 +431,14 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
         f.push_str(header);
         f.push(':');
         f.push_str(value.to_str().expect("header value must be valid"));
+        f.push('\n');
     }
     f.push('\n');
     f.push_str(&signed_headers.join(";"));
+    f.push('\n');
     f.push_str("UNSIGNED-PAYLOAD");
 
+    debug!("string to sign: {}", f);
     Ok(f)
 }
 
