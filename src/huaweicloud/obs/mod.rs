@@ -5,4 +5,3 @@ pub use signer::Builder;
 pub use signer::Signer;
 
 mod credential;
-mod subresource;

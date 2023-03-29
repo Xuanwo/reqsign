@@ -1,26 +1,30 @@
 //! Huawei Cloud Object Storage Service (OBS) signer
-use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::fmt::Write;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use http::header::HeaderName;
 use http::header::AUTHORIZATION;
 use http::header::CONTENT_TYPE;
 use http::header::DATE;
-use http::HeaderMap;
 use http::HeaderValue;
 use log::debug;
 
+use once_cell::sync::Lazy;
+use percent_encoding::utf8_percent_encode;
+use std::collections::HashSet;
+
 use super::super::constants::*;
 use super::credential::CredentialLoader;
-use super::subresource::is_subresource_param;
 use crate::credential::Credential;
+use crate::ctx::SigningContext;
+use crate::ctx::SigningMethod;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
+use crate::time::format_http_date;
 use crate::time::DateTime;
+use crate::time::Duration;
 use crate::time::{self};
 
 /// Builder for `Signer`.
@@ -111,36 +115,41 @@ impl Signer {
         self.credential_loader.load()
     }
 
-    fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        let string_to_sign = string_to_sign(req, cred, &self.bucket)?;
-        let auth = base64_hmac_sha1(cred.secret_key().as_bytes(), string_to_sign.as_bytes());
+    fn build(
+        &self,
+        req: &mut impl SignableRequest,
+        method: SigningMethod,
+        cred: &Credential,
+    ) -> Result<SigningContext> {
+        let now = self.time.unwrap_or_else(time::now);
+        let mut ctx = req.build()?;
 
-        Ok(SignedOutput {
-            access_key: cred.access_key().to_string(),
-            signature: auth,
-        })
-    }
+        let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
+        let signature = base64_hmac_sha1(cred.secret_key().as_bytes(), string_to_sign.as_bytes());
 
-    fn apply_before(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if !req.headers().contains_key(DATE) {
-            let now = self.time.unwrap_or_else(time::now);
-            let now_str = time::format_http_date(now);
-            req.insert_header(DATE, HeaderValue::from_str(&now_str)?)?;
+        match method {
+            SigningMethod::Header => {
+                ctx.headers.insert(DATE, format_http_date(now).parse()?);
+                ctx.headers.insert(AUTHORIZATION, {
+                    let mut value: HeaderValue =
+                        format!("OBS {}:{}", cred.access_key(), signature).parse()?;
+                    value.set_sensitive(true);
+
+                    value
+                });
+            }
+            SigningMethod::Query(expire) => {
+                ctx.headers.insert(DATE, format_http_date(now).parse()?);
+                ctx.query_push("AccessKeyId", cred.access_key());
+                ctx.query_push("Expires", (now + expire).unix_timestamp().to_string());
+                ctx.query_push(
+                    "Signature",
+                    utf8_percent_encode(&signature, percent_encoding::NON_ALPHANUMERIC).to_string(),
+                )
+            }
         }
 
-        Ok(())
-    }
-
-    /// Apply signed results to requests.
-    fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
-        req.insert_header(AUTHORIZATION, {
-            let mut value: HeaderValue =
-                format!("OBS {}:{}", &output.access_key, output.signature).parse()?;
-            value.set_sensitive(true);
-            value
-        })?;
-
-        Ok(())
+        Ok(ctx)
     }
 
     /// Signing request.
@@ -174,21 +183,23 @@ impl Signer {
     /// }
     /// ```
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        let cred = match self.credential() {
-            None => return Err(anyhow!("credential not found")),
-            Some(cred) => cred,
-        };
+        if let Some(cred) = self.credential() {
+            let ctx = self.build(req, SigningMethod::Header, &cred)?;
+            return req.apply(ctx);
+        }
 
-        self.apply_before(req)?;
-        let sig = self.calculate(req, &cred)?;
-        self.apply(req, &sig)
+        Err(anyhow!("credential not found"))
     }
-}
 
-/// Singed output carries result of this signing.
-pub struct SignedOutput {
-    access_key: String,
-    signature: String,
+    /// Signing request with query.
+    pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
+        if let Some(cred) = self.credential() {
+            let ctx = self.build(req, SigningMethod::Query(expire), &cred)?;
+            return req.apply(ctx);
+        }
+
+        Err(anyhow!("credential not found"))
+    }
 }
 
 /// Construct string to sign
@@ -207,91 +218,152 @@ pub struct SignedOutput {
 /// ## Reference
 ///
 /// - [User Signature Authentication (OBS)](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0009.html)
-fn string_to_sign(req: &impl SignableRequest, _cred: &Credential, bucket: &str) -> Result<String> {
-    #[inline]
-    fn get_or_default<'a>(h: &'a HeaderMap, key: &'a HeaderName) -> Result<&'a str> {
-        match h.get(key) {
-            Some(v) => Ok(v.to_str()?),
-            None => Ok(""),
+fn string_to_sign(
+    ctx: &mut SigningContext,
+    cred: &Credential,
+    now: DateTime,
+    method: SigningMethod,
+    bucket: &str,
+) -> Result<String> {
+    let mut s = String::new();
+    s.write_str(ctx.method.as_str())?;
+    s.write_str("\n")?;
+    s.write_str(ctx.header_get_or_default(&CONTENT_MD5.parse()?)?)?;
+    s.write_str("\n")?;
+    s.write_str(ctx.header_get_or_default(&CONTENT_TYPE)?)?;
+    s.write_str("\n")?;
+    match method {
+        SigningMethod::Header => {
+            writeln!(&mut s, "{}", format_http_date(now))?;
+        }
+        SigningMethod::Query(expires) => {
+            writeln!(&mut s, "{}", (now + expires).unix_timestamp())?;
         }
     }
 
-    let h = req.headers();
-    let mut s = String::new();
-
-    writeln!(&mut s, "{}", req.method().as_str())?;
-    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_MD5.parse()?)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_TYPE)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &DATE)?)?;
-    let canonicalize_header = canonicalize_header(req)?;
-    if !canonicalize_header.is_empty() {
-        writeln!(&mut s, "{canonicalize_header}")?;
+    {
+        let headers = canonicalize_header(ctx, method, cred)?;
+        if !headers.is_empty() {
+            writeln!(&mut s, "{headers}",)?;
+        }
     }
-    write!(&mut s, "{}", canonicalize_resource(req, bucket)?)?;
+    write!(
+        &mut s,
+        "{}",
+        canonicalize_resource(ctx, bucket, method, cred)
+    )?;
 
     debug!("string to sign: {}", &s);
-
     Ok(s)
 }
 
 /// ## Reference
 ///
 /// - [Authentication of Signature in a Header](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0010.html)
-fn canonicalize_header(req: &impl SignableRequest) -> Result<String> {
-    let mut headers = req
-        .headers()
-        .iter()
-        // Filter all header that starts with "x-obs-"
-        .filter(|(k, _)| k.as_str().starts_with("x-obs-"))
-        // Convert all header name to lowercase
-        .map(|(k, v)| {
-            (
-                k.as_str().to_lowercase(),
-                v.to_str().expect("must be valid header").to_string(),
-            )
-        })
-        .collect::<Vec<(String, String)>>();
+fn canonicalize_header(
+    ctx: &mut SigningContext,
+    method: SigningMethod,
+    cred: &Credential,
+) -> Result<String> {
+    if method == SigningMethod::Header {
+        // Insert security token
+        if let Some(token) = cred.security_token() {
+            ctx.headers.insert("x-obs-security-token", token.parse()?);
+        }
+    }
 
-    // Sort via header name.
-    headers.sort_by(|x, y| x.0.cmp(&y.0));
-
-    Ok(headers
-        .iter()
-        // Format into "name:value"
-        .map(|(k, v)| format!("{k}:{v}"))
-        .collect::<Vec<String>>()
-        // Join via "\n"
-        .join("\n"))
+    Ok(SigningContext::header_to_string(
+        ctx.header_to_vec_with_prefix("x-obs-"),
+        "\n",
+    ))
 }
 
 /// ## Reference
 ///
 /// - [Authentication of Signature in a Header](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0010.html)
-fn canonicalize_resource(req: &impl SignableRequest, bucket: &str) -> Result<String> {
-    let mut s = String::new();
-
-    write!(&mut s, "/{bucket}")?;
-    write!(&mut s, "{}", req.path())?;
-
-    let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
-        form_urlencoded::parse(req.query().unwrap_or_default().as_bytes())
-            .filter(|(k, _)| is_subresource_param(k))
-            .collect();
-    // Sort by param name
-    params.sort();
-
-    let params_str = params
-        .iter()
-        .map(|(k, v)| format!("{k}={v}"))
-        .collect::<Vec<String>>()
-        .join("&");
-
-    if !params_str.is_empty() {
-        write!(s, "?{params_str}")?;
+fn canonicalize_resource(
+    ctx: &mut SigningContext,
+    bucket: &str,
+    method: SigningMethod,
+    cred: &Credential,
+) -> String {
+    if let SigningMethod::Query(_) = method {
+        // Insert security token
+        if let Some(token) = cred.security_token() {
+            ctx.query
+                .push(("security-token".to_string(), token.to_string()));
+        };
     }
 
-    Ok(s.to_string())
+    let params = ctx.query_to_vec_with_filter(is_sub_resource);
+
+    let params_str = SigningContext::query_to_string(params, "=", "&");
+
+    if params_str.is_empty() {
+        format!("/{bucket}{}", ctx.path_percent_decoded())
+    } else {
+        format!("/{bucket}{}?{params_str}", ctx.path_percent_decoded())
+    }
 }
+
+fn is_sub_resource(param: &str) -> bool {
+    SUBRESOURCES.contains(param)
+}
+
+// Please attention: the subsources are case sensitive.
+static SUBRESOURCES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    HashSet::from([
+        "CDNNotifyConfiguration",
+        "acl",
+        "append",
+        "attname",
+        "backtosource",
+        "cors",
+        "customdomain",
+        "delete",
+        "deletebucket",
+        "directcoldaccess",
+        "encryption",
+        "inventory",
+        "length",
+        "lifecycle",
+        "location",
+        "logging",
+        "metadata",
+        "modify",
+        "name",
+        "notification",
+        "partNumber",
+        "policy",
+        "position",
+        "quota",
+        "rename",
+        "replication",
+        "response-cache-control",
+        "response-content-disposition",
+        "response-content-encoding",
+        "response-content-language",
+        "response-content-type",
+        "response-expires",
+        "restore",
+        "storageClass",
+        "storagePolicy",
+        "storageinfo",
+        "tagging",
+        "torrent",
+        "truncate",
+        "uploadId",
+        "uploads",
+        "versionId",
+        "versioning",
+        "versions",
+        "website",
+        "x-image-process",
+        "x-image-save-bucket",
+        "x-image-save-object",
+        "x-obs-security-token",
+    ])
+});
 
 #[cfg(test)]
 mod tests {
@@ -299,7 +371,7 @@ mod tests {
 
     use ::time::UtcOffset;
     use anyhow::Result;
-    use http::Uri;
+    use http::{header::HeaderName, Uri};
 
     use super::*;
     use crate::time::parse_rfc2822;
