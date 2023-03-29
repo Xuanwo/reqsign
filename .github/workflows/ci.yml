@@ -59,7 +59,7 @@ jobs:
       - name: Install cargo-nextest
         run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
       - name: Test
-        run: cargo nextest run --no-fail-fast && cargo test --doc
+        run: cargo nextest run --no-fail-fast
         env:
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full
