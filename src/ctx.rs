@@ -4,7 +4,7 @@ use anyhow::Result;
 use http::{
     header::HeaderName,
     uri::{Authority, Scheme},
-    HeaderMap, Method,
+    HeaderMap, HeaderValue, Method,
 };
 use time::Duration;
 
@@ -50,6 +50,29 @@ impl SigningContext {
             Some(v) => Ok(v.to_str()?),
             None => Ok(""),
         }
+    }
+
+    pub fn header_value_normalize(v: &mut HeaderValue) {
+        let bs = v.as_bytes();
+
+        let starting_index = bs.iter().position(|b| *b != b' ').unwrap_or(0);
+        let ending_offset = bs.iter().rev().position(|b| *b != b' ').unwrap_or(0);
+        let ending_index = bs.len() - ending_offset;
+
+        // This can't fail because we started with a valid HeaderValue and then only trimmed spaces
+        *v = HeaderValue::from_bytes(&bs[starting_index..ending_index])
+            .expect("invalid header value")
+    }
+
+    pub fn header_names_to_vec_sorted(&self) -> Vec<&str> {
+        let mut h = self
+            .headers
+            .keys()
+            .map(|k| k.as_str())
+            .collect::<Vec<&str>>();
+        h.sort_unstable();
+
+        h
     }
 
     pub fn headers_to_vec_with_prefix(&self, prefix: &str) -> Vec<(String, String)> {
