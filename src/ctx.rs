@@ -30,8 +30,16 @@ impl SigningContext {
             .sum::<usize>()
     }
 
+    /// Push a new query pair into query list.
+    #[inline]
     pub fn query_push(&mut self, key: impl Into<String>, value: impl Into<String>) {
         self.query.push((key.into(), value.into()));
+    }
+
+    /// Push a query string into query list.
+    #[inline]
+    pub fn query_append(&mut self, query: &str) {
+        self.query.push((query.to_string(), "".to_string()));
     }
 
     pub fn query_to_vec_with_filter(&self, filter: impl Fn(&str) -> bool) -> Vec<(String, String)> {
@@ -42,6 +50,32 @@ impl SigningContext {
             // Clone all queries
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect()
+    }
+
+    /// Convert sorted query to string.
+    ///
+    /// ```shell
+    /// [(a, b), (c, d)] => "a:b\nc:d"
+    /// ```
+    pub fn query_to_string(mut query: Vec<(String, String)>, sep: &str, join: &str) -> String {
+        let mut s = String::with_capacity(16);
+
+        // Sort via header name.
+        query.sort();
+
+        for (idx, (k, v)) in query.into_iter().enumerate() {
+            if idx != 0 {
+                s.push_str(join);
+            }
+
+            s.push_str(&k);
+            if !v.is_empty() {
+                s.push_str(sep);
+                s.push_str(&v);
+            }
+        }
+
+        s
     }
 
     #[inline]
@@ -64,7 +98,7 @@ impl SigningContext {
             .expect("invalid header value")
     }
 
-    pub fn header_names_to_vec_sorted(&self) -> Vec<&str> {
+    pub fn header_name_to_vec_sorted(&self) -> Vec<&str> {
         let mut h = self
             .headers
             .keys()
@@ -75,7 +109,7 @@ impl SigningContext {
         h
     }
 
-    pub fn headers_to_vec_with_prefix(&self, prefix: &str) -> Vec<(String, String)> {
+    pub fn header_to_vec_with_prefix(&self, prefix: &str) -> Vec<(String, String)> {
         self.headers
             .iter()
             // Filter all header that starts with prefix
@@ -88,6 +122,30 @@ impl SigningContext {
                 )
             })
             .collect()
+    }
+
+    /// Convert sorted headers to string.
+    ///
+    /// ```shell
+    /// [(a, b), (c, d)] => "a:b\nc:d"
+    /// ```
+    pub fn header_to_string(mut headers: Vec<(String, String)>, sep: &str) -> String {
+        let mut s = String::with_capacity(16);
+
+        // Sort via header name.
+        headers.sort();
+
+        for (idx, (k, v)) in headers.into_iter().enumerate() {
+            if idx != 0 {
+                s.push('\n');
+            }
+
+            s.push_str(&k);
+            s.push_str(sep);
+            s.push_str(&v);
+        }
+
+        s
     }
 }
 

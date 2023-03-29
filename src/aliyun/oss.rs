@@ -278,18 +278,10 @@ fn canonicalize_header(
         }
     }
 
-    let mut headers = ctx.headers_to_vec_with_prefix("x-oss-");
-
-    // Sort via header name.
-    headers.sort_by(|x, y| x.0.cmp(&y.0));
-
-    Ok(headers
-        .iter()
-        // Format into "name:value"
-        .map(|(k, v)| format!("{k}:{v}"))
-        .collect::<Vec<String>>()
-        // Join via "\n"
-        .join("\n"))
+    Ok(SigningContext::header_to_string(
+        ctx.header_to_vec_with_prefix("x-oss-"),
+        "\n",
+    ))
 }
 
 /// Build canonicalize resource
@@ -311,22 +303,9 @@ fn canonicalize_resource(
         };
     }
 
-    let mut params = ctx.query_to_vec_with_filter(is_sub_resource);
+    let params = ctx.query_to_vec_with_filter(is_sub_resource);
 
-    // Sort by param name
-    params.sort();
-
-    let params_str = params
-        .iter()
-        .map(|(k, v)| {
-            if v.is_empty() {
-                k.to_string()
-            } else {
-                format!("{k}={v}")
-            }
-        })
-        .collect::<Vec<String>>()
-        .join("&");
+    let params_str = SigningContext::query_to_string(params, "=", "&");
 
     if params_str.is_empty() {
         format!("/{bucket}{}", ctx.path_percent_decoded())

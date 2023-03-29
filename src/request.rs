@@ -1,6 +1,5 @@
 //! Provide common request trait for signing.
 
-use std::fmt::Write;
 use std::mem;
 use std::str::FromStr;
 
@@ -206,14 +205,17 @@ impl<T> SignableRequest for http::Request<T> {
                 let mut s = ctx.path;
                 s.reserve(query_size + 1);
 
-                s.write_str("?")?;
+                s.push('?');
                 for (i, (k, v)) in ctx.query.iter().enumerate() {
                     if i > 0 {
-                        s.write_str("&")?;
+                        s.push('&');
                     }
-                    s.write_str(k)?;
-                    s.write_str("=")?;
-                    s.write_str(v)?;
+
+                    s.push_str(k);
+                    if !v.is_empty() {
+                        s.push('=');
+                        s.push_str(v);
+                    }
                 }
 
                 s
