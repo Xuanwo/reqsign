@@ -489,3 +489,442 @@ fn generate_signing_key(secret: &str, time: DateTime, region: &str, service: &st
 
     sign_request
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::SystemTime;
+
+    use anyhow::Result;
+    use aws_sigv4;
+    use aws_sigv4::http_request::PayloadChecksumKind;
+    use aws_sigv4::http_request::PercentEncodingMode;
+    use aws_sigv4::http_request::SignableBody;
+    use aws_sigv4::http_request::SignableRequest;
+    use aws_sigv4::http_request::SignatureLocation;
+    use aws_sigv4::http_request::SigningSettings;
+    use aws_sigv4::SigningParams;
+    use http::header;
+
+    use super::*;
+
+    fn test_get_request() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_get_request_with_sse() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption",
+            "a".parse().expect("must be valid"),
+        );
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption-customer-algorithm",
+            "b".parse().expect("must be valid"),
+        );
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption-customer-key",
+            "c".parse().expect("must be valid"),
+        );
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption-customer-key-md5",
+            "d".parse().expect("must be valid"),
+        );
+        req.headers_mut().insert(
+            "x-amz-server-side-encryption-aws-kms-key-id",
+            "e".parse().expect("must be valid"),
+        );
+
+        req
+    }
+
+    fn test_get_request_with_query() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello?list-type=2&max-keys=3&prefix=CI/&start-after=ExampleGuide.pdf"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_get_request_virtual_host() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://hello.s3.test.example.com"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_get_request_with_query_virtual_host() -> http::Request<&'static str> {
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://hello.s3.test.example.com?list-type=2&max-keys=3&prefix=CI/&start-after=ExampleGuide.pdf"
+            .parse()
+            .expect("url must be valid");
+
+        req
+    }
+
+    fn test_put_request() -> http::Request<&'static str> {
+        let content = "Hello,World!";
+        let mut req = http::Request::new(content);
+        *req.method_mut() = http::Method::PUT;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+
+        req.headers_mut().insert(
+            http::header::CONTENT_LENGTH,
+            HeaderValue::from_str(&content.len().to_string()).expect("must be valid"),
+        );
+
+        req
+    }
+
+    fn test_put_request_virtual_host() -> http::Request<&'static str> {
+        let content = "Hello,World!";
+        let mut req = http::Request::new(content);
+        *req.method_mut() = http::Method::PUT;
+        *req.uri_mut() = "http://hello.s3.test.example.com"
+            .parse()
+            .expect("url must be valid");
+
+        req.headers_mut().insert(
+            header::CONTENT_LENGTH,
+            HeaderValue::from_str(&content.len().to_string()).expect("must be valid"),
+        );
+
+        req
+    }
+
+    fn test_cases() -> &'static [fn() -> http::Request<&'static str>] {
+        &[
+            test_get_request,
+            test_get_request_with_sse,
+            test_get_request_with_query,
+            test_get_request_virtual_host,
+            test_get_request_with_query_virtual_host,
+            test_put_request,
+            test_put_request_virtual_host,
+        ]
+    }
+
+    fn compare_request(name: &str, l: &http::Request<&str>, r: &http::Request<&str>) {
+        fn format_headers(req: &http::Request<&str>) -> Vec<String> {
+            use crate::request::SignableRequest;
+
+            let mut hs = req
+                .headers()
+                .iter()
+                .map(|(k, v)| format!("{}:{}", k, v.to_str().expect("must be valid")))
+                .collect::<Vec<_>>();
+
+            // Insert host if original request doesn't have it.
+            if !hs.contains(&format!("host:{}", req.host_port())) {
+                hs.push(format!("host:{}", req.host_port()))
+            }
+
+            hs.sort();
+            hs
+        }
+
+        assert_eq!(
+            format_headers(l),
+            format_headers(r),
+            "{name} header mismatch"
+        );
+
+        fn format_query(req: &http::Request<&str>) -> Vec<String> {
+            let query = req.uri().query().unwrap_or_default();
+            let mut query = form_urlencoded::parse(query.as_bytes())
+                .map(|(k, v)| format!("{}={}", &k, &v))
+                .collect::<Vec<_>>();
+            query.sort();
+            query
+        }
+
+        assert_eq!(format_query(l), format_query(r), "{name} query mismatch");
+    }
+
+    #[tokio::test]
+    async fn test_calculate() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        for req_fn in test_cases() {
+            let mut req = req_fn();
+            let name = format!(
+                "{} {} {:?}",
+                req.method(),
+                req.uri().path(),
+                req.uri().query(),
+            );
+            let now = time::now();
+
+            let mut ss = SigningSettings::default();
+            ss.percent_encoding_mode = PercentEncodingMode::Double;
+            ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+
+            let sp = SigningParams::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .service_name("s3")
+                .time(SystemTime::from(now))
+                .settings(ss)
+                .build()
+                .expect("signing params must be valid");
+
+            let output = aws_sigv4::http_request::sign(
+                SignableRequest::new(
+                    req.method(),
+                    req.uri(),
+                    req.headers(),
+                    SignableBody::UnsignedPayload,
+                ),
+                &sp,
+            )
+            .expect("signing must succeed");
+            let (aws_sig, _) = output.into_parts();
+            aws_sig.apply_to_request(&mut req);
+            let expected_req = req;
+
+            let mut req = req_fn();
+
+            let signer = Signer::builder()
+                .config_loader({
+                    let cfg = ConfigLoader::default();
+                    cfg.set_region("test");
+                    cfg.set_access_key_id("access_key_id");
+                    cfg.set_secret_access_key("secret_access_key");
+                    cfg
+                })
+                .service("s3")
+                .time(now)
+                .build()?;
+
+            signer.sign(&mut req).expect("must apply success");
+            let actual_req = req;
+
+            compare_request(&name, &expected_req, &actual_req);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_calculate_in_query() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        for req_fn in test_cases() {
+            let mut req = req_fn();
+            let name = format!(
+                "{} {} {:?}",
+                req.method(),
+                req.uri().path(),
+                req.uri().query(),
+            );
+            let now = time::now();
+
+            let mut ss = SigningSettings::default();
+            ss.percent_encoding_mode = PercentEncodingMode::Double;
+            ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+            ss.signature_location = SignatureLocation::QueryParams;
+            ss.expires_in = Some(std::time::Duration::from_secs(3600));
+
+            let sp = SigningParams::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .service_name("s3")
+                .time(SystemTime::from(now))
+                .settings(ss)
+                .build()
+                .expect("signing params must be valid");
+
+            let output = aws_sigv4::http_request::sign(
+                SignableRequest::new(
+                    req.method(),
+                    req.uri(),
+                    req.headers(),
+                    SignableBody::UnsignedPayload,
+                ),
+                &sp,
+            )
+            .expect("signing must succeed");
+            let (aws_sig, _) = output.into_parts();
+            aws_sig.apply_to_request(&mut req);
+            let expected_req = req;
+
+            let mut req = req_fn();
+
+            let signer = Signer::builder()
+                .config_loader({
+                    let cfg = ConfigLoader::default();
+                    cfg.set_region("test");
+                    cfg.set_access_key_id("access_key_id");
+                    cfg.set_secret_access_key("secret_access_key");
+                    cfg
+                })
+                .service("s3")
+                .time(now)
+                .build()?;
+
+            signer.sign_query(&mut req, Duration::hours(1))?;
+            let actual_req = req;
+
+            compare_request(&name, &expected_req, &actual_req);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_calculate_with_token() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        for req_fn in test_cases() {
+            let mut req = req_fn();
+            let name = format!(
+                "{} {} {:?}",
+                req.method(),
+                req.uri().path(),
+                req.uri().query(),
+            );
+            let now = time::now();
+
+            let mut ss = SigningSettings::default();
+            ss.percent_encoding_mode = PercentEncodingMode::Double;
+            ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+
+            let sp = SigningParams::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .security_token("security_token")
+                .service_name("s3")
+                .time(SystemTime::from(now))
+                .settings(ss)
+                .build()
+                .expect("signing params must be valid");
+
+            let output = aws_sigv4::http_request::sign(
+                SignableRequest::new(
+                    req.method(),
+                    req.uri(),
+                    req.headers(),
+                    SignableBody::UnsignedPayload,
+                ),
+                &sp,
+            )
+            .expect("signing must succeed");
+            let (aws_sig, _) = output.into_parts();
+            aws_sig.apply_to_request(&mut req);
+            let expected_req = req;
+
+            let mut req = req_fn();
+
+            let signer = Signer::builder()
+                .config_loader({
+                    let cfg = ConfigLoader::default();
+                    cfg.set_region("test");
+                    cfg.set_access_key_id("access_key_id");
+                    cfg.set_secret_access_key("secret_access_key");
+                    cfg.set_session_token("security_token");
+                    cfg
+                })
+                .service("s3")
+                .time(now)
+                .build()?;
+
+            signer.sign(&mut req).expect("must apply success");
+            let actual_req = req;
+
+            compare_request(&name, &expected_req, &actual_req);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_calculate_with_token_in_query() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        for req_fn in test_cases() {
+            let mut req = req_fn();
+            let name = format!(
+                "{} {} {:?}",
+                req.method(),
+                req.uri().path(),
+                req.uri().query(),
+            );
+            let now = time::now();
+
+            let mut ss = SigningSettings::default();
+            ss.percent_encoding_mode = PercentEncodingMode::Double;
+            ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+            ss.signature_location = SignatureLocation::QueryParams;
+            ss.expires_in = Some(std::time::Duration::from_secs(3600));
+
+            let sp = SigningParams::builder()
+                .access_key("access_key_id")
+                .secret_key("secret_access_key")
+                .region("test")
+                .security_token("security_token")
+                .service_name("s3")
+                .time(SystemTime::from(now))
+                .settings(ss)
+                .build()
+                .expect("signing params must be valid");
+
+            let output = aws_sigv4::http_request::sign(
+                SignableRequest::new(
+                    req.method(),
+                    req.uri(),
+                    req.headers(),
+                    SignableBody::UnsignedPayload,
+                ),
+                &sp,
+            )
+            .expect("signing must succeed");
+            let (aws_sig, _) = output.into_parts();
+            aws_sig.apply_to_request(&mut req);
+            let expected_req = req;
+
+            let mut req = req_fn();
+
+            let signer = Signer::builder()
+                .config_loader({
+                    let cfg = ConfigLoader::default();
+                    cfg.set_region("test");
+                    cfg.set_access_key_id("access_key_id");
+                    cfg.set_secret_access_key("secret_access_key");
+                    cfg.set_session_token("security_token");
+                    cfg
+                })
+                .service("s3")
+                .time(now)
+                .build()?;
+
+            signer
+                .sign_query(&mut req, Duration::hours(1))
+                .expect("must apply success");
+            let actual_req = req;
+
+            compare_request(&name, &expected_req, &actual_req);
+        }
+
+        Ok(())
+    }
+}
