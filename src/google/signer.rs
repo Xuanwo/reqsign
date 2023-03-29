@@ -221,70 +221,81 @@ impl Signer {
         self.credential_loader.load_credential()
     }
 
-    fn build(
+    fn build_header(
         &self,
         req: &mut impl SignableRequest,
-        method: SigningMethod,
-        cred: &Credential,
         token: &Token,
     ) -> Result<SigningContext> {
         let mut ctx = req.build()?;
 
-        match method {
-            SigningMethod::Header => {
-                ctx.headers.insert(header::AUTHORIZATION, {
-                    let mut value: http::HeaderValue =
-                        format!("Bearer {}", token.access_token()).parse()?;
-                    value.set_sensitive(true);
+        ctx.headers.insert(header::AUTHORIZATION, {
+            let mut value: http::HeaderValue =
+                format!("Bearer {}", token.access_token()).parse()?;
+            value.set_sensitive(true);
 
-                    value
-                });
-            }
-            SigningMethod::Query(_) => {
-                let now = self.time.unwrap_or_else(time::now);
+            value
+        });
 
-                // canonicalize context
-                canonicalize_header(&mut ctx)?;
-                canonicalize_query(&mut ctx, method, cred, now, &self.service, &self.region)?;
+        Ok(ctx)
+    }
 
-                // build canonical request and string to sign.
-                let creq = canonical_request_string(&mut ctx)?;
-                let encoded_req = hex_sha256(creq.as_bytes());
+    fn build_query(
+        &self,
+        req: &mut impl SignableRequest,
+        expire: Duration,
+        cred: &Credential,
+    ) -> Result<SigningContext> {
+        let mut ctx = req.build()?;
 
-                // Scope: "20220313/<region>/<service>/goog4_request"
-                let scope = format!(
-                    "{}/{}/{}/goog4_request",
-                    format_date(now),
-                    self.region,
-                    self.service
-                );
-                debug!("calculated scope: {scope}");
+        let now = self.time.unwrap_or_else(time::now);
 
-                // StringToSign:
-                //
-                // GOOG4-RSA-SHA256
-                // 20220313T072004Z
-                // 20220313/<region>/<service>/goog4_request
-                // <hashed_canonical_request>
-                let string_to_sign = {
-                    let mut f = String::new();
-                    f.push_str("GOOG4-RSA-SHA256");
-                    f.push_str(&format_iso8601(now));
-                    f.push_str(&scope);
-                    f.push_str(&encoded_req);
-                    f
-                };
-                debug!("calculated string to sign: {string_to_sign}");
+        // canonicalize context
+        canonicalize_header(&mut ctx)?;
+        canonicalize_query(
+            &mut ctx,
+            SigningMethod::Query(expire),
+            cred,
+            now,
+            &self.service,
+            &self.region,
+        )?;
 
-                let mut rng = rand::thread_rng();
-                let private_key = rsa::RsaPrivateKey::from_pkcs8_pem(cred.private_key())?;
-                let signing_key = SigningKey::<rsa::sha2::Sha256>::new_with_prefix(private_key);
-                let signature = signing_key.sign_with_rng(&mut rng, string_to_sign.as_bytes());
+        // build canonical request and string to sign.
+        let creq = canonical_request_string(&mut ctx)?;
+        let encoded_req = hex_sha256(creq.as_bytes());
 
-                ctx.query
-                    .push(("X-Goog-Signature".to_string(), signature.to_string()));
-            }
-        }
+        // Scope: "20220313/<region>/<service>/goog4_request"
+        let scope = format!(
+            "{}/{}/{}/goog4_request",
+            format_date(now),
+            self.region,
+            self.service
+        );
+        debug!("calculated scope: {scope}");
+
+        // StringToSign:
+        //
+        // GOOG4-RSA-SHA256
+        // 20220313T072004Z
+        // 20220313/<region>/<service>/goog4_request
+        // <hashed_canonical_request>
+        let string_to_sign = {
+            let mut f = String::new();
+            f.push_str("GOOG4-RSA-SHA256");
+            f.push_str(&format_iso8601(now));
+            f.push_str(&scope);
+            f.push_str(&encoded_req);
+            f
+        };
+        debug!("calculated string to sign: {string_to_sign}");
+
+        let mut rng = rand::thread_rng();
+        let private_key = rsa::RsaPrivateKey::from_pkcs8_pem(cred.private_key())?;
+        let signing_key = SigningKey::<rsa::sha2::Sha256>::new_with_prefix(private_key);
+        let signature = signing_key.sign_with_rng(&mut rng, string_to_sign.as_bytes());
+
+        ctx.query
+            .push(("X-Goog-Signature".to_string(), signature.to_string()));
 
         Ok(ctx)
     }
@@ -325,8 +336,8 @@ impl Signer {
     ///
     /// we can also send API via signed JWT: [Addendum: Service account authorization without OAuth](https://developers.google.com/identity/protocols/oauth2/service-account#jwt-auth)
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let (Some(cred), Some(token)) = (self.credential(), self.token()) {
-            let ctx = self.build(req, SigningMethod::Header, &cred, &token)?;
+        if let Some(token) = self.token() {
+            let ctx = self.build_header(req, &token)?;
             return req.apply(ctx);
         }
 
@@ -371,8 +382,8 @@ impl Signer {
     /// }
     /// ```
     pub fn sign_query(&self, req: &mut impl SignableRequest, duration: Duration) -> Result<()> {
-        if let (Some(cred), Some(token)) = (self.credential(), self.token()) {
-            let ctx = self.build(req, SigningMethod::Query(duration), &cred, &token)?;
+        if let Some(cred) = self.credential() {
+            let ctx = self.build_query(req, duration, &cred)?;
             return req.apply(ctx);
         }
 
@@ -420,7 +431,6 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
 }
 
 fn canonicalize_header(ctx: &mut SigningContext) -> Result<()> {
-    // Header names and values need to be normalized according to Step 4 of https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
     for (_, value) in ctx.headers.iter_mut() {
         SigningContext::header_value_normalize(value)
     }
@@ -446,9 +456,9 @@ fn canonicalize_query(
         ctx.query
             .push(("X-Goog-Algorithm".into(), "GOOG4-RSA-SHA256".into()));
         ctx.query.push((
-            "X-Goog-Credentia".into(),
+            "X-Goog-Credential".into(),
             format!(
-                "{}/{}/{}/{}/aws4_request",
+                "{}/{}/{}/{}/goog4_request",
                 cred.client_email(),
                 format_date(now),
                 region,
@@ -491,6 +501,7 @@ mod tests {
     use reqwest::blocking::Client;
 
     use crate::time::parse_rfc2822;
+    use pretty_assertions::assert_eq;
 
     use super::*;
 
@@ -576,7 +587,7 @@ mod tests {
         let query = req.query().unwrap();
         assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));
         assert!(query.contains("X-Goog-Credential"));
-        assert!(query == "X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=testbucket-reqsign-account%40iam-testbucket-reqsign-project.iam.gserviceaccount.com%2F20220815%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20220815T165012Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&X-Goog-Signature=9F423139DB223D818F2D4D6BCA4916DD1EE5AEB8E72D99EC60E8B903DC3CF0586C27A0F821C8CB20C6BB76C776E63134DAFF5957E7862BB89926F18E0D3618E4EE40EF8DBEC64D87F5AD4CAF6FE4C2BC3239E1076A33BE3113D6E0D1AF263C16FA5E1C9590C8F8E4E2CA2FED11533607B5AFE84B53E2E00CB320E0BC853C138EBBDCFEC3E9219C73551478EE12AABBD2576686F887738A21DC5AE00DFF3D481BD08F642342C8CCB476E74C8FEA0C02BA6FEFD61300218D6E216EAD4B59F3351E456601DF38D1CC1B4CE639D2748739933672A08B5FEBBED01B5BC0785E81A865EE0252A0C5AE239061F3F5DB4AFD8CC676646750C762A277FBFDE70A85DFDF33");
+        assert_eq!(query, "X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=testbucket-reqsign-account%40iam-testbucket-reqsign-project.iam.gserviceaccount.com%2F20220815%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20220815T165012Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&X-Goog-Signature=9F423139DB223D818F2D4D6BCA4916DD1EE5AEB8E72D99EC60E8B903DC3CF0586C27A0F821C8CB20C6BB76C776E63134DAFF5957E7862BB89926F18E0D3618E4EE40EF8DBEC64D87F5AD4CAF6FE4C2BC3239E1076A33BE3113D6E0D1AF263C16FA5E1C9590C8F8E4E2CA2FED11533607B5AFE84B53E2E00CB320E0BC853C138EBBDCFEC3E9219C73551478EE12AABBD2576686F887738A21DC5AE00DFF3D481BD08F642342C8CCB476E74C8FEA0C02BA6FEFD61300218D6E216EAD4B59F3351E456601DF38D1CC1B4CE639D2748739933672A08B5FEBBED01B5BC0785E81A865EE0252A0C5AE239061F3F5DB4AFD8CC676646750C762A277FBFDE70A85DFDF33");
         Ok(())
     }
 }
