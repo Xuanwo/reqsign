@@ -208,7 +208,7 @@ impl Signer {
                     "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
                     cred.access_key(),
                     scope,
-                    ctx.header_names_to_vec_sorted().join(";"),
+                    ctx.header_name_to_vec_sorted().join(";"),
                     signature
                 ))?;
                 authorization.set_sensitive(true);
@@ -355,7 +355,7 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
             .join("&")
     )?;
     // Insert signed headers
-    let signed_headers = ctx.header_names_to_vec_sorted();
+    let signed_headers = ctx.header_name_to_vec_sorted();
     for header in signed_headers.iter() {
         let value = &ctx.headers[*header];
         writeln!(
@@ -444,7 +444,7 @@ fn canonicalize_query(
             .push(("X-Amz-Expires".into(), expire.whole_seconds().to_string()));
         ctx.query.push((
             "X-Amz-SignedHeaders".into(),
-            ctx.header_names_to_vec_sorted().join(";"),
+            ctx.header_name_to_vec_sorted().join(";"),
         ));
 
         if let Some(token) = cred.security_token() {

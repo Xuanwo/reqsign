@@ -1,19 +1,20 @@
 //! Azure Storage Singer
 
-use std::borrow::Cow;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::fmt::Write;
 
+use ::time::Duration;
 use anyhow::anyhow;
 use anyhow::Result;
 use http::header::*;
-use http::HeaderMap;
 use log::debug;
 
 use super::super::constants::*;
 use super::credential::CredentialLoader;
 use crate::credential::Credential;
+use crate::ctx::SigningContext;
+use crate::ctx::SigningMethod;
 use crate::hash::base64_decode;
 use crate::hash::base64_hmac_sha256;
 use crate::request::SignableRequest;
@@ -130,60 +131,42 @@ impl Signer {
         self.credential_loader.load()
     }
 
-    fn calculate(&self, req: &impl SignableRequest, cred: &Credential) -> Result<SignedOutput> {
-        if let Some(sas_token) = cred.security_token() {
-            // The SAS token already contains an auth signature so we don't need to
-            // construct one
-            Ok(SignedOutput::SharedAccessSignature(sas_token.to_owned()))
-        } else {
-            let now = self.time.unwrap_or_else(time::now);
-            let string_to_sign = string_to_sign(req, cred, now, self.omit_service_version)?;
-            let auth =
-                base64_hmac_sha256(&base64_decode(cred.secret_key()), string_to_sign.as_bytes());
+    fn build(
+        &self,
+        req: &mut impl SignableRequest,
+        method: SigningMethod,
+        cred: &Credential,
+    ) -> Result<SigningContext> {
+        let mut ctx = req.build()?;
 
-            Ok(SignedOutput::SharedKey {
-                account_name: cred.access_key().to_string(),
-                signed_time: now,
-                signature: auth,
-            })
-        }
-    }
-
-    /// Apply signed results to requests.
-    pub fn apply(&self, req: &mut impl SignableRequest, output: &SignedOutput) -> Result<()> {
-        match output {
-            SignedOutput::SharedAccessSignature(sas_token) => {
-                // The SAS token is itself a query string
-                return req.set_query(sas_token);
-            }
-            SignedOutput::SharedKey {
-                account_name,
-                signed_time,
-                signature,
-            } => {
-                req.insert_header(
-                    HeaderName::from_static(X_MS_DATE),
-                    format_http_date(*signed_time).parse()?,
-                )?;
-
-                if !self.omit_service_version {
-                    req.insert_header(
-                        HeaderName::from_static(X_MS_VERSION),
-                        AZURE_VERSION.parse()?,
-                    )?;
+        match method {
+            SigningMethod::Query(_) => {
+                if let Some(token) = cred.security_token() {
+                    ctx.query_append(token);
+                } else {
+                    return Err(anyhow!("SAS token is required for query signing"));
                 }
+            }
+            SigningMethod::Header => {
+                let now = self.time.unwrap_or_else(time::now);
+                let string_to_sign =
+                    string_to_sign(&mut ctx, cred, now, self.omit_service_version)?;
+                let signature = base64_hmac_sha256(
+                    &base64_decode(cred.secret_key()),
+                    string_to_sign.as_bytes(),
+                );
 
-                req.insert_header(AUTHORIZATION, {
+                ctx.headers.insert(AUTHORIZATION, {
                     let mut value: HeaderValue =
-                        format!("SharedKey {account_name}:{signature}").parse()?;
+                        format!("SharedKey {}:{signature}", cred.access_key()).parse()?;
                     value.set_sensitive(true);
 
                     value
-                })?;
+                });
             }
         }
 
-        Ok(())
+        Ok(ctx)
     }
 
     /// Signing request.
@@ -217,8 +200,8 @@ impl Signer {
     /// ```
     pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
         if let Some(cred) = self.credential() {
-            let sig = self.calculate(req, &cred)?;
-            return self.apply(req, &sig);
+            let ctx = self.build(req, SigningMethod::Header, &cred)?;
+            return req.apply(ctx);
         }
 
         if self.allow_anonymous {
@@ -228,16 +211,21 @@ impl Signer {
 
         Err(anyhow!("credential not found"))
     }
-}
 
-/// Singed output carries result of this signing.
-pub enum SignedOutput {
-    SharedKey {
-        account_name: String,
-        signed_time: DateTime,
-        signature: String,
-    },
-    SharedAccessSignature(String),
+    /// Signing request with query.
+    pub fn sign_query(&self, req: &mut impl SignableRequest) -> Result<()> {
+        if let Some(cred) = self.credential() {
+            let ctx = self.build(req, SigningMethod::Query(Duration::seconds(1)), &cred)?;
+            return req.apply(ctx);
+        }
+
+        if self.allow_anonymous {
+            debug!("credential not found and anonymous is allowed, skipping signing.");
+            return Ok(());
+        }
+
+        Err(anyhow!("credential not found"))
+    }
 }
 
 /// Construct string to sign
@@ -268,44 +256,44 @@ pub enum SignedOutput {
 ///
 /// - [Blob, Queue, and File Services (Shared Key authorization)](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
 fn string_to_sign(
-    req: &impl SignableRequest,
+    ctx: &mut SigningContext,
     cred: &Credential,
     now: DateTime,
     omit_service_version: bool,
 ) -> Result<String> {
-    #[inline]
-    fn get_or_default<'a>(h: &'a HeaderMap, key: &'a HeaderName) -> Result<&'a str> {
-        match h.get(key) {
-            Some(v) => Ok(v.to_str()?),
-            None => Ok(""),
-        }
-    }
+    let mut s = String::with_capacity(128);
 
-    let h = req.headers();
-    let mut s = String::new();
-
-    writeln!(&mut s, "{}", req.method().as_str())?;
-    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_ENCODING)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_LANGUAGE)?)?;
+    writeln!(&mut s, "{}", ctx.method.as_str())?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&CONTENT_ENCODING)?)?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&CONTENT_LANGUAGE)?)?;
     writeln!(
         &mut s,
         "{}",
-        get_or_default(&h, &CONTENT_LENGTH).map(|v| if v == "0" { "" } else { v })?
+        ctx.header_get_or_default(&CONTENT_LENGTH)
+            .map(|v| if v == "0" { "" } else { v })?
     )?;
-    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_MD5.parse()?)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &CONTENT_TYPE)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &DATE)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &IF_MODIFIED_SINCE)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &IF_MATCH)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &IF_NONE_MATCH)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &IF_UNMODIFIED_SINCE)?)?;
-    writeln!(&mut s, "{}", get_or_default(&h, &RANGE)?)?;
     writeln!(
         &mut s,
         "{}",
-        canonicalize_header(req, now, omit_service_version)?
+        ctx.header_get_or_default(&CONTENT_MD5.parse()?)?
     )?;
-    write!(&mut s, "{}", canonicalize_resource(req, cred))?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&CONTENT_TYPE)?)?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&DATE)?)?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&IF_MODIFIED_SINCE)?)?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&IF_MATCH)?)?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&IF_NONE_MATCH)?)?;
+    writeln!(
+        &mut s,
+        "{}",
+        ctx.header_get_or_default(&IF_UNMODIFIED_SINCE)?
+    )?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&RANGE)?)?;
+    writeln!(
+        &mut s,
+        "{}",
+        canonicalize_header(ctx, now, omit_service_version)?
+    )?;
+    write!(&mut s, "{}", canonicalize_resource(ctx, cred))?;
 
     debug!("string to sign: {}", &s);
 
@@ -316,66 +304,37 @@ fn string_to_sign(
 ///
 /// - [Constructing the canonicalized headers string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string)
 fn canonicalize_header(
-    req: &impl SignableRequest,
+    ctx: &mut SigningContext,
     now: DateTime,
     omit_service_version: bool,
 ) -> Result<String> {
-    let mut headers = req
-        .headers()
-        .iter()
-        // Filter all header that starts with "x-ms-"
-        .filter(|(k, _)| k.as_str().starts_with("x-ms-"))
-        // Convert all header name to lowercase
-        .map(|(k, v)| {
-            (
-                k.as_str().to_lowercase(),
-                v.to_str().expect("must be valid header").to_string(),
-            )
-        })
-        .collect::<Vec<(String, String)>>();
-
-    // Insert x_ms_date header.
-    headers.push((X_MS_DATE.to_lowercase(), format_http_date(now)));
-
+    ctx.headers
+        .insert(X_MS_DATE, format_http_date(now).parse()?);
     if !omit_service_version {
         // Insert x_ms_version header.
-        headers.push((X_MS_VERSION.to_lowercase(), AZURE_VERSION.to_string()));
+        ctx.headers
+            .insert(X_MS_VERSION, AZURE_VERSION.to_string().parse()?);
     }
 
-    // Sort via header name.
-    headers.sort_by(|x, y| x.0.cmp(&y.0));
-
-    Ok(headers
-        .iter()
-        // Format into "name:value"
-        .map(|(k, v)| format!("{k}:{v}"))
-        .collect::<Vec<String>>()
-        // Join via "\n"
-        .join("\n"))
+    Ok(SigningContext::header_to_string(
+        ctx.header_to_vec_with_prefix("x-ms-"),
+        "\n",
+    ))
 }
 
 /// ## Reference
 ///
 /// - [Constructing the canonicalized resource string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-resource-string)
-fn canonicalize_resource(req: &impl SignableRequest, cred: &Credential) -> String {
-    if req.query().is_none() {
-        return format!("/{}{}", cred.access_key(), req.path());
+fn canonicalize_resource(ctx: &mut SigningContext, cred: &Credential) -> String {
+    if ctx.query.is_empty() {
+        return format!("/{}{}", cred.access_key(), ctx.path);
     }
-
-    let mut params: Vec<(Cow<'_, str>, Cow<'_, str>)> =
-        form_urlencoded::parse(req.query().unwrap_or_default().as_bytes()).collect();
-    // Sort by param name
-    params.sort();
 
     format!(
         "/{}{}\n{}",
         cred.access_key(),
-        req.path(),
-        params
-            .iter()
-            .map(|(k, v)| format!("{k}:{v}"))
-            .collect::<Vec<String>>()
-            .join("\n")
+        ctx.path,
+        SigningContext::query_to_string(ctx.query.clone(), ":", "\n")
     )
 }
 
@@ -387,6 +346,8 @@ mod tests {
 
     #[test]
     pub fn test_sas_url() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         let signer = AzureStorageSigner::builder()
             .security_token("sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
             .build()
@@ -398,7 +359,7 @@ mod tests {
             .unwrap();
 
         // Signing request with Signer
-        assert!(signer.sign(&mut req).is_ok());
+        assert!(signer.sign_query(&mut req).is_ok());
         assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob?sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
     }
 
