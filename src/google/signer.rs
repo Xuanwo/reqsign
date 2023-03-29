@@ -357,10 +357,11 @@ impl Signer {
     ///
     /// # Example
     /// ```no_run
-    /// use time::Duration;
     /// use anyhow::Result;
     /// use reqsign::GoogleSigner;
-    /// use reqwest::{Client, Url};
+    /// use reqwest::Client;
+    /// use reqwest::Url;
+    /// use time::Duration;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
@@ -510,12 +511,11 @@ fn canonicalize_query(
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
     use reqwest::blocking::Client;
 
-    use crate::time::parse_rfc2822;
-    use pretty_assertions::assert_eq;
-
     use super::*;
+    use crate::time::parse_rfc2822;
 
     #[derive(Debug)]
     struct TestLoader {

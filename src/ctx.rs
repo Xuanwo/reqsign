@@ -1,11 +1,12 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
-use http::{
-    header::HeaderName,
-    uri::{Authority, Scheme},
-    HeaderMap, HeaderValue, Method,
-};
+use http::header::HeaderName;
+use http::uri::Authority;
+use http::uri::Scheme;
+use http::HeaderMap;
+use http::HeaderValue;
+use http::Method;
 use time::Duration;
 
 pub struct SigningContext {
