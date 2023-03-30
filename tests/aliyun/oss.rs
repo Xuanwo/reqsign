@@ -2,6 +2,7 @@ use std::env;
 use std::str::FromStr;
 
 use anyhow::Result;
+use http::header::CONTENT_LENGTH;
 use http::Request;
 use http::StatusCode;
 use log::debug;
@@ -217,6 +218,8 @@ async fn test_put_object_with_special_characters() -> Result<()> {
         url,
         utf8_percent_encode("put-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
+    req.headers_mut()
+        .insert(CONTENT_LENGTH, 0.to_string().parse()?);
 
     let cred = loader.load().await.expect("load request must success");
     signer
