@@ -3,7 +3,6 @@
 use std::collections::HashSet;
 use std::fmt::Write;
 
-use anyhow::anyhow;
 use anyhow::Result;
 use http::header::AUTHORIZATION;
 use http::header::CONTENT_TYPE;
@@ -13,7 +12,6 @@ use log::debug;
 use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 
-use super::credential::CredentialLoader;
 use crate::credential::Credential;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
@@ -26,119 +24,17 @@ use crate::time::Duration;
 
 const CONTENT_MD5: &str = "content-md5";
 
-/// Builder for `Signer`
-#[derive(Default)]
-pub struct Builder {
-    bucket: String,
-    credential: Credential,
-
-    disable_load_from_env: bool,
-    disable_load_from_assume_role_with_oidc: bool,
-    allow_anonymous: bool,
-
-    time: Option<DateTime>,
-}
-
-impl Builder {
-    /// Specify bucket name.
-    pub fn bucket(&mut self, bucket: &str) -> &mut Self {
-        self.bucket = bucket.to_string();
-        self
-    }
-
-    /// Specify access key id.
-    ///
-    /// If not set, we will try to load via `credential_loader`.
-    pub fn access_key_id(&mut self, access_key_id: &str) -> &mut Self {
-        self.credential.set_access_key(access_key_id);
-        self
-    }
-
-    /// Specify access key secret.
-    ///
-    /// If not set, we will try to load via `credential_loader`.
-    pub fn access_key_secret(&mut self, access_key_secret: &str) -> &mut Self {
-        self.credential.set_secret_key(access_key_secret);
-        self
-    }
-
-    /// Disable load from env.
-    pub fn disable_load_from_env(&mut self) -> &mut Self {
-        self.disable_load_from_env = true;
-        self
-    }
-
-    /// Disable load from assume role with oidc.
-    pub fn disable_load_from_assume_role_with_oidc(&mut self) -> &mut Self {
-        self.disable_load_from_assume_role_with_oidc = true;
-        self
-    }
-
-    /// Allow anonymous request if credential is not loaded.
-    pub fn allow_anonymous(&mut self) -> &mut Self {
-        self.allow_anonymous = true;
-        self
-    }
-
-    /// Specify the signing time.
-    ///
-    /// # Note
-    ///
-    /// We should always take current time to sign requests.
-    /// Only use this function for testing.
-    #[cfg(test)]
-    pub fn time(&mut self, time: DateTime) -> &mut Self {
-        self.time = Some(time);
-        self
-    }
-
-    /// Use exising information to build a new signer.
-    ///
-    /// The builder should not be used anymore.
-    pub fn build(&mut self) -> Result<Signer> {
-        if self.bucket.is_empty() {
-            return Err(anyhow!("bucket is required"));
-        }
-
-        let mut cred_loader = CredentialLoader::default();
-        if self.credential.is_valid() {
-            cred_loader = cred_loader.with_credential(self.credential.clone());
-        }
-        if self.disable_load_from_env {
-            cred_loader = cred_loader.with_disable_env();
-        }
-        if self.disable_load_from_assume_role_with_oidc {
-            cred_loader = cred_loader.with_disable_assume_role_with_oidc();
-        }
-
-        Ok(Signer {
-            bucket: self.bucket.to_string(),
-            credential_loader: cred_loader,
-            allow_anonymous: self.allow_anonymous,
-            time: self.time,
-        })
-    }
-}
-
 /// Singer for Aliyun OSS.
 pub struct Signer {
     bucket: String,
-    credential_loader: CredentialLoader,
-
-    /// Allow anonymous request if credential is not loaded.
-    allow_anonymous: bool,
-    time: Option<DateTime>,
 }
 
 impl Signer {
-    /// Load credential via credential load chain specified while building.
-    ///
-    /// # Note
-    ///
-    /// This function should never be exported to avoid credential leaking by
-    /// mistake.
-    fn credential(&self) -> Option<Credential> {
-        self.credential_loader.load()
+    /// Create a new signer
+    pub fn new(bucket: &str) -> Self {
+        Self {
+            bucket: bucket.to_owned(),
+        }
     }
 
     /// Building a signing context.
@@ -148,7 +44,7 @@ impl Signer {
         method: SigningMethod,
         cred: &Credential,
     ) -> Result<SigningContext> {
-        let now = self.time.unwrap_or_else(time::now);
+        let now = time::now();
         let mut ctx = req.build()?;
 
         let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
@@ -180,33 +76,22 @@ impl Signer {
     }
 
     /// Signing request with header.
-    pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential() {
-            let ctx = self.build(req, SigningMethod::Header, &cred)?;
-            return req.apply(ctx);
-        }
+    pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Header, cred)?;
 
-        if self.allow_anonymous {
-            debug!("credential not found and anonymous is allowed, skipping signing.");
-            return Ok(());
-        }
-
-        Err(anyhow!("credential not found"))
+        req.apply(ctx)
     }
 
     /// Signing request with query.
-    pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
-        if let Some(cred) = self.credential() {
-            let ctx = self.build(req, SigningMethod::Query(expire), &cred)?;
-            return req.apply(ctx);
-        }
+    pub fn sign_query(
+        &self,
+        req: &mut impl SignableRequest,
+        expire: Duration,
+        cred: &Credential,
+    ) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
 
-        if self.allow_anonymous {
-            debug!("credential not found and anonymous is allowed, skipping signing.");
-            return Ok(());
-        }
-
-        Err(anyhow!("credential not found"))
+        req.apply(ctx)
     }
 }
 
