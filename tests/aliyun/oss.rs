@@ -210,7 +210,6 @@ async fn test_put_object_with_special_characters() -> Result<()> {
 
     let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
-    let cred = loader.load().await.expect("load request must success");
     let mut req = Request::new("");
     *req.method_mut() = http::Method::PUT;
     *req.uri_mut() = http::Uri::from_str(&format!(
@@ -219,6 +218,7 @@ async fn test_put_object_with_special_characters() -> Result<()> {
         utf8_percent_encode("put-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
+    let cred = loader.load().await.expect("load request must success");
     signer
         .sign(&mut req, &cred)
         .expect("sign request must success");
