@@ -250,8 +250,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_signer_with_oidc() -> Result<()> {
+    #[test]
+    fn test_signer_with_oidc() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         dotenv::from_filename(".env").ok();
