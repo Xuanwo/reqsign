@@ -1,6 +1,6 @@
 use std::fs;
 use std::sync::Arc;
-use std::sync::RwLock;
+use std::sync::Mutex;
 use std::thread::sleep;
 
 use anyhow::anyhow;
@@ -8,39 +8,40 @@ use anyhow::Result;
 use backon::BackoffBuilder;
 use backon::ExponentialBuilder;
 use log::warn;
+use reqwest::Client;
 use serde::Deserialize;
 
-use super::config::ConfigLoader;
+use super::config::Config;
 use crate::credential::Credential;
 use crate::time::format_rfc3339;
 use crate::time::now;
 use crate::time::parse_rfc3339;
 
-/// CredentialLoader will load credential from different methods.
+/// Loader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
-pub struct CredentialLoader {
-    credential: Arc<RwLock<Option<Credential>>>,
+pub struct Loader {
+    credential: Arc<Mutex<Option<Credential>>>,
 
     disable_env: bool,
     disable_assume_role_with_oidc: bool,
 
-    client: ureq::Agent,
-    config_loader: ConfigLoader,
+    client: Client,
+    config: Config,
 }
 
-impl Default for CredentialLoader {
-    fn default() -> Self {
+impl Loader {
+    /// Create a new loader via client and config.
+    pub fn new(client: Client, config: Config) -> Self {
         Self {
-            credential: Arc::new(Default::default()),
+            client,
+            config,
+
+            credential: Arc::default(),
             disable_env: false,
             disable_assume_role_with_oidc: false,
-            client: ureq::Agent::new(),
-            config_loader: Default::default(),
         }
     }
-}
 
-impl CredentialLoader {
     /// Disable load from env.
     pub fn with_disable_env(mut self) -> Self {
         self.disable_env = true;
@@ -53,16 +54,10 @@ impl CredentialLoader {
         self
     }
 
-    /// Set Credential.
-    pub fn with_credential(self, cred: Credential) -> Self {
-        *self.credential.write().expect("lock poisoned") = Some(cred);
-        self
-    }
-
     /// Load credential.
-    pub fn load(&self) -> Option<Credential> {
+    pub async fn load(&self) -> Option<Credential> {
         // Return cached credential if it's valid.
-        match self.credential.read().expect("lock poisoned").clone() {
+        match self.credential.lock().expect("lock poisoned").clone() {
             Some(cred) if cred.is_valid() => return Some(cred),
             _ => (),
         }
@@ -74,14 +69,19 @@ impl CredentialLoader {
             .build();
 
         let cred = loop {
-            let cred = self.load_via_env().or_else(|| {
+            let cred = self.load_via_env();
+
+            let cred = if cred.is_some() {
+                cred
+            } else {
                 self.load_via_assume_role_with_oidc()
+                    .await
                     .map_err(|err| {
                         warn!("load credential via assume role with oidc failed: {err:?}");
                         err
                     })
                     .unwrap_or_default()
-            });
+            };
 
             match cred {
                 Some(cred) => break cred,
@@ -98,7 +98,7 @@ impl CredentialLoader {
             }
         };
 
-        let mut lock = self.credential.write().expect("lock poisoned");
+        let mut lock = self.credential.lock().expect("lock poisoned");
         *lock = Some(cred.clone());
 
         Some(cred)
@@ -109,15 +109,10 @@ impl CredentialLoader {
             return None;
         }
 
-        self.config_loader.load_via_env();
-
-        if let (Some(ak), Some(sk)) = (
-            self.config_loader.access_key_id(),
-            self.config_loader.access_key_secret(),
-        ) {
-            let mut cred = Credential::new(&ak, &sk);
-            if let Some(tk) = self.config_loader.security_token() {
-                cred.set_security_token(&tk);
+        if let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.access_key_secret) {
+            let mut cred = Credential::new(ak, sk);
+            if let Some(tk) = &self.config.security_token {
+                cred.set_security_token(tk);
             }
             Some(cred)
         } else {
@@ -125,15 +120,15 @@ impl CredentialLoader {
         }
     }
 
-    fn load_via_assume_role_with_oidc(&self) -> Result<Option<Credential>> {
+    async fn load_via_assume_role_with_oidc(&self) -> Result<Option<Credential>> {
         if self.disable_assume_role_with_oidc {
             return Ok(None);
         }
 
         let (token_file, role_arn, provider_arn) = match (
-            self.config_loader.oidc_token_file(),
-            self.config_loader.role_arn(),
-            self.config_loader.oidc_provider_arn(),
+            &self.config.oidc_token_file,
+            &self.config.role_arn,
+            &self.config.oidc_provider_arn,
         ) {
             (Some(token_file), Some(role_arn), Some(provider_arn)) => {
                 (token_file, role_arn, provider_arn)
@@ -142,23 +137,27 @@ impl CredentialLoader {
         };
 
         let token = fs::read_to_string(token_file)?;
-        let role_session_name = self.config_loader.role_session_name();
+        let role_session_name = self
+            .config
+            .role_session_name
+            .as_deref()
+            .unwrap_or("reqsign");
 
         // Construct request to Aliyun STS Service.
-        let url = format!("https://sts.aliyuncs.com/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}", provider_arn, role_arn,  role_session_name, format_rfc3339(now()), token);
+        let url = format!("https://sts.aliyuncs.com/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}", provider_arn, role_arn, role_session_name, format_rfc3339(now()), token);
 
-        let req = self.client.get(&url).set(
+        let req = self.client.get(&url).header(
             http::header::CONTENT_TYPE.as_str(),
             "application/x-www-form-urlencoded",
         );
 
-        let resp = req.call()?;
+        let resp = req.send().await?;
         if resp.status() != http::StatusCode::OK {
-            let content = resp.into_string()?;
+            let content = resp.text().await?;
             return Err(anyhow!("request to Aliyun STS Services failed: {content}"));
         }
 
-        let resp: AssumeRoleWithOidcResponse = serde_json::from_str(&resp.into_string()?)?;
+        let resp: AssumeRoleWithOidcResponse = serde_json::from_slice(&resp.bytes().await?)?;
         let resp_cred = resp.credentials;
 
         let cred = Credential::new(&resp_cred.access_key_id, &resp_cred.access_key_secret)
@@ -193,11 +192,22 @@ mod tests {
     use std::str::FromStr;
 
     use http::Request;
+    use once_cell::sync::Lazy;
     use reqwest::blocking::Client;
     use time::Duration;
+    use tokio::runtime::Runtime;
 
     use super::super::constants::*;
+    use super::super::oss::Signer;
     use super::*;
+    use log::debug;
+
+    static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("Should create a tokio runtime")
+    });
 
     #[test]
     fn test_parse_assume_role_with_oidc_response() -> Result<()> {
@@ -292,10 +302,12 @@ mod tests {
                 (ALIBABA_CLOUD_OIDC_TOKEN_FILE, Some(&file_path)),
             ],
             || {
-                let l = CredentialLoader::default();
-                let x = l.load().expect("credential must be valid");
+                RUNTIME.block_on(async {
+                    let l = Loader::new(reqwest::Client::new(), Config::default().from_env());
+                    let x = l.load().await.expect("credential must be valid");
 
-                assert!(x.is_valid());
+                    assert!(x.is_valid());
+                })
             },
         );
 
@@ -305,8 +317,6 @@ mod tests {
     #[test]
     fn test_signer_with_oidc_query() -> Result<()> {
         let _ = env_logger::builder().try_init();
-
-        use log::debug;
 
         dotenv::from_filename(".env").ok();
 
@@ -356,27 +366,32 @@ mod tests {
                 (ALIBABA_CLOUD_OIDC_TOKEN_FILE, Some(&file_path)),
             ],
             || {
-                let mut builder = super::super::oss::Builder::default();
-                builder.bucket(
-                    &env::var("REQSIGN_ALIYUN_OSS_BUCKET")
-                        .expect("env REQSIGN_ALIYUN_OSS_BUCKET must set"),
-                );
-                let signer = builder.build().expect("must succeed");
+                RUNTIME.block_on(async {
+                    let config = Config::default().from_env();
+                    let loader = Loader::new(reqwest::Client::new(), config);
 
-                let url = &env::var("REQSIGN_ALIYUN_OSS_URL")
-                    .expect("env REQSIGN_ALIYUN_OSS_URL must set");
+                    let signer = Signer::new(
+                        &env::var("REQSIGN_ALIYUN_OSS_BUCKET")
+                            .expect("env REQSIGN_ALIYUN_OSS_BUCKET must set"),
+                    );
 
-                let mut req = Request::new("");
-                *req.method_mut() = http::Method::GET;
-                *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))
-                    .expect("must valid");
+                    let url = &env::var("REQSIGN_ALIYUN_OSS_URL")
+                        .expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
-                signer
-                    .sign_query(&mut req, Duration::seconds(3600))
-                    .expect("sign request must success");
+                    let mut req = Request::new("");
+                    *req.method_mut() = http::Method::GET;
+                    *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))
+                        .expect("must valid");
 
-                debug!("signed request url: {:?}", req.uri().to_string());
-                debug!("signed request: {:?}", req);
+                    let cred = loader.load().await.expect("credential must be valid");
+
+                    signer
+                        .sign_query(&mut req, Duration::seconds(3600), &cred)
+                        .expect("sign request must success");
+
+                    debug!("signed request url: {:?}", req.uri().to_string());
+                    debug!("signed request: {:?}", req);
+                })
             },
         );
         Ok(())

@@ -53,8 +53,7 @@
 pub mod credential;
 
 mod aliyun;
-pub use aliyun::oss::Builder as AliyunOssBuilder;
-pub use aliyun::oss::Signer as AliyunOssSigner;
+pub use aliyun::*;
 
 mod aws;
 pub use aws::config::ConfigLoader as AwsConfigLoader;
