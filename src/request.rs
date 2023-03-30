@@ -101,7 +101,6 @@ impl<T> SignableRequest for http::Request<T> {
 }
 
 /// Implement `SignableRequest` for [`reqwest::Request`]
-#[cfg(feature = "reqwest_request")]
 impl SignableRequest for reqwest::Request {
     fn build(&mut self) -> Result<SigningContext> {
         let this = self as &mut reqwest::Request;
