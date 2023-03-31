@@ -662,7 +662,6 @@ mod tests {
             let cred = loader.load().await?.unwrap();
 
             let signer = Signer::new("s3", "test").time(now);
-            signer.sign(&mut req, &cred).expect("must apply success");
 
             signer.sign_query(&mut req, Duration::hours(1), &cred)?;
             let actual_req = req;
