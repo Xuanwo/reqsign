@@ -20,13 +20,10 @@ use crate::time::parse_rfc3339;
 /// Loader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
 pub struct Loader {
-    credential: Arc<Mutex<Option<Credential>>>,
-
-    disable_env: bool,
-    disable_assume_role_with_oidc: bool,
-
     client: Client,
     config: Config,
+
+    credential: Arc<Mutex<Option<Credential>>>,
 }
 
 impl Loader {
@@ -37,21 +34,7 @@ impl Loader {
             config,
 
             credential: Arc::default(),
-            disable_env: false,
-            disable_assume_role_with_oidc: false,
         }
-    }
-
-    /// Disable load from env.
-    pub fn with_disable_env(mut self) -> Self {
-        self.disable_env = true;
-        self
-    }
-
-    /// Disable load from assume role with oidc.
-    pub fn with_disable_assume_role_with_oidc(mut self) -> Self {
-        self.disable_assume_role_with_oidc = true;
-        self
     }
 
     /// Load credential.
@@ -69,7 +52,7 @@ impl Loader {
             .build();
 
         let cred = loop {
-            let cred = self.load_via_env();
+            let cred = self.load_via_static();
 
             let cred = if cred.is_some() {
                 cred
@@ -104,11 +87,7 @@ impl Loader {
         Some(cred)
     }
 
-    fn load_via_env(&self) -> Option<Credential> {
-        if self.disable_env {
-            return None;
-        }
-
+    fn load_via_static(&self) -> Option<Credential> {
         if let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.access_key_secret) {
             let mut cred = Credential::new(ak, sk);
             if let Some(tk) = &self.config.security_token {
@@ -121,10 +100,6 @@ impl Loader {
     }
 
     async fn load_via_assume_role_with_oidc(&self) -> Result<Option<Credential>> {
-        if self.disable_assume_role_with_oidc {
-            return Ok(None);
-        }
-
         let (token_file, role_arn, provider_arn) = match (
             &self.config.oidc_token_file,
             &self.config.role_arn,
