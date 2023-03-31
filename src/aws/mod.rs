@@ -1,9 +1,11 @@
 //! AWS service signer
 //!
 //! Only sigv4 has been supported.
-pub mod config;
-pub mod credential;
-pub mod v4;
+mod config;
+pub use config::Config as AwsConfig;
+mod credential;
+pub use credential::Loader as AwsLoader;
+mod v4;
+pub use v4::Signer as AwsV4Signer;
 
 mod constants;
-mod region;

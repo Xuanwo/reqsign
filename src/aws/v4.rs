@@ -1,10 +1,8 @@
 //! AWS service sigv4 signer
 
 use std::fmt::Debug;
-use std::fmt::Formatter;
 use std::fmt::Write;
 
-use anyhow::anyhow;
 use anyhow::Result;
 use http::header;
 use http::HeaderValue;
@@ -12,13 +10,10 @@ use log::debug;
 use percent_encoding::percent_decode_str;
 use percent_encoding::utf8_percent_encode;
 
-use super::config::ConfigLoader;
 use super::constants::AWS_QUERY_ENCODE_SET;
 use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::constants::X_AMZ_DATE;
 use super::constants::X_AMZ_SECURITY_TOKEN;
-use super::credential::CredentialLoader;
-use super::region::RegionLoader;
 use crate::credential::Credential;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
@@ -32,49 +27,25 @@ use crate::time::DateTime;
 use crate::time::Duration;
 use crate::time::{self};
 
-/// Builder for `Signer`.
-#[derive(Default)]
-pub struct Builder {
-    service: Option<String>,
-
-    config_loader: ConfigLoader,
-    credential_loader: Option<CredentialLoader>,
-    allow_anonymous: bool,
+/// Singer that implement AWS SigV4.
+///
+/// - [Signature Version 4 signing process](https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html)
+#[derive(Debug)]
+pub struct Signer {
+    service: String,
+    region: String,
 
     time: Option<DateTime>,
 }
 
-impl Builder {
-    /// Specify service like "s3".
-    pub fn service(&mut self, service: &str) -> &mut Self {
-        self.service = Some(service.to_string());
-        self
-    }
-
-    /// Set the config loader used by builder.
-    ///
-    /// # Notes
-    ///
-    /// Signer will only read data from it, it's your responsible to decide
-    /// whether or not to call `ConfigLoader::load()`.
-    ///
-    /// If `load` is called, ConfigLoader will load config from current env.
-    /// If not, ConfigLoader will only use static config that set by users.
-    pub fn config_loader(&mut self, cfg: ConfigLoader) -> &mut Self {
-        self.config_loader = cfg;
-        self
-    }
-
-    /// Allow anonymous request if credential is not loaded.
-    pub fn allow_anonymous(&mut self) -> &mut Self {
-        self.allow_anonymous = true;
-        self
-    }
-
-    /// Set credential loader
-    pub fn credential_loader(&mut self, cred: CredentialLoader) -> &mut Self {
-        self.credential_loader = Some(cred);
-        self
+impl Signer {
+    /// Create a builder.
+    pub fn new(service: &str, region: &str) -> Self {
+        Self {
+            service: service.to_string(),
+            region: region.to_string(),
+            time: None,
+        }
     }
 
     /// Specify the signing time.
@@ -84,77 +55,9 @@ impl Builder {
     /// We should always take current time to sign requests.
     /// Only use this function for testing.
     #[cfg(test)]
-    pub fn time(&mut self, time: DateTime) -> &mut Self {
+    pub fn time(mut self, time: DateTime) -> Self {
         self.time = Some(time);
         self
-    }
-
-    /// Use exising information to build a new signer.
-    ///
-    /// The builder should not be used anymore.
-    pub fn build(&mut self) -> Result<Signer> {
-        let service = self
-            .service
-            .as_ref()
-            .ok_or_else(|| anyhow!("service is required"))?;
-        debug!("signer: service: {:?}", service);
-
-        let cred_loader = match self.credential_loader.take() {
-            Some(cred) => cred,
-            None => {
-                let mut loader = CredentialLoader::new(self.config_loader.clone());
-                if self.allow_anonymous {
-                    loader = loader.with_allow_anonymous();
-                }
-                loader
-            }
-        };
-
-        let region_loader = RegionLoader::new(self.config_loader.clone());
-
-        let region = region_loader
-            .load()
-            .ok_or_else(|| anyhow!("region is missing"))?;
-        debug!("signer region: {}", &region);
-
-        Ok(Signer {
-            service: service.to_string(),
-            region,
-            credential_loader: cred_loader,
-            allow_anonymous: self.allow_anonymous,
-            time: self.time,
-        })
-    }
-}
-
-/// Singer that implement AWS SigV4.
-///
-/// - [Signature Version 4 signing process](https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html)
-pub struct Signer {
-    service: String,
-    region: String,
-    credential_loader: CredentialLoader,
-
-    /// Allow anonymous request if credential is not loaded.
-    allow_anonymous: bool,
-
-    time: Option<DateTime>,
-}
-
-impl Signer {
-    /// Create a builder.
-    pub fn builder() -> Builder {
-        Builder::default()
-    }
-
-    /// Load credential via credential load chain specified while building.
-    ///
-    /// # Note
-    ///
-    /// This function should never be exported to avoid credential leaking by
-    /// mistake.
-    fn credential(&self) -> Option<Credential> {
-        self.credential_loader.load()
     }
 
     fn build(
@@ -260,18 +163,9 @@ impl Signer {
     ///     Ok(())
     /// }
     /// ```
-    pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential() {
-            let ctx = self.build(req, SigningMethod::Header, &cred)?;
-            return req.apply(ctx);
-        }
-
-        if self.allow_anonymous {
-            debug!("credential not found and anonymous is allowed, skipping signing.");
-            return Ok(());
-        }
-
-        Err(anyhow!("credential not found"))
+    pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Header, cred)?;
+        req.apply(ctx)
     }
 
     /// Signing request with query.
@@ -306,28 +200,14 @@ impl Signer {
     ///     Ok(())
     /// }
     /// ```
-    pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
-        if let Some(cred) = self.credential() {
-            let ctx = self.build(req, SigningMethod::Query(expire), &cred)?;
-            return req.apply(ctx);
-        }
-
-        if self.allow_anonymous {
-            debug!("credential not found and anonymous is allowed, skipping signing.");
-            return Ok(());
-        }
-
-        Err(anyhow!("credential not found"))
-    }
-}
-
-impl Debug for Signer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Signer {{ region: {}, service: {}, allow_anonymous: {} }}",
-            self.region, self.service, self.allow_anonymous
-        )
+    pub fn sign_query(
+        &self,
+        req: &mut impl SignableRequest,
+        expire: Duration,
+        cred: &Credential,
+    ) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
+        req.apply(ctx)
     }
 }
 
@@ -495,7 +375,6 @@ mod tests {
     use std::time::SystemTime;
 
     use anyhow::Result;
-    use aws_sigv4;
     use aws_sigv4::http_request::PayloadChecksumKind;
     use aws_sigv4::http_request::PercentEncodingMode;
     use aws_sigv4::http_request::SignableBody;
@@ -504,6 +383,11 @@ mod tests {
     use aws_sigv4::http_request::SigningSettings;
     use aws_sigv4::SigningParams;
     use http::header;
+    use reqwest::Client;
+
+    use crate::aws::AwsConfig;
+
+    use super::super::AwsLoader;
 
     use super::*;
 
@@ -700,19 +584,19 @@ mod tests {
 
             let mut req = req_fn();
 
-            let signer = Signer::builder()
-                .config_loader({
-                    let cfg = ConfigLoader::default();
-                    cfg.set_region("test");
-                    cfg.set_access_key_id("access_key_id");
-                    cfg.set_secret_access_key("secret_access_key");
-                    cfg
-                })
-                .service("s3")
-                .time(now)
-                .build()?;
+            let loader = AwsLoader::new(
+                Client::new(),
+                AwsConfig {
+                    access_key_id: Some("access_key_id".to_string()),
+                    secret_access_key: Some("secret_access_key".to_string()),
+                    ..Default::default()
+                },
+            );
+            let cred = loader.load().await?.unwrap();
 
-            signer.sign(&mut req).expect("must apply success");
+            let signer = Signer::new("s3", "test").time(now);
+            signer.sign(&mut req, &cred).expect("must apply success");
+
             let actual_req = req;
 
             compare_request(&name, &expected_req, &actual_req);
@@ -767,19 +651,20 @@ mod tests {
 
             let mut req = req_fn();
 
-            let signer = Signer::builder()
-                .config_loader({
-                    let cfg = ConfigLoader::default();
-                    cfg.set_region("test");
-                    cfg.set_access_key_id("access_key_id");
-                    cfg.set_secret_access_key("secret_access_key");
-                    cfg
-                })
-                .service("s3")
-                .time(now)
-                .build()?;
+            let loader = AwsLoader::new(
+                Client::new(),
+                AwsConfig {
+                    access_key_id: Some("access_key_id".to_string()),
+                    secret_access_key: Some("secret_access_key".to_string()),
+                    ..Default::default()
+                },
+            );
+            let cred = loader.load().await?.unwrap();
 
-            signer.sign_query(&mut req, Duration::hours(1))?;
+            let signer = Signer::new("s3", "test").time(now);
+            signer.sign(&mut req, &cred).expect("must apply success");
+
+            signer.sign_query(&mut req, Duration::hours(1), &cred)?;
             let actual_req = req;
 
             compare_request(&name, &expected_req, &actual_req);
@@ -833,20 +718,20 @@ mod tests {
 
             let mut req = req_fn();
 
-            let signer = Signer::builder()
-                .config_loader({
-                    let cfg = ConfigLoader::default();
-                    cfg.set_region("test");
-                    cfg.set_access_key_id("access_key_id");
-                    cfg.set_secret_access_key("secret_access_key");
-                    cfg.set_session_token("security_token");
-                    cfg
-                })
-                .service("s3")
-                .time(now)
-                .build()?;
+            let loader = AwsLoader::new(
+                Client::new(),
+                AwsConfig {
+                    access_key_id: Some("access_key_id".to_string()),
+                    secret_access_key: Some("secret_access_key".to_string()),
+                    session_token: Some("security_token".to_string()),
+                    ..Default::default()
+                },
+            );
+            let cred = loader.load().await?.unwrap();
 
-            signer.sign(&mut req).expect("must apply success");
+            let signer = Signer::new("s3", "test").time(now);
+
+            signer.sign(&mut req, &cred).expect("must apply success");
             let actual_req = req;
 
             compare_request(&name, &expected_req, &actual_req);
@@ -902,21 +787,20 @@ mod tests {
 
             let mut req = req_fn();
 
-            let signer = Signer::builder()
-                .config_loader({
-                    let cfg = ConfigLoader::default();
-                    cfg.set_region("test");
-                    cfg.set_access_key_id("access_key_id");
-                    cfg.set_secret_access_key("secret_access_key");
-                    cfg.set_session_token("security_token");
-                    cfg
-                })
-                .service("s3")
-                .time(now)
-                .build()?;
+            let loader = AwsLoader::new(
+                Client::new(),
+                AwsConfig {
+                    access_key_id: Some("access_key_id".to_string()),
+                    secret_access_key: Some("secret_access_key".to_string()),
+                    session_token: Some("security_token".to_string()),
+                    ..Default::default()
+                },
+            );
+            let cred = loader.load().await?.unwrap();
 
+            let signer = Signer::new("s3", "test").time(now);
             signer
-                .sign_query(&mut req, Duration::hours(1))
+                .sign_query(&mut req, Duration::hours(1), &cred)
                 .expect("must apply success");
             let actual_req = req;
 

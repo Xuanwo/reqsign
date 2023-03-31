@@ -8,12 +8,13 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign::AwsConfigLoader;
+use reqsign::AwsConfig;
+use reqsign::AwsLoader;
 use reqsign::AwsV4Signer;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use time::Duration;
 
-fn init_signer() -> Option<AwsV4Signer> {
+fn init_signer() -> Option<(AwsLoader, AwsV4Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -23,37 +24,41 @@ fn init_signer() -> Option<AwsV4Signer> {
         return None;
     }
 
-    let mut builder = AwsV4Signer::builder();
-    builder
-        .service(&env::var("REQSIGN_AWS_V4_SERVICE").expect("env REQSIGN_AWS_V4_SERVICE must set"));
-    builder.config_loader({
-        let loader = AwsConfigLoader::default();
-        loader.set_region(
-            &env::var("REQSIGN_AWS_V4_REGION").expect("env REQSIGN_AWS_V4_REGION must set"),
-        );
-        loader.set_access_key_id(
-            &env::var("REQSIGN_AWS_V4_ACCESS_KEY").expect("env REQSIGN_AWS_V4_ACCESS_KEY must set"),
-        );
-        loader.set_secret_access_key(
-            &env::var("REQSIGN_AWS_V4_SECRET_KEY").expect("env REQSIGN_AWS_V4_SECRET_KEY must set"),
-        );
+    let config = AwsConfig {
+        region: Some(
+            env::var("REQSIGN_AWS_V4_REGION").expect("env REQSIGN_AWS_V4_REGION must set"),
+        ),
+        access_key_id: Some(
+            env::var("REQSIGN_AWS_V4_ACCESS_KEY").expect("env REQSIGN_AWS_V4_ACCESS_KEY must set"),
+        ),
+        secret_access_key: Some(
+            env::var("REQSIGN_AWS_V4_SECRET_KEY").expect("env REQSIGN_AWS_V4_SECRET_KEY must set"),
+        ),
+        ..Default::default()
+    }
+    .from_env()
+    .from_profile();
 
-        // Make sure all value has been loaded.
-        loader.load();
-        loader
-    });
+    let region = config.region.as_deref().unwrap().to_string();
 
-    Some(builder.build().expect("signer must be valid"))
+    let loader = AwsLoader::new(Client::new(), config);
+
+    let signer = AwsV4Signer::new(
+        &env::var("REQSIGN_AWS_V4_SERVICE").expect("env REQSIGN_AWS_V4_SERVICE must set"),
+        &region,
+    );
+
+    Some((loader, signer))
 }
 
-#[test]
-fn test_head_object() -> Result<()> {
+#[tokio::test]
+async fn test_head_object() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
     }
-    let signer = signer.unwrap();
+    let (loader, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
@@ -61,13 +66,21 @@ fn test_head_object() -> Result<()> {
     *req.method_mut() = http::Method::HEAD;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
-    signer.sign(&mut req).expect("sign request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
+    signer
+        .sign(&mut req, &cred)
+        .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
     let client = Client::new();
     let resp = client
         .execute(req.try_into()?)
+        .await
         .expect("request must succeed");
 
     debug!("got response: {:?}", resp);
@@ -75,14 +88,14 @@ fn test_head_object() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_put_object_with_query() -> Result<()> {
+#[tokio::test]
+async fn test_put_object_with_query() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
     }
-    let signer = signer.unwrap();
+    let (loader, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
@@ -90,8 +103,13 @@ fn test_put_object_with_query() -> Result<()> {
     *req.method_mut() = http::Method::PUT;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "put_object_test"))?;
 
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
     signer
-        .sign_query(&mut req, Duration::hours(1))
+        .sign_query(&mut req, Duration::hours(1), &cred)
         .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
@@ -99,25 +117,26 @@ fn test_put_object_with_query() -> Result<()> {
     let client = Client::new();
     let resp = client
         .execute(req.try_into()?)
+        .await
         .expect("request must succeed");
 
     let status = resp.status();
     debug!(
         "got response: {:?}",
-        String::from_utf8(resp.bytes()?.to_vec())?
+        String::from_utf8(resp.bytes().await?.to_vec())?
     );
     assert_eq!(StatusCode::OK, status);
     Ok(())
 }
 
-#[test]
-fn test_get_object_with_query() -> Result<()> {
+#[tokio::test]
+async fn test_get_object_with_query() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
     }
-    let signer = signer.unwrap();
+    let (loader, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
@@ -125,8 +144,13 @@ fn test_get_object_with_query() -> Result<()> {
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
     signer
-        .sign_query(&mut req, Duration::hours(1))
+        .sign_query(&mut req, Duration::hours(1), &cred)
         .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
@@ -134,6 +158,7 @@ fn test_get_object_with_query() -> Result<()> {
     let client = Client::new();
     let resp = client
         .execute(req.try_into()?)
+        .await
         .expect("request must success");
 
     debug!("got response: {:?}", resp);
@@ -141,14 +166,14 @@ fn test_get_object_with_query() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_head_object_with_special_characters() -> Result<()> {
+#[tokio::test]
+async fn test_head_object_with_special_characters() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
     }
-    let signer = signer.unwrap();
+    let (loader, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
@@ -160,13 +185,21 @@ fn test_head_object_with_special_characters() -> Result<()> {
         utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
-    signer.sign(&mut req).expect("sign request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
+    signer
+        .sign(&mut req, &cred)
+        .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
     let client = Client::new();
     let resp = client
         .execute(req.try_into()?)
+        .await
         .expect("request must success");
 
     debug!("got response: {:?}", resp);
@@ -174,14 +207,14 @@ fn test_head_object_with_special_characters() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_head_object_with_encoded_characters() -> Result<()> {
+#[tokio::test]
+async fn test_head_object_with_encoded_characters() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
     }
-    let signer = signer.unwrap();
+    let (loader, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
@@ -193,13 +226,21 @@ fn test_head_object_with_encoded_characters() -> Result<()> {
         utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
-    signer.sign(&mut req).expect("sign request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
+    signer
+        .sign(&mut req, &cred)
+        .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
     let client = Client::new();
     let resp = client
         .execute(req.try_into()?)
+        .await
         .expect("request must success");
 
     debug!("got response: {:?}", resp);
@@ -207,14 +248,14 @@ fn test_head_object_with_encoded_characters() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_list_bucket() -> Result<()> {
+#[tokio::test]
+async fn test_list_bucket() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
     }
-    let signer = signer.unwrap();
+    let (loader, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
 
@@ -223,13 +264,21 @@ fn test_list_bucket() -> Result<()> {
     *req.uri_mut() =
         http::Uri::from_str(&format!("{url}?list-type=2&delimiter=/&encoding-type=url"))?;
 
-    signer.sign(&mut req).expect("sign request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
+    signer
+        .sign(&mut req, &cred)
+        .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
     let client = Client::new();
     let resp = client
         .execute(req.try_into()?)
+        .await
         .expect("request must success");
 
     debug!("got response: {:?}", resp);
