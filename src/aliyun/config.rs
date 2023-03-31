@@ -4,7 +4,7 @@ use std::env;
 use super::constants::*;
 
 /// Config carries all the configuration for Aliyun services.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Config {
     /// `access_key_id` will be loaded from
@@ -28,9 +28,8 @@ pub struct Config {
     pub role_arn: Option<String>,
     /// `role_session_name` will be loaded from
     ///
-    /// - this field if it's `is_some`
     /// - default to `resign`
-    pub role_session_name: Option<String>,
+    pub role_session_name: String,
     /// `oidc_provider_arn` will be loaded from
     ///
     /// - this field if it's `is_some`
@@ -41,6 +40,20 @@ pub struct Config {
     /// - this field if it's `is_some`
     /// - env value: [`ALIBABA_CLOUD_OIDC_TOKEN_FILE`]
     pub oidc_token_file: Option<String>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            access_key_id: None,
+            access_key_secret: None,
+            security_token: None,
+            role_arn: None,
+            role_session_name: "resign".to_string(),
+            oidc_provider_arn: None,
+            oidc_token_file: None,
+        }
+    }
 }
 
 impl Config {
