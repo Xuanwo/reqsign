@@ -9,7 +9,7 @@ use aws_sigv4::SigningParams;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
-use reqsign::AwsConfigLoader;
+use reqsign::credential::Credential;
 use reqsign::AwsV4Signer;
 
 criterion_group!(benches, bench);
@@ -19,17 +19,9 @@ pub fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("aws_v4");
 
     group.bench_function("reqsign", |b| {
-        let s = AwsV4Signer::builder()
-            .config_loader({
-                let cfg = AwsConfigLoader::default();
-                cfg.set_region("test");
-                cfg.set_access_key_id("access_key_id");
-                cfg.set_secret_access_key("secret_access_key");
-                cfg
-            })
-            .service("s3")
-            .build()
-            .expect("signer must be valid");
+        let cred = Credential::new("access_key_id", "secret_access_key");
+
+        let s = AwsV4Signer::new("s3", "test");
 
         b.iter(|| {
             let mut req = http::Request::new("");
@@ -38,7 +30,7 @@ pub fn bench(c: &mut Criterion) {
                 .parse()
                 .expect("url must be valid");
 
-            s.sign(&mut req).expect("must success")
+            s.sign(&mut req, &cred).expect("must success")
         })
     });
 
