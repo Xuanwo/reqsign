@@ -568,8 +568,8 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_signer_with_web_loader() -> Result<()> {
+    #[test]
+    fn test_signer_with_web_loader() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         dotenv::from_filename(".env").ok();
@@ -593,16 +593,20 @@ mod tests {
         req.headers_mut()
             .insert(http::header::CONTENT_TYPE, "application/json".parse()?);
 
-        #[derive(Deserialize)]
-        struct Token {
-            access_token: String,
-        }
-        let token = client
-            .execute(req.try_into()?)
-            .await?
-            .json::<Token>()
-            .await?
-            .access_token;
+        let token = RUNTIME.block_on(async {
+            #[derive(Deserialize)]
+            struct Token {
+                access_token: String,
+            }
+            client
+                .execute(req.try_into().unwrap())
+                .await
+                .unwrap()
+                .json::<Token>()
+                .await
+                .unwrap()
+                .access_token
+        });
 
         let file_path = format!(
             "{}/testdata/services/aws/web_identity_token_file",
