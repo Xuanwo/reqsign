@@ -98,23 +98,23 @@ impl Loader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Ok(Some(cred)) = self.load_via_customed_credential_load() {
+        if let Some(cred) = self.load_via_customed_credential_load()? {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_config() {
+        if let Some(cred) = self.load_via_config()? {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_assume_role_with_web_identity().await {
+        if let Some(cred) = self.load_via_assume_role_with_web_identity().await? {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_assume_role().await {
+        if let Some(cred) = self.load_via_assume_role().await? {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_imds_v2().await {
+        if let Some(cred) = self.load_via_imds_v2().await? {
             return Ok(Some(cred));
         }
 
