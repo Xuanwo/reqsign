@@ -2,12 +2,12 @@ use std::env;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use anyhow::Result;
 use log::debug;
 use serde::Deserialize;
 
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
-use anyhow::Result;
 
 /// Credential is the file which stores service account's client_id and private key.
 #[derive(Clone, Deserialize)]

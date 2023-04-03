@@ -2,10 +2,11 @@
 
 use anyhow::Result;
 use chrono::format::Fixed;
+use chrono::format::Item;
 use chrono::format::Numeric;
 use chrono::format::Pad;
 use chrono::SecondsFormat;
-use chrono::{format::Item, Utc};
+use chrono::Utc;
 
 pub type DateTime = chrono::DateTime<Utc>;
 

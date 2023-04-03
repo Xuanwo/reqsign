@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::fmt::Write;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::header::AUTHORIZATION;
@@ -12,7 +13,7 @@ use log::debug;
 use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 
-use crate::credential::Credential;
+use super::credential::Credential;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::base64_hmac_sha1;
@@ -20,7 +21,6 @@ use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
-use std::time::Duration;
 
 const CONTENT_MD5: &str = "content-md5";
 
@@ -48,14 +48,15 @@ impl Signer {
         let mut ctx = req.build()?;
 
         let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
-        let signature = base64_hmac_sha1(cred.secret_key().as_bytes(), string_to_sign.as_bytes());
+        let signature =
+            base64_hmac_sha1(cred.access_key_secret.as_bytes(), string_to_sign.as_bytes());
 
         match method {
             SigningMethod::Header => {
                 ctx.headers.insert(DATE, format_http_date(now).parse()?);
                 ctx.headers.insert(AUTHORIZATION, {
                     let mut value: HeaderValue =
-                        format!("OSS {}:{}", cred.access_key(), signature).parse()?;
+                        format!("OSS {}:{}", cred.access_key_id, signature).parse()?;
                     value.set_sensitive(true);
 
                     value
@@ -63,7 +64,7 @@ impl Signer {
             }
             SigningMethod::Query(expire) => {
                 ctx.headers.insert(DATE, format_http_date(now).parse()?);
-                ctx.query_push("OSSAccessKeyId", cred.access_key());
+                ctx.query_push("OSSAccessKeyId", &cred.access_key_id);
                 ctx.query_push(
                     "Expires",
                     (now + chrono::Duration::from_std(expire).unwrap())
@@ -167,7 +168,7 @@ fn canonicalize_header(
 ) -> Result<String> {
     if method == SigningMethod::Header {
         // Insert security token
-        if let Some(token) = cred.security_token() {
+        if let Some(token) = &cred.security_token {
             ctx.headers.insert("x-oss-security-token", token.parse()?);
         }
     }
@@ -192,7 +193,7 @@ fn canonicalize_resource(
 ) -> String {
     if let SigningMethod::Query(_) = method {
         // Insert security token
-        if let Some(token) = cred.security_token() {
+        if let Some(token) = &cred.security_token {
             ctx.query
                 .push(("security-token".to_string(), token.to_string()));
         };

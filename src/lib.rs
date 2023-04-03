@@ -49,8 +49,6 @@
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
-pub mod credential;
-
 #[cfg(feature = "services-aliyun")]
 mod aliyun;
 #[cfg(feature = "services-aliyun")]

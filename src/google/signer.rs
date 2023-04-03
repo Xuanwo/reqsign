@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::header;
@@ -20,7 +21,6 @@ use crate::time;
 use crate::time::format_date;
 use crate::time::format_iso8601;
 use crate::time::DateTime;
-use std::time::Duration;
 
 /// Singer that implement Google OAuth2 Authentication.
 ///

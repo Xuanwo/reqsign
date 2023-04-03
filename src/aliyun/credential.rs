@@ -8,10 +8,44 @@ use reqwest::Client;
 use serde::Deserialize;
 
 use super::config::Config;
-use crate::credential::Credential;
 use crate::time::format_rfc3339;
 use crate::time::now;
 use crate::time::parse_rfc3339;
+use crate::time::DateTime;
+
+/// Credential that holds the access_key and secret_key.
+#[derive(Default, Clone)]
+#[cfg_attr(test, derive(Debug))]
+pub struct Credential {
+    /// Access key id for credential.
+    pub access_key_id: String,
+    /// Access key secret for credential.
+    pub access_key_secret: String,
+    /// Security token for credential.
+    pub security_token: Option<String>,
+    /// expires in for credential.
+    pub expires_in: Option<DateTime>,
+}
+
+impl Credential {
+    /// is current cred is valid?
+    pub fn is_valid(&self) -> bool {
+        if (self.access_key_id.is_empty() || self.access_key_secret.is_empty())
+            && self.security_token.is_none()
+        {
+            return false;
+        }
+        // Take 120s as buffer to avoid edge cases.
+        if let Some(valid) = self
+            .expires_in
+            .map(|v| v > now() + chrono::Duration::minutes(2))
+        {
+            return valid;
+        }
+
+        true
+    }
+}
 
 /// Loader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
@@ -67,11 +101,14 @@ impl Loader {
 
     fn load_via_static(&self) -> Result<Option<Credential>> {
         if let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.access_key_secret) {
-            let mut cred = Credential::new(ak, sk);
-            if let Some(tk) = &self.config.security_token {
-                cred.set_security_token(tk);
-            }
-            Ok(Some(cred))
+            Ok(Some(Credential {
+                access_key_id: ak.clone(),
+                access_key_secret: sk.clone(),
+                security_token: self.config.security_token.clone(),
+                // Set expires_in to 10 minutes to enforce re-read
+                // from file.
+                expires_in: Some(now() + chrono::Duration::minutes(10)),
+            }))
         } else {
             Ok(None)
         }
@@ -109,11 +146,12 @@ impl Loader {
         let resp: AssumeRoleWithOidcResponse = serde_json::from_slice(&resp.bytes().await?)?;
         let resp_cred = resp.credentials;
 
-        let cred = Credential::new(&resp_cred.access_key_id, &resp_cred.access_key_secret)
-            .with_security_token(&resp_cred.security_token)
-            .with_expires_in(parse_rfc3339(&resp_cred.expiration)?);
-
-        cred.check()?;
+        let cred = Credential {
+            access_key_id: resp_cred.access_key_id,
+            access_key_secret: resp_cred.access_key_secret,
+            security_token: Some(resp_cred.security_token),
+            expires_in: Some(parse_rfc3339(&resp_cred.expiration)?),
+        };
 
         Ok(Some(cred))
     }
@@ -139,12 +177,12 @@ struct AssumeRoleWithOidcCredentials {
 mod tests {
     use std::env;
     use std::str::FromStr;
+    use std::time::Duration;
 
     use http::Request;
     use log::debug;
     use once_cell::sync::Lazy;
     use reqwest::blocking::Client;
-    use std::time::Duration;
     use tokio::runtime::Runtime;
 
     use super::super::constants::*;
