@@ -68,8 +68,7 @@ mod huaweicloud;
 pub use huaweicloud::*;
 
 mod tencent;
-pub use tencent::cos::Builder as TencentCosBuilder;
-pub use tencent::cos::Signer as TencentCosSigner;
+pub use tencent::*;
 
 mod ctx;
 mod dirs;
