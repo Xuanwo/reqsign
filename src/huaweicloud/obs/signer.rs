@@ -1,10 +1,8 @@
 //! Huawei Cloud Object Storage Service (OBS) signer
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::fmt::Formatter;
 use std::fmt::Write;
 
-use anyhow::anyhow;
 use anyhow::Result;
 use http::header::AUTHORIZATION;
 use http::header::CONTENT_TYPE;
@@ -15,8 +13,7 @@ use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 
 use super::super::constants::*;
-use super::credential::CredentialLoader;
-use crate::credential::Credential;
+use super::credential::Credential;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::base64_hmac_sha1;
@@ -26,26 +23,23 @@ use crate::time::DateTime;
 use crate::time::Duration;
 use crate::time::{self};
 
-/// Builder for `Signer`.
-#[derive(Default)]
-pub struct Builder {
-    credential: Credential,
+/// Singer that implement Huawei Cloud Object Storage Service Authorization.
+///
+/// - [User Signature Authentication](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0009.html)
+#[derive(Debug)]
+pub struct Signer {
+    bucket: String,
 
     time: Option<DateTime>,
-    bucket: Option<String>,
 }
 
-impl Builder {
-    /// Specify access key.
-    pub fn access_key(&mut self, access_key: &str) -> &mut Self {
-        self.credential.set_access_key(access_key);
-        self
-    }
-
-    /// Specify secret key.
-    pub fn secret_key(&mut self, secret_key: &str) -> &mut Self {
-        self.credential.set_secret_key(secret_key);
-        self
+impl Signer {
+    /// Create a builder.
+    pub fn new(bucket: &str) -> Self {
+        Self {
+            bucket: bucket.to_string(),
+            time: None,
+        }
     }
 
     /// Specify the signing time.
@@ -55,63 +49,9 @@ impl Builder {
     /// We should always take current time to sign requests.
     /// Only use this function for testing.
     #[cfg(test)]
-    pub fn time(&mut self, time: DateTime) -> &mut Self {
+    pub fn with_time(mut self, time: DateTime) -> Self {
         self.time = Some(time);
         self
-    }
-
-    /// Set the bucket name in canonicalized resource.
-    /// The caller should guarantee the param is same with bucket name in domain.
-    pub fn bucket(&mut self, bucket: &str) -> &mut Self {
-        self.bucket = Some(bucket.to_string());
-        self
-    }
-
-    /// Use exising information to build a new signer.
-    ///
-    /// The builder should not be used anymore.
-    pub fn build(&mut self) -> Result<Signer> {
-        let mut cred_loader = CredentialLoader::default();
-        if self.credential.is_valid() {
-            cred_loader = cred_loader.with_credential(self.credential.clone());
-        }
-
-        let bucket = self
-            .bucket
-            .clone()
-            .ok_or_else(|| anyhow!("bucket should not be none"))?;
-
-        Ok(Signer {
-            credential_loader: cred_loader,
-            time: self.time,
-            bucket,
-        })
-    }
-}
-
-/// Singer that implement Huawei Cloud Object Storage Service Authorization.
-///
-/// - [User Signature Authentication](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0009.html)
-pub struct Signer {
-    credential_loader: CredentialLoader,
-    time: Option<DateTime>,
-    bucket: String,
-}
-
-impl Debug for Signer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Signer")
-    }
-}
-
-impl Signer {
-    /// Create a builder.
-    pub fn builder() -> Builder {
-        Builder::default()
-    }
-
-    fn credential(&self) -> Option<Credential> {
-        self.credential_loader.load()
     }
 
     fn build(
@@ -124,14 +64,15 @@ impl Signer {
         let mut ctx = req.build()?;
 
         let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
-        let signature = base64_hmac_sha1(cred.secret_key().as_bytes(), string_to_sign.as_bytes());
+        let signature =
+            base64_hmac_sha1(cred.secret_access_key.as_bytes(), string_to_sign.as_bytes());
 
         match method {
             SigningMethod::Header => {
                 ctx.headers.insert(DATE, format_http_date(now).parse()?);
                 ctx.headers.insert(AUTHORIZATION, {
                     let mut value: HeaderValue =
-                        format!("OBS {}:{}", cred.access_key(), signature).parse()?;
+                        format!("OBS {}:{}", cred.access_key_id, signature).parse()?;
                     value.set_sensitive(true);
 
                     value
@@ -139,7 +80,7 @@ impl Signer {
             }
             SigningMethod::Query(expire) => {
                 ctx.headers.insert(DATE, format_http_date(now).parse()?);
-                ctx.query_push("AccessKeyId", cred.access_key());
+                ctx.query_push("AccessKeyId", &cred.access_key_id);
                 ctx.query_push("Expires", (now + expire).unix_timestamp().to_string());
                 ctx.query_push(
                     "Signature",
@@ -181,23 +122,20 @@ impl Signer {
     ///     Ok(())
     /// }
     /// ```
-    pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential() {
-            let ctx = self.build(req, SigningMethod::Header, &cred)?;
-            return req.apply(ctx);
-        }
-
-        Err(anyhow!("credential not found"))
+    pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Header, cred)?;
+        req.apply(ctx)
     }
 
     /// Signing request with query.
-    pub fn sign_query(&self, req: &mut impl SignableRequest, expire: Duration) -> Result<()> {
-        if let Some(cred) = self.credential() {
-            let ctx = self.build(req, SigningMethod::Query(expire), &cred)?;
-            return req.apply(ctx);
-        }
-
-        Err(anyhow!("credential not found"))
+    pub fn sign_query(
+        &self,
+        req: &mut impl SignableRequest,
+        expire: Duration,
+        cred: &Credential,
+    ) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
+        req.apply(ctx)
     }
 }
 
@@ -266,7 +204,7 @@ fn canonicalize_header(
 ) -> Result<String> {
     if method == SigningMethod::Header {
         // Insert security token
-        if let Some(token) = cred.security_token() {
+        if let Some(token) = &cred.security_token {
             ctx.headers.insert("x-obs-security-token", token.parse()?);
         }
     }
@@ -289,7 +227,7 @@ fn canonicalize_resource(
 ) -> String {
     if let SigningMethod::Query(_) = method {
         // Insert security token
-        if let Some(token) = cred.security_token() {
+        if let Some(token) = &cred.security_token {
             ctx.query
                 .push(("security-token".to_string(), token.to_string()));
         };
@@ -374,20 +312,25 @@ mod tests {
     use http::header::HeaderName;
     use http::Uri;
 
+    use super::super::config::Config;
+    use super::super::credential::CredentialLoader;
     use super::*;
     use crate::time::parse_rfc2822;
 
-    #[test]
-    fn test_sign() -> Result<()> {
-        let signer = Signer::builder()
-            .access_key("access_key")
-            .secret_key("123456")
-            .bucket("bucket")
-            .time(
-                parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
-                    .to_offset(UtcOffset::from_hms(0, 0, 0)?),
-            )
-            .build()?;
+    #[tokio::test]
+    async fn test_sign() -> Result<()> {
+        let config = Config {
+            access_key_id: Some("access_key".to_string()),
+            secret_access_key: Some("123456".to_string()),
+            ..Default::default()
+        };
+        let loader = CredentialLoader::new(config);
+        let cred = loader.load().await?.unwrap();
+
+        let signer = Signer::new("bucket").with_time(
+            parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+                .to_offset(UtcOffset::from_hms(0, 0, 0)?),
+        );
 
         let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt";
         let mut req = http::Request::get(Uri::from_str(get_req)?).body(())?;
@@ -401,7 +344,7 @@ mod tests {
         );
 
         // Signing request with Signer
-        signer.sign(&mut req)?;
+        signer.sign(&mut req, &cred)?;
         let headers = req.headers();
         let auth = headers.get("Authorization").unwrap();
 
@@ -415,17 +358,20 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_sign_with_subresource() -> Result<()> {
-        let signer = Signer::builder()
-            .access_key("access_key")
-            .secret_key("123456")
-            .bucket("bucket")
-            .time(
-                parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
-                    .to_offset(UtcOffset::from_hms(0, 0, 0)?),
-            )
-            .build()?;
+    #[tokio::test]
+    async fn test_sign_with_subresource() -> Result<()> {
+        let config = Config {
+            access_key_id: Some("access_key".to_string()),
+            secret_access_key: Some("123456".to_string()),
+            ..Default::default()
+        };
+        let loader = CredentialLoader::new(config);
+        let cred = loader.load().await?.unwrap();
+
+        let signer = Signer::new("bucket").with_time(
+            parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+                .to_offset(UtcOffset::from_hms(0, 0, 0)?),
+        );
 
         let get_req =
             "http://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt?name=hello&abc=def";
@@ -440,7 +386,7 @@ mod tests {
         );
 
         // Signing request with Signer
-        signer.sign(&mut req)?;
+        signer.sign(&mut req, &cred)?;
         let headers = req.headers();
         let auth = headers.get("Authorization").unwrap();
 
@@ -455,17 +401,20 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_sign_list_objects() -> Result<()> {
-        let signer = Signer::builder()
-            .access_key("access_key")
-            .secret_key("123456")
-            .bucket("bucket")
-            .time(
-                parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
-                    .to_offset(UtcOffset::from_hms(0, 0, 0)?),
-            )
-            .build()?;
+    #[tokio::test]
+    async fn test_sign_list_objects() -> Result<()> {
+        let config = Config {
+            access_key_id: Some("access_key".to_string()),
+            secret_access_key: Some("123456".to_string()),
+            ..Default::default()
+        };
+        let loader = CredentialLoader::new(config);
+        let cred = loader.load().await?.unwrap();
+
+        let signer = Signer::new("bucket").with_time(
+            parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
+                .to_offset(UtcOffset::from_hms(0, 0, 0)?),
+        );
 
         let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com?name=hello&abc=def";
         let mut req = http::Request::get(Uri::from_str(get_req)?).body(())?;
@@ -479,7 +428,7 @@ mod tests {
         );
 
         // Signing request with Signer
-        signer.sign(&mut req)?;
+        signer.sign(&mut req, &cred)?;
         let headers = req.headers();
         let auth = headers.get("Authorization").unwrap();
 

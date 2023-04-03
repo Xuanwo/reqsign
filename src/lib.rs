@@ -65,8 +65,7 @@ mod google;
 pub use google::*;
 
 mod huaweicloud;
-pub use huaweicloud::obs::Builder as HuaweicloudObsBuilder;
-pub use huaweicloud::obs::Signer as HuaweicloudObsSigner;
+pub use huaweicloud::*;
 
 mod tencent;
 pub use tencent::cos::Builder as TencentCosBuilder;
