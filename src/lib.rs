@@ -72,11 +72,6 @@ mod tencent;
 pub use tencent::cos::Builder as TencentCosBuilder;
 pub use tencent::cos::Signer as TencentCosSigner;
 
-mod error;
-pub use error::Error;
-pub use error::ErrorKind;
-pub(crate) use error::Result;
-
 mod ctx;
 mod dirs;
 mod hash;

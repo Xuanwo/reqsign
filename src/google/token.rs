@@ -19,9 +19,8 @@ use time::Duration;
 use super::credential::Credential;
 use crate::time::now;
 use crate::time::DateTime;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use anyhow::anyhow;
+use anyhow::Result;
 
 /// Token is the authentication methods used by google services.
 ///
@@ -184,41 +183,42 @@ impl TokenLoader {
     }
 
     /// Load token from different sources.
-    pub async fn load(&self) -> Result<Token> {
+    pub async fn load(&self) -> Result<Option<Token>> {
         match self.token.lock().expect("lock poisoned").clone() {
             Some((token, expire_in)) if now() < expire_in - Duration::minutes(2) => {
-                return Ok(token)
+                return Ok(Some(token))
             }
             _ => (),
         }
 
-        let token = self.load_inner().await?;
+        let token = if let Some(token) = self.load_inner().await? {
+            token
+        } else {
+            return Ok(None);
+        };
 
         let expire_in = now() + Duration::seconds(token.expires_in() as i64);
 
         let mut lock = self.token.lock().expect("lock poisoned");
         *lock = Some((token.clone(), expire_in));
 
-        Ok(token)
+        Ok(Some(token))
     }
 
-    async fn load_inner(&self) -> Result<Token> {
+    async fn load_inner(&self) -> Result<Option<Token>> {
         if let Ok(Some(token)) = self.exchange_token_via_customed_token_loader().await {
-            return Ok(token);
+            return Ok(Some(token));
         }
 
         if let Ok(Some(token)) = self.exchange_token_via_credential().await {
-            return Ok(token);
+            return Ok(Some(token));
         }
 
         if let Ok(Some(token)) = self.exchange_token_via_vm_metadata().await {
-            return Ok(token);
+            return Ok(Some(token));
         }
 
-        Err(Error::new(
-            ErrorKind::NotFound,
-            "no token found for google service",
-        ))
+        Ok(None)
     }
 
     async fn exchange_token_via_customed_token_loader(&self) -> Result<Option<Token>> {
@@ -257,10 +257,7 @@ impl TokenLoader {
 
         if resp.status() != StatusCode::OK {
             error!("exchange token got unexpected response: {:?}", resp);
-            return Err(Error::new(
-                ErrorKind::Unexpected,
-                &format!("exchange token failed: {}", resp.text().await?),
-            ));
+            return Err(anyhow!("exchange token failed: {}", resp.text().await?));
         }
 
         let token: Token = serde_json::from_slice(&resp.bytes().await?)?;

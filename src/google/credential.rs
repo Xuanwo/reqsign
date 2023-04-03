@@ -7,9 +7,7 @@ use serde::Deserialize;
 
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use anyhow::Result;
 
 /// Credential is the file which stores service account's client_id and private key.
 #[derive(Clone, Deserialize)]
@@ -59,41 +57,42 @@ impl CredentialLoader {
     }
 
     /// Load credential from pre-configured methods.
-    pub async fn load(&self) -> Result<Credential> {
+    pub async fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it has been loaded at least once.
         if let Some(cred) = self.credential.lock().expect("lock poisoned").clone() {
-            return Ok(cred);
+            return Ok(Some(cred));
         }
 
-        let cred = self.load_inner().await?;
+        let cred = if let Some(cred) = self.load_inner().await? {
+            cred
+        } else {
+            return Ok(None);
+        };
 
         let mut lock = self.credential.lock().expect("lock poisoned");
         *lock = Some(cred.clone());
 
-        Ok(cred)
+        Ok(Some(cred))
     }
 
-    async fn load_inner(&self) -> Result<Credential> {
+    async fn load_inner(&self) -> Result<Option<Credential>> {
         if let Ok(Some(cred)) = self.load_via_content() {
-            return Ok(cred);
+            return Ok(Some(cred));
         }
 
         if let Ok(Some(cred)) = self.load_via_path().await {
-            return Ok(cred);
+            return Ok(Some(cred));
         }
 
         if let Ok(Some(cred)) = self.load_via_env().await {
-            return Ok(cred);
+            return Ok(Some(cred));
         }
 
         if let Ok(Some(cred)) = self.load_via_well_known_location().await {
-            return Ok(cred);
+            return Ok(Some(cred));
         }
 
-        Err(Error::new(
-            ErrorKind::NotFound,
-            "no credential found for google service",
-        ))
+        Ok(None)
     }
 
     async fn load_via_path(&self) -> Result<Option<Credential>> {
@@ -208,7 +207,11 @@ mod tests {
                 RUNTIME.block_on(async {
                     let cred_loader = CredentialLoader::default();
 
-                    let cred = cred_loader.load().await.expect("credentail must be exist");
+                    let cred = cred_loader
+                        .load()
+                        .await
+                        .expect("credentail must be exist")
+                        .unwrap();
 
                     assert_eq!("test-234@test.iam.gserviceaccount.com", &cred.client_email);
                     assert_eq!(
