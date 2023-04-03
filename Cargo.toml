@@ -12,8 +12,8 @@ version = "0.8.5"
 all-features = true
 
 [features]
-native-tls = ["reqwest/default-tls", "ureq/native-tls"]
-rustls = ["reqwest/rustls-tls", "ureq/tls"]
+native-tls = ["reqwest/default-tls"]
+rustls = ["reqwest/rustls-tls"]
 
 reqwest_blocking_request = ["reqwest/blocking"]
 
@@ -47,7 +47,6 @@ sha1 = "0.10"
 sha2 = "0.10"
 time = { version = "0.3", features = ["macros", "formatting", "parsing"] }
 tokio = { version = "1", features = ["fs"] }
-ureq = { version = "2.5", default-features = false }
 
 [dev-dependencies]
 aws-sigv4 = "0.55"
@@ -58,4 +57,3 @@ pretty_assertions = "1.3"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 temp-env = "0.3"
 tokio = { version = "1", features = ["full"] }
-ureq = { version = "2.5" }

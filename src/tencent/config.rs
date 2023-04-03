@@ -1,4 +1,4 @@
-/// Config carries all the configuration for Huawei Cloud OBS services.
+/// Config carries all the configuration for Tencent COS services.
 #[derive(Clone, Default)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Config {
