@@ -1,5 +1,7 @@
 use std::fmt::Debug;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::Display;
+use std::fmt::Formatter;
+use std::fmt::{self};
 
 /// Result that is a wrapper of `Result<T, reqsign::Error>`
 pub type Result<T> = std::result::Result<T, Error>;

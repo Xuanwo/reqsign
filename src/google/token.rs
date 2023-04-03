@@ -1,22 +1,16 @@
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::ops::Add;
-
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
 use async_trait::async_trait;
-
 use http::header;
 use http::StatusCode;
 use jsonwebtoken::Algorithm;
 use jsonwebtoken::EncodingKey;
 use jsonwebtoken::Header;
 use log::error;
-
 use reqwest::Client;
 use serde::Deserialize;
 use serde::Serialize;
@@ -25,6 +19,9 @@ use time::Duration;
 use super::credential::Credential;
 use crate::time::now;
 use crate::time::DateTime;
+use crate::Error;
+use crate::ErrorKind;
+use crate::Result;
 
 /// Token is the authentication methods used by google services.
 ///
