@@ -76,19 +76,19 @@ impl CredentialLoader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Ok(Some(cred)) = self.load_via_content() {
+        if let Some(cred) = self.load_via_content()? {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_path().await {
+        if let Some(cred) = self.load_via_path().await? {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_env().await {
+        if let Some(cred) = self.load_via_env().await? {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_well_known_location().await {
+        if let Some(cred) = self.load_via_well_known_location().await? {
             return Ok(Some(cred));
         }
 
