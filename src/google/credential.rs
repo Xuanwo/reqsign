@@ -2,9 +2,11 @@ use std::env;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use log::debug;
 use serde::Deserialize;
 
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
+use crate::hash::base64_decode;
 use crate::Error;
 use crate::ErrorKind;
 use crate::Result;
@@ -112,7 +114,10 @@ impl CredentialLoader {
             return Ok(None);
         };
 
-        let cred: Credential = serde_json::from_slice(content.as_bytes())?;
+        let cred: Credential = serde_json::from_slice(&base64_decode(content)).map_err(|err| {
+            debug!("load credential from content failed: {err:?}");
+            err
+        })?;
         Ok(Some(cred))
     }
 
@@ -159,9 +164,15 @@ impl CredentialLoader {
 
     /// Build credential loader from given path.
     async fn load_file(path: &str) -> Result<Credential> {
-        let content = tokio::fs::read(path).await?;
+        let content = tokio::fs::read(path).await.map_err(|err| {
+            debug!("load credential failed at reading file: {err:?}");
+            err
+        })?;
 
-        let credential: Credential = serde_json::from_slice(&content)?;
+        let credential: Credential = serde_json::from_slice(&content).map_err(|err| {
+            debug!("load credential failed at serde_json: {err:?}");
+            err
+        })?;
 
         Ok(credential)
     }
