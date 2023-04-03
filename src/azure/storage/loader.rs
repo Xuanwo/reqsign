@@ -51,7 +51,7 @@ impl Loader {
             return Ok(Some(cred));
         }
 
-        if let (Some(ak), Some(sk)) = (&self.config.account_key, &self.config.account_name) {
+        if let (Some(ak), Some(sk)) = (&self.config.account_name, &self.config.account_key) {
             let cred = Credential::SharedKey(ak.clone(), sk.clone());
             return Ok(Some(cred));
         }

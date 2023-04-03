@@ -89,7 +89,7 @@ impl Signer {
 
                     ctx.headers.insert(AUTHORIZATION, {
                         let mut value: HeaderValue =
-                            format!("SharedKey {}:{signature}", ak).parse()?;
+                            format!("SharedKey {ak}:{signature}").parse()?;
                         value.set_sensitive(true);
 
                         value
