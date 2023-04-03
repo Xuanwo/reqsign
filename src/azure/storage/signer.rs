@@ -5,7 +5,6 @@ use std::fmt::Write;
 
 use ::time::Duration;
 use anyhow::anyhow;
-use anyhow::Ok;
 use anyhow::Result;
 use http::header::*;
 use log::debug;
