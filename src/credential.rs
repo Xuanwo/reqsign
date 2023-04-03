@@ -131,18 +131,6 @@ pub trait CredentialLoad: 'static + Send + Sync + Debug {
     fn load_credential(&self) -> Result<Option<Credential>>;
 }
 
-/// DummyLoader always returns `Ok(None)`.
-///
-/// It's useful when users don't want to load credential/region from env.
-#[derive(Debug)]
-pub struct DummyLoader {}
-
-impl CredentialLoad for DummyLoader {
-    fn load_credential(&self) -> Result<Option<Credential>> {
-        Ok(None)
-    }
-}
-
 fn redact(v: &str) -> &str {
     if v.is_empty() {
         "<empty>"
