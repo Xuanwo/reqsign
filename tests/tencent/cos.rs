@@ -1,5 +1,6 @@
 use std::env;
 use std::str::FromStr;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::header::AUTHORIZATION;
@@ -13,7 +14,6 @@ use reqsign::TencentCosConfig;
 use reqsign::TencentCosCredentialLoader;
 use reqsign::TencentCosSigner;
 use reqwest::Client;
-use std::time::Duration;
 
 fn init_signer() -> Option<(TencentCosCredentialLoader, TencentCosSigner)> {
     let _ = env_logger::builder().is_test(true).try_init();

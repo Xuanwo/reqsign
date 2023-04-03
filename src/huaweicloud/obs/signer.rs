@@ -2,6 +2,7 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::fmt::Write;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::header::AUTHORIZATION;
@@ -21,7 +22,6 @@ use crate::request::SignableRequest;
 use crate::time::format_http_date;
 use crate::time::now;
 use crate::time::DateTime;
-use std::time::Duration;
 
 /// Singer that implement Huawei Cloud Object Storage Service Authorization.
 ///

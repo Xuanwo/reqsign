@@ -1,5 +1,6 @@
 use std::env;
 use std::str::FromStr;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::header::CONTENT_LENGTH;
@@ -13,7 +14,6 @@ use reqsign::AliyunConfig;
 use reqsign::AliyunLoader;
 use reqsign::AliyunOssSigner;
 use reqwest::Client;
-use std::time::Duration;
 
 fn init_signer() -> Option<(AliyunLoader, AliyunOssSigner)> {
     let _ = env_logger::builder().is_test(true).try_init();

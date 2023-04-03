@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 use std::fmt::Write;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::header::AUTHORIZATION;
@@ -20,7 +21,6 @@ use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
-use std::time::Duration;
 
 const CONTENT_MD5: &str = "content-md5";
 

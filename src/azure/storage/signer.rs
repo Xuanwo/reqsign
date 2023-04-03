@@ -2,12 +2,12 @@
 
 use std::fmt::Debug;
 use std::fmt::Write;
+use std::time::Duration;
 
 use anyhow::anyhow;
 use anyhow::Result;
 use http::header::*;
 use log::debug;
-use std::time::Duration;
 
 use super::super::constants::*;
 use super::credential::Credential;

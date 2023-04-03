@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::header::HeaderName;
@@ -7,7 +8,6 @@ use http::uri::Scheme;
 use http::HeaderMap;
 use http::HeaderValue;
 use http::Method;
-use std::time::Duration;
 
 pub struct SigningContext {
     pub method: Method,

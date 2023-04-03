@@ -177,12 +177,12 @@ struct AssumeRoleWithOidcCredentials {
 mod tests {
     use std::env;
     use std::str::FromStr;
+    use std::time::Duration;
 
     use http::Request;
     use log::debug;
     use once_cell::sync::Lazy;
     use reqwest::blocking::Client;
-    use std::time::Duration;
     use tokio::runtime::Runtime;
 
     use super::super::constants::*;

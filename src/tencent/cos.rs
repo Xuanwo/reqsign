@@ -1,5 +1,7 @@
 //! Tencent COS Singer
 
+use std::time::Duration;
+
 use anyhow::Result;
 use http::header::AUTHORIZATION;
 use http::header::DATE;
@@ -16,7 +18,6 @@ use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
-use std::time::Duration;
 
 /// Singer for Tencent COS.
 #[derive(Default)]

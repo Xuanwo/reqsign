@@ -1,4 +1,5 @@
 use std::env;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::StatusCode;
@@ -8,7 +9,6 @@ use reqsign::GoogleCredentialLoader;
 use reqsign::GoogleSigner;
 use reqsign::GoogleTokenLoader;
 use reqwest::Client;
-use std::time::Duration;
 
 async fn init_signer() -> Option<(GoogleCredentialLoader, GoogleTokenLoader, GoogleSigner)> {
     let _ = env_logger::builder().is_test(true).try_init();

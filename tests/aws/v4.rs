@@ -1,5 +1,6 @@
 use std::env;
 use std::str::FromStr;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::Request;
@@ -12,7 +13,6 @@ use reqsign::AwsConfig;
 use reqsign::AwsLoader;
 use reqsign::AwsV4Signer;
 use reqwest::Client;
-use std::time::Duration;
 
 fn init_signer() -> Option<(AwsLoader, AwsV4Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();

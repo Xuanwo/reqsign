@@ -3,6 +3,8 @@ use std::fmt::Formatter;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use anyhow::anyhow;
+use anyhow::Result;
 use async_trait::async_trait;
 use http::header;
 use http::StatusCode;
@@ -17,8 +19,6 @@ use serde::Serialize;
 use super::credential::Credential;
 use crate::time::now;
 use crate::time::DateTime;
-use anyhow::anyhow;
-use anyhow::Result;
 
 /// Token is the authentication methods used by google services.
 ///

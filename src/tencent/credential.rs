@@ -1,7 +1,9 @@
-use super::config::Config;
-use anyhow::Result;
 use std::sync::Arc;
 use std::sync::Mutex;
+
+use anyhow::Result;
+
+use super::config::Config;
 
 /// Credential for cos.
 #[derive(Clone)]
