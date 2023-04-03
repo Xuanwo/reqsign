@@ -14,7 +14,7 @@ use super::constants::AWS_QUERY_ENCODE_SET;
 use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::constants::X_AMZ_DATE;
 use super::constants::X_AMZ_SECURITY_TOKEN;
-use crate::credential::Credential;
+use super::credential::Credential;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::hex_hmac_sha256;
@@ -102,14 +102,15 @@ impl Signer {
         };
         debug!("calculated string to sign: {string_to_sign}");
 
-        let signing_key = generate_signing_key(cred.secret_key(), now, &self.region, &self.service);
+        let signing_key =
+            generate_signing_key(&cred.secret_access_key, now, &self.region, &self.service);
         let signature = hex_hmac_sha256(&signing_key, string_to_sign.as_bytes());
 
         match method {
             SigningMethod::Header => {
                 let mut authorization = HeaderValue::from_str(&format!(
                     "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
-                    cred.access_key(),
+                    cred.access_key_id,
                     scope,
                     ctx.header_name_to_vec_sorted().join(";"),
                     signature
@@ -286,7 +287,7 @@ fn canonicalize_header(
         }
 
         // Insert X_AMZ_SECURITY_TOKEN header if security token exists.
-        if let Some(token) = cred.security_token() {
+        if let Some(token) = &cred.session_token {
             let mut value = HeaderValue::from_str(token)?;
             // Set token value sensitive to valid leaking.
             value.set_sensitive(true);
@@ -313,7 +314,7 @@ fn canonicalize_query(
             "X-Amz-Credential".into(),
             format!(
                 "{}/{}/{}/{}/aws4_request",
-                cred.access_key(),
+                cred.access_key_id,
                 format_date(now),
                 region,
                 service
@@ -327,7 +328,7 @@ fn canonicalize_query(
             ctx.header_name_to_vec_sorted().join(";"),
         ));
 
-        if let Some(token) = cred.security_token() {
+        if let Some(token) = &cred.session_token {
             ctx.query
                 .push(("X-Amz-Security-Token".into(), token.into()));
         }

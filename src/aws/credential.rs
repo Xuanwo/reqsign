@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::fmt::Write;
 use std::fs;
 use std::sync::atomic::AtomicBool;
@@ -7,14 +8,60 @@ use std::sync::Mutex;
 
 use anyhow::anyhow;
 use anyhow::Result;
+use async_trait::async_trait;
 use quick_xml::de;
 use reqwest::Client;
 use serde::Deserialize;
 
 use super::config::Config;
-use crate::credential::Credential;
-use crate::credential::CredentialLoad;
+use crate::time::now;
 use crate::time::parse_rfc3339;
+use crate::time::DateTime;
+
+/// Credential that holds the access_key and secret_key.
+#[derive(Default, Clone)]
+#[cfg_attr(test, derive(Debug))]
+pub struct Credential {
+    /// Access key id for aws services.
+    pub access_key_id: String,
+    /// Secret access key for aws services.
+    pub secret_access_key: String,
+    /// Session token for aws services.
+    pub session_token: Option<String>,
+    /// Expiration time for this credential.
+    pub expires_in: Option<DateTime>,
+}
+
+impl Credential {
+    /// is current cred is valid?
+    pub fn is_valid(&self) -> bool {
+        if (self.access_key_id.is_empty() || self.secret_access_key.is_empty())
+            && self.session_token.is_none()
+        {
+            return false;
+        }
+        // Take 120s as buffer to avoid edge cases.
+        if let Some(valid) = self
+            .expires_in
+            .map(|v| v > now() + chrono::Duration::minutes(2))
+        {
+            return valid;
+        }
+
+        true
+    }
+}
+
+/// Loader trait will try to load credential from different sources.
+#[async_trait]
+pub trait CredentialLoad: 'static + Send + Sync + Debug {
+    /// Load credential from sources.
+    ///
+    /// - If succeed, return `Ok(Some(cred))`
+    /// - If not found, return `Ok(None)`
+    /// - If unexpected errors happened, return `Err(err)`
+    async fn load_credential(&self, client: Client) -> Result<Option<Credential>>;
+}
 
 /// CredentialLoader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
@@ -98,7 +145,7 @@ impl Loader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Some(cred) = self.load_via_customed_credential_load()? {
+        if let Some(cred) = self.load_via_customed_credential_load().await? {
             return Ok(Some(cred));
         }
 
@@ -121,9 +168,9 @@ impl Loader {
         Ok(None)
     }
 
-    fn load_via_customed_credential_load(&self) -> Result<Option<Credential>> {
+    async fn load_via_customed_credential_load(&self) -> Result<Option<Credential>> {
         if let Some(loader) = &self.customed_credential_loader {
-            loader.load_credential()
+            loader.load_credential(self.client.clone()).await
         } else {
             Ok(None)
         }
@@ -131,11 +178,14 @@ impl Loader {
 
     fn load_via_config(&self) -> Result<Option<Credential>> {
         if let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.secret_access_key) {
-            let mut cred = Credential::new(ak, sk);
-            if let Some(tk) = &self.config.session_token {
-                cred.set_security_token(tk);
-            }
-            Ok(Some(cred))
+            Ok(Some(Credential {
+                access_key_id: ak.clone(),
+                secret_access_key: sk.clone(),
+                session_token: self.config.session_token.clone(),
+                // Set expires_in to 10 minutes to enforce re-read
+                // from file.
+                expires_in: Some(now() + chrono::Duration::minutes(10)),
+            }))
         } else {
             Ok(None)
         }
@@ -205,11 +255,12 @@ impl Loader {
             ));
         }
 
-        let cred = Credential::new(&resp.access_key_id, &resp.secret_access_key)
-            .with_security_token(&resp.token)
-            .with_expires_in(parse_rfc3339(&resp.expiration)?);
-
-        cred.check()?;
+        let cred = Credential {
+            access_key_id: resp.access_key_id,
+            secret_access_key: resp.secret_access_key,
+            session_token: Some(resp.token),
+            expires_in: Some(parse_rfc3339(&resp.expiration)?),
+        };
 
         Ok(Some(cred))
     }
@@ -242,11 +293,12 @@ impl Loader {
         let resp: AssumeRoleResponse = de::from_str(&resp.text().await?)?;
         let resp_cred = resp.result.credentials;
 
-        let cred = Credential::new(&resp_cred.access_key_id, &resp_cred.secret_access_key)
-            .with_security_token(&resp_cred.session_token)
-            .with_expires_in(parse_rfc3339(&resp_cred.expiration)?);
-
-        cred.check()?;
+        let cred = Credential {
+            access_key_id: resp_cred.access_key_id,
+            secret_access_key: resp_cred.secret_access_key,
+            session_token: Some(resp_cred.session_token),
+            expires_in: Some(parse_rfc3339(&resp_cred.expiration)?),
+        };
 
         Ok(Some(cred))
     }
@@ -279,11 +331,12 @@ impl Loader {
         let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.text().await?)?;
         let resp_cred = resp.result.credentials;
 
-        let cred = Credential::new(&resp_cred.access_key_id, &resp_cred.secret_access_key)
-            .with_security_token(&resp_cred.session_token)
-            .with_expires_in(parse_rfc3339(&resp_cred.expiration)?);
-
-        cred.check()?;
+        let cred = Credential {
+            access_key_id: resp_cred.access_key_id,
+            secret_access_key: resp_cred.secret_access_key,
+            session_token: Some(resp_cred.session_token),
+            expires_in: Some(parse_rfc3339(&resp_cred.expiration)?),
+        };
 
         Ok(Some(cred))
     }
@@ -429,8 +482,8 @@ mod tests {
                     let x = l.load().await.expect("load must succeed");
 
                     let x = x.expect("must load succeed");
-                    assert_eq!("access_key_id", x.access_key());
-                    assert_eq!("secret_access_key", x.secret_key());
+                    assert_eq!("access_key_id", x.access_key_id);
+                    assert_eq!("secret_access_key", x.secret_access_key);
                 })
             },
         );
@@ -467,8 +520,8 @@ mod tests {
                 RUNTIME.block_on(async {
                     let l = Loader::new(Client::new(), Config::default().from_env().from_profile());
                     let x = l.load().await.unwrap().unwrap();
-                    assert_eq!("config_access_key_id", x.access_key());
-                    assert_eq!("config_secret_access_key", x.secret_key());
+                    assert_eq!("config_access_key_id", x.access_key_id);
+                    assert_eq!("config_secret_access_key", x.secret_access_key);
                 })
             },
         );
@@ -505,8 +558,8 @@ mod tests {
                 RUNTIME.block_on(async {
                     let l = Loader::new(Client::new(), Config::default().from_env().from_profile());
                     let x = l.load().await.unwrap().unwrap();
-                    assert_eq!("shared_access_key_id", x.access_key());
-                    assert_eq!("shared_secret_access_key", x.secret_key());
+                    assert_eq!("shared_access_key_id", x.access_key_id);
+                    assert_eq!("shared_secret_access_key", x.secret_access_key);
                 })
             },
         );
@@ -544,8 +597,8 @@ mod tests {
                 RUNTIME.block_on(async {
                     let l = Loader::new(Client::new(), Config::default().from_env().from_profile());
                     let x = l.load().await.expect("load must success").unwrap();
-                    assert_eq!("shared_access_key_id", x.access_key());
-                    assert_eq!("shared_secret_access_key", x.secret_key());
+                    assert_eq!("shared_access_key_id", x.access_key_id);
+                    assert_eq!("shared_secret_access_key", x.secret_access_key);
                 })
             },
         );

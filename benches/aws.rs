@@ -9,7 +9,7 @@ use aws_sigv4::SigningParams;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
-use reqsign::credential::Credential;
+use reqsign::AwsCredential;
 use reqsign::AwsV4Signer;
 
 criterion_group!(benches, bench);
@@ -19,7 +19,11 @@ pub fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("aws_v4");
 
     group.bench_function("reqsign", |b| {
-        let cred = Credential::new("access_key_id", "secret_access_key");
+        let cred = AwsCredential {
+            access_key_id: "access_key_id".to_string(),
+            secret_access_key: "secret_access_key".to_string(),
+            ..Default::default()
+        };
 
         let s = AwsV4Signer::new("s3", "test");
 
