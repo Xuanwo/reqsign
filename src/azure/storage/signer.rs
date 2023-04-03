@@ -1,18 +1,17 @@
 //! Azure Storage Singer
 
 use std::fmt::Debug;
-use std::fmt::Formatter;
 use std::fmt::Write;
 
 use ::time::Duration;
 use anyhow::anyhow;
+use anyhow::Ok;
 use anyhow::Result;
 use http::header::*;
 use log::debug;
 
 use super::super::constants::*;
-use super::credential::CredentialLoader;
-use crate::credential::Credential;
+use super::credential::Credential;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::base64_decode;
@@ -22,46 +21,33 @@ use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
 
-/// Builder for `Signer`.
-#[derive(Default, Clone)]
-pub struct Builder {
-    credential: Credential,
-    allow_anonymous: bool,
+/// Singer that implement Azure Storage Shared Key Authorization.
+///
+/// - [Authorize with Shared Key](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
+#[derive(Debug, Default)]
+pub struct Signer {
+    /// whether to omit service version or not
     omit_service_version: bool,
-
+    /// Allow anonymous request if credential is not loaded.
+    allow_anonymous: bool,
     time: Option<DateTime>,
 }
 
-impl Builder {
+impl Signer {
+    /// Create a signer.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Allow anonymous access
-    pub fn allow_anonymous(&mut self, value: bool) -> &mut Self {
+    pub fn allow_anonymous(mut self, value: bool) -> Self {
         self.allow_anonymous = value;
         self
     }
 
-    /// Specify account name.
-    pub fn account_name(&mut self, account_name: &str) -> &mut Self {
-        self.credential.set_access_key(account_name);
-        self
-    }
-
-    /// Specify account key.
-    pub fn account_key(&mut self, account_key: &str) -> &mut Self {
-        self.credential.set_secret_key(account_key);
-        self
-    }
-
     /// set the signer to omitting service version
-    pub fn omit_service_version(&mut self) -> &mut Self {
+    pub fn omit_service_version(mut self) -> Self {
         self.omit_service_version = true;
-        self
-    }
-
-    /// Specify a Shared Access Signature (SAS) token.
-    /// * ref: [Grant limited access to Azure Storage resources using shared access signatures (SAS)](https://docs.microsoft.com/azure/storage/common/storage-sas-overview)
-    /// * ref: [Create SAS tokens for storage containers](https://docs.microsoft.com/azure/applied-ai-services/form-recognizer/create-sas-tokens)
-    pub fn security_token(&mut self, security_token: &str) -> &mut Self {
-        self.credential.set_security_token(security_token);
         self
     }
 
@@ -77,60 +63,6 @@ impl Builder {
         self
     }
 
-    /// Use existing information to build a new signer.
-    ///
-    /// The builder should not be used anymore.
-    pub fn build(&mut self) -> Result<Signer> {
-        let mut cred_loader = CredentialLoader::default();
-        if self.credential.is_valid() {
-            cred_loader = cred_loader.with_credential(self.credential.clone());
-        }
-
-        Ok(Signer {
-            credential_loader: cred_loader,
-
-            omit_service_version: self.omit_service_version,
-            time: self.time,
-            allow_anonymous: self.allow_anonymous,
-        })
-    }
-}
-
-/// Singer that implement Azure Storage Shared Key Authorization.
-///
-/// - [Authorize with Shared Key](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
-pub struct Signer {
-    credential_loader: CredentialLoader,
-
-    /// whether to omit service version or not
-    omit_service_version: bool,
-    /// Allow anonymous request if credential is not loaded.
-    allow_anonymous: bool,
-    time: Option<DateTime>,
-}
-
-impl Debug for Signer {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Signer")
-    }
-}
-
-impl Signer {
-    /// Create a builder.
-    pub fn builder() -> Builder {
-        Builder::default()
-    }
-
-    /// Load credential via credential load chain specified while building.
-    ///
-    /// # Note
-    ///
-    /// This function should never be exported to avoid credential leaking by
-    /// mistake.
-    fn credential(&self) -> Option<Credential> {
-        self.credential_loader.load()
-    }
-
     fn build(
         &self,
         req: &mut impl SignableRequest,
@@ -139,31 +71,31 @@ impl Signer {
     ) -> Result<SigningContext> {
         let mut ctx = req.build()?;
 
-        match method {
-            SigningMethod::Query(_) => {
-                if let Some(token) = cred.security_token() {
-                    ctx.query_append(token);
-                } else {
+        match cred {
+            Credential::SharedAccessSignature(token) => {
+                ctx.query_append(token);
+                return Ok(ctx);
+            }
+            Credential::SharedKey(ak, sk) => match method {
+                SigningMethod::Query(_) => {
                     return Err(anyhow!("SAS token is required for query signing"));
                 }
-            }
-            SigningMethod::Header => {
-                let now = self.time.unwrap_or_else(time::now);
-                let string_to_sign =
-                    string_to_sign(&mut ctx, cred, now, self.omit_service_version)?;
-                let signature = base64_hmac_sha256(
-                    &base64_decode(cred.secret_key()),
-                    string_to_sign.as_bytes(),
-                );
+                SigningMethod::Header => {
+                    let now = self.time.unwrap_or_else(time::now);
+                    let string_to_sign =
+                        string_to_sign(&mut ctx, ak, now, self.omit_service_version)?;
+                    let signature =
+                        base64_hmac_sha256(&base64_decode(sk), string_to_sign.as_bytes());
 
-                ctx.headers.insert(AUTHORIZATION, {
-                    let mut value: HeaderValue =
-                        format!("SharedKey {}:{signature}", cred.access_key()).parse()?;
-                    value.set_sensitive(true);
+                    ctx.headers.insert(AUTHORIZATION, {
+                        let mut value: HeaderValue =
+                            format!("SharedKey {ak}:{signature}").parse()?;
+                        value.set_sensitive(true);
 
-                    value
-                });
-            }
+                        value
+                    });
+                }
+            },
         }
 
         Ok(ctx)
@@ -198,33 +130,15 @@ impl Signer {
     ///     Ok(())
     /// }
     /// ```
-    pub fn sign(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential() {
-            let ctx = self.build(req, SigningMethod::Header, &cred)?;
-            return req.apply(ctx);
-        }
-
-        if self.allow_anonymous {
-            debug!("credential not found and anonymous is allowed, skipping signing.");
-            return Ok(());
-        }
-
-        Err(anyhow!("credential not found"))
+    pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Header, cred)?;
+        req.apply(ctx)
     }
 
     /// Signing request with query.
-    pub fn sign_query(&self, req: &mut impl SignableRequest) -> Result<()> {
-        if let Some(cred) = self.credential() {
-            let ctx = self.build(req, SigningMethod::Query(Duration::seconds(1)), &cred)?;
-            return req.apply(ctx);
-        }
-
-        if self.allow_anonymous {
-            debug!("credential not found and anonymous is allowed, skipping signing.");
-            return Ok(());
-        }
-
-        Err(anyhow!("credential not found"))
+    pub fn sign_query(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Query(Duration::seconds(1)), cred)?;
+        req.apply(ctx)
     }
 }
 
@@ -257,7 +171,7 @@ impl Signer {
 /// - [Blob, Queue, and File Services (Shared Key authorization)](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
 fn string_to_sign(
     ctx: &mut SigningContext,
-    cred: &Credential,
+    ak: &str,
     now: DateTime,
     omit_service_version: bool,
 ) -> Result<String> {
@@ -293,7 +207,7 @@ fn string_to_sign(
         "{}",
         canonicalize_header(ctx, now, omit_service_version)?
     )?;
-    write!(&mut s, "{}", canonicalize_resource(ctx, cred))?;
+    write!(&mut s, "{}", canonicalize_resource(ctx, ak))?;
 
     debug!("string to sign: {}", &s);
 
@@ -326,14 +240,14 @@ fn canonicalize_header(
 /// ## Reference
 ///
 /// - [Constructing the canonicalized resource string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-resource-string)
-fn canonicalize_resource(ctx: &mut SigningContext, cred: &Credential) -> String {
+fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
     if ctx.query.is_empty() {
-        return format!("/{}{}", cred.access_key(), ctx.path);
+        return format!("/{}{}", ak, ctx.path);
     }
 
     format!(
         "/{}{}\n{}",
-        cred.access_key(),
+        ak,
         ctx.path,
         SigningContext::query_to_string(ctx.query.clone(), ":", "\n")
     )
@@ -343,16 +257,23 @@ fn canonicalize_resource(ctx: &mut SigningContext, cred: &Credential) -> String 
 mod tests {
     use http::Request;
 
-    use crate::AzureStorageSigner;
+    use super::super::config::Config;
+    use crate::{azure::storage::loader::Loader, AzureStorageSigner};
 
-    #[test]
-    pub fn test_sas_url() {
+    #[tokio::test]
+    async fn test_sas_url() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let signer = AzureStorageSigner::builder()
-            .security_token("sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
-            .build()
-            .unwrap();
+        let config = Config {
+            sas_token: Some("sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D".to_string()),
+            ..Default::default()
+        };
+
+        let loader = Loader::new(config);
+        let cred = loader.load().await.unwrap().unwrap();
+
+        let signer = AzureStorageSigner::new();
+
         // Construct request
         let mut req = Request::builder()
             .uri("https://test.blob.core.windows.net/testbucket/testblob")
@@ -360,27 +281,7 @@ mod tests {
             .unwrap();
 
         // Signing request with Signer
-        assert!(signer.sign_query(&mut req).is_ok());
+        assert!(signer.sign_query(&mut req, &cred).is_ok());
         assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob?sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
-    }
-
-    #[test]
-    pub fn test_anonymous() {
-        let signer = AzureStorageSigner::builder()
-            .allow_anonymous(true)
-            .build()
-            .unwrap();
-        // Construct request
-        let mut req = Request::builder()
-            .uri("https://test.blob.core.windows.net/testbucket/testblob")
-            .body(())
-            .unwrap();
-
-        // Signing request with Signer
-        assert!(signer.sign(&mut req).is_ok());
-        assert_eq!(
-            req.uri(),
-            "https://test.blob.core.windows.net/testbucket/testblob"
-        )
     }
 }
