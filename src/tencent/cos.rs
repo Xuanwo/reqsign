@@ -16,7 +16,7 @@ use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
-use crate::time::Duration;
+use std::time::Duration;
 
 /// Singer for Tencent COS.
 #[derive(Default)]
@@ -58,7 +58,7 @@ impl Signer {
 
         match method {
             SigningMethod::Header => {
-                let signature = build_signature(&mut ctx, cred, now, Duration::hours(1));
+                let signature = build_signature(&mut ctx, cred, now, Duration::from_secs(3600));
 
                 ctx.headers.insert(DATE, format_http_date(now).parse()?);
                 ctx.headers.insert(AUTHORIZATION, {
@@ -120,8 +120,8 @@ fn build_signature(
 ) -> String {
     let key_time = format!(
         "{};{}",
-        now.unix_timestamp(),
-        (now + expires).unix_timestamp()
+        now.timestamp(),
+        (now + chrono::Duration::from_std(expires).unwrap()).timestamp()
     );
 
     let sign_key = hex_hmac_sha1(cred.secret_access_key.as_bytes(), key_time.as_bytes());

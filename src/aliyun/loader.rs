@@ -144,7 +144,7 @@ mod tests {
     use log::debug;
     use once_cell::sync::Lazy;
     use reqwest::blocking::Client;
-    use time::Duration;
+    use std::time::Duration;
     use tokio::runtime::Runtime;
 
     use super::super::constants::*;
@@ -339,7 +339,7 @@ mod tests {
                         .unwrap();
 
                     signer
-                        .sign_query(&mut req, Duration::seconds(3600), &cred)
+                        .sign_query(&mut req, Duration::from_secs(3600), &cred)
                         .expect("sign request must success");
 
                     debug!("signed request url: {:?}", req.uri().to_string());

@@ -20,7 +20,7 @@ use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
-use crate::time::Duration;
+use std::time::Duration;
 
 const CONTENT_MD5: &str = "content-md5";
 
@@ -64,7 +64,12 @@ impl Signer {
             SigningMethod::Query(expire) => {
                 ctx.headers.insert(DATE, format_http_date(now).parse()?);
                 ctx.query_push("OSSAccessKeyId", cred.access_key());
-                ctx.query_push("Expires", (now + expire).unix_timestamp().to_string());
+                ctx.query_push(
+                    "Expires",
+                    (now + chrono::Duration::from_std(expire).unwrap())
+                        .timestamp()
+                        .to_string(),
+                );
                 ctx.query_push(
                     "Signature",
                     utf8_percent_encode(&signature, percent_encoding::NON_ALPHANUMERIC).to_string(),
@@ -126,7 +131,11 @@ fn string_to_sign(
             writeln!(&mut s, "{}", format_http_date(now))?;
         }
         SigningMethod::Query(expires) => {
-            writeln!(&mut s, "{}", (now + expires).unix_timestamp())?;
+            writeln!(
+                &mut s,
+                "{}",
+                (now + chrono::Duration::from_std(expires).unwrap()).timestamp()
+            )?;
         }
     }
 

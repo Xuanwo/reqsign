@@ -13,7 +13,7 @@ use reqsign::AliyunConfig;
 use reqsign::AliyunLoader;
 use reqsign::AliyunOssSigner;
 use reqwest::Client;
-use time::Duration;
+use std::time::Duration;
 
 fn init_signer() -> Option<(AliyunLoader, AliyunOssSigner)> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -157,7 +157,7 @@ async fn test_get_object_with_query_sign() -> Result<()> {
         .expect("load request must success")
         .unwrap();
     signer
-        .sign_query(&mut req, Duration::seconds(3600), &cred)
+        .sign_query(&mut req, Duration::from_secs(3600), &cred)
         .expect("sign request must success");
 
     debug!("signed request: {:?}", req);

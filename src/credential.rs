@@ -7,9 +7,8 @@ use std::ops::Add;
 use anyhow::anyhow;
 use anyhow::Result;
 
+use crate::time::now;
 use crate::time::DateTime;
-use crate::time::Duration;
-use crate::time::{self};
 
 /// Credential that holds the access_key and secret_key.
 #[derive(Default, Clone)]
@@ -87,7 +86,7 @@ impl Credential {
         // Take 120s as buffer to avoid edge cases.
         if let Some(valid) = self
             .expires_in
-            .map(|v| v > time::now().add(Duration::minutes(2)))
+            .map(|v| v > now().add(chrono::Duration::minutes(2)))
         {
             return valid;
         }
@@ -130,42 +129,6 @@ pub trait CredentialLoad: 'static + Send + Sync + Debug {
     /// - If not found, return `Ok(None)`
     /// - If unexpected errors happened, return `Err(err)`
     fn load_credential(&self) -> Result<Option<Credential>>;
-}
-
-/// CredentialLoadChain will try to load credential via the insert order.
-///
-/// - If found, return directly.
-/// - If not found, keep going and try next one.
-/// - If meeting error, return directly.
-#[derive(Default, Debug)]
-pub struct CredentialLoadChain {
-    loaders: Vec<Box<dyn CredentialLoad>>,
-}
-
-impl CredentialLoadChain {
-    /// Check if this chain is empty.
-    pub fn is_empty(&self) -> bool {
-        self.loaders.is_empty()
-    }
-
-    /// Insert new loaders into chain.
-    pub fn push(&mut self, l: impl CredentialLoad + 'static) -> &mut Self {
-        self.loaders.push(Box::new(l));
-
-        self
-    }
-}
-
-impl CredentialLoad for CredentialLoadChain {
-    fn load_credential(&self) -> Result<Option<Credential>> {
-        for l in self.loaders.iter() {
-            if let Some(c) = l.load_credential()? {
-                return Ok(Some(c));
-            }
-        }
-
-        Ok(None)
-    }
 }
 
 /// DummyLoader always returns `Ok(None)`.

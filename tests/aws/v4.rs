@@ -12,7 +12,7 @@ use reqsign::AwsConfig;
 use reqsign::AwsLoader;
 use reqsign::AwsV4Signer;
 use reqwest::Client;
-use time::Duration;
+use std::time::Duration;
 
 fn init_signer() -> Option<(AwsLoader, AwsV4Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -109,7 +109,7 @@ async fn test_put_object_with_query() -> Result<()> {
         .expect("load request must success")
         .unwrap();
     signer
-        .sign_query(&mut req, Duration::hours(1), &cred)
+        .sign_query(&mut req, Duration::from_secs(3600), &cred)
         .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
@@ -150,7 +150,7 @@ async fn test_get_object_with_query() -> Result<()> {
         .expect("load request must success")
         .unwrap();
     signer
-        .sign_query(&mut req, Duration::hours(1), &cred)
+        .sign_query(&mut req, Duration::from_secs(3600), &cred)
         .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
