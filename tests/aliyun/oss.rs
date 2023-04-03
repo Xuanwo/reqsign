@@ -62,7 +62,11 @@ async fn test_get_object() -> Result<()> {
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
-    let cred = loader.load().await.expect("load request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
     signer
         .sign(&mut req, &cred)
         .expect("sign request must success");
@@ -108,7 +112,11 @@ async fn test_delete_objects() -> Result<()> {
     req.headers_mut()
         .insert("CONTENT-MD5", "WOctCY1SS662e7ziElh4cw==".parse().unwrap());
 
-    let cred = loader.load().await.expect("load request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
     signer
         .sign(&mut req, &cred)
         .expect("sign request must success");
@@ -143,7 +151,11 @@ async fn test_get_object_with_query_sign() -> Result<()> {
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
-    let cred = loader.load().await.expect("load request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
     signer
         .sign_query(&mut req, Duration::seconds(3600), &cred)
         .expect("sign request must success");
@@ -182,7 +194,11 @@ async fn test_head_object_with_special_characters() -> Result<()> {
         utf8_percent_encode("not-exist-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
-    let cred = loader.load().await.expect("load request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
     signer
         .sign(&mut req, &cred)
         .expect("sign request must success");
@@ -221,7 +237,11 @@ async fn test_put_object_with_special_characters() -> Result<()> {
     req.headers_mut()
         .insert(CONTENT_LENGTH, 0.to_string().parse()?);
 
-    let cred = loader.load().await.expect("load request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
     signer
         .sign(&mut req, &cred)
         .expect("sign request must success");
@@ -257,7 +277,11 @@ async fn test_list_bucket() -> Result<()> {
     *req.uri_mut() =
         http::Uri::from_str(&format!("{url}?list-type=2&delimiter=/&encoding-type=url"))?;
 
-    let cred = loader.load().await.expect("load request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
     signer
         .sign(&mut req, &cred)
         .expect("sign request must success");
@@ -296,7 +320,11 @@ async fn test_list_bucket_with_invalid_token() -> Result<()> {
         utf8_percent_encode("hello.txt", NON_ALPHANUMERIC)
     ))?;
 
-    let cred = loader.load().await.expect("load request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
     signer
         .sign(&mut req, &cred)
         .expect("sign request must success");

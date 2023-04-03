@@ -1,13 +1,9 @@
 use std::fs;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::thread::sleep;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use backon::BackoffBuilder;
-use backon::ExponentialBuilder;
-use log::warn;
 use reqwest::Client;
 use serde::Deserialize;
 
@@ -38,64 +34,46 @@ impl Loader {
     }
 
     /// Load credential.
-    pub async fn load(&self) -> Option<Credential> {
+    pub async fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
         match self.credential.lock().expect("lock poisoned").clone() {
-            Some(cred) if cred.is_valid() => return Some(cred),
+            Some(cred) if cred.is_valid() => return Ok(Some(cred)),
             _ => (),
         }
 
-        // Let's retry 4 times: 1s -> 2s -> 4s -> 8s.
-        let mut retry = ExponentialBuilder::default()
-            .with_max_times(4)
-            .with_jitter()
-            .build();
-
-        let cred = loop {
-            let cred = self.load_via_static();
-
-            let cred = if cred.is_some() {
-                cred
-            } else {
-                self.load_via_assume_role_with_oidc()
-                    .await
-                    .map_err(|err| {
-                        warn!("load credential via assume role with oidc failed: {err:?}");
-                        err
-                    })
-                    .unwrap_or_default()
-            };
-
-            match cred {
-                Some(cred) => break cred,
-                None => match retry.next() {
-                    Some(dur) => {
-                        sleep(dur);
-                        continue;
-                    }
-                    None => {
-                        warn!("load credential still failed after retry");
-                        return None;
-                    }
-                },
-            }
+        let cred = if let Some(cred) = self.load_inner().await? {
+            cred
+        } else {
+            return Ok(None);
         };
 
         let mut lock = self.credential.lock().expect("lock poisoned");
         *lock = Some(cred.clone());
 
-        Some(cred)
+        Ok(Some(cred))
     }
 
-    fn load_via_static(&self) -> Option<Credential> {
+    async fn load_inner(&self) -> Result<Option<Credential>> {
+        if let Some(cred) = self.load_via_static()? {
+            return Ok(Some(cred));
+        }
+
+        if let Some(cred) = self.load_via_assume_role_with_oidc().await? {
+            return Ok(Some(cred));
+        }
+
+        Ok(None)
+    }
+
+    fn load_via_static(&self) -> Result<Option<Credential>> {
         if let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.access_key_secret) {
             let mut cred = Credential::new(ak, sk);
             if let Some(tk) = &self.config.security_token {
                 cred.set_security_token(tk);
             }
-            Some(cred)
+            Ok(Some(cred))
         } else {
-            None
+            Ok(None)
         }
     }
 
@@ -275,7 +253,7 @@ mod tests {
             || {
                 RUNTIME.block_on(async {
                     let l = Loader::new(reqwest::Client::new(), Config::default().from_env());
-                    let x = l.load().await.expect("credential must be valid");
+                    let x = l.load().await.expect("credential must be valid").unwrap();
 
                     assert!(x.is_valid());
                 })
@@ -354,7 +332,11 @@ mod tests {
                     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))
                         .expect("must valid");
 
-                    let cred = loader.load().await.expect("credential must be valid");
+                    let cred = loader
+                        .load()
+                        .await
+                        .expect("credential must be valid")
+                        .unwrap();
 
                     signer
                         .sign_query(&mut req, Duration::seconds(3600), &cred)

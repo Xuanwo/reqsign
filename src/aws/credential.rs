@@ -7,7 +7,6 @@ use std::sync::Mutex;
 
 use anyhow::anyhow;
 use anyhow::Result;
-use log::warn;
 use quick_xml::de;
 use reqwest::Client;
 use serde::Deserialize;
@@ -99,39 +98,23 @@ impl Loader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Some(cred) = self.load_via_customed_credential_load().map_err(|err| {
-            warn!("load credential via customed credential load failed: {err:?}");
-            err
-        })? {
+        if let Ok(Some(cred)) = self.load_via_customed_credential_load() {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_config()? {
+        if let Ok(Some(cred)) = self.load_via_config() {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self
-            .load_via_assume_role_with_web_identity()
-            .await
-            .map_err(|err| {
-                warn!("load credential via assume role with web identity failed: {err:?}");
-                err
-            })?
-        {
+        if let Ok(Some(cred)) = self.load_via_assume_role_with_web_identity().await {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_assume_role().await.map_err(|err| {
-            warn!("load credential via assume role failed: {err:?}");
-            err
-        })? {
+        if let Ok(Some(cred)) = self.load_via_assume_role().await {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_imds_v2().await.map_err(|err| {
-            warn!("load credential via imds v2 failed: {err:?}");
-            err
-        })? {
+        if let Ok(Some(cred)) = self.load_via_imds_v2().await {
             return Ok(Some(cred));
         }
 
