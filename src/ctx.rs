@@ -7,7 +7,7 @@ use http::uri::Scheme;
 use http::HeaderMap;
 use http::HeaderValue;
 use http::Method;
-use time::Duration;
+use std::time::Duration;
 
 pub struct SigningContext {
     pub method: Method,

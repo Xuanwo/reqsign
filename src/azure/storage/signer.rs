@@ -3,11 +3,11 @@
 use std::fmt::Debug;
 use std::fmt::Write;
 
-use ::time::Duration;
 use anyhow::anyhow;
 use anyhow::Result;
 use http::header::*;
 use log::debug;
+use std::time::Duration;
 
 use super::super::constants::*;
 use super::credential::Credential;
@@ -136,7 +136,7 @@ impl Signer {
 
     /// Signing request with query.
     pub fn sign_query(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Query(Duration::seconds(1)), cred)?;
+        let ctx = self.build(req, SigningMethod::Query(Duration::from_secs(1)), cred)?;
         req.apply(ctx)
     }
 }

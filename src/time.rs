@@ -1,46 +1,65 @@
 //! Time related utils.
 
 use anyhow::Result;
-#[cfg(test)]
-use time::format_description::well_known::Rfc2822;
-use time::format_description::well_known::Rfc3339;
-use time::format_description::FormatItem;
-use time::macros::format_description;
-use time::OffsetDateTime;
+use chrono::format::Fixed;
+use chrono::format::Numeric;
+use chrono::format::Pad;
+use chrono::SecondsFormat;
+use chrono::{format::Item, Utc};
 
-/// DateTime is an alias of [`time::OffsetDateTime`]
-///
-/// We will use UTC time across the whole reqsign lib.
-pub type DateTime = OffsetDateTime;
-/// Duration is an alias of [`time::Duration`]
-pub type Duration = time::Duration;
+pub type DateTime = chrono::DateTime<Utc>;
 
 /// Create datetime of now.
 pub fn now() -> DateTime {
-    OffsetDateTime::now_utc()
+    Utc::now()
 }
 
 /// DATE is a time format like `20220301`
-pub const DATE: &[FormatItem<'static>] = format_description!("[year][month][day]");
+const DATE: &[Item<'static>] = &[
+    Item::Numeric(Numeric::Year, Pad::Zero),
+    Item::Numeric(Numeric::Month, Pad::Zero),
+    Item::Numeric(Numeric::Day, Pad::Zero),
+];
 
 /// Format time into date: `20220301`
 pub fn format_date(t: DateTime) -> String {
-    t.format(DATE).expect("time must be valid")
+    t.format_with_items(DATE.iter()).to_string()
 }
 
 /// ISO8601 is a time format like `20220313T072004Z`.
-pub const ISO8601: &[FormatItem<'static>] =
-    format_description!("[year][month][day]T[hour][minute][second]Z");
+const ISO8601: &[Item<'static>] = &[
+    Item::Numeric(Numeric::Year, Pad::Zero),
+    Item::Numeric(Numeric::Month, Pad::Zero),
+    Item::Numeric(Numeric::Day, Pad::Zero),
+    Item::Literal("T"),
+    Item::Numeric(Numeric::Hour, Pad::Zero),
+    Item::Numeric(Numeric::Minute, Pad::Zero),
+    Item::Numeric(Numeric::Second, Pad::Zero),
+    Item::Literal("Z"),
+];
 
 /// Format time into ISO8601: `20220313T072004Z`
 pub fn format_iso8601(t: DateTime) -> String {
-    t.format(ISO8601).expect("time must be valid")
+    t.format_with_items(ISO8601.iter()).to_string()
 }
 
 /// HTTP_DATE is a time format like `Sun, 06 Nov 1994 08:49:37 GMT`.
-pub const HTTP_DATE: &[FormatItem<'static>] = format_description!(
-    "[weekday repr:short], [day] [month repr:short] [year] [hour]:[minute]:[second] GMT"
-);
+const HTTP_DATE: &[Item<'static>] = &[
+    Item::Fixed(Fixed::ShortWeekdayName),
+    Item::Literal(", "),
+    Item::Numeric(Numeric::Day, Pad::Zero),
+    Item::Literal(" "),
+    Item::Fixed(Fixed::ShortMonthName),
+    Item::Literal(" "),
+    Item::Numeric(Numeric::Year, Pad::Zero),
+    Item::Literal(" "),
+    Item::Numeric(Numeric::Hour, Pad::Zero),
+    Item::Literal(":"),
+    Item::Numeric(Numeric::Minute, Pad::Zero),
+    Item::Literal(":"),
+    Item::Numeric(Numeric::Second, Pad::Zero),
+    Item::Literal(" GMT"),
+];
 
 /// Format time into http date: `Sun, 06 Nov 1994 08:49:37 GMT`
 ///
@@ -51,32 +70,12 @@ pub const HTTP_DATE: &[FormatItem<'static>] = format_description!(
 /// - Timezone is fixed to GMT.
 /// - Day must be 2 digit.
 pub fn format_http_date(t: DateTime) -> String {
-    t.format(HTTP_DATE).expect("time must be valid")
-}
-
-/// Format time into RFC2822: `Tue, 01 Jul 2003 10:52:37 +0200`
-///
-/// - [Reference](https://httpwg.org/specs/rfc7231.html#http.date)
-#[cfg(test)]
-pub fn format_rfc2822(t: DateTime) -> String {
-    t.format(&Rfc2822).expect("time must be valid")
+    t.format_with_items(HTTP_DATE.iter()).to_string()
 }
 
 /// Format time into RFC3339: `2022-03-13T07:20:04Z`
 pub fn format_rfc3339(t: DateTime) -> String {
-    t.format(&Rfc3339).expect("time must be valid")
-}
-
-/// Parse time from RFC2822.
-///
-/// All of them are valid time:
-///
-/// - `Tue, 1 Jul 2003 10:52:37 +0200`
-/// - `Tue, 01 Jul 2003 10:52:37 +0200`
-/// - `Tue, 1 Jul 2003 10:52:37 GMT`
-#[cfg(test)]
-pub fn parse_rfc2822(s: &str) -> Result<DateTime> {
-    Ok(OffsetDateTime::parse(s, &Rfc2822)?)
+    t.to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 /// Parse time from RFC3339.
@@ -87,22 +86,17 @@ pub fn parse_rfc2822(s: &str) -> Result<DateTime> {
 /// - `2022-03-01T08:12:34+00:00`
 /// - `2022-03-01T08:12:34.00+00:00`
 pub fn parse_rfc3339(s: &str) -> Result<DateTime> {
-    Ok(OffsetDateTime::parse(s, &Rfc3339)?)
+    Ok(chrono::DateTime::parse_from_rfc3339(s)?.with_timezone(&Utc))
 }
 
 #[cfg(test)]
 mod tests {
-    use time::Date;
-    use time::Month;
-    use time::PrimitiveDateTime;
-    use time::Time;
+    use chrono::TimeZone;
 
     use super::*;
 
-    fn test_time() -> OffsetDateTime {
-        let date = Date::from_calendar_date(2022, Month::March, 1).expect("must be valid date");
-        let time = Time::from_hms(8, 12, 34).expect("must be valid time");
-        PrimitiveDateTime::new(date, time).assume_utc()
+    fn test_time() -> DateTime {
+        Utc.with_ymd_and_hms(2022, 3, 1, 8, 12, 34).unwrap()
     }
 
     #[test]
@@ -124,29 +118,9 @@ mod tests {
     }
 
     #[test]
-    fn test_format_rfc2822() {
-        let t = test_time();
-        assert_eq!("Tue, 01 Mar 2022 08:12:34 +0000", format_rfc2822(t))
-    }
-
-    #[test]
     fn test_format_rfc3339() {
         let t = test_time();
         assert_eq!("2022-03-01T08:12:34Z", format_rfc3339(t))
-    }
-
-    #[test]
-    fn test_parse_rfc2822() {
-        let t = test_time();
-
-        for v in [
-            "Tue, 01 Mar 2022 08:12:34 +0000",
-            "Tue, 01 Mar 2022 08:12:34 GMT",
-            "Tue, 01 Mar 2022 08:12:34 UT",
-            "Tue, 1 Mar 2022 08:12:34 +0000",
-        ] {
-            assert_eq!(t, parse_rfc2822(v).expect("must be valid time"));
-        }
     }
 
     #[test]

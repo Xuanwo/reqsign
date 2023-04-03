@@ -23,9 +23,9 @@ use crate::hash::hmac_sha256;
 use crate::request::SignableRequest;
 use crate::time::format_date;
 use crate::time::format_iso8601;
+use crate::time::now;
 use crate::time::DateTime;
-use crate::time::Duration;
-use crate::time::{self};
+use std::time::Duration;
 
 /// Singer that implement AWS SigV4.
 ///
@@ -66,7 +66,7 @@ impl Signer {
         method: SigningMethod,
         cred: &Credential,
     ) -> Result<SigningContext> {
-        let now = self.time.unwrap_or_else(time::now);
+        let now = self.time.unwrap_or_else(now);
         let mut ctx = req.build()?;
 
         // canonicalize context
@@ -321,7 +321,7 @@ fn canonicalize_query(
         ));
         ctx.query.push(("X-Amz-Date".into(), format_iso8601(now)));
         ctx.query
-            .push(("X-Amz-Expires".into(), expire.whole_seconds().to_string()));
+            .push(("X-Amz-Expires".into(), expire.as_secs().to_string()));
         ctx.query.push((
             "X-Amz-SignedHeaders".into(),
             ctx.header_name_to_vec_sorted().join(";"),
@@ -550,7 +550,7 @@ mod tests {
                 req.uri().path(),
                 req.uri().query(),
             );
-            let now = time::now();
+            let now = now();
 
             let mut ss = SigningSettings::default();
             ss.percent_encoding_mode = PercentEncodingMode::Double;
@@ -615,7 +615,7 @@ mod tests {
                 req.uri().path(),
                 req.uri().query(),
             );
-            let now = time::now();
+            let now = now();
 
             let mut ss = SigningSettings::default();
             ss.percent_encoding_mode = PercentEncodingMode::Double;
@@ -661,7 +661,7 @@ mod tests {
 
             let signer = Signer::new("s3", "test").time(now);
 
-            signer.sign_query(&mut req, Duration::hours(1), &cred)?;
+            signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
             let actual_req = req;
 
             compare_request(&name, &expected_req, &actual_req);
@@ -682,7 +682,7 @@ mod tests {
                 req.uri().path(),
                 req.uri().query(),
             );
-            let now = time::now();
+            let now = now();
 
             let mut ss = SigningSettings::default();
             ss.percent_encoding_mode = PercentEncodingMode::Double;
@@ -749,7 +749,7 @@ mod tests {
                 req.uri().path(),
                 req.uri().query(),
             );
-            let now = time::now();
+            let now = now();
 
             let mut ss = SigningSettings::default();
             ss.percent_encoding_mode = PercentEncodingMode::Double;
@@ -797,7 +797,7 @@ mod tests {
 
             let signer = Signer::new("s3", "test").time(now);
             signer
-                .sign_query(&mut req, Duration::hours(1), &cred)
+                .sign_query(&mut req, Duration::from_secs(3600), &cred)
                 .expect("must apply success");
             let actual_req = req;
 

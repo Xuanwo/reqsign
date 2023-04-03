@@ -19,9 +19,9 @@ use crate::ctx::SigningMethod;
 use crate::hash::base64_hmac_sha1;
 use crate::request::SignableRequest;
 use crate::time::format_http_date;
+use crate::time::now;
 use crate::time::DateTime;
-use crate::time::Duration;
-use crate::time::{self};
+use std::time::Duration;
 
 /// Singer that implement Huawei Cloud Object Storage Service Authorization.
 ///
@@ -60,7 +60,7 @@ impl Signer {
         method: SigningMethod,
         cred: &Credential,
     ) -> Result<SigningContext> {
-        let now = self.time.unwrap_or_else(time::now);
+        let now = self.time.unwrap_or_else(now);
         let mut ctx = req.build()?;
 
         let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
@@ -81,7 +81,12 @@ impl Signer {
             SigningMethod::Query(expire) => {
                 ctx.headers.insert(DATE, format_http_date(now).parse()?);
                 ctx.query_push("AccessKeyId", &cred.access_key_id);
-                ctx.query_push("Expires", (now + expire).unix_timestamp().to_string());
+                ctx.query_push(
+                    "Expires",
+                    (now + chrono::Duration::from_std(expire).unwrap())
+                        .timestamp()
+                        .to_string(),
+                );
                 ctx.query_push(
                     "Signature",
                     utf8_percent_encode(&signature, percent_encoding::NON_ALPHANUMERIC).to_string(),
@@ -174,7 +179,11 @@ fn string_to_sign(
             writeln!(&mut s, "{}", format_http_date(now))?;
         }
         SigningMethod::Query(expires) => {
-            writeln!(&mut s, "{}", (now + expires).unix_timestamp())?;
+            writeln!(
+                &mut s,
+                "{}",
+                (now + chrono::Duration::from_std(expires).unwrap()).timestamp()
+            )?;
         }
     }
 
@@ -307,15 +316,14 @@ static SUBRESOURCES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
 mod tests {
     use std::str::FromStr;
 
-    use ::time::UtcOffset;
     use anyhow::Result;
+    use chrono::Utc;
     use http::header::HeaderName;
     use http::Uri;
 
     use super::super::config::Config;
     use super::super::credential::CredentialLoader;
     use super::*;
-    use crate::time::parse_rfc2822;
 
     #[tokio::test]
     async fn test_sign() -> Result<()> {
@@ -328,8 +336,9 @@ mod tests {
         let cred = loader.load().await?.unwrap();
 
         let signer = Signer::new("bucket").with_time(
-            parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
-                .to_offset(UtcOffset::from_hms(0, 0, 0)?),
+            chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
+                .unwrap()
+                .with_timezone(&Utc),
         );
 
         let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt";
@@ -369,8 +378,9 @@ mod tests {
         let cred = loader.load().await?.unwrap();
 
         let signer = Signer::new("bucket").with_time(
-            parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
-                .to_offset(UtcOffset::from_hms(0, 0, 0)?),
+            chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
+                .unwrap()
+                .with_timezone(&Utc),
         );
 
         let get_req =
@@ -412,8 +422,9 @@ mod tests {
         let cred = loader.load().await?.unwrap();
 
         let signer = Signer::new("bucket").with_time(
-            parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?
-                .to_offset(UtcOffset::from_hms(0, 0, 0)?),
+            chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
+                .unwrap()
+                .with_timezone(&Utc),
         );
 
         let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com?name=hello&abc=def";

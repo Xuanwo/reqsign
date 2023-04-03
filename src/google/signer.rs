@@ -20,7 +20,7 @@ use crate::time;
 use crate::time::format_date;
 use crate::time::format_iso8601;
 use crate::time::DateTime;
-use crate::time::Duration;
+use std::time::Duration;
 
 /// Singer that implement Google OAuth2 Authentication.
 ///
@@ -309,7 +309,7 @@ fn canonicalize_query(
         ));
         ctx.query.push(("X-Goog-Date".into(), format_iso8601(now)));
         ctx.query
-            .push(("X-Goog-Expires".into(), expire.whole_seconds().to_string()));
+            .push(("X-Goog-Expires".into(), expire.as_secs().to_string()));
         ctx.query.push((
             "X-Goog-SignedHeaders".into(),
             ctx.header_name_to_vec_sorted().join(";"),
@@ -340,11 +340,11 @@ fn canonicalize_query(
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
     use pretty_assertions::assert_eq;
 
     use super::super::credential::CredentialLoader;
     use super::*;
-    use crate::time::parse_rfc2822;
 
     #[tokio::test]
     async fn test_sign_query() -> Result<()> {
@@ -366,7 +366,7 @@ mod tests {
             .parse()
             .expect("url must be valid");
 
-        signer.sign_query(&mut req, time::Duration::hours(1), &cred)?;
+        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
 
         let query = req.uri().query().unwrap();
         assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));
@@ -393,12 +393,13 @@ mod tests {
             .parse()
             .expect("url must be valid");
 
-        let time_offset =
-            parse_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")?.to_offset(::time::UtcOffset::UTC);
+        let time_offset = chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
+            .unwrap()
+            .with_timezone(&Utc);
 
         let signer = Signer::new("storage").time(time_offset);
 
-        signer.sign_query(&mut req, time::Duration::hours(1), &cred)?;
+        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
 
         let query = req.uri().query().unwrap();
         assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));

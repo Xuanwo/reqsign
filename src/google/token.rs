@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 use std::fmt::Formatter;
-use std::ops::Add;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -14,7 +13,6 @@ use log::error;
 use reqwest::Client;
 use serde::Deserialize;
 use serde::Serialize;
-use time::Duration;
 
 use super::credential::Credential;
 use crate::time::now;
@@ -92,13 +90,13 @@ pub struct Claims {
 
 impl Claims {
     pub fn new(client_email: &str, scope: &str) -> Claims {
-        let current = DateTime::now_utc().unix_timestamp() as u64;
+        let current = now().timestamp() as u64;
 
         Claims {
             iss: client_email.to_string(),
             scope: scope.to_string(),
             aud: "https://oauth2.googleapis.com/token".to_string(),
-            exp: current.add(3600),
+            exp: current + 3600,
             iat: current,
         }
     }
@@ -185,7 +183,7 @@ impl TokenLoader {
     /// Load token from different sources.
     pub async fn load(&self) -> Result<Option<Token>> {
         match self.token.lock().expect("lock poisoned").clone() {
-            Some((token, expire_in)) if now() < expire_in - Duration::minutes(2) => {
+            Some((token, expire_in)) if now() < expire_in - chrono::Duration::seconds(2 * 60) => {
                 return Ok(Some(token))
             }
             _ => (),
@@ -197,7 +195,7 @@ impl TokenLoader {
             return Ok(None);
         };
 
-        let expire_in = now() + Duration::seconds(token.expires_in() as i64);
+        let expire_in = now() + chrono::Duration::seconds(token.expires_in() as i64);
 
         let mut lock = self.token.lock().expect("lock poisoned");
         *lock = Some((token.clone(), expire_in));
