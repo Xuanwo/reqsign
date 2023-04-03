@@ -4,6 +4,7 @@ use anyhow::Result;
 use chrono::format::Fixed;
 use chrono::format::Numeric;
 use chrono::format::Pad;
+use chrono::SecondsFormat;
 use chrono::{format::Item, Utc};
 
 pub type DateTime = chrono::DateTime<Utc>;
@@ -74,7 +75,7 @@ pub fn format_http_date(t: DateTime) -> String {
 
 /// Format time into RFC3339: `2022-03-13T07:20:04Z`
 pub fn format_rfc3339(t: DateTime) -> String {
-    t.to_rfc3339()
+    t.to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
 /// Parse time from RFC3339.
