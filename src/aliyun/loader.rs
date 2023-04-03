@@ -163,6 +163,7 @@ mod tests {
     use std::str::FromStr;
 
     use http::Request;
+    use log::debug;
     use once_cell::sync::Lazy;
     use reqwest::blocking::Client;
     use time::Duration;
@@ -171,7 +172,6 @@ mod tests {
     use super::super::constants::*;
     use super::super::oss::Signer;
     use super::*;
-    use log::debug;
 
     static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         tokio::runtime::Builder::new_multi_thread()

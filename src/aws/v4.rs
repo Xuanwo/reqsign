@@ -385,11 +385,9 @@ mod tests {
     use http::header;
     use reqwest::Client;
 
-    use crate::aws::AwsConfig;
-
     use super::super::AwsLoader;
-
     use super::*;
+    use crate::aws::AwsConfig;
 
     fn test_get_request() -> http::Request<&'static str> {
         let mut req = http::Request::new("");

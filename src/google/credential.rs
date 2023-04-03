@@ -1,201 +1,37 @@
 use std::env;
-use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::ops::Add;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::sync::RwLock;
-use std::thread::sleep;
+use std::sync::Mutex;
 
-use anyhow::anyhow;
-use anyhow::Result;
-use backon::BackoffBuilder;
-use backon::ExponentialBuilder;
-use http::header;
-use http::StatusCode;
-use jsonwebtoken::Algorithm;
-use jsonwebtoken::EncodingKey;
-use jsonwebtoken::Header;
-use log::error;
-use log::info;
-use log::warn;
+use log::debug;
 use serde::Deserialize;
-use serde::Serialize;
-use time::Duration;
 
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
-use crate::time::now;
-use crate::time::DateTime;
-
-/// Token is the authentication methods used by google services.
-///
-/// Most of the time, they will be exchanged via application credentials.
-#[derive(Clone, Deserialize, Default)]
-#[serde(default)]
-pub struct Token {
-    access_token: String,
-    scope: String,
-    token_type: String,
-    expires_in: usize,
-}
-
-impl Token {
-    /// Create a new token.
-    ///
-    /// scope will looks like: `https://www.googleapis.com/auth/devstorage.read_only`.
-    pub fn new(access_token: &str, expires_in: usize, scope: &str) -> Self {
-        Self {
-            access_token: access_token.to_string(),
-            scope: scope.to_string(),
-            expires_in,
-            token_type: "Bearer".to_string(),
-        }
-    }
-
-    /// Notes: don't allow get token from reqsign.
-    pub(crate) fn access_token(&self) -> &str {
-        &self.access_token
-    }
-
-    /// Notes: don't allow get expires_in from reqsign.
-    pub(crate) fn expires_in(&self) -> usize {
-        self.expires_in
-    }
-}
-
-/// Make sure `access_token` is redacted for Token
-impl Debug for Token {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Token")
-            .field("access_token", &"<redacted>")
-            .field("scope", &self.scope)
-            .field("token_type", &self.token_type)
-            .field("expires_in", &self.expires_in)
-            .finish()
-    }
-}
-
-/// Claims is used to build JWT for google cloud.
-///
-/// ```json
-/// {
-///   "iss": "761326798069-r5mljlln1rd4lrbhg75efgigp36m78j5@developer.gserviceaccount.com",
-///   "scope": "https://www.googleapis.com/auth/devstorage.read_only",
-///   "aud": "https://oauth2.googleapis.com/token",
-///   "exp": 1328554385,
-///   "iat": 1328550785
-/// }
-/// ```
-#[derive(Debug, Serialize)]
-pub struct Claims {
-    iss: String,
-    scope: String,
-    aud: String,
-    exp: u64,
-    iat: u64,
-}
-
-impl Claims {
-    pub fn new(client_email: &str, scope: &str) -> Claims {
-        let current = DateTime::now_utc().unix_timestamp() as u64;
-
-        Claims {
-            iss: client_email.to_string(),
-            scope: scope.to_string(),
-            aud: "https://oauth2.googleapis.com/token".to_string(),
-            exp: current.add(3600),
-            iat: current,
-        }
-    }
-}
+use anyhow::Result;
 
 /// Credential is the file which stores service account's client_id and private key.
 #[derive(Clone, Deserialize)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Credential {
-    private_key: String,
-    client_email: String,
-}
-
-impl Credential {
-    pub fn client_email(&self) -> &str {
-        &self.client_email
-    }
-
-    pub fn private_key(&self) -> &str {
-        &self.private_key
-    }
-}
-
-/// TokenLoad will be used to load token.
-pub trait TokenLoad: 'static + Debug + Send + Sync {
-    /// load_token is the only function in token loeader trait.
-    ///
-    /// - `Ok(Some(Token))` indicates there is a valid token.
-    /// - `Ok(None)` indicates no token loaded, try next one.
-    /// - `Err(err)` indicates error happened, try next one.
-    fn load_token(&self) -> Result<Option<Token>>;
+    /// Private key of credential
+    pub private_key: String,
+    /// The client email of credential
+    pub client_email: String,
 }
 
 /// CredentialLoader will load credential from different methods.
+#[derive(Default)]
 #[cfg_attr(test, derive(Debug))]
 pub struct CredentialLoader {
-    credential: Arc<RwLock<Option<Credential>>>,
-    credential_loaded: AtomicBool,
-    token: Arc<RwLock<Option<(Token, DateTime)>>>,
-    token_loaded: AtomicBool,
-
-    allow_anonymous: bool,
+    path: Option<String>,
+    content: Option<String>,
     disable_env: bool,
     disable_well_known_location: bool,
-    disable_vm_metadata: bool,
 
-    service_account: Option<String>,
-    scope: String,
-    customed_token_loader: Option<Box<dyn TokenLoad>>,
-
-    client: ureq::Agent,
-}
-
-impl Default for CredentialLoader {
-    fn default() -> Self {
-        let client = ureq::AgentBuilder::new()
-            // Set overall timeout per-request to 32s.
-            //
-            // TODO: make this a config while needed.
-            .timeout(std::time::Duration::from_secs(32))
-            .build();
-
-        Self {
-            credential: Arc::default(),
-            credential_loaded: AtomicBool::default(),
-            token: Arc::default(),
-            token_loaded: AtomicBool::default(),
-            allow_anonymous: false,
-            disable_env: false,
-            disable_well_known_location: false,
-            disable_vm_metadata: false,
-            service_account: None,
-            // Default to read-only if not set.
-            scope: "read-only".to_string(),
-            customed_token_loader: None,
-            client,
-        }
-    }
+    credential: Arc<Mutex<Option<Credential>>>,
 }
 
 impl CredentialLoader {
-    /// Allow anonymous.
-    ///
-    /// By enabling this option, CredentialLoader will not retry after
-    /// loading credential failed.
-    pub fn with_allow_anonymous(mut self) -> Self {
-        self.allow_anonymous = true;
-        self
-    }
-
     /// Disable load from env.
     pub fn with_disable_env(mut self) -> Self {
         self.disable_env = true;
@@ -208,237 +44,90 @@ impl CredentialLoader {
         self
     }
 
-    /// Disable load from vm metadata.
-    pub fn with_disable_vm_metadata(mut self) -> Self {
-        self.disable_vm_metadata = true;
+    /// Set credential path.
+    pub fn with_path(mut self, path: &str) -> Self {
+        self.path = Some(path.to_string());
         self
     }
 
-    /// Build credential loader with given scope.
-    pub fn with_scope(mut self, scope: &str) -> Self {
-        self.scope = scope.to_string();
+    /// Set credential content.
+    pub fn with_content(mut self, content: &str) -> Self {
+        self.content = Some(content.to_string());
         self
     }
 
-    /// Build credential loader with given service account.
-    pub fn with_service_account(mut self, service_account: &str) -> Self {
-        self.service_account = Some(service_account.to_string());
-        self
-    }
-
-    /// Build credential loader with given Credential.
-    pub fn with_credential(self, cred: Credential) -> Self {
-        self.credential_loaded.store(true, Ordering::Relaxed);
-        *self.credential.write().expect("lock poisoned") = Some(cred);
-        self
-    }
-
-    /// Build credential loader with given customed token loader.
-    pub fn with_customed_token_loader(mut self, f: Box<dyn TokenLoad>) -> Self {
-        self.customed_token_loader = Some(f);
-        self
-    }
-
-    /// Build credential loader from given path.
-    pub fn from_path(path: &str) -> Result<Self> {
-        let cred = Self::load_from_file(path)?;
-        Ok(CredentialLoader::default().with_credential(cred))
-    }
-
-    /// Build credential loader from given base64 content.
-    pub fn from_base64(content: &str) -> Result<Self> {
-        let content = base64_decode(content);
-
-        let cred: Credential = serde_json::from_slice(&content)
-            .map_err(|err| anyhow!("deserialize credential of base64 failed: {err:?}"))?;
-        Ok(CredentialLoader::default().with_credential(cred))
-    }
-
-    /// Load token from CredentialLoader.
-    pub fn load(&self) -> Option<Token> {
+    /// Load credential from pre-configured methods.
+    pub async fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it has been loaded at least once.
-        if self.token_loaded.load(Ordering::Relaxed) {
-            match self.token.read().expect("lock poisoned").clone() {
-                Some((token, expire_in)) if now() < expire_in - Duration::minutes(2) => {
-                    return Some(token)
-                }
-                None if self.allow_anonymous => return None,
-                _ => (),
-            }
+        if let Some(cred) = self.credential.lock().expect("lock poisoned").clone() {
+            return Ok(Some(cred));
         }
 
-        let mut retry = ExponentialBuilder::default()
-            .with_max_times(4)
-            .with_jitter()
-            .build();
-
-        let token = loop {
-            let token = self
-                .exchange_token_via_customed_token_loader()
-                .unwrap_or_default()
-                .or_else(|| {
-                    self.exchange_token_via_credential()
-                        .map_err(|err| {
-                            warn!("exchange token via credential failed: {err:?}");
-                            err
-                        })
-                        .unwrap_or_default()
-                })
-                .or_else(|| {
-                    self.exchange_token_via_vm_metadata()
-                        .map_err(|err| {
-                            warn!("exchange token via vm metadata failed: {err:?}");
-                            err
-                        })
-                        .unwrap_or_default()
-                });
-
-            match token {
-                Some(token) => {
-                    self.token_loaded.store(true, Ordering::Relaxed);
-                    break token;
-                }
-                None if self.allow_anonymous => {
-                    info!("load token failed but we allowing anonymous access");
-
-                    self.token_loaded.store(true, Ordering::Relaxed);
-                    return None;
-                }
-                None => match retry.next() {
-                    Some(dur) => {
-                        sleep(dur);
-                        continue;
-                    }
-                    None => {
-                        warn!("load token still failed after retry");
-                        return None;
-                    }
-                },
-            }
-        };
-
-        let expire_in = now() + Duration::seconds(token.expires_in() as i64);
-
-        let mut lock = self.token.write().expect("lock poisoned");
-        *lock = Some((token.clone(), expire_in));
-
-        Some(token)
-    }
-
-    fn exchange_token_via_customed_token_loader(&self) -> Result<Option<Token>> {
-        match &self.customed_token_loader {
-            Some(f) => f.load_token(),
-            None => Ok(None),
-        }
-    }
-
-    /// Exchange token via Google OAuth2 Service.
-    ///
-    /// Reference: [Using OAuth 2.0 for Server to Server Applications](https://developers.google.com/identity/protocols/oauth2/service-account#authorizingrequests)
-    fn exchange_token_via_credential(&self) -> Result<Option<Token>> {
-        let cred = if let Some(cred) = self.load_credential() {
+        let cred = if let Some(cred) = self.load_inner().await? {
             cred
         } else {
             return Ok(None);
         };
 
-        let jwt = jsonwebtoken::encode(
-            &Header::new(Algorithm::RS256),
-            &Claims::new(cred.client_email(), &self.scope),
-            &EncodingKey::from_rsa_pem(cred.private_key().as_bytes())?,
-        )?;
+        let mut lock = self.credential.lock().expect("lock poisoned");
+        *lock = Some(cred.clone());
 
-        let resp = self
-            .client
-            .post("https://oauth2.googleapis.com/token")
-            .set(
-                header::CONTENT_TYPE.as_str(),
-                "application/x-www-form-urlencoded",
-            )
-            .send_form(&[
-                ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
-                ("assertion", &jwt),
-            ])?;
-
-        if resp.status() != StatusCode::OK {
-            error!("exchange token got unexpected response: {:?}", resp);
-            return Err(anyhow!("exchange token failed: {:?}", resp));
-        }
-
-        let token: Token = serde_json::from_reader(resp.into_reader())?;
-        Ok(Some(token))
+        Ok(Some(cred))
     }
 
-    /// Exchange token via vm metadata
-    fn exchange_token_via_vm_metadata(&self) -> Result<Option<Token>> {
-        if self.disable_vm_metadata {
+    async fn load_inner(&self) -> Result<Option<Credential>> {
+        if let Ok(Some(cred)) = self.load_via_content() {
+            return Ok(Some(cred));
+        }
+
+        if let Ok(Some(cred)) = self.load_via_path().await {
+            return Ok(Some(cred));
+        }
+
+        if let Ok(Some(cred)) = self.load_via_env().await {
+            return Ok(Some(cred));
+        }
+
+        if let Ok(Some(cred)) = self.load_via_well_known_location().await {
+            return Ok(Some(cred));
+        }
+
+        Ok(None)
+    }
+
+    async fn load_via_path(&self) -> Result<Option<Credential>> {
+        let path = if let Some(path) = &self.path {
+            path
+        } else {
             return Ok(None);
-        }
+        };
 
-        // Use `default` if service account not set by user.
-        let service_account = self
-            .service_account
-            .clone()
-            .unwrap_or_else(|| "default".to_string());
-
-        let url = format!("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/{service_account}/token?scopes={}", self.scope);
-
-        let resp = self
-            .client
-            .get(&url)
-            .set("Metadata-Flavor", "Google")
-            .call()
-            .map_err(|err| {
-                error!("get token from compute metadata failed: {err:?}");
-                err
-            })?;
-
-        let token: Token = serde_json::from_reader(resp.into_reader())?;
-        Ok(Some(token))
+        Ok(Some(Self::load_file(path).await?))
     }
 
-    pub fn load_credential(&self) -> Option<Credential> {
-        // Return cached credential if it has been loaded at least once.
-        if self.credential_loaded.load(Ordering::Relaxed) {
-            if let Some(cred) = self.credential.read().expect("lock poisoned").clone() {
-                return Some(cred);
-            }
-        }
+    /// Build credential loader from given base64 content.
+    fn load_via_content(&self) -> Result<Option<Credential>> {
+        let content = if let Some(content) = &self.content {
+            content
+        } else {
+            return Ok(None);
+        };
 
-        let cred = self
-            .load_via_env()
-            .map_err(|err| {
-                warn!("load credential via env failed: {err:?}");
-                err
-            })
-            .unwrap_or_default()
-            .or_else(|| {
-                self.load_via_well_known_location()
-                    .map_err(|err| {
-                        warn!("load credential via well known location failed: {err:?}");
-                        err
-                    })
-                    .unwrap_or_default()
-            });
-
-        self.credential_loaded.store(true, Ordering::Relaxed);
-
-        if let Some(cred) = &cred {
-            let mut lock = self.credential.write().expect("lock poisoned");
-            *lock = Some(cred.clone());
-        }
-
-        cred
+        let cred: Credential = serde_json::from_slice(&base64_decode(content)).map_err(|err| {
+            debug!("load credential from content failed: {err:?}");
+            err
+        })?;
+        Ok(Some(cred))
     }
 
     /// Load from env GOOGLE_APPLICATION_CREDENTIALS.
-    fn load_via_env(&self) -> Result<Option<Credential>> {
+    async fn load_via_env(&self) -> Result<Option<Credential>> {
         if self.disable_env {
             return Ok(None);
         }
 
         if let Ok(cred_path) = env::var(GOOGLE_APPLICATION_CREDENTIALS) {
-            let cred = Self::load_from_file(&cred_path)?;
+            let cred = Self::load_file(&cred_path).await?;
             Ok(Some(cred))
         } else {
             Ok(None)
@@ -449,7 +138,7 @@ impl CredentialLoader {
     ///
     /// - `$HOME/.config/gcloud/application_default_credentials.json`
     /// - `%APPDATA%\gcloud\application_default_credentials.json`
-    fn load_via_well_known_location(&self) -> Result<Option<Credential>> {
+    async fn load_via_well_known_location(&self) -> Result<Option<Credential>> {
         if self.disable_well_known_location {
             return Ok(None);
         }
@@ -465,19 +154,24 @@ impl CredentialLoader {
             return Ok(None);
         };
 
-        let cred = Self::load_from_file(&format!(
+        let cred = Self::load_file(&format!(
             "{config_dir}/gcloud/application_default_credentials.json"
-        ))?;
+        ))
+        .await?;
         Ok(Some(cred))
     }
 
-    /// Load credential from given path.
-    fn load_from_file(path: &str) -> Result<Credential> {
-        let content = std::fs::read(path)
-            .map_err(|err| anyhow!("load credential from file {path} failed: {err:?}"))?;
+    /// Build credential loader from given path.
+    async fn load_file(path: &str) -> Result<Credential> {
+        let content = tokio::fs::read(path).await.map_err(|err| {
+            debug!("load credential failed at reading file: {err:?}");
+            err
+        })?;
 
-        let credential: Credential = serde_json::from_slice(&content)
-            .map_err(|err| anyhow!("deserialize credential of file {path} failed: {err:?}"))?;
+        let credential: Credential = serde_json::from_slice(&content).map_err(|err| {
+            debug!("load credential failed at serde_json: {err:?}");
+            err
+        })?;
 
         Ok(credential)
     }
@@ -485,7 +179,17 @@ impl CredentialLoader {
 
 #[cfg(test)]
 mod tests {
+    use once_cell::sync::Lazy;
+    use tokio::runtime::Runtime;
+
     use super::*;
+
+    static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("Should create a tokio runtime")
+    });
 
     #[test]
     fn test_credential_loader() {
@@ -500,15 +204,18 @@ mod tests {
                 )),
             )],
             || {
-                let cred_loader = CredentialLoader::default();
+                RUNTIME.block_on(async {
+                    let cred_loader = CredentialLoader::default();
 
-                let cred = cred_loader
-                    .load_credential()
-                    .expect("credentail must be exist");
+                    let cred = cred_loader
+                        .load()
+                        .await
+                        .expect("credentail must be exist")
+                        .unwrap();
 
-                assert_eq!("test-234@test.iam.gserviceaccount.com", cred.client_email());
-                assert_eq!(
-                    "-----BEGIN RSA PRIVATE KEY-----
+                    assert_eq!("test-234@test.iam.gserviceaccount.com", &cred.client_email);
+                    assert_eq!(
+                        "-----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQDOy4jaJIcVlffi5ENtlNhJ0tsI1zt21BI3DMGtPq7n3Ymow24w
 BV2Z73l4dsqwRo2QVSwnCQ2bVtM2DgckMNDShfWfKe3LRcl96nnn51AtAYIfRnc+
 ogstzxZi4J64f7IR3KIAFxJnzo+a6FS6MmsYMAs8/Oj68fRmCD0AbAs5ZwIDAQAB
@@ -524,8 +231,9 @@ WSjmfo3qemZ6Z5ymHyjMcj9FOE4AtW71Uw6wX7juR3eo7HPwdkRjdK34EDUc9i9o
 V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
 -----END RSA PRIVATE KEY-----
 ",
-                    cred.private_key()
-                );
+                        &cred.private_key
+                    );
+                })
             },
         );
     }

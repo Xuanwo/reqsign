@@ -1,9 +1,15 @@
 //! Google Service Signer
 
 mod constants;
+
 mod credential;
+pub use credential::Credential as GoogleCredential;
+pub use credential::CredentialLoader as GoogleCredentialLoader;
+
+mod token;
+pub use token::Token as GoogleToken;
+pub use token::TokenLoad as GoogleTokenLoad;
+pub use token::TokenLoader as GoogleTokenLoader;
+
 mod signer;
-pub use credential::Token;
-pub use credential::TokenLoad;
-pub use signer::Builder;
-pub use signer::Signer;
+pub use signer::Signer as GoogleSigner;

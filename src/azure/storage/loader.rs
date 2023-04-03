@@ -1,8 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
+
+use anyhow::Result;
 
 use super::config::Config;
 use super::credential::Credential;
-use anyhow::Result;
 
 /// Loader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]

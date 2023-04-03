@@ -258,7 +258,8 @@ mod tests {
     use http::Request;
 
     use super::super::config::Config;
-    use crate::{azure::storage::loader::Loader, AzureStorageSigner};
+    use crate::azure::storage::loader::Loader;
+    use crate::AzureStorageSigner;
 
     #[tokio::test]
     async fn test_sas_url() {
