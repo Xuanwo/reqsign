@@ -206,22 +206,22 @@ impl TokenLoader {
     }
 
     async fn load_inner(&self) -> Result<Option<Token>> {
-        if let Ok(Some(token)) = self.exchange_token_via_customed_token_loader().await {
+        if let Some(token) = self.load_via_customed_token_loader().await? {
             return Ok(Some(token));
         }
 
-        if let Ok(Some(token)) = self.exchange_token_via_credential().await {
+        if let Some(token) = self.load_via_credential().await? {
             return Ok(Some(token));
         }
 
-        if let Ok(Some(token)) = self.exchange_token_via_vm_metadata().await {
+        if let Some(token) = self.load_via_vm_metadata().await? {
             return Ok(Some(token));
         }
 
         Ok(None)
     }
 
-    async fn exchange_token_via_customed_token_loader(&self) -> Result<Option<Token>> {
+    async fn load_via_customed_token_loader(&self) -> Result<Option<Token>> {
         match &self.customed_token_loader {
             Some(f) => f.load(self.client.clone()).await,
             None => Ok(None),
@@ -231,7 +231,7 @@ impl TokenLoader {
     /// Exchange token via Google OAuth2 Service.
     ///
     /// Reference: [Using OAuth 2.0 for Server to Server Applications](https://developers.google.com/identity/protocols/oauth2/service-account#authorizingrequests)
-    async fn exchange_token_via_credential(&self) -> Result<Option<Token>> {
+    async fn load_via_credential(&self) -> Result<Option<Token>> {
         let cred = if let Some(cred) = &self.credentials {
             cred
         } else {
@@ -265,7 +265,7 @@ impl TokenLoader {
     }
 
     /// Exchange token via vm metadata
-    async fn exchange_token_via_vm_metadata(&self) -> Result<Option<Token>> {
+    async fn load_via_vm_metadata(&self) -> Result<Option<Token>> {
         if self.disable_vm_metadata {
             return Ok(None);
         }
