@@ -62,10 +62,7 @@ mod azure;
 pub use azure::*;
 
 mod google;
-pub use google::Builder as GoogleBuilder;
-pub use google::Signer as GoogleSigner;
-pub use google::Token as GoogleToken;
-pub use google::TokenLoad as GoogleTokenLoad;
+pub use google::*;
 
 mod huaweicloud;
 pub use huaweicloud::obs::Builder as HuaweicloudObsBuilder;
@@ -74,6 +71,11 @@ pub use huaweicloud::obs::Signer as HuaweicloudObsSigner;
 mod tencent;
 pub use tencent::cos::Builder as TencentCosBuilder;
 pub use tencent::cos::Signer as TencentCosSigner;
+
+mod error;
+pub use error::Error;
+pub use error::ErrorKind;
+pub(crate) use error::Result;
 
 mod ctx;
 mod dirs;
