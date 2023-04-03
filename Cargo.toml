@@ -12,10 +12,43 @@ version = "0.8.5"
 all-features = true
 
 [features]
-native-tls = ["reqwest/default-tls"]
-rustls = ["reqwest/rustls-tls"]
+default = ["reqwest_request", "services-all"]
 
-reqwest_blocking_request = ["reqwest/blocking"]
+native-tls = ["reqwest?/default-tls"]
+rustls = ["reqwest?/rustls-tls"]
+
+# requests that reqwest supports
+reqwest_blocking_request = ["reqwest?/blocking"]
+reqwest_request = ["dep:reqwest"]
+
+# services that reqsign supports
+services-all = [
+  "services-aliyun",
+  "services-aws",
+  "services-azblob",
+  "services-google",
+  "services-huaweicloud",
+  "services-tencent",
+]
+
+services-aliyun = ["dep:reqwest", "dep:serde", "dep:serde_json"]
+services-aws = [
+  "dep:reqwest",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:quick-xml",
+  "dep:rust-ini",
+]
+services-azblob = ["dep:serde", "dep:serde_json"]
+services-google = [
+  "dep:reqwest",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:jsonwebtoken",
+  "dep:tokio",
+]
+services-huaweicloud = ["dep:serde", "dep:serde_json"]
+services-tencent = ["dep:serde", "dep:serde_json"]
 
 [[bench]]
 harness = false
@@ -24,7 +57,6 @@ name = "aws"
 [dependencies]
 anyhow = "1"
 async-trait = "0.1"
-backon = "0.4"
 base64 = "0.21"
 bytes = "1"
 dirs = "5"
@@ -32,21 +64,21 @@ form_urlencoded = "1"
 hex = "0.4"
 hmac = "0.12"
 http = "0.2"
-jsonwebtoken = "8"
+jsonwebtoken = { version = "8", optional = true }
 log = "0.4"
 once_cell = "1"
 percent-encoding = "2"
-quick-xml = { version = "0.28", features = ["serialize"] }
+quick-xml = { version = "0.28", features = ["serialize"], optional = true }
 rand = "0.8.5"
-reqwest = { version = "0.11", default-features = false }
+reqwest = { version = "0.11", default-features = false, optional = true }
 rsa = { version = "0.8.1", features = ["sha2"] }
-rust-ini = "0.18"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+rust-ini = { version = "0.18", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
 sha1 = "0.10"
 sha2 = "0.10"
 time = { version = "0.3", features = ["macros", "formatting", "parsing"] }
-tokio = { version = "1", features = ["fs"] }
+tokio = { version = "1", features = ["fs"], optional = true }
 
 [dev-dependencies]
 aws-sigv4 = "0.55"

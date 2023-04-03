@@ -45,29 +45,40 @@
 //!
 //! - `reqwest_request`: Enable to support signing [`reqwest::Request`]
 //! - `reqwest_blocking_request`: Enable to support signing [`reqwest::blocking::Request`]
-//! - `http_types_request`: Enable to support signing [`http_types::Request`]
 
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
 pub mod credential;
 
+#[cfg(feature = "services-aliyun")]
 mod aliyun;
+#[cfg(feature = "services-aliyun")]
 pub use aliyun::*;
 
+#[cfg(feature = "services-aws")]
 mod aws;
+#[cfg(feature = "services-aws")]
 pub use aws::*;
 
+#[cfg(feature = "services-azblob")]
 mod azure;
+#[cfg(feature = "services-azblob")]
 pub use azure::*;
 
+#[cfg(feature = "services-google")]
 mod google;
+#[cfg(feature = "services-google")]
 pub use google::*;
 
+#[cfg(feature = "services-huaweicloud")]
 mod huaweicloud;
+#[cfg(feature = "services-huaweicloud")]
 pub use huaweicloud::*;
 
+#[cfg(feature = "services-tencent")]
 mod tencent;
+#[cfg(feature = "services-tencent")]
 pub use tencent::*;
 
 mod ctx;
