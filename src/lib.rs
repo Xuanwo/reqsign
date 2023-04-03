@@ -59,8 +59,7 @@ mod aws;
 pub use aws::*;
 
 mod azure;
-pub use azure::storage::Builder as AzureStorageBuilder;
-pub use azure::storage::Signer as AzureStorageSigner;
+pub use azure::*;
 
 mod google;
 pub use google::Builder as GoogleBuilder;

@@ -7,10 +7,12 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
+use reqsign::AzureStorageConfig;
+use reqsign::AzureStorageLoader;
 use reqsign::AzureStorageSigner;
-use reqwest::blocking::Client;
+use reqwest::Client;
 
-fn init_signer() -> Option<AzureStorageSigner> {
+fn init_signer() -> Option<(AzureStorageLoader, AzureStorageSigner)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -21,27 +23,31 @@ fn init_signer() -> Option<AzureStorageSigner> {
         return None;
     }
 
-    let mut builder = AzureStorageSigner::builder();
-    builder.account_name(
-        &env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
-            .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),
-    );
-    builder.account_key(
-        &env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY")
-            .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_KEY must set"),
-    );
+    let config = AzureStorageConfig {
+        account_name: Some(
+            env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
+                .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),
+        ),
+        account_key: Some(
+            env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY")
+                .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_KEY must set"),
+        ),
+        ..Default::default()
+    };
 
-    Some(builder.build().expect("signer must be valid"))
+    let loader = AzureStorageLoader::new(config);
+
+    Some((loader, AzureStorageSigner::new()))
 }
 
-#[test]
-fn test_head_blob() -> Result<()> {
+#[tokio::test]
+async fn test_head_blob() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
     }
-    let signer = signer.unwrap();
+    let (loader, signer) = signer.unwrap();
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
@@ -51,13 +57,21 @@ fn test_head_blob() -> Result<()> {
     builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
     let mut req = builder.body("")?;
 
-    signer.sign(&mut req).expect("sign request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load credential must success")
+        .unwrap();
+    signer
+        .sign(&mut req, &cred)
+        .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
     let client = Client::new();
     let resp = client
         .execute(req.try_into()?)
+        .await
         .expect("request must success");
 
     debug!("got response: {:?}", resp);
@@ -65,14 +79,14 @@ fn test_head_blob() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_head_object_with_encoded_characters() -> Result<()> {
+#[tokio::test]
+async fn test_head_object_with_encoded_characters() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
     }
-    let signer = signer.unwrap();
+    let (loader, signer) = signer.unwrap();
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
@@ -85,13 +99,21 @@ fn test_head_object_with_encoded_characters() -> Result<()> {
         utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
-    signer.sign(&mut req).expect("sign request must success");
+    let cred = loader
+        .load()
+        .await
+        .expect("load credential must success")
+        .unwrap();
+    signer
+        .sign(&mut req, &cred)
+        .expect("sign request must success");
 
     debug!("signed request: {:?}", req);
 
     let client = Client::new();
     let resp = client
         .execute(req.try_into()?)
+        .await
         .expect("request must success");
 
     debug!("got response: {:?}", resp);
@@ -99,14 +121,14 @@ fn test_head_object_with_encoded_characters() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_list_blobs() -> Result<()> {
+#[tokio::test]
+async fn test_list_blobs() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
     }
-    let signer = signer.unwrap();
+    let (loader, signer) = signer.unwrap();
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
@@ -124,13 +146,21 @@ fn test_list_blobs() -> Result<()> {
         builder = builder.uri(format!("{url}?{query}"));
         let mut req = builder.body("")?;
 
-        signer.sign(&mut req).expect("sign request must success");
+        let cred = loader
+            .load()
+            .await
+            .expect("load credential must success")
+            .unwrap();
+        signer
+            .sign(&mut req, &cred)
+            .expect("sign request must success");
 
         debug!("signed request: {:?}", req);
 
         let client = Client::new();
         let resp = client
             .execute(req.try_into()?)
+            .await
             .expect("request must success");
 
         debug!("got response: {:?}", resp);
