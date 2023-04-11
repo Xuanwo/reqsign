@@ -29,7 +29,7 @@ async fn init_signer() -> Option<(GoogleCredentialLoader, GoogleTokenLoader, Goo
             .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE must set"),
         Client::new(),
     )
-    .with_credentials(cred_loader.load().await.unwrap().unwrap());
+    .with_credentials(cred_loader.load().unwrap().unwrap());
 
     let signer = GoogleSigner::new("storage");
 
@@ -127,7 +127,7 @@ async fn test_get_object_with_query() -> Result<()> {
     ));
     let mut req = builder.body("")?;
 
-    let cred = cred_loader.load().await?.unwrap();
+    let cred = cred_loader.load()?.unwrap();
     signer
         .sign_query(&mut req, Duration::from_secs(3600), &cred)
         .expect("sign request must success");
