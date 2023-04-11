@@ -71,7 +71,7 @@ pub struct Loader {
 
     allow_anonymous: bool,
     disable_ec2_metadata: bool,
-    customed_credential_loader: Option<Arc<dyn CredentialLoad>>,
+    customed_credential_loader: Option<Box<dyn CredentialLoad>>,
 
     loaded: AtomicBool,
     credential: Arc<Mutex<Option<Credential>>>,
@@ -111,7 +111,7 @@ impl Loader {
     /// Set customed credential loader.
     ///
     /// This loader will be used first.
-    pub fn with_customed_credential_loader(mut self, f: Arc<dyn CredentialLoad>) -> Self {
+    pub fn with_customed_credential_loader(mut self, f: Box<dyn CredentialLoad>) -> Self {
         self.customed_credential_loader = Some(f);
         self
     }
