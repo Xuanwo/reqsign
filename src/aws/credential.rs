@@ -9,6 +9,7 @@ use std::sync::Mutex;
 use anyhow::anyhow;
 use anyhow::Result;
 use async_trait::async_trait;
+use http::header::CONTENT_LENGTH;
 use quick_xml::de;
 use reqwest::Client;
 use serde::Deserialize;
@@ -201,6 +202,7 @@ impl Loader {
         let req = self
             .client
             .put(url)
+            .header(CONTENT_LENGTH, "0")
             .header("x-aws-ec2-metadata-token-ttl-seconds", "60");
         let resp = req.send().await?;
         if resp.status() != http::StatusCode::OK {
