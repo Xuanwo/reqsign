@@ -27,8 +27,6 @@ use crate::time::DateTime;
 pub struct Signer {
     /// whether to omit service version or not
     omit_service_version: bool,
-    /// Allow anonymous request if credential is not loaded.
-    allow_anonymous: bool,
     time: Option<DateTime>,
 }
 
@@ -36,12 +34,6 @@ impl Signer {
     /// Create a signer.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Allow anonymous access
-    pub fn allow_anonymous(mut self, value: bool) -> Self {
-        self.allow_anonymous = value;
-        self
     }
 
     /// set the signer to omitting service version
