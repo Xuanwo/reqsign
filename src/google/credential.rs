@@ -76,19 +76,19 @@ impl CredentialLoader {
     }
 
     fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Some(cred) = self.load_via_content()? {
+        if let Ok(Some(cred)) = self.load_via_content() {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_path()? {
+        if let Ok(Some(cred)) = self.load_via_path() {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_env()? {
+        if let Ok(Some(cred)) = self.load_via_env() {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_well_known_location()? {
+        if let Ok(Some(cred)) = self.load_via_well_known_location() {
             return Ok(Some(cred));
         }
 
