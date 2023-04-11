@@ -57,13 +57,13 @@ impl CredentialLoader {
     }
 
     /// Load credential from pre-configured methods.
-    pub async fn load(&self) -> Result<Option<Credential>> {
+    pub fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it has been loaded at least once.
         if let Some(cred) = self.credential.lock().expect("lock poisoned").clone() {
             return Ok(Some(cred));
         }
 
-        let cred = if let Some(cred) = self.load_inner().await? {
+        let cred = if let Some(cred) = self.load_inner()? {
             cred
         } else {
             return Ok(None);
@@ -75,34 +75,34 @@ impl CredentialLoader {
         Ok(Some(cred))
     }
 
-    async fn load_inner(&self) -> Result<Option<Credential>> {
+    fn load_inner(&self) -> Result<Option<Credential>> {
         if let Some(cred) = self.load_via_content()? {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_path().await? {
+        if let Some(cred) = self.load_via_path()? {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_env().await? {
+        if let Some(cred) = self.load_via_env()? {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_well_known_location().await? {
+        if let Some(cred) = self.load_via_well_known_location()? {
             return Ok(Some(cred));
         }
 
         Ok(None)
     }
 
-    async fn load_via_path(&self) -> Result<Option<Credential>> {
+    fn load_via_path(&self) -> Result<Option<Credential>> {
         let path = if let Some(path) = &self.path {
             path
         } else {
             return Ok(None);
         };
 
-        Ok(Some(Self::load_file(path).await?))
+        Ok(Some(Self::load_file(path)?))
     }
 
     /// Build credential loader from given base64 content.
@@ -121,13 +121,13 @@ impl CredentialLoader {
     }
 
     /// Load from env GOOGLE_APPLICATION_CREDENTIALS.
-    async fn load_via_env(&self) -> Result<Option<Credential>> {
+    fn load_via_env(&self) -> Result<Option<Credential>> {
         if self.disable_env {
             return Ok(None);
         }
 
         if let Ok(cred_path) = env::var(GOOGLE_APPLICATION_CREDENTIALS) {
-            let cred = Self::load_file(&cred_path).await?;
+            let cred = Self::load_file(&cred_path)?;
             Ok(Some(cred))
         } else {
             Ok(None)
@@ -138,7 +138,7 @@ impl CredentialLoader {
     ///
     /// - `$HOME/.config/gcloud/application_default_credentials.json`
     /// - `%APPDATA%\gcloud\application_default_credentials.json`
-    async fn load_via_well_known_location(&self) -> Result<Option<Credential>> {
+    fn load_via_well_known_location(&self) -> Result<Option<Credential>> {
         if self.disable_well_known_location {
             return Ok(None);
         }
@@ -156,14 +156,13 @@ impl CredentialLoader {
 
         let cred = Self::load_file(&format!(
             "{config_dir}/gcloud/application_default_credentials.json"
-        ))
-        .await?;
+        ))?;
         Ok(Some(cred))
     }
 
     /// Build credential loader from given path.
-    async fn load_file(path: &str) -> Result<Credential> {
-        let content = tokio::fs::read(path).await.map_err(|err| {
+    fn load_file(path: &str) -> Result<Credential> {
+        let content = std::fs::read(path).map_err(|err| {
             debug!("load credential failed at reading file: {err:?}");
             err
         })?;
@@ -209,7 +208,6 @@ mod tests {
 
                     let cred = cred_loader
                         .load()
-                        .await
                         .expect("credentail must be exist")
                         .unwrap();
 

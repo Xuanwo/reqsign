@@ -356,7 +356,7 @@ mod tests {
         );
 
         let loader = CredentialLoader::default().with_path(&credential_path);
-        let cred = loader.load().await?.unwrap();
+        let cred = loader.load()?.unwrap();
 
         let signer = Signer::new("storage");
 
@@ -385,7 +385,7 @@ mod tests {
         );
 
         let loader = CredentialLoader::default().with_path(&credential_path);
-        let cred = loader.load().await?.unwrap();
+        let cred = loader.load()?.unwrap();
 
         let mut req = http::Request::new("");
         *req.method_mut() = http::Method::GET;
