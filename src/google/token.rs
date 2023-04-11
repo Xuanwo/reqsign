@@ -172,11 +172,8 @@ impl TokenLoader {
     }
 
     /// Set the customed token loader for token loader.
-    pub fn with_customed_token_loader<T: TokenLoad + 'static>(
-        mut self,
-        customed_token_loader: T,
-    ) -> Self {
-        self.customed_token_loader = Some(Box::new(customed_token_loader));
+    pub fn with_customed_token_loader(mut self, customed_token_loader: Box<dyn TokenLoad>) -> Self {
+        self.customed_token_loader = Some(customed_token_loader);
         self
     }
 
