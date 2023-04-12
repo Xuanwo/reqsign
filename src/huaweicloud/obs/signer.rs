@@ -247,9 +247,9 @@ fn canonicalize_resource(
     let params_str = SigningContext::query_to_string(params, "=", "&");
 
     if params_str.is_empty() {
-        format!("/{bucket}{}", ctx.path_percent_decoded())
+        format!("/{bucket}{}", ctx.path)
     } else {
-        format!("/{bucket}{}?{params_str}", ctx.path_percent_decoded())
+        format!("/{bucket}{}?{params_str}", ctx.path)
     }
 }
 
