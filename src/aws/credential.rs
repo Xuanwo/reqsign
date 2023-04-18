@@ -10,6 +10,7 @@ use anyhow::anyhow;
 use anyhow::Result;
 use async_trait::async_trait;
 use http::header::CONTENT_LENGTH;
+use log::debug;
 use quick_xml::de;
 use reqwest::Client;
 use serde::Deserialize;
@@ -146,23 +147,44 @@ impl Loader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Ok(Some(cred)) = self.load_via_customed_credential_load().await {
+        if let Ok(Some(cred)) = self
+            .load_via_customed_credential_load()
+            .await
+            .map_err(|err| debug!("load credential via customed_credential_load failed: {err:?}"))
+        {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_config() {
+        if let Ok(Some(cred)) = self
+            .load_via_config()
+            .map_err(|err| debug!("load credential via config failed: {err:?}"))
+        {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_assume_role_with_web_identity().await {
+        if let Ok(Some(cred)) = self
+            .load_via_assume_role_with_web_identity()
+            .await
+            .map_err(|err| {
+                debug!("load credential via assume_role_with_web_identity failed: {err:?}")
+            })
+        {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_assume_role().await {
+        if let Ok(Some(cred)) = self
+            .load_via_assume_role()
+            .await
+            .map_err(|err| debug!("load credential via assume_role failed: {err:?}"))
+        {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self.load_via_imds_v2().await {
+        if let Ok(Some(cred)) = self
+            .load_via_imds_v2()
+            .await
+            .map_err(|err| debug!("load credential via imds_v2 failed: {err:?}"))
+        {
             return Ok(Some(cred));
         }
 
