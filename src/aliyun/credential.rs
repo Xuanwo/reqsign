@@ -4,6 +4,7 @@ use std::sync::Mutex;
 
 use anyhow::anyhow;
 use anyhow::Result;
+use log::debug;
 use reqwest::Client;
 use serde::Deserialize;
 
@@ -88,11 +89,18 @@ impl Loader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Some(cred) = self.load_via_static()? {
+        if let Ok(Some(cred)) = self
+            .load_via_static()
+            .map_err(|err| debug!("load credential via static failed: {err:?}"))
+        {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_assume_role_with_oidc().await? {
+        if let Ok(Some(cred)) = self
+            .load_via_assume_role_with_oidc()
+            .await
+            .map_err(|err| debug!("load credential load via assume_role_with_oidc: {err:?}"))
+        {
             return Ok(Some(cred));
         }
 
