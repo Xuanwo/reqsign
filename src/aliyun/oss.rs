@@ -194,8 +194,10 @@ fn canonicalize_resource(
     if let SigningMethod::Query(_) = method {
         // Insert security token
         if let Some(token) = &cred.security_token {
-            ctx.query
-                .push(("security-token".to_string(), token.to_string()));
+            ctx.query.push((
+                "security-token".to_string(),
+                utf8_percent_encode(token, percent_encoding::NON_ALPHANUMERIC).to_string(),
+            ));
         };
     }
 
