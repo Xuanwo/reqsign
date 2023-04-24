@@ -79,6 +79,36 @@ impl SigningContext {
         s
     }
 
+    /// Convert sorted query to percent decoded string.
+    ///
+    /// ```shell
+    /// [(a, b), (c, d)] => "a:b\nc:d"
+    /// ```
+    pub fn query_to_percent_decoded_string(
+        mut query: Vec<(String, String)>,
+        sep: &str,
+        join: &str,
+    ) -> String {
+        let mut s = String::with_capacity(16);
+
+        // Sort via header name.
+        query.sort();
+
+        for (idx, (k, v)) in query.into_iter().enumerate() {
+            if idx != 0 {
+                s.push_str(join);
+            }
+
+            s.push_str(&k);
+            if !v.is_empty() {
+                s.push_str(sep);
+                s.push_str(&percent_encoding::percent_decode_str(&v).decode_utf8_lossy());
+            }
+        }
+
+        s
+    }
+
     #[inline]
     pub fn header_get_or_default(&self, key: &HeaderName) -> Result<&str> {
         match self.headers.get(key) {

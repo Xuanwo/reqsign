@@ -187,7 +187,7 @@ mod tests {
     use std::str::FromStr;
     use std::time::Duration;
 
-    use http::Request;
+    use http::{Request, StatusCode};
     use log::debug;
     use once_cell::sync::Lazy;
     use reqwest::blocking::Client;
@@ -390,6 +390,17 @@ mod tests {
 
                     debug!("signed request url: {:?}", req.uri().to_string());
                     debug!("signed request: {:?}", req);
+
+                    let client = reqwest::Client::new();
+                    let resp = client
+                        .execute(req.try_into().unwrap())
+                        .await
+                        .expect("request must succeed");
+
+                    let status = resp.status();
+                    debug!("got response: {:?}", resp);
+                    debug!("got response content: {}", resp.text().await.unwrap());
+                    assert_eq!(StatusCode::NOT_FOUND, status);
                 })
             },
         );
