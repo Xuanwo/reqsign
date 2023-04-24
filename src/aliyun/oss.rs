@@ -203,7 +203,8 @@ fn canonicalize_resource(
 
     let params = ctx.query_to_vec_with_filter(is_sub_resource);
 
-    let params_str = SigningContext::query_to_string(params, "=", "&");
+    // OSS requires that the query string be percent-decoded.
+    let params_str = SigningContext::query_to_percent_decoded_string(params, "=", "&");
 
     if params_str.is_empty() {
         format!("/{bucket}{}", ctx.path_percent_decoded())

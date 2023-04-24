@@ -187,7 +187,7 @@ mod tests {
     use std::str::FromStr;
     use std::time::Duration;
 
-    use http::Request;
+    use http::{Request, StatusCode};
     use log::debug;
     use once_cell::sync::Lazy;
     use reqwest::blocking::Client;
@@ -298,10 +298,45 @@ mod tests {
             ],
             || {
                 RUNTIME.block_on(async {
-                    let l = Loader::new(reqwest::Client::new(), Config::default().from_env());
-                    let x = l.load().await.expect("credential must be valid").unwrap();
+                    let config = Config::default().from_env();
+                    let loader = Loader::new(reqwest::Client::new(), config);
 
-                    assert!(x.is_valid());
+                    let signer = Signer::new(
+                        &env::var("REQSIGN_ALIYUN_OSS_BUCKET")
+                            .expect("env REQSIGN_ALIYUN_OSS_BUCKET must set"),
+                    );
+
+                    let url = &env::var("REQSIGN_ALIYUN_OSS_URL")
+                        .expect("env REQSIGN_ALIYUN_OSS_URL must set");
+
+                    let mut req = Request::new("");
+                    *req.method_mut() = http::Method::GET;
+                    *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))
+                        .expect("must valid");
+
+                    let cred = loader
+                        .load()
+                        .await
+                        .expect("credential must be valid")
+                        .unwrap();
+
+                    signer
+                        .sign(&mut req, &cred)
+                        .expect("sign request must success");
+
+                    debug!("signed request url: {:?}", req.uri().to_string());
+                    debug!("signed request: {:?}", req);
+
+                    let client = reqwest::Client::new();
+                    let resp = client
+                        .execute(req.try_into().unwrap())
+                        .await
+                        .expect("request must succeed");
+
+                    let status = resp.status();
+                    debug!("got response: {:?}", resp);
+                    debug!("got response content: {}", resp.text().await.unwrap());
+                    assert_eq!(StatusCode::NOT_FOUND, status);
                 })
             },
         );
@@ -390,6 +425,17 @@ mod tests {
 
                     debug!("signed request url: {:?}", req.uri().to_string());
                     debug!("signed request: {:?}", req);
+
+                    let client = reqwest::Client::new();
+                    let resp = client
+                        .execute(req.try_into().unwrap())
+                        .await
+                        .expect("request must succeed");
+
+                    let status = resp.status();
+                    debug!("got response: {:?}", resp);
+                    debug!("got response content: {}", resp.text().await.unwrap());
+                    assert_eq!(StatusCode::NOT_FOUND, status);
                 })
             },
         );
