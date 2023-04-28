@@ -13,6 +13,7 @@ use reqsign::AwsConfig;
 use reqsign::AwsLoader;
 use reqsign::AwsV4Signer;
 use reqwest::Client;
+use sha2::{Digest, Sha256};
 
 fn init_signer() -> Option<(AwsLoader, AwsV4Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -98,8 +99,14 @@ async fn test_put_object_with_query() -> Result<()> {
     let (loader, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+    let body = "Hello, World!";
+    let body_digest = hex::encode(Sha256::digest(body).as_slice());
 
-    let mut req = Request::new("Hello, World!");
+    let mut req = Request::new(body);
+    req.headers_mut().insert(
+        "x-amz-content-sha256",
+        body_digest.parse().expect("parse digest failed"),
+    );
     *req.method_mut() = http::Method::PUT;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "put_object_test"))?;
 
