@@ -72,7 +72,7 @@ percent-encoding = "2"
 quick-xml = { version = "0.28", features = ["serialize"], optional = true }
 rand = "0.8.5"
 reqwest = { version = "0.11", default-features = false, optional = true }
-rsa = { version = "0.8.1", features = ["sha2"] }
+rsa = { version = "0.9.0", features = ["sha2"] }
 rust-ini = { version = "0.18", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
