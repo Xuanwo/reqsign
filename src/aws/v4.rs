@@ -248,8 +248,12 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
     }
     writeln!(f)?;
     writeln!(f, "{}", signed_headers.join(";"))?;
-    // TODO: we should support user specify payload hash.
-    write!(f, "UNSIGNED-PAYLOAD")?;
+
+    if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
+        write!(f, "UNSIGNED-PAYLOAD")?;
+    } else {
+        write!(f, "{}", ctx.headers[X_AMZ_CONTENT_SHA_256].to_str()?)?;
+    }
 
     Ok(f)
 }
@@ -476,6 +480,28 @@ mod tests {
         req
     }
 
+    fn test_put_request_with_body_digest() -> http::Request<&'static str> {
+        let content = "Hello,World!";
+        let mut req = http::Request::new(content);
+        *req.method_mut() = http::Method::PUT;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+
+        req.headers_mut().insert(
+            header::CONTENT_LENGTH,
+            HeaderValue::from_str(&content.len().to_string()).expect("must be valid"),
+        );
+
+        let body = hex_sha256(content.as_bytes());
+        req.headers_mut().insert(
+            "x-amz-content-sha256",
+            HeaderValue::from_str(&body).expect("must be valid"),
+        );
+
+        req
+    }
+
     fn test_put_request_virtual_host() -> http::Request<&'static str> {
         let content = "Hello,World!";
         let mut req = http::Request::new(content);
@@ -501,6 +527,7 @@ mod tests {
             test_get_request_with_query_virtual_host,
             test_put_request,
             test_put_request_virtual_host,
+            test_put_request_with_body_digest,
         ]
     }
 
@@ -567,13 +594,13 @@ mod tests {
                 .build()
                 .expect("signing params must be valid");
 
+            let mut body = SignableBody::UnsignedPayload;
+            if req.headers().get(X_AMZ_CONTENT_SHA_256).is_some() {
+                body = SignableBody::Bytes(req.body().as_bytes());
+            }
+
             let output = aws_sigv4::http_request::sign(
-                SignableRequest::new(
-                    req.method(),
-                    req.uri(),
-                    req.headers(),
-                    SignableBody::UnsignedPayload,
-                ),
+                SignableRequest::new(req.method(), req.uri(), req.headers(), body),
                 &sp,
             )
             .expect("signing must succeed");
@@ -634,13 +661,13 @@ mod tests {
                 .build()
                 .expect("signing params must be valid");
 
+            let mut body = SignableBody::UnsignedPayload;
+            if req.headers().get(X_AMZ_CONTENT_SHA_256).is_some() {
+                body = SignableBody::Bytes(req.body().as_bytes());
+            }
+
             let output = aws_sigv4::http_request::sign(
-                SignableRequest::new(
-                    req.method(),
-                    req.uri(),
-                    req.headers(),
-                    SignableBody::UnsignedPayload,
-                ),
+                SignableRequest::new(req.method(), req.uri(), req.headers(), body),
                 &sp,
             )
             .expect("signing must succeed");
@@ -700,13 +727,13 @@ mod tests {
                 .build()
                 .expect("signing params must be valid");
 
+            let mut body = SignableBody::UnsignedPayload;
+            if req.headers().get(X_AMZ_CONTENT_SHA_256).is_some() {
+                body = SignableBody::Bytes(req.body().as_bytes());
+            }
+
             let output = aws_sigv4::http_request::sign(
-                SignableRequest::new(
-                    req.method(),
-                    req.uri(),
-                    req.headers(),
-                    SignableBody::UnsignedPayload,
-                ),
+                SignableRequest::new(req.method(), req.uri(), req.headers(), body),
                 &sp,
             )
             .expect("signing must succeed");
@@ -769,13 +796,13 @@ mod tests {
                 .build()
                 .expect("signing params must be valid");
 
+            let mut body = SignableBody::UnsignedPayload;
+            if req.headers().get(X_AMZ_CONTENT_SHA_256).is_some() {
+                body = SignableBody::Bytes(req.body().as_bytes());
+            }
+
             let output = aws_sigv4::http_request::sign(
-                SignableRequest::new(
-                    req.method(),
-                    req.uri(),
-                    req.headers(),
-                    SignableBody::UnsignedPayload,
-                ),
+                SignableRequest::new(req.method(), req.uri(), req.headers(), body),
                 &sp,
             )
             .expect("signing must succeed");
