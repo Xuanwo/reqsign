@@ -58,7 +58,6 @@ name = "aws"
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.21"
-bytes = "1"
 chrono = "0.4.24"
 form_urlencoded = "1"
 hex = "0.4"
@@ -73,7 +72,6 @@ quick-xml = { version = "0.28", features = ["serialize"], optional = true }
 rand = "0.8.5"
 reqwest = { version = "0.11", default-features = false, optional = true }
 rsa = { version = "0.8.1", features = ["sha2"] }
-rust-ini = { version = "0.18", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 sha1 = "0.10"
