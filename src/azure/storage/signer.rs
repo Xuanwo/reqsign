@@ -73,7 +73,7 @@ impl Signer {
                     let signer = account_sas::AccountSharedAccessSignature::new(
                         ak.to_string(),
                         sk.to_string(),
-                        time::add_minutes(time::now(), 15),
+                        time::now() + chrono::Duration::minutes(15),
                     );
 
                     signer.token().iter().for_each(|(k, v)| {

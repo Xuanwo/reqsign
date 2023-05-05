@@ -105,11 +105,8 @@ mod tests {
     #[test]
     fn test_can_generate_sas_token() {
         let key = hash::base64_encode("key".as_bytes());
-        let sign = AccountSharedAccessSignature::new(
-            "account".to_string(),
-            key,
-            time::add_minutes(test_time(), 5),
-        );
+        let expiry = test_time() + chrono::Duration::minutes(5);
+        let sign = AccountSharedAccessSignature::new("account".to_string(), key, expiry);
         let token = sign
             .token()
             .iter()
