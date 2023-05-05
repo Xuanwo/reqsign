@@ -90,6 +90,17 @@ pub fn parse_rfc3339(s: &str) -> Result<DateTime> {
     Ok(chrono::DateTime::parse_from_rfc3339(s)?.with_timezone(&Utc))
 }
 
+/// Subtract minutes from time
+#[allow(dead_code)]
+pub fn sub_minutes(t: DateTime, minutes: i64) -> DateTime {
+    t - chrono::Duration::minutes(minutes)
+}
+
+/// Add minutes to time
+pub fn add_minutes(t: DateTime, minutes: i64) -> DateTime {
+    t + chrono::Duration::minutes(minutes)
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
@@ -135,5 +146,19 @@ mod tests {
         ] {
             assert_eq!(t, parse_rfc3339(v).expect("must be valid time"));
         }
+    }
+
+    #[test]
+    fn test_sub_minutes() {
+        let t = test_time();
+        assert_eq!("2022-03-01T08:02:34Z", format_rfc3339(sub_minutes(t, 10)));
+        assert_eq!("2022-03-01T07:02:34Z", format_rfc3339(sub_minutes(t, 70)));
+    }
+
+    #[test]
+    fn test_add_minutes() {
+        let t = test_time();
+        assert_eq!("2022-03-01T08:22:34Z", format_rfc3339(add_minutes(t, 10)));
+        assert_eq!("2022-03-01T09:22:34Z", format_rfc3339(add_minutes(t, 70)));
     }
 }
