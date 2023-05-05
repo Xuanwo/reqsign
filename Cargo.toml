@@ -39,7 +39,7 @@ services-aws = [
   "dep:quick-xml",
   "dep:rust-ini",
 ]
-services-azblob = ["dep:serde", "dep:serde_json", "dep:bitflags"]
+services-azblob = ["dep:serde", "dep:serde_json"]
 services-google = [
   "dep:reqwest",
   "dep:serde",
@@ -58,7 +58,6 @@ name = "aws"
 anyhow = "1"
 async-trait = "0.1"
 base64 = "0.21"
-bitflags = {version = "2.2.1", optional = true}
 chrono = "0.4.24"
 form_urlencoded = "1"
 hex = "0.4"
