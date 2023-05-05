@@ -10,10 +10,7 @@ use log::debug;
 
 use super::super::constants::*;
 use super::credential::Credential;
-use crate::azure::storage::sas::account_sas::{
-    AccountSasPermissions, AccountSasResource, AccountSasResourceType, AccountSharedAccessSignature,
-};
-use crate::azure::storage::sas::Protocol;
+use crate::azure::storage::sas::account_sas;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::base64_decode;
@@ -73,9 +70,13 @@ impl Signer {
             Credential::SharedKey(ak, sk) => match method {
                 SigningMethod::Query(_) => {
                     // try sign request use account_sas token
-                    let account_sas =
-                        create_default_account_sas_signature(ak.to_string(), sk.to_string());
-                    account_sas.token().iter().for_each(|(k, v)| {
+                    let signer = account_sas::AccountSharedAccessSignature::new(
+                        ak.to_string(),
+                        sk.to_string(),
+                        time::add_minutes(time::now(), 15),
+                    );
+
+                    signer.token().iter().for_each(|(k, v)| {
                         ctx.query_push(k, v);
                     });
                 }
@@ -139,31 +140,6 @@ impl Signer {
         let ctx = self.build(req, SigningMethod::Query(Duration::from_secs(1)), cred)?;
         req.apply(ctx)
     }
-}
-
-fn create_default_account_sas_signature(ak: String, sk: String) -> AccountSharedAccessSignature {
-    let mut a = AccountSharedAccessSignature::new(
-        ak,
-        sk,
-        AccountSasResource::Blob // bqtf
-            | AccountSasResource::Queue
-            | AccountSasResource::Table
-            | AccountSasResource::File,
-        AccountSasResourceType::Object // sco
-            | AccountSasResourceType::Container
-            | AccountSasResourceType::Service,
-        AccountSasPermissions::READ //rwdlacu
-            | AccountSasPermissions::WRITE
-            | AccountSasPermissions::DELETE
-            | AccountSasPermissions::LIST
-            | AccountSasPermissions::ADD
-            | AccountSasPermissions::CREATE
-            | AccountSasPermissions::UPDATE,
-        time::add_minutes(time::now(), 15), // expire time 15m
-    );
-    a.protocol(Protocol::Https);
-
-    a
 }
 
 /// Construct string to sign
