@@ -5,6 +5,7 @@ mod constants;
 mod credential;
 pub use credential::Credential as GoogleCredential;
 pub use credential::CredentialLoader as GoogleCredentialLoader;
+pub use credential::{external_account, service_account};
 
 mod token;
 pub use token::Token as GoogleToken;

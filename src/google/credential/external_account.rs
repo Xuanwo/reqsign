@@ -1,6 +1,7 @@
+//! An external account.
+
 pub use credential_source::{
-    CredentialSource, EnvironmentSourcedCredentials, ExecutableSourcedCredentials,
-    FileSourcedCredentials, FormatType, UrlSourcedCredentials,
+    CredentialSource, FileSourcedCredentials, FormatType, UrlSourcedCredentials,
 };
 use serde::Deserialize;
 
@@ -9,6 +10,7 @@ use serde::Deserialize;
 /// Reference: https://google.aip.dev/auth/4117#expected-behavior.
 #[derive(Clone, Deserialize)]
 #[cfg_attr(test, derive(Debug))]
+#[serde(rename_all = "snake_case")]
 pub struct ExternalAccount {
     /// This is the STS audience containing the resource name for the workload
     /// identity pool and provider identifier.
@@ -28,9 +30,12 @@ pub struct ExternalAccount {
     pub credential_source: CredentialSource,
 }
 
+/// Extra information about the impersonation exchange.
 #[derive(Clone, Deserialize)]
 #[cfg_attr(test, derive(Debug))]
+#[serde(rename_all = "snake_case")]
 pub struct ServiceAccountImpersonation {
+    /// The lifetime in seconds to be used when exchanging the STS token.
     pub token_lifetime_seconds: Option<usize>,
 }
 
@@ -45,29 +50,35 @@ mod credential_source {
     use serde::Deserialize;
     use serde_json::Value;
 
+    /// An instruction on how to load a token for the local environment.
+    ///
+    /// **NOTE:** environment and executable sources are not yet supported.
     #[derive(Clone, Deserialize)]
     #[cfg_attr(test, derive(Debug))]
     #[serde(untagged)]
     pub enum CredentialSource {
-        EnvironmentSourced(EnvironmentSourcedCredentials),
-        ExecutableSourced {
-            executable: ExecutableSourcedCredentials,
-        },
+        /// An OIDC token provided via file.
         FileSourced(FileSourcedCredentials),
+        /// An OIDC token provided via a URL.
         UrlSourced(UrlSourcedCredentials),
     }
 
+    /// A source format type.
     #[derive(Clone, Debug, Default, Deserialize)]
     #[serde(rename_all = "snake_case", tag = "type")]
     pub enum FormatType {
+        /// A raw token.
         #[default]
         Text,
+        /// A JSON payload containing the token.
         Json {
+            /// The field containing the token.
             subject_token_field_name: String,
         },
     }
 
     impl FormatType {
+        /// Parse a slice of bytes as the expected format.
         pub fn parse(&self, slice: &[u8]) -> Result<String> {
             match &self {
                 Self::Text => Ok(String::from_utf8(slice.to_vec())?),
@@ -87,38 +98,29 @@ mod credential_source {
         }
     }
 
+    /// A file sourced OIDC token.
     #[derive(Clone, Deserialize)]
     #[cfg_attr(test, derive(Debug))]
-    pub struct EnvironmentSourcedCredentials {
-        pub environment_id: String,
-        pub region_url: String,
-        pub regional_red_verification_url: String,
-        pub url: Option<String>,
-        pub imdsv2_session_token_url: Option<String>,
-    }
-
-    #[derive(Clone, Deserialize)]
-    #[cfg_attr(test, derive(Debug))]
-    pub struct ExecutableSourcedCredentials {
-        pub command: String,
-        pub timeout_millis: Option<i64>,
-        pub output_file: Option<String>,
-    }
-
-    #[derive(Clone, Deserialize)]
-    #[cfg_attr(test, derive(Debug))]
+    #[serde(rename_all = "snake_case")]
     pub struct FileSourcedCredentials {
+        /// The file containing the token.
         pub file: String,
+        /// The format of the file.
         #[serde(default)]
         pub format: FormatType,
     }
 
+    /// A URL sourced OIDC token. Used by Azure and other OIDC providers.
     #[derive(Clone, Deserialize)]
     #[cfg_attr(test, derive(Debug))]
+    #[serde(rename_all = "snake_case")]
     pub struct UrlSourcedCredentials {
+        /// The URL to where the POST request is made.
         pub url: String,
+        /// The headers to be injected in the request.
         #[serde(default)]
         pub headers: HashMap<String, String>,
+        /// The format of the response payload.
         #[serde(default)]
         pub format: FormatType,
     }
