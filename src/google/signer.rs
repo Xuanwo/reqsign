@@ -343,10 +343,9 @@ mod tests {
     use chrono::Utc;
     use pretty_assertions::assert_eq;
 
-    use super::{
-        super::credential::{Credential, CredentialLoader},
-        *,
-    };
+    use crate::google::credential::CredentialAccount;
+
+    use super::{super::credential::CredentialLoader, *};
 
     #[tokio::test]
     async fn test_sign_query() -> Result<()> {
@@ -358,7 +357,7 @@ mod tests {
         );
 
         let loader = CredentialLoader::default().with_path(&credential_path);
-        let Credential::ServiceAccount(cred) = loader.load()?.unwrap() else {
+        let CredentialAccount::ServiceAccount(cred) = loader.load_account()?.unwrap() else {
             panic!("expected service account");
         };
 
@@ -389,7 +388,7 @@ mod tests {
         );
 
         let loader = CredentialLoader::default().with_path(&credential_path);
-        let Credential::ServiceAccount(cred) = loader.load()?.unwrap() else {
+        let CredentialAccount::ServiceAccount(cred) = loader.load_account()?.unwrap() else {
             panic!("expected service account");
         };
 

@@ -5,7 +5,9 @@ use http::header::ACCEPT;
 use log::error;
 use serde::Deserialize;
 
-use crate::google::credential::{external_account::CredentialSource, Credential, ExternalAccount};
+use crate::google::credential::{
+    external_account::CredentialSource, CredentialAccount, ExternalAccount,
+};
 
 use super::{Token, TokenLoader};
 
@@ -96,7 +98,7 @@ impl TokenLoader {
     ///
     /// Reference: [External Account Credentials (Workload Identity Federation)](https://google.aip.dev/auth/4117)
     pub(super) async fn load_via_external_account(&self) -> Result<Option<Token>> {
-        let cred = if let Some(Credential::ExternalAccount(cred)) = &self.credential {
+        let cred = if let Some(CredentialAccount::ExternalAccount(cred)) = &self.credential {
             cred
         } else {
             return Ok(None);

@@ -5,6 +5,7 @@ use std::env;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use anyhow::bail;
 use anyhow::Result;
 use log::debug;
 
@@ -14,16 +15,19 @@ pub use self::service_account::ServiceAccount;
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
 
-/// A Google credential, either a service or an external account.
+/// A Google credential account, either a service or an external account.
 #[derive(Clone, serde::Deserialize)]
 #[cfg_attr(test, derive(Debug))]
 #[serde(rename_all = "snake_case", tag = "type")]
-pub enum Credential {
+pub enum CredentialAccount {
     /// An external account, used by a Workload Identity User.
     ExternalAccount(ExternalAccount),
     /// A service account.
     ServiceAccount(ServiceAccount),
 }
+
+/// An alias to the new [`ServiceAccount`] type.
+pub type Credential = ServiceAccount;
 
 /// CredentialLoader will load credential from different methods.
 #[derive(Default)]
@@ -34,7 +38,7 @@ pub struct CredentialLoader {
     disable_env: bool,
     disable_well_known_location: bool,
 
-    credential: Arc<Mutex<Option<Credential>>>,
+    credential: Arc<Mutex<Option<CredentialAccount>>>,
 }
 
 impl CredentialLoader {
@@ -64,6 +68,17 @@ impl CredentialLoader {
 
     /// Load credential from pre-configured methods.
     pub fn load(&self) -> Result<Option<Credential>> {
+        match self.load_account()? {
+            Some(CredentialAccount::ServiceAccount(credential)) => Ok(Some(credential)),
+            Some(CredentialAccount::ExternalAccount(_)) => {
+                bail!("expected service account, got external account")
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Load account from pre-configured methods.
+    pub fn load_account(&self) -> Result<Option<CredentialAccount>> {
         // Return cached credential if it has been loaded at least once.
         if let Some(cred) = self.credential.lock().expect("lock poisoned").clone() {
             return Ok(Some(cred));
@@ -81,7 +96,7 @@ impl CredentialLoader {
         Ok(Some(cred))
     }
 
-    fn load_inner(&self) -> Result<Option<Credential>> {
+    fn load_inner(&self) -> Result<Option<CredentialAccount>> {
         if let Ok(Some(cred)) = self.load_via_content() {
             return Ok(Some(cred));
         }
@@ -101,7 +116,7 @@ impl CredentialLoader {
         Ok(None)
     }
 
-    fn load_via_path(&self) -> Result<Option<Credential>> {
+    fn load_via_path(&self) -> Result<Option<CredentialAccount>> {
         let path = if let Some(path) = &self.path {
             path
         } else {
@@ -112,7 +127,7 @@ impl CredentialLoader {
     }
 
     /// Build credential loader from given base64 content.
-    fn load_via_content(&self) -> Result<Option<Credential>> {
+    fn load_via_content(&self) -> Result<Option<CredentialAccount>> {
         let content = if let Some(content) = &self.content {
             content
         } else {
@@ -127,7 +142,7 @@ impl CredentialLoader {
     }
 
     /// Load from env GOOGLE_APPLICATION_CREDENTIALS.
-    fn load_via_env(&self) -> Result<Option<Credential>> {
+    fn load_via_env(&self) -> Result<Option<CredentialAccount>> {
         if self.disable_env {
             return Ok(None);
         }
@@ -144,7 +159,7 @@ impl CredentialLoader {
     ///
     /// - `$HOME/.config/gcloud/application_default_credentials.json`
     /// - `%APPDATA%\gcloud\application_default_credentials.json`
-    fn load_via_well_known_location(&self) -> Result<Option<Credential>> {
+    fn load_via_well_known_location(&self) -> Result<Option<CredentialAccount>> {
         if self.disable_well_known_location {
             return Ok(None);
         }
@@ -167,7 +182,7 @@ impl CredentialLoader {
     }
 
     /// Build credential loader from given path.
-    fn load_file(path: &str) -> Result<Credential> {
+    fn load_file(path: &str) -> Result<CredentialAccount> {
         let content = std::fs::read(path).map_err(|err| {
             debug!("load credential failed at reading file: {err:?}");
             err
@@ -205,11 +220,11 @@ mod tests {
                 let cred_loader = CredentialLoader::default();
 
                 let cred = cred_loader
-                    .load()
+                    .load_account()
                     .expect("credentail must be exist")
                     .unwrap();
 
-                let Credential::ServiceAccount(cred) = cred else {
+                let CredentialAccount::ServiceAccount(cred) = cred else {
                         panic!("expected service account");
                     };
 
@@ -253,11 +268,11 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
                 let cred_loader = CredentialLoader::default();
 
                 let cred = cred_loader
-                    .load()
+                    .load_account()
                     .expect("credentail must be exist")
                     .unwrap();
 
-                let Credential::ExternalAccount(cred) = cred else {
+                let CredentialAccount::ExternalAccount(cred) = cred else {
                         panic!("expected external account");
                     };
 

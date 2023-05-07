@@ -3,14 +3,16 @@ use http::header;
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use log::error;
 
-use super::{Claims, Credential, Token, TokenLoader};
+use crate::google::credential::CredentialAccount;
+
+use super::{Claims, Token, TokenLoader};
 
 impl TokenLoader {
     /// Exchange token via Google OAuth2 Service.
     ///
     /// Reference: [Using OAuth 2.0 for Server to Server Applications](https://developers.google.com/identity/protocols/oauth2/service-account#authorizingrequests)
     pub(super) async fn load_via_service_account(&self) -> Result<Option<Token>> {
-        let cred = if let Some(Credential::ServiceAccount(cred)) = &self.credential {
+        let cred = if let Some(CredentialAccount::ServiceAccount(cred)) = &self.credential {
             cred
         } else {
             return Ok(None);
