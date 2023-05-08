@@ -1,5 +1,6 @@
 use std::env;
 use std::str::FromStr;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::StatusCode;
@@ -7,9 +8,8 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign::AzureStorageConfig;
-use reqsign::AzureStorageLoader;
 use reqsign::AzureStorageSigner;
+use reqsign::{AzureStorageConfig, AzureStorageLoader};
 use reqwest::Client;
 
 fn init_signer() -> Option<(AzureStorageLoader, AzureStorageSigner)> {
@@ -122,7 +122,7 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_list_blobs() -> Result<()> {
+async fn test_list_container_blobs() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
@@ -156,6 +156,93 @@ async fn test_list_blobs() -> Result<()> {
             .expect("sign request must success");
 
         debug!("signed request: {:?}", req);
+
+        let client = Client::new();
+        let resp = client
+            .execute(req.try_into()?)
+            .await
+            .expect("request must success");
+
+        debug!("got response: {:?}", resp);
+        assert_eq!(StatusCode::OK, resp.status());
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_can_head_blob_with_sas() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
+        return Ok(());
+    }
+    let (loader, signer) = signer.unwrap();
+
+    let url =
+        &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
+
+    let mut builder = http::Request::builder();
+    builder = builder.method(http::Method::HEAD);
+    builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
+    let mut req = builder.body("")?;
+
+    let cred = loader
+        .load()
+        .await
+        .expect("load credential must success")
+        .unwrap();
+    signer
+        .sign_query(&mut req, Duration::from_secs(60), &cred)
+        .expect("sign request must success");
+
+    println!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .await
+        .expect("request must success");
+
+    println!("got response: {:?}", resp);
+    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_can_list_container_blobs() -> Result<()> {
+    // API https://learn.microsoft.com/en-us/rest/api/storageservices/list-blobs?tabs=azure-ad
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
+        return Ok(());
+    }
+    let (loader, signer) = signer.unwrap();
+
+    let url =
+        &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
+
+    for query in [
+        // Without prefix
+        "restype=container&comp=list",
+        // With not encoded prefix
+        "restype=container&comp=list&prefix=test/path/to/dir",
+        // With encoded prefix
+        "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
+    ] {
+        let mut builder = http::Request::builder();
+        builder = builder.method(http::Method::GET);
+        builder = builder.uri(format!("{url}?{query}"));
+        let mut req = builder.body("")?;
+
+        let cred = loader
+            .load()
+            .await
+            .expect("load credential must success")
+            .unwrap();
+        signer
+            .sign_query(&mut req, Duration::from_secs(60), &cred)
+            .expect("sign request must success");
 
         let client = Client::new();
         let resp = client

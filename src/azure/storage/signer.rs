@@ -4,13 +4,13 @@ use std::fmt::Debug;
 use std::fmt::Write;
 use std::time::Duration;
 
-use anyhow::anyhow;
 use anyhow::Result;
 use http::header::*;
 use log::debug;
 
 use super::super::constants::*;
 use super::credential::Credential;
+use crate::azure::storage::sas::account_sas;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::base64_decode;
@@ -68,8 +68,17 @@ impl Signer {
                 return Ok(ctx);
             }
             Credential::SharedKey(ak, sk) => match method {
-                SigningMethod::Query(_) => {
-                    return Err(anyhow!("SAS token is required for query signing"));
+                SigningMethod::Query(d) => {
+                    // try sign request use account_sas token
+                    let signer = account_sas::AccountSharedAccessSignature::new(
+                        ak.to_string(),
+                        sk.to_string(),
+                        time::now() + chrono::Duration::from_std(d)?,
+                    );
+
+                    signer.token().iter().for_each(|(k, v)| {
+                        ctx.query_push(k, v);
+                    });
                 }
                 SigningMethod::Header => {
                     let now = self.time.unwrap_or_else(time::now);
@@ -127,8 +136,13 @@ impl Signer {
     }
 
     /// Signing request with query.
-    pub fn sign_query(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Query(Duration::from_secs(1)), cred)?;
+    pub fn sign_query(
+        &self,
+        req: &mut impl SignableRequest,
+        expire: Duration,
+        cred: &Credential,
+    ) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
         req.apply(ctx)
     }
 }
@@ -247,6 +261,7 @@ fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
 #[cfg(test)]
 mod tests {
     use http::Request;
+    use std::time::Duration;
 
     use super::super::config::Config;
     use crate::azure::storage::loader::Loader;
@@ -273,7 +288,9 @@ mod tests {
             .unwrap();
 
         // Signing request with Signer
-        assert!(signer.sign_query(&mut req, &cred).is_ok());
+        assert!(signer
+            .sign_query(&mut req, Duration::from_secs(1), &cred)
+            .is_ok());
         assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob?sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
     }
 }

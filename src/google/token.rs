@@ -1,17 +1,13 @@
+mod external_account;
+mod service_account;
+
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use anyhow::anyhow;
 use anyhow::Result;
 use async_trait::async_trait;
-use http::header;
-use http::StatusCode;
-use jsonwebtoken::Algorithm;
-use jsonwebtoken::EncodingKey;
-use jsonwebtoken::Header;
-use log::error;
 use reqwest::Client;
 use serde::Deserialize;
 use serde::Serialize;
@@ -110,7 +106,7 @@ pub trait TokenLoad: 'static + Send + Sync + Debug {
     /// - If succeed, return `Ok(Some(cred))`
     /// - If not found, return `Ok(None)`
     /// - If unexpected errors happened, return `Err(err)`
-    async fn load(&self, clinet: Client) -> Result<Option<Token>>;
+    async fn load(&self, client: Client) -> Result<Option<Token>>;
 }
 
 /// TokenLoader will load token from different methods.
@@ -119,7 +115,7 @@ pub struct TokenLoader {
     scope: String,
     client: Client,
 
-    credentials: Option<Credential>,
+    credential: Option<Credential>,
     disable_vm_metadata: bool,
     service_account: Option<String>,
     customed_token_loader: Option<Box<dyn TokenLoad>>,
@@ -144,7 +140,7 @@ impl TokenLoader {
             scope: scope.to_string(),
             client,
 
-            credentials: None,
+            credential: None,
             disable_vm_metadata: false,
             service_account: None,
             customed_token_loader: None,
@@ -155,7 +151,7 @@ impl TokenLoader {
 
     /// Set the credential for token loader.
     pub fn with_credentials(mut self, credentials: Credential) -> Self {
-        self.credentials = Some(credentials);
+        self.credential = Some(credentials);
         self
     }
 
@@ -205,7 +201,11 @@ impl TokenLoader {
             return Ok(Some(token));
         }
 
-        if let Some(token) = self.load_via_credential().await? {
+        if let Some(token) = self.load_via_service_account().await? {
+            return Ok(Some(token));
+        }
+
+        if let Some(token) = self.load_via_external_account().await? {
             return Ok(Some(token));
         }
 
@@ -221,42 +221,6 @@ impl TokenLoader {
             Some(f) => f.load(self.client.clone()).await,
             None => Ok(None),
         }
-    }
-
-    /// Exchange token via Google OAuth2 Service.
-    ///
-    /// Reference: [Using OAuth 2.0 for Server to Server Applications](https://developers.google.com/identity/protocols/oauth2/service-account#authorizingrequests)
-    async fn load_via_credential(&self) -> Result<Option<Token>> {
-        let cred = if let Some(cred) = &self.credentials {
-            cred
-        } else {
-            return Ok(None);
-        };
-
-        let jwt = jsonwebtoken::encode(
-            &Header::new(Algorithm::RS256),
-            &Claims::new(&cred.client_email, &self.scope),
-            &EncodingKey::from_rsa_pem(cred.private_key.as_bytes())?,
-        )?;
-
-        let resp = self
-            .client
-            .post("https://oauth2.googleapis.com/token")
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .form(&[
-                ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
-                ("assertion", &jwt),
-            ])
-            .send()
-            .await?;
-
-        if resp.status() != StatusCode::OK {
-            error!("exchange token got unexpected response: {:?}", resp);
-            return Err(anyhow!("exchange token failed: {}", resp.text().await?));
-        }
-
-        let token: Token = serde_json::from_slice(&resp.bytes().await?)?;
-        Ok(Some(token))
     }
 
     /// Exchange token via vm metadata
