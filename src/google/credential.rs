@@ -195,6 +195,8 @@ impl CredentialLoader {
 
 #[cfg(test)]
 mod tests {
+    use log::warn;
+
     use super::{
         external_account::{CredentialSource, FormatType},
         *,
@@ -290,5 +292,31 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
                 assert!(matches!(&source.format, FormatType::Json { .. }));
             },
         );
+    }
+
+    #[test]
+    fn loader_returns_external_account_from_github_oidc() {
+        let path = if let Ok(path) = env::var("REQSIGN_GOOGLE_CREDENTIAL_PATH") {
+            path
+        } else {
+            warn!("REQSIGN_GOOGLE_CREDENTIAL_PATH is not set, ignore");
+            return;
+        };
+
+        let cred_loader = CredentialLoader::default().with_path(&path);
+
+        let cred: ExternalAccount = cred_loader
+            .load()
+            .expect("credentail must be exist")
+            .unwrap()
+            .external_account
+            .unwrap();
+
+        assert_eq!(
+            "urn:ietf:params:oauth:token-type:jwt",
+            &cred.subject_token_type
+        );
+
+        assert_eq!("https://sts.googleapis.com/v1/token", &cred.token_url);
     }
 }

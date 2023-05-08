@@ -121,7 +121,7 @@ impl TokenLoader {
 mod credential_source {
     use std::io::Read;
 
-    use http::{HeaderMap, HeaderName, HeaderValue};
+    use http::{header::HeaderName, HeaderMap, HeaderValue};
 
     use super::*;
     use crate::external_account::{FileSourcedCredentials, UrlSourcedCredentials};
