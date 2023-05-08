@@ -46,6 +46,7 @@ services-google = [
   "dep:serde_json",
   "dep:jsonwebtoken",
   "dep:tokio",
+  "reqwest?/json",
 ]
 services-huaweicloud = ["dep:serde", "dep:serde_json"]
 services-tencent = ["dep:serde", "dep:serde_json"]

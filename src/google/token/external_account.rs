@@ -107,8 +107,8 @@ impl TokenLoader {
         let oidc_token =
             credential_source::load_oidc_token(&cred.credential_source, &self.client).await?;
 
-        let sts = load_security_token(&cred, &oidc_token, &self.client).await?;
-        let token = load_impersonated_token(&cred, sts.access_token(), &self.scope, &self.client)
+        let sts = load_security_token(cred, &oidc_token, &self.client).await?;
+        let token = load_impersonated_token(cred, sts.access_token(), &self.scope, &self.client)
             .await?
             .unwrap_or(sts);
 
