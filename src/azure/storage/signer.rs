@@ -68,12 +68,12 @@ impl Signer {
                 return Ok(ctx);
             }
             Credential::SharedKey(ak, sk) => match method {
-                SigningMethod::Query(_) => {
+                SigningMethod::Query(d) => {
                     // try sign request use account_sas token
                     let signer = account_sas::AccountSharedAccessSignature::new(
                         ak.to_string(),
                         sk.to_string(),
-                        time::now() + chrono::Duration::minutes(15),
+                        time::now() + chrono::Duration::from_std(d)?,
                     );
 
                     signer.token().iter().for_each(|(k, v)| {
@@ -136,8 +136,13 @@ impl Signer {
     }
 
     /// Signing request with query.
-    pub fn sign_query(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Query(Duration::from_secs(1)), cred)?;
+    pub fn sign_query(
+        &self,
+        req: &mut impl SignableRequest,
+        expire: Duration,
+        cred: &Credential,
+    ) -> Result<()> {
+        let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
         req.apply(ctx)
     }
 }
@@ -256,6 +261,7 @@ fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
 #[cfg(test)]
 mod tests {
     use http::Request;
+    use std::time::Duration;
 
     use super::super::config::Config;
     use crate::azure::storage::loader::Loader;
@@ -282,7 +288,9 @@ mod tests {
             .unwrap();
 
         // Signing request with Signer
-        assert!(signer.sign_query(&mut req, &cred).is_ok());
+        assert!(signer
+            .sign_query(&mut req, Duration::from_secs(1), &cred)
+            .is_ok());
         assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob?sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
     }
 }

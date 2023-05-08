@@ -1,5 +1,6 @@
 use std::env;
 use std::str::FromStr;
+use std::time::Duration;
 
 use anyhow::Result;
 use http::StatusCode;
@@ -192,7 +193,7 @@ async fn test_can_head_blob_with_sas() -> Result<()> {
         .expect("load credential must success")
         .unwrap();
     signer
-        .sign_query(&mut req, &cred)
+        .sign_query(&mut req, Duration::from_secs(60), &cred)
         .expect("sign request must success");
 
     println!("signed request: {:?}", req);
@@ -240,7 +241,7 @@ async fn test_can_list_container_blobs() -> Result<()> {
             .expect("load credential must success")
             .unwrap();
         signer
-            .sign_query(&mut req, &cred)
+            .sign_query(&mut req, Duration::from_secs(60), &cred)
             .expect("sign request must success");
 
         let client = Client::new();
