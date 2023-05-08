@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 use std::fmt::Write;
 use std::fs;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -71,11 +69,9 @@ pub struct Loader {
     client: Client,
     config: Config,
 
-    allow_anonymous: bool,
     disable_ec2_metadata: bool,
     customed_credential_loader: Option<Box<dyn CredentialLoad>>,
 
-    loaded: AtomicBool,
     credential: Arc<Mutex<Option<Credential>>>,
 }
 
@@ -86,22 +82,11 @@ impl Loader {
             client,
             config,
 
-            allow_anonymous: false,
             disable_ec2_metadata: false,
             customed_credential_loader: None,
 
-            loaded: AtomicBool::new(false),
             credential: Arc::default(),
         }
-    }
-
-    /// Allow anonymous.
-    ///
-    /// By enabling this option, CredentialLoader will not retry after
-    /// loading credential failed.
-    pub fn with_allow_anonymous(mut self) -> Self {
-        self.allow_anonymous = true;
-        self
     }
 
     /// Disable load from ec2 metadata.
@@ -128,20 +113,15 @@ impl Loader {
     /// 5. EC2 IMDSv2
     pub async fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it has been loaded at least once.
-        if self.loaded.load(Ordering::Relaxed) {
-            match self.credential.lock().expect("lock poisoned").clone() {
-                Some(cred) if cred.is_valid() => return Ok(Some(cred)),
-                None if self.allow_anonymous => return Ok(None),
-                _ => (),
-            }
+        match self.credential.lock().expect("lock poisoned").clone() {
+            Some(cred) if cred.is_valid() => return Ok(Some(cred)),
+            _ => (),
         }
 
         let cred = self.load_inner().await?;
 
         let mut lock = self.credential.lock().expect("lock poisoned");
         *lock = cred.clone();
-        // Set loaded after we have updated the credential.
-        self.loaded.store(true, Ordering::Relaxed);
 
         Ok(cred)
     }
