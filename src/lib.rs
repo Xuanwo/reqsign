@@ -16,7 +16,6 @@
 //!     let signer = AwsV4Signer::builder()
 //!         .config_loader(AwsConfigLoader::with_loaded())
 //!         .service("s3")
-//!         .allow_anonymous()
 //!         .build()?;
 //!     // Construct request
 //!     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
