@@ -117,6 +117,4 @@ jobs:
         env:
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full
-          # Google Cloud Storage Test
-          REQSIGN_GOOGLE_TEST: ${{ secrets.REQSIGN_GOOGLE_TEST }}
           REQSIGN_GOOGLE_CREDENTIAL_PATH: ${{steps.auth.outputs.credentials_file_path}}
