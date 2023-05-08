@@ -71,12 +71,13 @@ percent-encoding = "2"
 quick-xml = { version = "0.28", features = ["serialize"], optional = true }
 rand = "0.8.5"
 reqwest = { version = "0.11", default-features = false, optional = true }
-rsa = { version = "0.9.1", features = ["sha2"] }
+# BUG: rsa 0.9 will break gcs presign. The root cause is not found yet.
+rsa = { version = "0.8.2" }
 rust-ini = { version = "0.19", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 sha1 = "0.10"
-sha2 = "0.10"
+sha2 = { version = "0.10", features = ["oid"] }
 tokio = { version = "1", features = ["fs"], optional = true }
 
 [dev-dependencies]
