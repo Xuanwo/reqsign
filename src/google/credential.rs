@@ -26,9 +26,6 @@ pub enum CredentialAccount {
     ServiceAccount(ServiceAccount),
 }
 
-/// An alias to the new [`ServiceAccount`] type.
-pub type Credential = ServiceAccount;
-
 /// CredentialLoader will load credential from different methods.
 #[derive(Default)]
 #[cfg_attr(test, derive(Debug))]
@@ -67,7 +64,7 @@ impl CredentialLoader {
     }
 
     /// Load credential from pre-configured methods.
-    pub fn load(&self) -> Result<Option<Credential>> {
+    pub fn load(&self) -> Result<Option<ServiceAccount>> {
         match self.load_account()? {
             Some(CredentialAccount::ServiceAccount(credential)) => Ok(Some(credential)),
             Some(CredentialAccount::ExternalAccount(_)) => {
