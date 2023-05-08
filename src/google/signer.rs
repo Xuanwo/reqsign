@@ -11,7 +11,7 @@ use rsa::pkcs8::DecodePrivateKey;
 use rsa::signature::RandomizedSigner;
 
 use super::constants::GOOG_QUERY_ENCODE_SET;
-use super::credential::Credential;
+use super::credential::{Credential, ServiceAccount};
 use super::token::Token;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
@@ -85,7 +85,7 @@ impl Signer {
         &self,
         req: &mut impl SignableRequest,
         expire: Duration,
-        cred: &Credential,
+        cred: &ServiceAccount,
     ) -> Result<SigningContext> {
         let mut ctx = req.build()?;
 
@@ -225,6 +225,10 @@ impl Signer {
         duration: Duration,
         cred: &Credential,
     ) -> Result<()> {
+        let Some(cred) = &cred.service_account else {
+            anyhow::bail!("expected service account credential, got external account");
+        };
+
         let ctx = self.build_query(req, duration, cred)?;
         req.apply(ctx)
     }
@@ -289,7 +293,7 @@ fn canonicalize_header(ctx: &mut SigningContext) -> Result<()> {
 fn canonicalize_query(
     ctx: &mut SigningContext,
     method: SigningMethod,
-    cred: &Credential,
+    cred: &ServiceAccount,
     now: DateTime,
     service: &str,
     region: &str,
@@ -343,8 +347,7 @@ mod tests {
     use chrono::Utc;
     use pretty_assertions::assert_eq;
 
-    use super::super::credential::CredentialLoader;
-    use super::*;
+    use super::{super::credential::CredentialLoader, *};
 
     #[tokio::test]
     async fn test_sign_query() -> Result<()> {

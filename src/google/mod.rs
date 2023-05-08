@@ -3,6 +3,7 @@
 mod constants;
 
 mod credential;
+pub(crate) use credential::external_account;
 pub use credential::Credential as GoogleCredential;
 pub use credential::CredentialLoader as GoogleCredentialLoader;
 

@@ -1,22 +1,39 @@
+pub mod external_account;
+pub mod service_account;
+
 use std::env;
 use std::sync::Arc;
 use std::sync::Mutex;
 
 use anyhow::Result;
 use log::debug;
-use serde::Deserialize;
+
+pub use self::external_account::ExternalAccount;
+pub use self::service_account::ServiceAccount;
 
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
 
-/// Credential is the file which stores service account's client_id and private key.
-#[derive(Clone, Deserialize)]
+#[derive(Clone, serde::Deserialize)]
+#[cfg_attr(test, derive(Debug))]
+#[serde(rename_all = "snake_case")]
+pub enum CredentialType {
+    ExternalAccount,
+    ServiceAccount,
+}
+
+/// A Google API credential file.
+#[derive(Clone, serde::Deserialize)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Credential {
-    /// Private key of credential
-    pub private_key: String,
-    /// The client email of credential
-    pub client_email: String,
+    /// The type of the credential file.
+    #[serde(rename = "type")]
+    pub ty: CredentialType,
+
+    #[serde(flatten)]
+    pub(crate) service_account: Option<ServiceAccount>,
+    #[serde(flatten)]
+    pub(crate) external_account: Option<ExternalAccount>,
 }
 
 /// CredentialLoader will load credential from different methods.
@@ -113,7 +130,7 @@ impl CredentialLoader {
             return Ok(None);
         };
 
-        let cred: Credential = serde_json::from_slice(&base64_decode(content)).map_err(|err| {
+        let cred = serde_json::from_slice(&base64_decode(content)).map_err(|err| {
             debug!("load credential from content failed: {err:?}");
             err
         })?;
@@ -167,31 +184,24 @@ impl CredentialLoader {
             err
         })?;
 
-        let credential: Credential = serde_json::from_slice(&content).map_err(|err| {
+        let account = serde_json::from_slice(&content).map_err(|err| {
             debug!("load credential failed at serde_json: {err:?}");
             err
         })?;
 
-        Ok(credential)
+        Ok(account)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use once_cell::sync::Lazy;
-    use tokio::runtime::Runtime;
-
-    use super::*;
-
-    static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
-        tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .expect("Should create a tokio runtime")
-    });
+    use super::{
+        external_account::{CredentialSource, FormatType},
+        *,
+    };
 
     #[test]
-    fn test_credential_loader() {
+    fn loader_returns_service_account() {
         temp_env::with_vars(
             vec![(
                 GOOGLE_APPLICATION_CREDENTIALS,
@@ -203,17 +213,18 @@ mod tests {
                 )),
             )],
             || {
-                RUNTIME.block_on(async {
-                    let cred_loader = CredentialLoader::default();
+                let cred_loader = CredentialLoader::default();
 
-                    let cred = cred_loader
-                        .load()
-                        .expect("credentail must be exist")
-                        .unwrap();
+                let cred = cred_loader
+                    .load()
+                    .expect("credentail must be exist")
+                    .unwrap()
+                    .service_account
+                    .unwrap();
 
-                    assert_eq!("test-234@test.iam.gserviceaccount.com", &cred.client_email);
-                    assert_eq!(
-                        "-----BEGIN RSA PRIVATE KEY-----
+                assert_eq!("test-234@test.iam.gserviceaccount.com", &cred.client_email);
+                assert_eq!(
+                    "-----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQDOy4jaJIcVlffi5ENtlNhJ0tsI1zt21BI3DMGtPq7n3Ymow24w
 BV2Z73l4dsqwRo2QVSwnCQ2bVtM2DgckMNDShfWfKe3LRcl96nnn51AtAYIfRnc+
 ogstzxZi4J64f7IR3KIAFxJnzo+a6FS6MmsYMAs8/Oj68fRmCD0AbAs5ZwIDAQAB
@@ -229,9 +240,54 @@ WSjmfo3qemZ6Z5ymHyjMcj9FOE4AtW71Uw6wX7juR3eo7HPwdkRjdK34EDUc9i9o
 V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
 -----END RSA PRIVATE KEY-----
 ",
-                        &cred.private_key
-                    );
-                })
+                    &cred.private_key
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn loader_returns_external_account() {
+        temp_env::with_vars(
+            vec![(
+                GOOGLE_APPLICATION_CREDENTIALS,
+                Some(format!(
+                    "{}/testdata/services/google/test_external_account.json",
+                    env::current_dir()
+                        .expect("current_dir must exist")
+                        .to_string_lossy()
+                )),
+            )],
+            || {
+                let cred_loader = CredentialLoader::default();
+
+                let cred = cred_loader
+                    .load()
+                    .expect("credentail must be exist")
+                    .unwrap()
+                    .external_account
+                    .unwrap();
+
+                assert_eq!(
+                    "//iam.googleapis.com/projects/000000000000/locations/global/workloadIdentityPools/reqsign/providers/reqsign-provider",
+                    &cred.audience
+                );
+                assert_eq!(
+                    "urn:ietf:params:oauth:token-type:jwt",
+                    &cred.subject_token_type
+                );
+                assert_eq!(
+                    "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/test-234@test.iam.gserviceaccount.com:generateAccessToken",
+                    &cred.service_account_impersonation_url.unwrap()
+                );
+                assert_eq!("https://sts.googleapis.com/v1/token", &cred.token_url);
+
+                let CredentialSource::UrlSourced(source) = cred.credential_source else {
+                    panic!("expected URL credential source");
+                };
+
+                assert_eq!("http://localhost:5000/token", &source.url);
+                assert!(matches!(&source.format, FormatType::Json { .. }));
             },
         );
     }
