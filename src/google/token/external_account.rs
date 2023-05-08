@@ -1,13 +1,11 @@
 use std::time::Duration;
 
 use anyhow::{bail, Result};
-use http::header::ACCEPT;
+use http::header::{ACCEPT, CONTENT_TYPE};
 use log::error;
 use serde::Deserialize;
 
-use crate::google::credential::{
-    external_account::CredentialSource, CredentialAccount, ExternalAccount,
-};
+use crate::google::credential::{external_account::CredentialSource, ExternalAccount};
 
 use super::{Token, TokenLoader};
 
@@ -39,10 +37,13 @@ async fn load_security_token(
         "subjectTokenType": &cred.subject_token_type,
     });
 
+    let req = serde_json::to_vec(&req)?;
+
     let resp = client
         .post(&cred.token_url)
         .header(ACCEPT, "application/json")
-        .json(&req)
+        .header(CONTENT_TYPE, "application/json")
+        .body(req)
         .send()
         .await?;
 
@@ -51,7 +52,7 @@ async fn load_security_token(
         bail!("exchange token failed: {}", resp.text().await?);
     }
 
-    let token = resp.json().await?;
+    let token = serde_json::from_slice(&resp.bytes().await?)?;
     Ok(token)
 }
 
@@ -76,11 +77,14 @@ async fn load_impersonated_token(
         "lifetime": format!("{lifetime}s"),
     });
 
+    let req = serde_json::to_vec(&req)?;
+
     let resp = client
         .post(url)
         .header(ACCEPT, "application/json")
+        .header(CONTENT_TYPE, "application/json")
         .bearer_auth(access_token)
-        .json(&req)
+        .body(req)
         .send()
         .await?;
 
@@ -89,7 +93,7 @@ async fn load_impersonated_token(
         bail!("exchange impersonated token failed: {}", resp.text().await?);
     }
 
-    let token: ImpersonatedToken = resp.json().await?;
+    let token: ImpersonatedToken = serde_json::from_slice(&resp.bytes().await?)?;
     Ok(Some(Token::new(&token.access_token, lifetime, scope)))
 }
 
@@ -98,9 +102,7 @@ impl TokenLoader {
     ///
     /// Reference: [External Account Credentials (Workload Identity Federation)](https://google.aip.dev/auth/4117)
     pub(super) async fn load_via_external_account(&self) -> Result<Option<Token>> {
-        let cred = if let Some(CredentialAccount::ExternalAccount(cred)) = &self.credential {
-            cred
-        } else {
+        let Some(cred) = self.credential.as_ref().and_then(|cred| cred.external_account.as_ref()) else {
             return Ok(None);
         };
 

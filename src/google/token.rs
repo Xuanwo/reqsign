@@ -12,8 +12,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde::Serialize;
 
-use super::credential::CredentialAccount;
-use super::credential::ServiceAccount;
+use super::credential::Credential;
 use crate::time::now;
 use crate::time::DateTime;
 
@@ -116,7 +115,7 @@ pub struct TokenLoader {
     scope: String,
     client: Client,
 
-    credential: Option<CredentialAccount>,
+    credential: Option<Credential>,
     disable_vm_metadata: bool,
     service_account: Option<String>,
     customed_token_loader: Option<Box<dyn TokenLoad>>,
@@ -150,15 +149,9 @@ impl TokenLoader {
         }
     }
 
-    /// Set the account for token loader.
-    pub fn with_account(mut self, account: CredentialAccount) -> Self {
-        self.credential = Some(account);
-        self
-    }
-
     /// Set the credential for token loader.
-    pub fn with_credentials(mut self, credentials: ServiceAccount) -> Self {
-        self.credential = Some(CredentialAccount::ServiceAccount(credentials));
+    pub fn with_credentials(mut self, credentials: Credential) -> Self {
+        self.credential = Some(credentials);
         self
     }
 

@@ -11,7 +11,7 @@ use rsa::pkcs8::DecodePrivateKey;
 use rsa::signature::RandomizedSigner;
 
 use super::constants::GOOG_QUERY_ENCODE_SET;
-use super::credential::ServiceAccount;
+use super::credential::{Credential, ServiceAccount};
 use super::token::Token;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
@@ -223,8 +223,12 @@ impl Signer {
         &self,
         req: &mut impl SignableRequest,
         duration: Duration,
-        cred: &ServiceAccount,
+        cred: &Credential,
     ) -> Result<()> {
+        let Some(cred) = &cred.service_account else {
+            anyhow::bail!("expected service account credential, got external account");
+        };
+
         let ctx = self.build_query(req, duration, cred)?;
         req.apply(ctx)
     }
@@ -343,8 +347,6 @@ mod tests {
     use chrono::Utc;
     use pretty_assertions::assert_eq;
 
-    use crate::google::credential::CredentialAccount;
-
     use super::{super::credential::CredentialLoader, *};
 
     #[tokio::test]
@@ -357,9 +359,7 @@ mod tests {
         );
 
         let loader = CredentialLoader::default().with_path(&credential_path);
-        let CredentialAccount::ServiceAccount(cred) = loader.load_account()?.unwrap() else {
-            panic!("expected service account");
-        };
+        let cred = loader.load()?.unwrap();
 
         let signer = Signer::new("storage");
 
@@ -388,9 +388,7 @@ mod tests {
         );
 
         let loader = CredentialLoader::default().with_path(&credential_path);
-        let CredentialAccount::ServiceAccount(cred) = loader.load_account()?.unwrap() else {
-            panic!("expected service account");
-        };
+        let cred = loader.load()?.unwrap();
 
         let mut req = http::Request::new("");
         *req.method_mut() = http::Method::GET;
