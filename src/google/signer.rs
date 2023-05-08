@@ -137,7 +137,7 @@ impl Signer {
 
         let mut rng = rand::thread_rng();
         let private_key = rsa::RsaPrivateKey::from_pkcs8_pem(&cred.private_key)?;
-        let signing_key = SigningKey::<rsa::sha2::Sha256>::new_with_prefix(private_key);
+        let signing_key = SigningKey::<rsa::sha2::Sha256>::new(private_key);
         let signature = signing_key.sign_with_rng(&mut rng, string_to_sign.as_bytes());
 
         ctx.query
