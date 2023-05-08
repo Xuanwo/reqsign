@@ -93,3 +93,28 @@ jobs:
           REQSIGN_ALIYUN_ROLE_ARN: ${{ secrets.REQSIGN_ALIYUN_ROLE_ARN }}
           REQSIGN_ALIYUN_IDP_URL: ${{ secrets.REQSIGN_ALIYUN_IDP_URL }}
           REQSIGN_ALIYUN_IDP_BODY: ${{ secrets.REQSIGN_ALIYUN_IDP_BODY }}
+
+  test_gcs_wif:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install cargo-nextest
+        run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+
+      - id: auth
+        uses: google-github-actions/auth@v0.4.0
+        with:
+          token_format: "access_token"
+          create_credentials_file: true
+          workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_ID }}
+          service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+
+      - name: Test
+        run: cargo nextest run --no-fail-fast
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+          REQSIGN_GOOGLE_CREDENTIAL_PATH: ${{steps.auth.outputs.credentials_file_path}}
