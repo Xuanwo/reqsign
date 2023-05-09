@@ -67,14 +67,17 @@ impl Signer {
                 ctx.query_append(token);
                 return Ok(ctx);
             }
-            Credential::BearerToken(token) => {
-                ctx.headers.insert(AUTHORIZATION, {
-                    let mut value: HeaderValue = format!("Bearer {}", token).parse()?;
-                    value.set_sensitive(true);
-                    value
-                });
-                return Ok(ctx);
-            }
+            Credential::BearerToken(token) => match method {
+                SigningMethod::Query(_) => {}
+                SigningMethod::Header => {
+                    ctx.headers.insert(AUTHORIZATION, {
+                        let mut value: HeaderValue = format!("Bearer {}", token).parse()?;
+                        value.set_sensitive(true);
+
+                        value
+                    });
+                }
+            },
             Credential::SharedKey(ak, sk) => match method {
                 SigningMethod::Query(d) => {
                     // try sign request use account_sas token
@@ -273,7 +276,7 @@ mod tests {
 
     use super::super::config::Config;
     use crate::azure::storage::loader::Loader;
-    use crate::AzureStorageSigner;
+    use crate::{AzureStorageCredential, AzureStorageSigner};
 
     #[tokio::test]
     async fn test_sas_url() {
@@ -300,5 +303,32 @@ mod tests {
             .sign_query(&mut req, Duration::from_secs(1), &cred)
             .is_ok());
         assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob?sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
+    }
+
+    #[tokio::test]
+    async fn test_can_sign_request_use_bearer_token() {
+        let signer = AzureStorageSigner::new();
+        let mut req = Request::builder()
+            .uri("https://test.blob.core.windows.net/testbucket/testblob")
+            .body(())
+            .unwrap();
+        let cred = AzureStorageCredential::BearerToken("token".to_string());
+
+        // Can effectively sign request with SigningMethod::Header
+        assert!(signer.sign(&mut req, &cred).is_ok());
+        let authorization = req
+            .headers()
+            .get("Authorization")
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert_eq!("Bearer token", authorization);
+
+        // Will not sign request with SigningMethod::Query
+        *req.headers_mut() = http::header::HeaderMap::new();
+        assert!(signer
+            .sign_query(&mut req, Duration::from_secs(1), &cred)
+            .is_ok());
+        assert!(req.headers().get("Authorization").is_none());
     }
 }
