@@ -67,6 +67,14 @@ impl Signer {
                 ctx.query_append(token);
                 return Ok(ctx);
             }
+            Credential::BearerToken(token) => {
+                ctx.headers.insert(AUTHORIZATION, {
+                    let mut value: HeaderValue = format!("Bearer {}", token).parse()?;
+                    value.set_sensitive(true);
+                    value
+                });
+                return Ok(ctx);
+            }
             Credential::SharedKey(ak, sk) => match method {
                 SigningMethod::Query(d) => {
                     // try sign request use account_sas token
