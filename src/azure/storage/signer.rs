@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::fmt::Write;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use http::header::*;
 use log::debug;
 
@@ -68,7 +68,9 @@ impl Signer {
                 return Ok(ctx);
             }
             Credential::BearerToken(token) => match method {
-                SigningMethod::Query(_) => {}
+                SigningMethod::Query(_) => {
+                    return Err(anyhow!("BearerToken can't be used in query string"));
+                }
                 SigningMethod::Header => {
                     ctx.headers.insert(AUTHORIZATION, {
                         let mut value: HeaderValue = format!("Bearer {}", token).parse()?;
@@ -328,7 +330,6 @@ mod tests {
         *req.headers_mut() = http::header::HeaderMap::new();
         assert!(signer
             .sign_query(&mut req, Duration::from_secs(1), &cred)
-            .is_ok());
-        assert!(req.headers().get("Authorization").is_none());
+            .is_err());
     }
 }
