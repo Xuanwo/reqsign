@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use crate::azure::storage::imds_credential::ImdsManagedIdentityCredential;
 use anyhow::Result;
 
 use super::config::Config;
@@ -59,5 +60,11 @@ impl Loader {
         }
 
         Ok(None)
+    }
+
+    async fn load_access_token_via_imds(&self) -> Result<Option<String>> {
+        let token = ImdsManagedIdentityCredential::new().get_token("").await?;
+
+        Ok(Some(token.access_token))
     }
 }
