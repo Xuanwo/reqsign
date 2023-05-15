@@ -20,6 +20,12 @@ pub struct ImdsCredential {
     endpoint: Option<String>,
 }
 
+impl Default for ImdsCredential {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ImdsCredential {
     /// Creates a new instance of the ImdsCredential with default parameters.
     pub fn new() -> Self {
@@ -109,7 +115,7 @@ impl ImdsCredential {
             _ => (),
         }
 
-        let url = Url::parse_with_params(&endpoint, &query_items)?;
+        let url = Url::parse_with_params(endpoint, &query_items)?;
         let mut req = Request::builder()
             .method(Method::GET)
             .uri(url.to_string())
