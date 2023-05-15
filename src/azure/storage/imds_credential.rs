@@ -132,6 +132,7 @@ impl ImdsCredential {
         }
 
         let token: AccessToken = serde_json::from_str(&rsp_body)?;
+        println!("token = {:?}", token);
 
         Ok(token)
     }
@@ -143,8 +144,7 @@ impl ImdsCredential {
 #[allow(unused)]
 pub struct AccessToken {
     pub access_token: String,
-    // #[serde(deserialize_with = "expires_on_string")]
-    // pub expires_on: OffsetDateTime,
+    pub expires_on: String,
     pub token_type: String,
     pub resource: String,
 }
