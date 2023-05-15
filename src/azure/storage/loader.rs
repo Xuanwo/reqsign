@@ -67,7 +67,7 @@ impl Loader {
     }
 
     async fn load_via_imds(&self, imds: &ImdsCredential) -> Result<Option<Credential>> {
-        let token = imds.get_token("").await?;
+        let token = imds.get_token("https://storage.azure.com/").await?;
 
         Ok(Some(Credential::BearerToken(token.access_token)))
     }
