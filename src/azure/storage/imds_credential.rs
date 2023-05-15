@@ -11,7 +11,7 @@ const MSI_ENDPOINT: &str = "http://169.254.169.254/metadata/identity/oauth2/toke
 /// This authentication type works in Azure VMs, App Service and Azure Functions applications, as well as the Azure Cloud Shell
 ///
 /// Built up from docs at [https://docs.microsoft.com/azure/app-service/overview-managed-identity#using-the-rest-protocol](https://docs.microsoft.com/azure/app-service/overview-managed-identity#using-the-rest-protocol)
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ImdsCredential {
     object_id: Option<String>,
     client_id: Option<String>,
@@ -93,6 +93,7 @@ impl ImdsCredential {
         self
     }
 
+    /// Gets an access token for the specified resource.
     pub async fn get_token(&self, resource: &str) -> anyhow::Result<AccessToken> {
         let endpoint = self.endpoint.as_deref().unwrap_or(MSI_ENDPOINT);
         let mut query_items = vec![("api-version", MSI_API_VERSION), ("resource", resource)];
