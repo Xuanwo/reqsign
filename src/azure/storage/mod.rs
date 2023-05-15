@@ -9,9 +9,12 @@ mod config;
 pub use config::Config as AzureStorageConfig;
 
 mod credential;
-mod imds_credential;
 
 pub use credential::Credential as AzureStorageCredential;
+
+mod imds_credential;
+
+pub use imds_credential::ImdsCredential as AzureStorageImdsCredential;
 
 mod loader;
 

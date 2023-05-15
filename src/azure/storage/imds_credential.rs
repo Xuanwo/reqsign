@@ -1,45 +1,40 @@
-use async_trait::async_trait;
 use http::{HeaderValue, Method, Request};
 use reqwest::{Client, Url};
-use serde::{de::Deserializer, Deserialize};
+use serde::Deserialize;
 use std::str;
 
 const MSI_API_VERSION: &str = "2019-08-01";
+const MSI_ENDPOINT: &str = "http://169.254.169.254/metadata/identity/oauth2/token";
 
 /// Attempts authentication using a managed identity that has been assigned to the deployment environment.
 ///
 /// This authentication type works in Azure VMs, App Service and Azure Functions applications, as well as the Azure Cloud Shell
 ///
 /// Built up from docs at [https://docs.microsoft.com/azure/app-service/overview-managed-identity#using-the-rest-protocol](https://docs.microsoft.com/azure/app-service/overview-managed-identity#using-the-rest-protocol)
-pub struct ImdsManagedIdentityCredential {
-    endpoint: Option<String>,
-    secret: Option<String>,
+#[derive(Clone)]
+pub struct ImdsCredential {
     object_id: Option<String>,
     client_id: Option<String>,
     msi_res_id: Option<String>,
+    msi_secret: Option<String>,
+    endpoint: Option<String>,
 }
 
-impl Default for ImdsManagedIdentityCredential {
-    /// Creates an instance of the `TransportOptions` with the default parameters.
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[async_trait]
-impl ImdsManagedIdentityCredential {
-    /// Creates a new `ImdsManagedIdentityCredential` with the specified parameters.
+impl ImdsCredential {
+    /// Creates a new instance of the ImdsCredential with default parameters.
     pub fn new() -> Self {
         Self {
             object_id: None,
             client_id: None,
             msi_res_id: None,
-            secret: None,
+            msi_secret: None,
             endpoint: None,
         }
     }
 
     /// Specifies the endpoint from which the identity should be retrieved.
+    ///
+    /// If not specified, the default endpoint of `http://169.254.169.254/metadata/identity/oauth2/token` will be used.
     pub fn with_endpoint<A>(mut self, endpoint: A) -> Self
     where
         A: Into<String>,
@@ -48,12 +43,14 @@ impl ImdsManagedIdentityCredential {
         self
     }
 
-    /// Specifies the secret associated with a user assigned managed service identity resource that should be used to retrieve the access token.
-    pub fn with_secret<A>(mut self, secret: A) -> Self
+    /// Specifies the header that should be used to retrieve the access token.
+    ///
+    /// This header mitigates server-side request forgery (SSRF) attacks.
+    pub fn with_msi_secret<A>(mut self, msi_secret: A) -> Self
     where
         A: Into<String>,
     {
-        self.secret = Some(secret.into());
+        self.msi_secret = Some(msi_secret.into());
         self
     }
 
@@ -96,11 +93,8 @@ impl ImdsManagedIdentityCredential {
         self
     }
 
-    pub async fn get_token(&self, resource: &str) -> anyhow::Result<MsiTokenResponse> {
-        let msi_endpoint = self
-            .endpoint
-            .unwrap_or_else(|_| "http://169.254.169.254/metadata/identity/oauth2/token".to_owned());
-
+    pub async fn get_token(&self, resource: &str) -> anyhow::Result<AccessToken> {
+        let endpoint = self.endpoint.as_deref().unwrap_or(MSI_ENDPOINT);
         let mut query_items = vec![("api-version", MSI_API_VERSION), ("resource", resource)];
 
         match (
@@ -114,31 +108,31 @@ impl ImdsManagedIdentityCredential {
             _ => (),
         }
 
-        let url = Url::parse_with_params(&msi_endpoint, &query_items)?;
-        let mut builder = Request::builder();
-        builder = builder.method(Method::Get);
-        builder = builder.uri(url);
-        let mut req = builder.body("")?;
+        let url = Url::parse_with_params(&endpoint, &query_items)?;
+        let mut req = Request::builder()
+            .method(Method::GET)
+            .uri(url.to_string())
+            .body("")?;
 
         req.headers_mut()
             .insert("metadata", HeaderValue::from_static("true"));
 
-        if let Some(secret) = &self.secret {
+        if let Some(secret) = &self.msi_secret {
             req.headers_mut()
                 .insert("x-identity-header", HeaderValue::from_str(secret)?);
         };
 
         let res = Client::new().execute(req.try_into()?).await?;
         let rsp_status = res.status();
-        let rsp_body = res.into_body().collect().await?;
+        let rsp_body = res.text().await?;
 
         if !rsp_status.is_success() {
-            panic!("Error getting MSI token: {}", res.text()?);
+            return Err(anyhow::anyhow!("Failed to get token from IMDS endpoint"));
         }
 
-        let x: MsiTokenResponse = serde_json::from_slice(&rsp_body)?;
+        let token: AccessToken = serde_json::from_str(&rsp_body)?;
 
-        Ok(x)
+        Ok(token)
     }
 }
 
@@ -146,7 +140,7 @@ impl ImdsManagedIdentityCredential {
 // https://docs.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=dotnet#rest-protocol-examples
 #[derive(Debug, Clone, Deserialize)]
 #[allow(unused)]
-struct MsiTokenResponse {
+pub struct AccessToken {
     pub access_token: String,
     // #[serde(deserialize_with = "expires_on_string")]
     // pub expires_on: OffsetDateTime,

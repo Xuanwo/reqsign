@@ -1,11 +1,11 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::azure::storage::imds_credential::ImdsManagedIdentityCredential;
 use anyhow::Result;
 
 use super::config::Config;
 use super::credential::Credential;
+use super::imds_credential::ImdsCredential;
 
 /// Loader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
@@ -41,14 +41,14 @@ impl Loader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Some(cred) = self.load_via_config()? {
+        if let Some(cred) = self.load_via_config().await? {
             return Ok(Some(cred));
         }
 
         Ok(None)
     }
 
-    fn load_via_config(&self) -> Result<Option<Credential>> {
+    async fn load_via_config(&self) -> Result<Option<Credential>> {
         if let Some(token) = &self.config.sas_token {
             let cred = Credential::SharedAccessSignature(token.clone());
             return Ok(Some(cred));
@@ -59,12 +59,16 @@ impl Loader {
             return Ok(Some(cred));
         }
 
+        if let Some(imds) = &self.config.imds_credential {
+            return self.load_via_imds(imds).await;
+        }
+
         Ok(None)
     }
 
-    async fn load_access_token_via_imds(&self) -> Result<Option<String>> {
-        let token = ImdsManagedIdentityCredential::new().get_token("").await?;
+    async fn load_via_imds(&self, imds: &ImdsCredential) -> Result<Option<Credential>> {
+        let token = imds.get_token("").await?;
 
-        Ok(Some(token.access_token))
+        Ok(Some(Credential::BearerToken(token.access_token)))
     }
 }

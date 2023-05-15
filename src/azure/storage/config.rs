@@ -1,3 +1,5 @@
+use crate::azure::storage::imds_credential::ImdsCredential;
+
 /// Config carries all the configuration for Azure Storage services.
 #[derive(Clone, Default)]
 #[cfg_attr(test, derive(Debug))]
@@ -14,16 +16,6 @@ pub struct Config {
     ///
     /// - this field if it's `is_some`
     pub sas_token: Option<String>,
-    /// `tenant_id` will be used to acquire an access token from Azure Instance Metadata Service (IMDS)
-    ///
-    /// - this field if it's `is_some`
-    pub tenant_id: Option<String>,
-    /// `client_id` will be used to acquire an access token from Azure Instance Metadata Service (IMDS)
-    ///
-    /// - this field if it's `is_some`
-    pub client_secret: Option<String>,
-    /// `client_secret` will be used to acquire an access token from Azure Instance Metadata Service (IMDS)
-    ///
-    /// - this field if it's `is_some`
-    pub client_id: Option<String>,
+    /// Will load credential from IMDS if it's `is_some`.
+    pub imds_credential: Option<ImdsCredential>,
 }
