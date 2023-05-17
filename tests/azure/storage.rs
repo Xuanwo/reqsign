@@ -10,7 +10,7 @@ use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
 
 use reqsign::AzureStorageSigner;
-use reqsign::{AzureStorageConfig, AzureStorageImdsCredential, AzureStorageLoader};
+use reqsign::{AzureStorageConfig, AzureStorageLoader};
 use reqwest::Client;
 
 fn init_signer() -> Option<(AzureStorageLoader, AzureStorageSigner)> {
@@ -273,12 +273,11 @@ async fn test_head_blob_with_ldms() -> Result<()> {
     }
 
     let config = AzureStorageConfig {
-        imds_credential: Some(AzureStorageImdsCredential::new()),
         ..Default::default()
     };
     let loader = AzureStorageLoader::new(config);
     let cred = loader
-        .load()
+        .load_with_imds()
         .await
         .expect("load credential must success")
         .unwrap();
@@ -323,12 +322,11 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
     }
 
     let config = AzureStorageConfig {
-        imds_credential: Some(AzureStorageImdsCredential::new()),
         ..Default::default()
     };
     let loader = AzureStorageLoader::new(config);
     let cred = loader
-        .load()
+        .load_with_imds()
         .await
         .expect("load credential must success")
         .unwrap();

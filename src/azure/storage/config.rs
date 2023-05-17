@@ -1,5 +1,3 @@
-use crate::azure::storage::imds_credential::ImdsCredential;
-
 /// Config carries all the configuration for Azure Storage services.
 #[derive(Clone, Default)]
 #[cfg_attr(test, derive(Debug))]
@@ -16,6 +14,24 @@ pub struct Config {
     ///
     /// - this field if it's `is_some`
     pub sas_token: Option<String>,
-    /// Will load credential from IMDS if it's `is_some`.
-    pub imds_credential: Option<ImdsCredential>,
+    /// Specifies the object id associated with a user assigned managed service identity resource
+    ///
+    /// The values of client_id and msi_res_id are discarded
+    pub imds_object_id: Option<String>,
+    /// Specifies the application id (client id) associated with a user assigned managed service identity resource
+    ///
+    /// The values of object_id and msi_res_id are discarded
+    pub imds_client_id: Option<String>,
+    /// Specifies the ARM resource id of the user assigned managed service identity resource
+    ///
+    /// The values of object_id and client_id are discarded
+    pub imds_msi_res_id: Option<String>,
+    /// Specifies the header that should be used to retrieve the access token.
+    ///
+    /// This header mitigates server-side request forgery (SSRF) attacks.
+    pub imds_msi_secret: Option<String>,
+    /// Specifies the endpoint from which the identity should be retrieved.
+    ///
+    /// If not specified, the default endpoint of `http://169.254.169.254/metadata/identity/oauth2/token` will be used.
+    pub imds_endpoint: Option<String>,
 }

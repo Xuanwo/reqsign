@@ -5,7 +5,7 @@ use anyhow::Result;
 
 use super::config::Config;
 use super::credential::Credential;
-use super::imds_credential::ImdsCredential;
+use super::imds_credential;
 
 /// Loader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
@@ -40,6 +40,24 @@ impl Loader {
         Ok(cred)
     }
 
+    /// Load credential with IMDS.
+    pub async fn load_with_imds(&self) -> Result<Option<Credential>> {
+        // Return cached credential if it's valid.
+        if let Some(cred) = self.credential.lock().expect("lock poisoned").clone() {
+            return Ok(Some(cred));
+        }
+
+        let token =
+            imds_credential::get_access_token("https://storage.azure.com/", &self.config).await?;
+
+        let cred = Some(Credential::BearerToken(token.access_token));
+
+        let mut lock = self.credential.lock().expect("lock poisoned");
+        *lock = cred.clone();
+
+        Ok(cred)
+    }
+
     async fn load_inner(&self) -> Result<Option<Credential>> {
         if let Some(cred) = self.load_via_config().await? {
             return Ok(Some(cred));
@@ -59,16 +77,6 @@ impl Loader {
             return Ok(Some(cred));
         }
 
-        if let Some(imds) = &self.config.imds_credential {
-            return self.load_via_imds(imds).await;
-        }
-
         Ok(None)
-    }
-
-    async fn load_via_imds(&self, imds: &ImdsCredential) -> Result<Option<Credential>> {
-        let token = imds.get_token("https://storage.azure.com/").await?;
-
-        Ok(Some(Credential::BearerToken(token.access_token)))
     }
 }
