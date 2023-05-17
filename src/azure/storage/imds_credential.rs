@@ -10,8 +10,8 @@ const MSI_ENDPOINT: &str = "http://169.254.169.254/metadata/identity/oauth2/toke
 ///
 /// This authentication type works in Azure VMs, App Service and Azure Functions applications, as well as the Azure Cloud Shell
 ///
-/// Built up from docs at [https://docs.microsoft.com/azure/app-service/overview-managed-identity#using-the-rest-protocol](https://docs.microsoft.com/azure/app-service/overview-managed-identity#using-the-rest-protocol)
-#[derive(Clone, Debug)]
+/// Built up from docs at <https://docs.microsoft.com/azure/app-service/overview-managed-identity#using-the-rest-protocol>
+#[derive(Clone, Debug, Default)]
 pub struct ImdsCredential {
     object_id: Option<String>,
     client_id: Option<String>,
@@ -20,21 +20,11 @@ pub struct ImdsCredential {
     endpoint: Option<String>,
 }
 
-impl Default for ImdsCredential {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ImdsCredential {
     /// Creates a new instance of the ImdsCredential with default parameters.
     pub fn new() -> Self {
         Self {
-            object_id: None,
-            client_id: None,
-            msi_res_id: None,
-            msi_secret: None,
-            endpoint: None,
+            ..Default::default()
         }
     }
 
