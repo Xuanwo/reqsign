@@ -277,7 +277,7 @@ async fn test_head_blob_with_ldms() -> Result<()> {
     };
     let loader = AzureStorageLoader::new(config);
     let cred = loader
-        .load_with_imds()
+        .load()
         .await
         .expect("load credential must success")
         .unwrap();
@@ -326,7 +326,7 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
     };
     let loader = AzureStorageLoader::new(config);
     let cred = loader
-        .load_with_imds()
+        .load()
         .await
         .expect("load credential must success")
         .unwrap();

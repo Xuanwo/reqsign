@@ -40,24 +40,6 @@ impl Loader {
         Ok(cred)
     }
 
-    /// Load credential with IMDS.
-    pub async fn load_with_imds(&self) -> Result<Option<Credential>> {
-        // Return cached credential if it's valid.
-        if let Some(cred) = self.credential.lock().expect("lock poisoned").clone() {
-            return Ok(Some(cred));
-        }
-
-        let token =
-            imds_credential::get_access_token("https://storage.azure.com/", &self.config).await?;
-
-        let cred = Some(Credential::BearerToken(token.access_token));
-
-        let mut lock = self.credential.lock().expect("lock poisoned");
-        *lock = cred.clone();
-
-        Ok(cred)
-    }
-
     async fn load_inner(&self) -> Result<Option<Credential>> {
         if let Some(cred) = self.load_via_config().await? {
             return Ok(Some(cred));
@@ -77,6 +59,17 @@ impl Loader {
             return Ok(Some(cred));
         }
 
-        Ok(None)
+        // try to load credential using AAD(Azure Active Directory) authenticate on Azure VM
+        // we may get an error if not running on Azure VM
+        // see https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol
+        self.load_via_imds().await
+    }
+
+    async fn load_via_imds(&self) -> Result<Option<Credential>> {
+        let token =
+            imds_credential::get_access_token("https://storage.azure.com/", &self.config).await?;
+        let cred = Some(Credential::BearerToken(token.access_token));
+
+        Ok(cred)
     }
 }

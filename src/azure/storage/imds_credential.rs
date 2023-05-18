@@ -12,13 +12,13 @@ const MSI_ENDPOINT: &str = "http://169.254.169.254/metadata/identity/oauth2/toke
 ///
 /// See <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
 pub async fn get_access_token(resource: &str, config: &Config) -> anyhow::Result<AccessToken> {
-    let endpoint = config.imds_endpoint.as_deref().unwrap_or(MSI_ENDPOINT);
+    let endpoint = config.endpoint.as_deref().unwrap_or(MSI_ENDPOINT);
     let mut query_items = vec![("api-version", MSI_API_VERSION), ("resource", resource)];
 
     match (
-        config.imds_object_id.as_ref(),
-        config.imds_client_id.as_ref(),
-        config.imds_msi_res_id.as_ref(),
+        config.object_id.as_ref(),
+        config.client_id.as_ref(),
+        config.msi_res_id.as_ref(),
     ) {
         (Some(object_id), None, None) => query_items.push(("object_id", object_id)),
         (None, Some(client_id), None) => query_items.push(("client_id", client_id)),
@@ -36,7 +36,7 @@ pub async fn get_access_token(resource: &str, config: &Config) -> anyhow::Result
     req.headers_mut()
         .insert("metadata", HeaderValue::from_static("true"));
 
-    if let Some(secret) = &config.imds_msi_secret {
+    if let Some(secret) = &config.msi_secret {
         req.headers_mut()
             .insert("x-identity-header", HeaderValue::from_str(secret)?);
     };
