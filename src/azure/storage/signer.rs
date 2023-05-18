@@ -72,10 +72,15 @@ impl Signer {
                     return Err(anyhow!("BearerToken can't be used in query string"));
                 }
                 SigningMethod::Header => {
+                    ctx.headers
+                        .insert(X_MS_VERSION, AZURE_VERSION.to_string().parse()?);
+                    if self.omit_service_version {
+                        ctx.headers
+                            .insert(X_MS_DATE, format_http_date(time::now()).parse()?);
+                    }
                     ctx.headers.insert(AUTHORIZATION, {
                         let mut value: HeaderValue = format!("Bearer {}", token).parse()?;
                         value.set_sensitive(true);
-
                         value
                     });
                 }

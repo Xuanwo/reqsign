@@ -12,6 +12,8 @@ mod credential;
 
 pub use credential::Credential as AzureStorageCredential;
 
+mod imds_credential;
+
 mod loader;
 
 pub use loader::Loader as AzureStorageLoader;

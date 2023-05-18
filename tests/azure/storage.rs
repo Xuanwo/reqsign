@@ -8,6 +8,7 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
+
 use reqsign::AzureStorageSigner;
 use reqsign::{AzureStorageConfig, AzureStorageLoader};
 use reqwest::Client;
@@ -242,6 +243,112 @@ async fn test_can_list_container_blobs() -> Result<()> {
             .unwrap();
         signer
             .sign_query(&mut req, Duration::from_secs(60), &cred)
+            .expect("sign request must success");
+
+        let client = Client::new();
+        let resp = client
+            .execute(req.try_into()?)
+            .await
+            .expect("request must success");
+
+        debug!("got response: {:?}", resp);
+        assert_eq!(StatusCode::OK, resp.status());
+    }
+
+    Ok(())
+}
+
+/// This test must run on azure vm with imds enabled,
+#[tokio::test]
+async fn test_head_blob_with_ldms() -> Result<()> {
+    let _ = env_logger::builder().is_test(true).try_init();
+    dotenv::from_filename(".env").ok();
+
+    if env::var("REQSIGN_AZURE_STORAGE_TEST").is_err()
+        || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"
+        || env::var("REQSIGN_AZURE_STORAGE_CRED").is_err()
+        || env::var("REQSIGN_AZURE_STORAGE_CRED").unwrap() != "imds"
+    {
+        return Ok(());
+    }
+
+    let config = AzureStorageConfig {
+        ..Default::default()
+    };
+    let loader = AzureStorageLoader::new(config);
+    let cred = loader
+        .load()
+        .await
+        .expect("load credential must success")
+        .unwrap();
+
+    let url =
+        &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
+
+    let mut req = http::Request::builder()
+        .method(http::Method::HEAD)
+        .uri(format!("{}/{}", url, "not_exist_file"))
+        .body("")?;
+
+    AzureStorageSigner::new()
+        .sign(&mut req, &cred)
+        .expect("sign request must success");
+
+    println!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .await
+        .expect("request must success");
+
+    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+
+    Ok(())
+}
+
+/// This test must run on azure vm with imds enabled
+#[tokio::test]
+async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
+    let _ = env_logger::builder().is_test(true).try_init();
+    dotenv::from_filename(".env").ok();
+
+    if env::var("REQSIGN_AZURE_STORAGE_TEST").is_err()
+        || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"
+        || env::var("REQSIGN_AZURE_STORAGE_CRED").is_err()
+        || env::var("REQSIGN_AZURE_STORAGE_CRED").unwrap() != "imds"
+    {
+        return Ok(());
+    }
+
+    let config = AzureStorageConfig {
+        ..Default::default()
+    };
+    let loader = AzureStorageLoader::new(config);
+    let cred = loader
+        .load()
+        .await
+        .expect("load credential must success")
+        .unwrap();
+
+    let url =
+        &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
+
+    for query in [
+        // Without prefix
+        "restype=container&comp=list",
+        // With not encoded prefix
+        "restype=container&comp=list&prefix=test/path/to/dir",
+        // With encoded prefix
+        "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
+    ] {
+        let mut builder = http::Request::builder();
+        builder = builder.method(http::Method::GET);
+        builder = builder.uri(format!("{url}?{query}"));
+        let mut req = builder.body("")?;
+
+        AzureStorageSigner::new()
+            .sign(&mut req, &cred)
             .expect("sign request must success");
 
         let client = Client::new();

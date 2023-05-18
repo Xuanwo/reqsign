@@ -39,7 +39,11 @@ services-aws = [
   "dep:quick-xml",
   "dep:rust-ini",
 ]
-services-azblob = ["dep:serde", "dep:serde_json"]
+services-azblob = [
+  "dep:serde",
+  "dep:serde_json",
+  "dep:reqwest",
+]
 services-google = [
   "dep:reqwest",
   "dep:serde",
