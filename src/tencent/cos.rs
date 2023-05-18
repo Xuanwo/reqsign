@@ -6,9 +6,11 @@ use anyhow::Result;
 use http::header::AUTHORIZATION;
 use http::header::DATE;
 use http::HeaderValue;
+use log::debug;
 use percent_encoding::percent_decode_str;
 use percent_encoding::utf8_percent_encode;
 
+use super::constants::*;
 use super::credential::Credential;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
@@ -146,23 +148,44 @@ fn build_signature(
         .map(|(k, _)| k.to_string())
         .collect::<Vec<_>>()
         .join(";");
+    debug!("param list: {param_list}");
 
-    let header_list = ctx.header_name_to_vec_sorted().join(";");
+    let mut headers = ctx
+        .header_to_vec_with_prefix("")
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.to_lowercase(),
+                utf8_percent_encode(&v.to_lowercase(), &TENCENT_URI_ENCODE_SET).to_string(),
+            )
+        })
+        .collect::<Vec<_>>();
+    headers.sort();
+
+    let header_list = headers
+        .iter()
+        .map(|(k, _)| k.to_string())
+        .collect::<Vec<_>>()
+        .join(";");
+    debug!("header list: {header_list}");
+    let header_string = headers
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join("&");
+    debug!("header string: {header_string}");
 
     let mut http_string = String::new();
 
-    http_string.push_str(ctx.method.as_str());
+    http_string.push_str(&ctx.method.as_str().to_ascii_lowercase());
     http_string.push('\n');
     http_string.push_str(&percent_decode_str(&ctx.path).decode_utf8_lossy());
     http_string.push('\n');
     http_string.push_str(&SigningContext::query_to_string(params, "=", "&"));
     http_string.push('\n');
-    http_string.push_str(&SigningContext::header_to_string(
-        ctx.header_to_vec_with_prefix(""),
-        "=",
-        "&",
-    ));
+    http_string.push_str(&header_string);
     http_string.push('\n');
+    debug!("http string: {http_string}");
 
     let mut string_to_sign = String::new();
     string_to_sign.push_str("sha1");
@@ -171,8 +194,9 @@ fn build_signature(
     string_to_sign.push('\n');
     string_to_sign.push_str(&hex_sha1(http_string.as_bytes()));
     string_to_sign.push('\n');
+    debug!("string_to_sign: {string_to_sign}");
 
     let signature = hex_hmac_sha1(sign_key.as_bytes(), string_to_sign.as_bytes());
 
-    format!("q-sign-algorithm=sha1&q-ak={}&q-sign-time={}&q-key-time={}&q-header-list={}&q-url-param-list={}&q-signature={}", cred.access_key_id, sign_key, key_time, header_list, param_list, signature)
+    format!("q-sign-algorithm=sha1&q-ak={}&q-sign-time={}&q-key-time={}&q-header-list={}&q-url-param-list={}&q-signature={}", cred.access_key_id, key_time, key_time, header_list, param_list, signature)
 }

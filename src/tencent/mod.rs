@@ -11,3 +11,5 @@ pub use credential::CredentialLoader as TencentCosCredentialLoader;
 
 mod config;
 pub use config::Config as TencentCosConfig;
+
+mod constants;
