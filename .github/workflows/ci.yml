@@ -93,13 +93,18 @@ jobs:
           REQSIGN_ALIYUN_ROLE_ARN: ${{ secrets.REQSIGN_ALIYUN_ROLE_ARN }}
           REQSIGN_ALIYUN_IDP_URL: ${{ secrets.REQSIGN_ALIYUN_IDP_URL }}
           REQSIGN_ALIYUN_IDP_BODY: ${{ secrets.REQSIGN_ALIYUN_IDP_BODY }}
+          # Tencent COS Test
+          REQSIGN_TENCENT_COS_TEST: ${{ secrets.REQSIGN_TENCENT_COS_TEST }}
+          REQSIGN_TENCENT_COS_ACCESS_KEY: ${{ secrets.REQSIGN_TENCENT_COS_ACCESS_KEY }}
+          REQSIGN_TENCENT_COS_SECRET_KEY: ${{ secrets.REQSIGN_TENCENT_COS_SECRET_KEY }}
+          REQSIGN_TENCENT_COS_URL: ${{ secrets.REQSIGN_TENCENT_COS_URL }}
 
   test_gcs_wif:
     runs-on: ubuntu-latest
     permissions:
       contents: "read"
       id-token: "write"
-    if: github.repository == 'Xuanwo/reqsign'
+    if: github.event.pull_request.head.repo.full_name == 'Xuanwo/reqsign'
     steps:
       - uses: actions/checkout@v3
       - name: Install cargo-nextest
