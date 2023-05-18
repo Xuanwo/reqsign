@@ -6,7 +6,7 @@ documentation = "https://docs.rs/reqsign"
 edition = "2021"
 license = "Apache-2.0"
 name = "reqsign"
-version = "0.10.1"
+version = "0.11.0"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -39,11 +39,7 @@ services-aws = [
   "dep:quick-xml",
   "dep:rust-ini",
 ]
-services-azblob = [
-  "dep:serde",
-  "dep:serde_json",
-  "dep:reqwest",
-]
+services-azblob = ["dep:serde", "dep:serde_json", "dep:reqwest"]
 services-google = [
   "dep:reqwest",
   "dep:serde",
