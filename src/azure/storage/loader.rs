@@ -45,7 +45,10 @@ impl Loader {
             return Ok(Some(cred));
         }
 
-        Ok(None)
+        // try to load credential using AAD(Azure Active Directory) authenticate on Azure VM
+        // we may get an error if not running on Azure VM
+        // see https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol
+        self.load_via_imds().await
     }
 
     async fn load_via_config(&self) -> Result<Option<Credential>> {
@@ -59,10 +62,7 @@ impl Loader {
             return Ok(Some(cred));
         }
 
-        // try to load credential using AAD(Azure Active Directory) authenticate on Azure VM
-        // we may get an error if not running on Azure VM
-        // see https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol
-        self.load_via_imds().await
+        Ok(None)
     }
 
     async fn load_via_imds(&self) -> Result<Option<Credential>> {
