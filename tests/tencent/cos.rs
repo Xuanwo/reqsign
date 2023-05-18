@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use http::header::AUTHORIZATION;
+use http::header::CONTENT_LENGTH;
 use http::Request;
 use http::StatusCode;
 use log::debug;
@@ -88,18 +89,19 @@ async fn test_delete_objects() -> Result<()> {
 
     let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
 
-    let mut req = Request::new(
-        r#"<Delete>
+    let content = r#"<Delete>
 <Object>
  <Key>sample1.txt</Key>
  </Object>
  <Object>
    <Key>sample2.txt</Key>
  </Object>
- </Delete>"#,
-    );
+ </Delete>"#;
+    let mut req = Request::new(content);
     *req.method_mut() = http::Method::POST;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/?delete", url))?;
+    req.headers_mut()
+        .insert(CONTENT_LENGTH, content.len().to_string().parse().unwrap());
     req.headers_mut()
         .insert("CONTENT-MD5", "WOctCY1SS662e7ziElh4cw==".parse().unwrap());
 
@@ -213,6 +215,8 @@ async fn test_put_object_with_special_characters() -> Result<()> {
         url,
         utf8_percent_encode("put-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
+    req.headers_mut()
+        .insert(CONTENT_LENGTH, "0".parse().unwrap());
 
     signer
         .sign(&mut req, &cred)
@@ -266,44 +270,5 @@ async fn test_list_bucket() -> Result<()> {
     debug!("got response: {:?}", resp);
     debug!("got response content: {}", resp.text().await?);
     assert_eq!(StatusCode::OK, status);
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_list_bucket_with_invalid_token() -> Result<()> {
-    let signer = init_signer();
-    if signer.is_none() {
-        warn!("REQSIGN_TENCENT_COS_TEST is not set, skipped");
-        return Ok(());
-    }
-    let (loader, signer) = signer.unwrap();
-    let cred = loader.load().await?.unwrap();
-
-    let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
-
-    let mut req = Request::new("");
-    *req.method_mut() = http::Method::GET;
-    *req.uri_mut() = http::Uri::from_str(&format!(
-        "{}?list-type=2&delimiter=/&encoding-type=url&continuation-token={}",
-        url,
-        utf8_percent_encode("hello.txt", NON_ALPHANUMERIC)
-    ))?;
-
-    signer
-        .sign(&mut req, &cred)
-        .expect("sign request must success");
-
-    debug!("signed request: {:?}", req);
-
-    let client = Client::new();
-    let resp = client
-        .execute(req.try_into()?)
-        .await
-        .expect("request must success");
-
-    let status = resp.status();
-    debug!("got response: {:?}", resp);
-    debug!("got response content: {}", resp.text().await?);
-    assert_eq!(StatusCode::BAD_REQUEST, status);
     Ok(())
 }

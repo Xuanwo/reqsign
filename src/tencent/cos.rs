@@ -134,10 +134,8 @@ fn build_signature(
         .iter()
         .map(|(k, v)| {
             (
-                utf8_percent_encode(&k.to_lowercase(), percent_encoding::NON_ALPHANUMERIC)
-                    .to_string(),
-                utf8_percent_encode(&v.to_lowercase(), percent_encoding::NON_ALPHANUMERIC)
-                    .to_string(),
+                utf8_percent_encode(&k.to_lowercase(), &TENCENT_URI_ENCODE_SET).to_string(),
+                utf8_percent_encode(&v.to_lowercase(), &TENCENT_URI_ENCODE_SET).to_string(),
             )
         })
         .collect::<Vec<_>>();
@@ -149,6 +147,12 @@ fn build_signature(
         .collect::<Vec<_>>()
         .join(";");
     debug!("param list: {param_list}");
+    let param_string = params
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, v))
+        .collect::<Vec<_>>()
+        .join("&");
+    debug!("param string: {param_string}");
 
     let mut headers = ctx
         .header_to_vec_with_prefix("")
@@ -156,7 +160,7 @@ fn build_signature(
         .map(|(k, v)| {
             (
                 k.to_lowercase(),
-                utf8_percent_encode(&v.to_lowercase(), &TENCENT_URI_ENCODE_SET).to_string(),
+                utf8_percent_encode(v, &TENCENT_URI_ENCODE_SET).to_string(),
             )
         })
         .collect::<Vec<_>>();
@@ -181,7 +185,7 @@ fn build_signature(
     http_string.push('\n');
     http_string.push_str(&percent_decode_str(&ctx.path).decode_utf8_lossy());
     http_string.push('\n');
-    http_string.push_str(&SigningContext::query_to_string(params, "=", "&"));
+    http_string.push_str(&param_string);
     http_string.push('\n');
     http_string.push_str(&header_string);
     http_string.push('\n');
