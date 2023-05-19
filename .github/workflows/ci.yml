@@ -145,10 +145,10 @@ jobs:
         id: idtoken
         with:
           script: |
-            const core = require('@actions/core')
-            let id_token = await core.getIDToken()
-            core.exportVariable('GITHUB_ID_TOKEN', id_token)
-            core.setSecret(id_token)
+            const client = require('@actions/core')
+            let id_token = await client.getIDToken()
+            client.exportVariable('GITHUB_ID_TOKEN', id_token)
+            client.setSecret(id_token)
 
       - name: Test
         run: cargo nextest run --no-fail-fast
