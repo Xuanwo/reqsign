@@ -150,6 +150,11 @@ impl CredentialLoader {
         }
 
         let resp: AssumeRoleWithWebIdentityResult = serde_json::from_str(&resp.text().await?)?;
+        if let Some(error) = resp.response.error {
+            return Err(anyhow!(
+                "request to Tencent Cloud STS Services failed: {error:?}"
+            ));
+        }
         let resp_expiration = resp.response.expiration;
         let resp_cred = resp.response.credentials;
 
@@ -182,6 +187,7 @@ struct AssumeRoleWithWebIdentityResult {
 #[derive(Default, Debug, Deserialize)]
 #[serde(default, rename_all = "PascalCase")]
 struct AssumeRoleWithWebIdentityResponse {
+    error: Option<AssumeRoleWithWebIdentityError>,
     expiration: String,
     credentials: AssumeRoleWithWebIdentityCredentials,
 }
@@ -192,6 +198,13 @@ struct AssumeRoleWithWebIdentityCredentials {
     token: String,
     tmp_secret_id: String,
     tmp_secret_key: String,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct AssumeRoleWithWebIdentityError {
+    code: String,
+    message: String,
 }
 
 #[cfg(test)]
