@@ -146,7 +146,7 @@ jobs:
         with:
           script: |
             const client = require('@actions/core')
-            let id_token = await client.getIDToken()
+            let id_token = await client.getIDToken('sts.tencentcloudapi.com')
             client.exportVariable('GITHUB_ID_TOKEN', id_token)
             client.setSecret(id_token)
 
