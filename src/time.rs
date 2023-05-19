@@ -1,5 +1,6 @@
 //! Time related utils.
 
+use anyhow::anyhow;
 use anyhow::Result;
 use chrono::format::Fixed;
 use chrono::format::Item;
@@ -87,7 +88,9 @@ pub fn format_rfc3339(t: DateTime) -> String {
 /// - `2022-03-01T08:12:34+00:00`
 /// - `2022-03-01T08:12:34.00+00:00`
 pub fn parse_rfc3339(s: &str) -> Result<DateTime> {
-    Ok(chrono::DateTime::parse_from_rfc3339(s)?.with_timezone(&Utc))
+    Ok(chrono::DateTime::parse_from_rfc3339(s)
+        .map_err(|err| anyhow!("parse {s} into rfc3339 failed for {err:?}"))?
+        .with_timezone(&Utc))
 }
 
 #[cfg(test)]
