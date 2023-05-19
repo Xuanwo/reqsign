@@ -127,7 +127,7 @@ fn build_signature(
         (now + chrono::Duration::from_std(expires).unwrap()).timestamp()
     );
 
-    let sign_key = hex_hmac_sha1(cred.secret_access_key.as_bytes(), key_time.as_bytes());
+    let sign_key = hex_hmac_sha1(cred.secret_key.as_bytes(), key_time.as_bytes());
 
     let mut params = ctx
         .query
@@ -202,5 +202,5 @@ fn build_signature(
 
     let signature = hex_hmac_sha1(sign_key.as_bytes(), string_to_sign.as_bytes());
 
-    format!("q-sign-algorithm=sha1&q-ak={}&q-sign-time={}&q-key-time={}&q-header-list={}&q-url-param-list={}&q-signature={}", cred.access_key_id, key_time, key_time, header_list, param_list, signature)
+    format!("q-sign-algorithm=sha1&q-ak={}&q-sign-time={}&q-key-time={}&q-header-list={}&q-url-param-list={}&q-signature={}", cred.secret_id, key_time, key_time, header_list, param_list, signature)
 }

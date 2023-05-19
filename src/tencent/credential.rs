@@ -22,10 +22,10 @@ use super::config::Config;
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Credential {
-    /// Access key id
-    pub access_key_id: String,
-    /// Secret access key
-    pub secret_access_key: String,
+    /// Secret ID
+    pub secret_id: String,
+    /// Secret Key
+    pub secret_key: String,
     /// security_token
     pub security_token: Option<String>,
     /// expires in for credential.
@@ -92,8 +92,8 @@ impl CredentialLoader {
     fn load_via_config(&self) -> Result<Option<Credential>> {
         if let (Some(ak), Some(sk)) = (&self.config.secret_id, &self.config.secret_key) {
             let cred = Credential {
-                access_key_id: ak.clone(),
-                secret_access_key: sk.clone(),
+                secret_id: ak.clone(),
+                secret_key: sk.clone(),
                 security_token: self.config.security_token.clone(),
                 // Set expires_in to 10 minutes to enforce re-read
                 // from file.
@@ -159,8 +159,8 @@ impl CredentialLoader {
         let resp_cred = resp.response.credentials;
 
         let cred = Credential {
-            access_key_id: resp_cred.tmp_secret_id,
-            secret_access_key: resp_cred.tmp_secret_key,
+            secret_id: resp_cred.tmp_secret_id,
+            secret_key: resp_cred.tmp_secret_key,
             security_token: Some(resp_cred.token),
             expires_in: Some(parse_rfc3339(&resp_expiration)?),
         };
