@@ -271,7 +271,7 @@ mod tests {
 
         let github_token = env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN not exist");
         let file_path = format!(
-            "{}/testdata/services/aliyun/web_identity_token_file",
+            "{}/testdata/services/tencent/web_identity_token_file",
             env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()
