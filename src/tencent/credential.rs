@@ -275,8 +275,13 @@ mod tests {
             return Ok(());
         }
 
-        let role_arn = env::var("REQSIGN_TENCENT_COS_ROLE_ARN")
-            .expect("REQSIGN_TENCENT_COS_ROLE_ARN not exist");
+        // Ignore test if role_arn not set
+        let role_arn = if let Ok(v) = env::var("REQSIGN_TENCENT_COS_ROLE_ARN") {
+            v
+        } else {
+            return Ok(());
+        };
+
         let provider_id = env::var("REQSIGN_TENCENT_COS_PROVIDER_ID")
             .expect("REQSIGN_TENCENT_COS_PROVIDER_ID not exist");
         let region =
