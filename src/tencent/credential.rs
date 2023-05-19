@@ -282,7 +282,7 @@ mod tests {
         let region =
             env::var("REQSIGN_TENCENT_COS_REGION").expect("REQSIGN_TENCENT_COS_REGION not exist");
 
-        let github_token = env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN not exist");
+        let github_token = env::var("GITHUB_ID_TOKEN").expect("GITHUB_ID_TOKEN not exist");
         let file_path = format!(
             "{}/testdata/services/tencent/web_identity_token_file",
             env::current_dir()
