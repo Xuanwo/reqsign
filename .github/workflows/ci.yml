@@ -54,6 +54,8 @@ jobs:
 
   unit:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v3
       - name: Install cargo-nextest
@@ -104,7 +106,7 @@ jobs:
     permissions:
       contents: "read"
       id-token: "write"
-    if: github.event.pull_request.head.repo.full_name == 'Xuanwo/reqsign'
+    if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
     steps:
       - uses: actions/checkout@v3
       - name: Install cargo-nextest
@@ -124,3 +126,39 @@ jobs:
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full
           REQSIGN_GOOGLE_CREDENTIAL_PATH: ${{steps.auth.outputs.credentials_file_path}}
+
+  test_tencent_cloud_web_identify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+    if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install cargo-nextest
+        run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+
+      - name: Install OIDC Client from Core Package
+        run: npm install @actions/core@1.6.0 @actions/http-client
+      - name: Get Id Token
+        uses: actions/github-script@v6
+        id: idtoken
+        with:
+          script: |
+            const client = require('@actions/core')
+            let id_token = await client.getIDToken('sts.tencentcloudapi.com')
+            client.exportVariable('GITHUB_ID_TOKEN', id_token)
+            client.setSecret(id_token)
+
+      - name: Test
+        run: cargo nextest run --no-fail-fast
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+          REQSIGN_TENCENT_COS_TEST: ${{ secrets.REQSIGN_TENCENT_COS_TEST }}
+          REQSIGN_TENCENT_COS_ACCESS_KEY: ${{ secrets.REQSIGN_TENCENT_COS_ACCESS_KEY }}
+          REQSIGN_TENCENT_COS_SECRET_KEY: ${{ secrets.REQSIGN_TENCENT_COS_SECRET_KEY }}
+          REQSIGN_TENCENT_COS_URL: ${{ secrets.REQSIGN_TENCENT_COS_URL }}
+          REQSIGN_TENCENT_COS_ROLE_ARN: ${{ secrets.REQSIGN_TENCENT_COS_ROLE_ARN }}
+          REQSIGN_TENCENT_COS_PROVIDER_ID: ${{ secrets.REQSIGN_TENCENT_COS_PROVIDER_ID }}
+          REQSIGN_TENCENT_COS_REGION: ${{ secrets.REQSIGN_TENCENT_COS_REGION }}
