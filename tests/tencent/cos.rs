@@ -27,17 +27,17 @@ fn init_signer() -> Option<(TencentCosCredentialLoader, TencentCosSigner)> {
     }
 
     let config = TencentCosConfig {
-        access_key_id: Some(
+        secret_id: Some(
             env::var("REQSIGN_TENCENT_COS_ACCESS_KEY")
                 .expect("env REQSIGN_TENCENT_COS_ACCESS_KEY must set"),
         ),
-        secret_access_key: Some(
+        secret_key: Some(
             env::var("REQSIGN_TENCENT_COS_SECRET_KEY")
                 .expect("env REQSIGN_TENCENT_COS_SECRET_KEY must set"),
         ),
         ..Default::default()
     };
-    let loader = TencentCosCredentialLoader::new(config);
+    let loader = TencentCosCredentialLoader::new(reqwest::Client::new(), config);
 
     Some((loader, TencentCosSigner::new()))
 }

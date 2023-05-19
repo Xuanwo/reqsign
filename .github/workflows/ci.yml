@@ -63,6 +63,8 @@ jobs:
         env:
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full
+          # Set github token
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Azure Storage Test
           REQSIGN_AZURE_STORAGE_TEST: ${{ secrets.REQSIGN_AZURE_STORAGE_TEST }}
           REQSIGN_AZURE_STORAGE_URL: ${{ secrets.REQSIGN_AZURE_STORAGE_URL }}
@@ -98,13 +100,16 @@ jobs:
           REQSIGN_TENCENT_COS_ACCESS_KEY: ${{ secrets.REQSIGN_TENCENT_COS_ACCESS_KEY }}
           REQSIGN_TENCENT_COS_SECRET_KEY: ${{ secrets.REQSIGN_TENCENT_COS_SECRET_KEY }}
           REQSIGN_TENCENT_COS_URL: ${{ secrets.REQSIGN_TENCENT_COS_URL }}
+          REQSIGN_TENCENT_COS_ROLE_ARN: ${{ secrets.REQSIGN_TENCENT_COS_ROLE_ARN }}
+          REQSIGN_TENCENT_COS_PROVIDER_ID: ${{ secrets.REQSIGN_TENCENT_COS_PROVIDER_ID }}
+          REQSIGN_TENCENT_COS_REGION: ${{ secrets.REQSIGN_TENCENT_COS_REGION }}
 
   test_gcs_wif:
     runs-on: ubuntu-latest
     permissions:
       contents: "read"
       id-token: "write"
-    if: github.event.pull_request.head.repo.full_name == 'Xuanwo/reqsign'
+    if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
     steps:
       - uses: actions/checkout@v3
       - name: Install cargo-nextest
