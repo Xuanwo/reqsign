@@ -44,7 +44,7 @@ pub struct Config {
     /// `web_identity_token_file` will be loaded from
     ///
     /// - this field if it's `is_some`
-    /// - env value: [`TENCENTCLOUD_WEB_IDENTITY_TOKEN_FILE`] or [`TKE_WEB_IDENTITY_TOKEN_FILE`]
+    /// - env value: [`TENCENTCLOUD_WEB_IDENTITY_TOKEN_FILE`] or [`TKE_IDENTITY_TOKEN_FILE`]
     pub web_identity_token_file: Option<String>,
 }
 
@@ -119,7 +119,7 @@ impl Config {
 
         if let Some(v) = envs
             .get(TENCENTCLOUD_WEB_IDENTITY_TOKEN_FILE)
-            .or_else(|| envs.get(TKE_WEB_IDENTITY_TOKEN_FILE))
+            .or_else(|| envs.get(TKE_IDENTITY_TOKEN_FILE))
         {
             self.web_identity_token_file = Some(v.to_string());
         }
