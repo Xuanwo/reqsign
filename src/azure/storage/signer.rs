@@ -25,8 +25,6 @@ use crate::time::DateTime;
 /// - [Authorize with Shared Key](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
 #[derive(Debug, Default)]
 pub struct Signer {
-    /// whether to omit service version or not
-    omit_service_version: bool,
     time: Option<DateTime>,
 }
 
@@ -34,12 +32,6 @@ impl Signer {
     /// Create a signer.
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// set the signer to omitting service version
-    pub fn omit_service_version(mut self) -> Self {
-        self.omit_service_version = true;
-        self
     }
 
     /// Specify the signing time.
@@ -73,11 +65,7 @@ impl Signer {
                 }
                 SigningMethod::Header => {
                     ctx.headers
-                        .insert(X_MS_VERSION, AZURE_VERSION.to_string().parse()?);
-                    if self.omit_service_version {
-                        ctx.headers
-                            .insert(X_MS_DATE, format_http_date(time::now()).parse()?);
-                    }
+                        .insert(X_MS_DATE, format_http_date(time::now()).parse()?);
                     ctx.headers.insert(AUTHORIZATION, {
                         let mut value: HeaderValue = format!("Bearer {}", token).parse()?;
                         value.set_sensitive(true);
@@ -100,8 +88,7 @@ impl Signer {
                 }
                 SigningMethod::Header => {
                     let now = self.time.unwrap_or_else(time::now);
-                    let string_to_sign =
-                        string_to_sign(&mut ctx, ak, now, self.omit_service_version)?;
+                    let string_to_sign = string_to_sign(&mut ctx, ak, now)?;
                     let signature =
                         base64_hmac_sha256(&base64_decode(sk), string_to_sign.as_bytes());
 
@@ -192,12 +179,7 @@ impl Signer {
 /// ## Reference
 ///
 /// - [Blob, Queue, and File Services (Shared Key authorization)](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
-fn string_to_sign(
-    ctx: &mut SigningContext,
-    ak: &str,
-    now: DateTime,
-    omit_service_version: bool,
-) -> Result<String> {
+fn string_to_sign(ctx: &mut SigningContext, ak: &str, now: DateTime) -> Result<String> {
     let mut s = String::with_capacity(128);
 
     writeln!(&mut s, "{}", ctx.method.as_str())?;
@@ -225,11 +207,7 @@ fn string_to_sign(
         ctx.header_get_or_default(&IF_UNMODIFIED_SINCE)?
     )?;
     writeln!(&mut s, "{}", ctx.header_get_or_default(&RANGE)?)?;
-    writeln!(
-        &mut s,
-        "{}",
-        canonicalize_header(ctx, now, omit_service_version)?
-    )?;
+    writeln!(&mut s, "{}", canonicalize_header(ctx, now)?)?;
     write!(&mut s, "{}", canonicalize_resource(ctx, ak))?;
 
     debug!("string to sign: {}", &s);
@@ -240,18 +218,9 @@ fn string_to_sign(
 /// ## Reference
 ///
 /// - [Constructing the canonicalized headers string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string)
-fn canonicalize_header(
-    ctx: &mut SigningContext,
-    now: DateTime,
-    omit_service_version: bool,
-) -> Result<String> {
+fn canonicalize_header(ctx: &mut SigningContext, now: DateTime) -> Result<String> {
     ctx.headers
         .insert(X_MS_DATE, format_http_date(now).parse()?);
-    if !omit_service_version {
-        // Insert x_ms_version header.
-        ctx.headers
-            .insert(X_MS_VERSION, AZURE_VERSION.to_string().parse()?);
-    }
 
     Ok(SigningContext::header_to_string(
         ctx.header_to_vec_with_prefix("x-ms-"),

@@ -55,6 +55,7 @@ async fn test_head_blob() -> Result<()> {
 
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::HEAD);
+    builder = builder.header("x-ms-version", "2023-01-03");
     builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
     let mut req = builder.body("")?;
 
@@ -94,6 +95,8 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
 
     let mut req = http::Request::new("");
     *req.method_mut() = http::Method::HEAD;
+    req.headers_mut()
+        .insert("x-ms-version", "2023-01-03".parse().unwrap());
     *req.uri_mut() = http::Uri::from_str(&format!(
         "{}/{}",
         url,
@@ -145,6 +148,7 @@ async fn test_list_container_blobs() -> Result<()> {
         let mut builder = http::Request::builder();
         builder = builder.method(http::Method::GET);
         builder = builder.uri(format!("{url}?{query}"));
+        builder = builder.header("x-ms-version", "2023-01-03");
         let mut req = builder.body("")?;
 
         let cred = loader
@@ -185,6 +189,7 @@ async fn test_can_head_blob_with_sas() -> Result<()> {
 
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::HEAD);
+    builder = builder.header("x-ms-version", "2023-01-03");
     builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
     let mut req = builder.body("")?;
 
@@ -233,6 +238,7 @@ async fn test_can_list_container_blobs() -> Result<()> {
     ] {
         let mut builder = http::Request::builder();
         builder = builder.method(http::Method::GET);
+        builder = builder.header("x-ms-version", "2023-01-03");
         builder = builder.uri(format!("{url}?{query}"));
         let mut req = builder.body("")?;
 
@@ -287,6 +293,7 @@ async fn test_head_blob_with_ldms() -> Result<()> {
 
     let mut req = http::Request::builder()
         .method(http::Method::HEAD)
+        .header("x-ms-version", "2023-01-03")
         .uri(format!("{}/{}", url, "not_exist_file"))
         .body("")?;
 
@@ -344,6 +351,7 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
     ] {
         let mut builder = http::Request::builder();
         builder = builder.method(http::Method::GET);
+        builder = builder.header("x-ms-version", "2023-01-03");
         builder = builder.uri(format!("{url}?{query}"));
         let mut req = builder.body("")?;
 
