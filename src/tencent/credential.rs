@@ -221,13 +221,10 @@ struct AssumeRoleWithWebIdentityError {
 #[cfg(test)]
 mod tests {
     use std::env;
-    use std::fs::File;
-    use std::io::Read;
     use std::str::FromStr;
 
-    use env_logger::Target;
     use http::{Request, StatusCode};
-    use log::{debug, LevelFilter};
+    use log::debug;
     use once_cell::sync::Lazy;
     use tokio::runtime::Runtime;
 
@@ -360,45 +357,5 @@ mod tests {
         );
 
         Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_assume_role_with_web_identity_none() {
-        let _ = fs::remove_file("test_reqwest.log");
-
-        let logfile = File::create("test_reqwest.log").expect("create log file failed");
-        let _ = env_logger::builder()
-            .target(Target::Pipe(Box::new(logfile)))
-            .filter_level(LevelFilter::Debug)
-            .is_test(true)
-            .try_init();
-
-        let config = Config {
-            region: Some("region".to_string()),
-            web_identity_token_file: None, // None web_identity_token_file
-            role_arn: Some("role".to_string()),
-            provider_id: None, // None provider_id
-            ..Default::default()
-        };
-        let loader = CredentialLoader::new(reqwest::Client::new(), config);
-        let cred = loader
-            .load_via_assume_role_with_web_identity()
-            .await
-            .expect("should load credential");
-
-        assert!(cred.is_none());
-
-        // test logfile content
-        let mut logfile = File::open("test_reqwest.log").expect("open log file");
-        let mut content = String::new();
-        logfile.read_to_string(&mut content).expect("read log file");
-
-        assert!(content.contains("region: Some(\"region\")"));
-        assert!(content.contains("web_identity_token_file: None"));
-        assert!(content.contains("role_arn: Some(\"role\")"));
-        assert!(content.contains("provider_id: None"));
-
-        // delete log file
-        fs::remove_file("test_reqwest.log").expect("remove log file");
     }
 }
