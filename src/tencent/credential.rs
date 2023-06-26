@@ -115,7 +115,28 @@ impl CredentialLoader {
             (Some(region), Some(token_file), Some(role_arn), Some(provider_id)) => {
                 (region, token_file, role_arn, provider_id)
             }
-            _ => return Ok(None),
+            _ => {
+                let missing = [
+                    ("region", self.config.region.is_none()),
+                    (
+                        "web_identity_token_file",
+                        self.config.web_identity_token_file.is_none(),
+                    ),
+                    ("role_arn", self.config.role_arn.is_none()),
+                    ("provider_id", self.config.provider_id.is_none()),
+                ]
+                .iter()
+                .filter_map(|&(k, v)| if v { Some(k) } else { None })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+                debug!(
+                    "assume_role_with_web_identity is not configured fully: [{}] is missing",
+                    missing
+                );
+
+                return Ok(None);
+            }
         };
 
         let token = fs::read_to_string(token_file)?;
