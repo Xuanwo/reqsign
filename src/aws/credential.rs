@@ -14,6 +14,7 @@ use reqwest::Client;
 use serde::Deserialize;
 
 use super::config::Config;
+use crate::aws::v4::Signer;
 use crate::time::now;
 use crate::time::parse_rfc3339;
 use crate::time::DateTime;
@@ -109,8 +110,9 @@ impl Loader {
     /// 1. Environment variables
     /// 2. Shared config (`~/.aws/config`, `~/.aws/credentials`)
     /// 3. Web Identity Tokens
-    /// 4. ECS (IAM Roles for Tasks) & General HTTP credentials:
-    /// 5. EC2 IMDSv2
+    /// 4. EC2 IMDSv2
+    ///
+    /// Assume to Role if provided.
     pub async fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it has been loaded at least once.
         match self.credential.lock().expect("lock poisoned").clone() {
@@ -118,11 +120,15 @@ impl Loader {
             _ => (),
         }
 
-        let cred = self.load_inner().await?;
+        let source_cred = self.load_inner().await?;
 
+        let cred = if let Some(c) = source_cred {
+            self.load_via_assume_role(c).await?
+        } else {
+            None
+        };
         let mut lock = self.credential.lock().expect("lock poisoned");
         *lock = cred.clone();
-
         Ok(cred)
     }
 
@@ -148,14 +154,6 @@ impl Loader {
             .map_err(|err| {
                 debug!("load credential via assume_role_with_web_identity failed: {err:?}")
             })
-        {
-            return Ok(Some(cred));
-        }
-
-        if let Ok(Some(cred)) = self
-            .load_via_assume_role()
-            .await
-            .map_err(|err| debug!("load credential via assume_role failed: {err:?}"))
         {
             return Ok(Some(cred));
         }
@@ -269,26 +267,41 @@ impl Loader {
         Ok(Some(cred))
     }
 
-    async fn load_via_assume_role(&self) -> Result<Option<Credential>> {
-        let role_arn = match &self.config.role_arn {
+    async fn load_via_assume_role(&self, cred: Credential) -> Result<Option<Credential>> {
+        let role_arn = match &self.config.assume_role_arn {
             Some(role_arn) => role_arn,
-            None => return Ok(None),
+            None => return Ok(Some(cred)),
         };
+        let duration_seconds = &self.config.duration_seconds;
         let role_session_name = &self.config.role_session_name;
 
+        let region = match &self.config.region {
+            Some(region) => region,
+            None => return Ok(Some(cred)),
+        };
         let endpoint = self.sts_endpoint()?;
+
+        let signer = Signer::new("sts", region);
 
         // Construct request to AWS STS Service.
         let mut url = format!("https://{endpoint}/?Action=AssumeRole&RoleArn={role_arn}&Version=2011-06-15&RoleSessionName={role_session_name}");
         if let Some(external_id) = &self.config.external_id {
             write!(url, "&ExternalId={external_id}")?;
         }
-        let req = self.client.get(&url).header(
-            http::header::CONTENT_TYPE.as_str(),
-            "application/x-www-form-urlencoded",
-        );
+        if *duration_seconds > 0 {
+            write!(url, "&DurationSeconds={duration_seconds}")?;
+        }
+        let mut req = self
+            .client
+            .get(&url)
+            .header(
+                http::header::CONTENT_TYPE.as_str(),
+                "application/x-www-form-urlencoded",
+            )
+            .build()?;
+        signer.sign(&mut req, &cred)?;
 
-        let resp = req.send().await?;
+        let resp = self.client.execute(req).await?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.text().await?;
             return Err(anyhow!("request to AWS STS Services failed: {content}"));
