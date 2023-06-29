@@ -435,13 +435,11 @@ struct Ec2MetadataIamSecurityCredentials {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
     use std::str::FromStr;
+    use std::{env, vec};
 
     use anyhow::Result;
-    use base64::prelude::BASE64_STANDARD;
-    use base64::Engine;
-    use http::Request;
+    use http::{Request, StatusCode};
     use once_cell::sync::Lazy;
     use quick_xml::de;
     use reqwest::Client;
@@ -449,6 +447,7 @@ mod tests {
 
     use super::*;
     use crate::aws::constants::*;
+    use crate::aws::v4::Signer;
 
     static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         tokio::runtime::Builder::new_multi_thread()
@@ -620,55 +619,64 @@ mod tests {
             return Ok(());
         }
 
-        let role_arn = env::var("REQSIGN_AWS_ROLE_ARN").expect("REQSIGN_AWS_ROLE_ARN not exist");
-        let idp_url = env::var("REQSIGN_AWS_IDP_URL").expect("REQSIGN_AWS_IDP_URL not exist");
-        let idp_content = BASE64_STANDARD
-            .decode(env::var("REQSIGN_AWS_IDP_BODY").expect("REQSIGN_AWS_IDP_BODY not exist"))?;
+        // Ignore test if role_arn not set
+        let role_arn = if let Ok(v) = env::var("REQSIGN_AWS_ROLE_ARN") {
+            v
+        } else {
+            return Ok(());
+        };
 
-        let client = Client::new();
+        // let provider_arn = env::var("REQSIGN_AWS_PROVIDER_ARN").expect("REQSIGN_AWS_PROVIDER_ARN not exist");
+        let region = env::var("REQSIGN_AWS_V4_REGION").expect("REQSIGN_AWS_V4_REGION not exist");
 
-        let mut req = Request::new(idp_content);
-        *req.method_mut() = http::Method::POST;
-        *req.uri_mut() = http::Uri::from_str(&idp_url)?;
-        req.headers_mut()
-            .insert(http::header::CONTENT_TYPE, "application/json".parse()?);
-
-        let token = RUNTIME.block_on(async {
-            #[derive(Deserialize)]
-            struct Token {
-                access_token: String,
-            }
-            client
-                .execute(req.try_into().unwrap())
-                .await
-                .unwrap()
-                .json::<Token>()
-                .await
-                .unwrap()
-                .access_token
-        });
-
+        let github_token = env::var("GITHUB_ID_TOKEN").expect("GITHUB_ID_TOKEN not exist");
         let file_path = format!(
             "{}/testdata/services/aws/web_identity_token_file",
             env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()
         );
-        fs::write(&file_path, token)?;
+        fs::write(&file_path, github_token)?;
 
         temp_env::with_vars(
             vec![
-                ("AWS_ROLE_ARN", Some(&role_arn)),
-                ("AWS_WEB_IDENTITY_TOKEN_FILE", Some(&file_path)),
+                (AWS_REGION, Some(&region)),
+                (AWS_ROLE_ARN, Some(&role_arn)),
+                (AWS_WEB_IDENTITY_TOKEN_FILE, Some(&file_path)),
             ],
             || {
-                let l = Loader::new(Client::new(), Config::default().from_env());
-                let x = RUNTIME
-                    .block_on(l.load())
-                    .expect("load_credential must success")
+                RUNTIME.block_on(async {
+                    let config = Config::default().from_env();
+                    let loader = Loader::new(reqwest::Client::new(), config);
+
+                    let signer = Signer::new("s3", &region);
+
+                    let mut req = Request::new("");
+                    *req.method_mut() = http::Method::GET;
+                    *req.uri_mut() = http::Uri::from_str(
+                        "https://s3.amazonaws.com/opendal-testing/not_exist_file",
+                    )
                     .unwrap();
 
-                assert!(x.is_valid());
+                    let cred = loader
+                        .load()
+                        .await
+                        .expect("credential must be valid")
+                        .unwrap();
+
+                    signer.sign(&mut req, &cred).expect("sign must success");
+
+                    debug!("signed request url: {:?}", req.uri().to_string());
+                    debug!("signed request: {:?}", req);
+
+                    let client = Client::new();
+                    let resp = client.execute(req.try_into().unwrap()).await.unwrap();
+
+                    let status = resp.status();
+                    debug!("got response: {:?}", resp);
+                    debug!("got response content: {:?}", resp.text().await.unwrap());
+                    assert_eq!(status, StatusCode::NOT_FOUND);
+                })
             },
         );
 
