@@ -651,12 +651,11 @@ mod tests {
 
                     let signer = Signer::new("s3", &region);
 
+                    let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
                     let mut req = Request::new("");
                     *req.method_mut() = http::Method::GET;
-                    *req.uri_mut() = http::Uri::from_str(
-                        "https://s3.amazonaws.com/opendal-testing/not_exist_file",
-                    )
-                    .unwrap();
+                    *req.uri_mut() =
+                        http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
 
                     let cred = loader
                         .load()
