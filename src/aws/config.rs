@@ -84,6 +84,22 @@ pub struct Config {
     /// - env value: [`AWS_WEB_IDENTITY_TOKEN_FILE`]
     /// - profile config: `web_identity_token_file`
     pub web_identity_token_file: Option<String>,
+
+    /// `assume_role_arn` indicates the role to assume.
+    pub assume_role_arn: Option<String>,
+    /// `duration_seconds` indicates the duration (in seconds) of the role session.
+    /// available values: `900` to `43200` or configured maximum session duration
+    /// default to `3600`
+    pub duration_seconds: i64,
+    // /// `credential_source` indicates the source of the credentials
+    // /// to use for the initial AssumeRole call.
+    // /// `credential_source` and `source_profile` are mutually exclusive.
+    // /// available values: `Environment`, `Ec2InstanceMetadata`
+    // pub credential_source: Option<String>,
+    // /// `source_profile` indicates the source profile to use for
+    // /// the initial AssumeRole call.
+    // /// `credential_source` and `source_profile` are mutually exclusive.
+    // pub source_profile: Option<String>,
 }
 
 impl Default for Config {
@@ -101,6 +117,8 @@ impl Default for Config {
             role_session_name: "reqsign".to_string(),
             external_id: None,
             web_identity_token_file: None,
+            assume_role_arn: None,
+            duration_seconds: DEFAULT_ROLE_DURATION_SECONDS,
         }
     }
 }
