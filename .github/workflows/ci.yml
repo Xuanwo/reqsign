@@ -185,7 +185,9 @@ jobs:
         env:
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full
-          REQSIGN_AWS_S3_TEST: ${{ secrets.REQSIGN_AWS_S3_TEST }}
-          REQSIGN_AWS_S3_REGION: ${{ secrets.REQSIGN_AWS_S3_REGION }}
+          # REQSIGN_AWS_S3_TEST: ${{ secrets.REQSIGN_AWS_S3_TEST }}
+          # REQSIGN_AWS_S3_REGION: ${{ secrets.REQSIGN_AWS_S3_REGION }}
+          REQSIGN_AWS_S3_TEST: on
+          REQSIGN_AWS_S3_REGION: us-east-2
           REQSIGN_AWS_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ROLE_ARN }}
           REQSIGN_AWS_PROVIDER_ARN: ${{ secrets.REQSIGN_AWS_PROVIDER_ARN }}
