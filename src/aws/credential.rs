@@ -613,8 +613,8 @@ mod tests {
 
         dotenv::from_filename(".env").ok();
 
-        if env::var("REQSIGN_AWS_V4_TEST").is_err()
-            || env::var("REQSIGN_AWS_V4_TEST").unwrap() != "on"
+        if env::var("REQSIGN_AWS_S3_TEST").is_err()
+            || env::var("REQSIGN_AWS_S3_TEST").unwrap() != "on"
         {
             return Ok(());
         }
@@ -627,7 +627,7 @@ mod tests {
         };
 
         // let provider_arn = env::var("REQSIGN_AWS_PROVIDER_ARN").expect("REQSIGN_AWS_PROVIDER_ARN not exist");
-        let region = env::var("REQSIGN_AWS_V4_REGION").expect("REQSIGN_AWS_V4_REGION not exist");
+        let region = env::var("REQSIGN_AWS_S3_REGION").expect("REQSIGN_AWS_S3_REGION not exist");
 
         let github_token = env::var("GITHUB_ID_TOKEN").expect("GITHUB_ID_TOKEN not exist");
         let file_path = format!(
@@ -651,12 +651,11 @@ mod tests {
 
                     let signer = Signer::new("s3", &region);
 
+                    let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
                     let mut req = Request::new("");
                     *req.method_mut() = http::Method::GET;
-                    *req.uri_mut() = http::Uri::from_str(
-                        "https://s3.amazonaws.com/opendal-testing/not_exist_file",
-                    )
-                    .unwrap();
+                    *req.uri_mut() =
+                        http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
 
                     let cred = loader
                         .load()
