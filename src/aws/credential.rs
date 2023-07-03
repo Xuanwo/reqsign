@@ -302,6 +302,7 @@ impl Loader {
             //     http::header::CONTENT_TYPE.as_str(),
             //     "application/x-www-form-urlencoded",
             // )
+            .body("")
             .build()?;
         signer.sign(&mut req, &cred)?;
         debug!("request to AWS STS Services: {:?}", req);
