@@ -297,7 +297,7 @@ impl Loader {
         }
         let mut req = self
             .client
-            .get(&url)
+            .post(&url)
             .header(
                 http::header::CONTENT_TYPE.as_str(),
                 "application/x-www-form-urlencoded",
