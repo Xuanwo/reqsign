@@ -297,7 +297,7 @@ impl Loader {
         // let signer = Signer::new("sts", DEFAULT_STS_REGION);
 
         // Construct request to AWS STS Service.
-        let mut url = format!("https://{endpoint}?Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
+        let mut url = format!("https://{endpoint}/?Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
         if let Some(external_id) = &self.config.external_id {
             write!(url, "&ExternalId={external_id}")?;
         }
