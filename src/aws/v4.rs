@@ -55,8 +55,7 @@ impl Signer {
     ///
     /// We should always take current time to sign requests.
     /// Only use this function for testing.
-    // DEBUG:
-    // #[cfg(test)]
+    #[cfg(test)]
     pub fn time(mut self, time: DateTime) -> Self {
         self.time = Some(time);
         self
