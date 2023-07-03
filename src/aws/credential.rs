@@ -324,9 +324,11 @@ impl Loader {
         let mut ss = SigningSettings::default();
         ss.percent_encoding_mode = PercentEncodingMode::Double;
         ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+        let session_token = cred.session_token.clone().unwrap();
         let sp = SigningParams::builder()
             .access_key(&cred.access_key_id)
             .secret_key(&cred.secret_access_key)
+            .security_token(&session_token)
             .region(region)
             .service_name("sts")
             .time(SystemTime::from(now))
@@ -350,7 +352,7 @@ impl Loader {
         signer.sign(&mut req2, &cred)?;
         debug!("request to AWS STS Services: real: {:?}", req2);
 
-        let real_req = reqwest::Request::try_from(req2)?;
+        let real_req = reqwest::Request::try_from(req)?;
         let resp = self.client.execute(real_req).await?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.text().await?;
