@@ -307,10 +307,10 @@ impl Loader {
         let duration = duration_seconds.to_string();
         let mut params = BTreeMap::new();
         params.insert("Action", "AssumeRole");
-        params.insert("DurationSeconds", &duration);
+        params.insert("Version", "2011-06-15");
         params.insert("RoleArn", role_arn);
         params.insert("RoleSessionName", role_session_name);
-        params.insert("Version", "2011-06-15");
+        params.insert("DurationSeconds", &duration);
         if let Some(external_id) = &self.config.external_id {
             params.insert("ExternalId", external_id);
         }
