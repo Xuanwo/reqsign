@@ -281,13 +281,14 @@ fn canonicalize_header(
             ctx.headers.insert(X_AMZ_DATE, date_header);
         }
 
-        // Insert X_AMZ_CONTENT_SHA_256 header if not present.
-        if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
-            ctx.headers.insert(
-                X_AMZ_CONTENT_SHA_256,
-                HeaderValue::from_static("UNSIGNED-PAYLOAD"),
-            );
-        }
+        // DEBUG:
+        // // Insert X_AMZ_CONTENT_SHA_256 header if not present.
+        // if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
+        //     ctx.headers.insert(
+        //         X_AMZ_CONTENT_SHA_256,
+        //         HeaderValue::from_static("UNSIGNED-PAYLOAD"),
+        //     );
+        // }
 
         // Insert X_AMZ_SECURITY_TOKEN header if security token exists.
         if let Some(token) = &cred.session_token {
