@@ -254,7 +254,7 @@ fn canonical_request_string(ctx: &mut SigningContext, service: &str) -> Result<S
     // https://github.com/aws/aws-sdk-go/blob/v1.44.294/aws/signer/v4/v4.go#L692
     if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
         if service == "s3" {
-            write!(f, "{}", "UNSIGNED-PAYLOAD")?;
+            write!(f, "UNSIGNED-PAYLOAD")?;
         } else {
             write!(f, "{}", EMPTY_STRING_SHA256)?;
         }

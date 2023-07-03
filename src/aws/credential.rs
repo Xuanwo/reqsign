@@ -334,7 +334,6 @@ impl Loader {
                 .collect::<Vec<_>>()
         );
 
-        let req = reqwest::Request::try_from(req)?;
         let resp = self.client.execute(req).await?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.text().await?;
