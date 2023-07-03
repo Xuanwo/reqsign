@@ -318,7 +318,7 @@ impl Loader {
         if let Some(external_id) = &self.config.external_id {
             params.insert("ExternalId", external_id);
         }
-        let mut req = self.client.get(&url).form(&params).build()?;
+        let mut req = self.client.post(&url).form(&params).build()?;
         // we know the body is not empty, so unwrap is safe.
         let body_hash = hex_sha256(req.body().unwrap().as_bytes().unwrap());
         req.headers_mut()
