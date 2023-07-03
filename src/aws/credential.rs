@@ -14,6 +14,7 @@ use reqwest::Client;
 use serde::Deserialize;
 
 use super::config::Config;
+use super::constants::DEFAULT_STS_REGION;
 use crate::aws::v4::Signer;
 use crate::time::now;
 use crate::time::parse_rfc3339;
@@ -282,7 +283,7 @@ impl Loader {
         let endpoint = self.sts_endpoint()?;
 
         // let signer = Signer::new("sts", region);
-        let signer = Signer::new("sts", "us-east-1");
+        let signer = Signer::new("sts", DEFAULT_STS_REGION);
 
         // Construct request to AWS STS Service.
         let mut url = format!("https://{endpoint}/?Action=AssumeRole&RoleArn={role_arn}&Version=2011-06-15&RoleSessionName={role_session_name}");

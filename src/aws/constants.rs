@@ -19,6 +19,7 @@ pub const AWS_ROLE_ARN: &str = "AWS_ROLE_ARN";
 pub const AWS_ROLE_SESSION_NAME: &str = "AWS_ROLE_SESSION_NAME";
 pub const AWS_STS_REGIONAL_ENDPOINTS: &str = "AWS_STS_REGIONAL_ENDPOINTS";
 
+pub const DEFAULT_STS_REGION: &str = "us-east-1";
 pub const DEFAULT_ROLE_DURATION_SECONDS: i64 = 3600;
 
 /// AsciiSet for [AWS UriEncode](https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html)
