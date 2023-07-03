@@ -303,7 +303,7 @@ impl Loader {
                 "application/x-www-form-urlencoded",
             )
             .build()?;
-        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
+        // signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
 
         let resp = self.client.execute(req).await?;
         if resp.status() != http::StatusCode::OK {
