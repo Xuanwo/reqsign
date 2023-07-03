@@ -367,10 +367,6 @@ impl Loader {
         signer.sign(&mut req, &cred)?;
         debug!("request to AWS STS Services: real: {:?}", req);
         debug!(
-            "request to AWS STS Services: body: {}",
-            String::from_utf8_lossy(req.body().unwrap().as_bytes().unwrap())
-        );
-        debug!(
             "request to AWS STS Services: headers: {:?}",
             req.headers()
                 .iter()
