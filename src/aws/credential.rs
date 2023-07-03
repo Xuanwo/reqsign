@@ -302,7 +302,8 @@ impl Loader {
         // let signer = Signer::new("sts", DEFAULT_STS_REGION);
 
         let encoded_role_arn = utf8_percent_encode(role_arn, NON_ALPHANUMERIC).to_string();
-        let url = format!("https://{endpoint}/?Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={encoded_role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
+        // let url = format!("https://{endpoint}/?Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={encoded_role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
+        let url = format!("https://{endpoint}/?Action=GetCallerIdentity&Version=2011-06-15");
         let mut req = self.client.get(&url).build()?;
 
         // Construct request to AWS STS Service.
@@ -380,8 +381,10 @@ impl Loader {
             let content = resp.text().await?;
             return Err(anyhow!("request to AWS STS Services failed: {content}"));
         }
+        let response_text = resp.text().await?;
+        debug!("response from AWS STS Services: {:?}", &response_text);
 
-        let resp: AssumeRoleResponse = de::from_str(&resp.text().await?)?;
+        let resp: AssumeRoleResponse = de::from_str(&response_text)?;
         let resp_cred = resp.result.credentials;
 
         let cred = Credential {
