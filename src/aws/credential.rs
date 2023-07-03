@@ -329,7 +329,7 @@ impl Loader {
             .access_key(&cred.access_key_id)
             .secret_key(&cred.secret_access_key)
             .security_token(&session_token)
-            .region(region)
+            .region("us-east-1")
             .service_name("sts")
             .time(SystemTime::from(now))
             .settings(ss)
