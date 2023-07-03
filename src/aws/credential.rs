@@ -281,7 +281,7 @@ impl Loader {
             Some(region) => region,
             None => return Ok(Some(cred)),
         };
-        let endpoint = self.sts_endpoint()?;
+        let endpoint = self.sts_endpoint(true)?;
 
         let signer = Signer::new("sts", region);
         // let signer = Signer::new("sts", DEFAULT_STS_REGION);
@@ -333,7 +333,7 @@ impl Loader {
         let token = fs::read_to_string(token_file)?;
         let role_session_name = &self.config.role_session_name;
 
-        let endpoint = self.sts_endpoint()?;
+        let endpoint = self.sts_endpoint(self.config.sts_regional_endpoints == "regional")?;
 
         // Construct request to AWS STS Service.
         let url = format!("https://{endpoint}/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
@@ -371,9 +371,9 @@ impl Loader {
     /// We can check them by region name.
     ///
     /// ref: https://github.com/awslabs/aws-sdk-rust/blob/31cfae2cf23be0c68a47357070dea1aee9227e3a/sdk/sts/src/aws_endpoint.rs
-    fn sts_endpoint(&self) -> Result<String> {
+    fn sts_endpoint(&self, regional: bool) -> Result<String> {
         // use regional sts if sts_regional_endpoints has been set.
-        if self.config.sts_regional_endpoints == "regional" {
+        if regional {
             let region = self.config.region.clone().ok_or_else(|| {
                 anyhow!("sts_regional_endpoints set to reginal, but region is not set")
             })?;
