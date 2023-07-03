@@ -10,6 +10,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use http::header::CONTENT_LENGTH;
 use log::debug;
+use percent_encoding::utf8_percent_encode;
+use percent_encoding::NON_ALPHANUMERIC;
 use quick_xml::de;
 use reqwest::Client;
 use serde::Deserialize;
@@ -272,7 +274,7 @@ impl Loader {
 
     async fn load_via_assume_role(&self, cred: Credential) -> Result<Option<Credential>> {
         let role_arn = match &self.config.assume_role_arn {
-            Some(role_arn) => role_arn,
+            Some(role_arn) => utf8_percent_encode(role_arn, NON_ALPHANUMERIC),
             None => return Ok(Some(cred)),
         };
         let duration_seconds = &self.config.duration_seconds;
@@ -302,7 +304,6 @@ impl Loader {
             //     http::header::CONTENT_TYPE.as_str(),
             //     "application/x-www-form-urlencoded",
             // )
-            .body("")
             .build()?;
         signer.sign(&mut req, &cred)?;
         debug!("request to AWS STS Services: {:?}", req);
