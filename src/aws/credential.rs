@@ -366,7 +366,10 @@ impl Loader {
 
         signer.sign(&mut req, &cred)?;
         debug!("request to AWS STS Services: real: {:?}", req);
-        debug!("request to AWS STS Services: body: {:?}", req.body());
+        debug!(
+            "request to AWS STS Services: body: {}",
+            String::from_utf8_lossy(req.body().unwrap().as_bytes().unwrap())
+        );
 
         // let real_req = reqwest::Request::try_from(req)?;
         let resp = self.client.execute(req).await?;
