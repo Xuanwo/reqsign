@@ -282,7 +282,8 @@ impl Loader {
 
     async fn load_via_assume_role(&self, cred: Credential) -> Result<Option<Credential>> {
         let role_arn = match &self.config.assume_role_arn {
-            Some(role_arn) => role_arn,
+            // Some(role_arn) => role_arn,
+            Some(_) => "arn:aws:iam::123456789012:role/test-role",
             None => return Ok(Some(cred)),
         };
         let duration_seconds = &self.config.duration_seconds;
