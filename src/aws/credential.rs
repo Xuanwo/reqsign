@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::fmt::Write;
 use std::fs;
@@ -292,72 +293,82 @@ impl Loader {
             Some(region) => region,
             None => return Ok(Some(cred)),
         };
-        let endpoint = self.sts_endpoint(false)?;
+        let endpoint = self.sts_endpoint(true)?;
 
         let signer = Signer::new("sts", region).time(now);
         // let signer = Signer::new("sts", DEFAULT_STS_REGION);
 
         // Construct request to AWS STS Service.
         let url = format!("https://{endpoint}/");
-        let mut body = format!("Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
+        // let mut body = format!("Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
+        // if let Some(external_id) = &self.config.external_id {
+        //     write!(body, "&ExternalId={external_id}")?;
+        // }
+        let duration = duration_seconds.to_string();
+        let mut params = BTreeMap::new();
+        params.insert("Action", "AssumeRole");
+        params.insert("DurationSeconds", &duration);
+        params.insert("RoleArn", role_arn);
+        params.insert("RoleSessionName", role_session_name);
+        params.insert("Version", "2011-06-15");
         if let Some(external_id) = &self.config.external_id {
-            write!(body, "&ExternalId={external_id}")?;
+            params.insert("ExternalId", external_id);
         }
-        // let mut req = self
-        //     .client
-        //     .post(&url)
-        //     .header(
-        //         http::header::CONTENT_TYPE.as_str(),
-        //         "application/x-www-form-urlencoded",
-        //     )
-        //     .body(body)
-        //     .build()?;
+        let mut req = self
+            .client
+            .post(&url)
+            // .header(
+            //     http::header::CONTENT_TYPE.as_str(),
+            //     "application/x-www-form-urlencoded",
+            // )
+            .form(&params)
+            .build()?;
 
-        let mut req = http::Request::new(body);
-        *req.method_mut() = http::Method::POST;
-        req.headers_mut().insert(
-            http::header::CONTENT_TYPE.as_str(),
-            HeaderValue::from_static("application/x-www-form-urlencoded"),
-        );
-        *req.uri_mut() = url.parse()?;
+        // let mut req = http::Request::new(body);
+        // *req.method_mut() = http::Method::POST;
+        // req.headers_mut().insert(
+        //     http::header::CONTENT_TYPE.as_str(),
+        //     HeaderValue::from_static("application/x-www-form-urlencoded"),
+        // );
+        // *req.uri_mut() = url.parse()?;
 
-        let mut ss = SigningSettings::default();
-        ss.percent_encoding_mode = PercentEncodingMode::Double;
-        ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
-        let session_token = cred.session_token.clone().unwrap();
-        let sp = SigningParams::builder()
-            .access_key(&cred.access_key_id)
-            .secret_key(&cred.secret_access_key)
-            .security_token(&session_token)
-            .region("us-east-1")
-            .service_name("sts")
-            .time(SystemTime::from(now))
-            .settings(ss)
-            .build()
-            .expect("signing params must be valid");
+        // let mut ss = SigningSettings::default();
+        // ss.percent_encoding_mode = PercentEncodingMode::Double;
+        // ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+        // let session_token = cred.session_token.clone().unwrap();
+        // let sp = SigningParams::builder()
+        //     .access_key(&cred.access_key_id)
+        //     .secret_key(&cred.secret_access_key)
+        //     .security_token(&session_token)
+        //     .region("us-east-1")
+        //     .service_name("sts")
+        //     .time(SystemTime::from(now))
+        //     .settings(ss)
+        //     .build()
+        //     .expect("signing params must be valid");
 
-        let mut body = SignableBody::UnsignedPayload;
-        if req.headers().get(X_AMZ_CONTENT_SHA_256).is_some() {
-            body = SignableBody::Bytes(req.body().as_bytes());
-        }
-        let output = aws_sigv4::http_request::sign(
-            SignableRequest::new(req.method(), req.uri(), req.headers(), body),
-            &sp,
-        )
-        .expect("signing must succeed");
-        let (aws_sig, _) = output.into_parts();
-        aws_sig.apply_to_request(&mut req);
-        debug!("request to AWS STS Services: expected: {:?}", &req);
+        // let mut body = SignableBody::UnsignedPayload;
+        // if req.headers().get(X_AMZ_CONTENT_SHA_256).is_some() {
+        //     body = SignableBody::Bytes(req.body().as_bytes());
+        // }
+        // let output = aws_sigv4::http_request::sign(
+        //     SignableRequest::new(req.method(), req.uri(), req.headers(), body),
+        //     &sp,
+        // )
+        // .expect("signing must succeed");
+        // let (aws_sig, _) = output.into_parts();
+        // aws_sig.apply_to_request(&mut req);
+        // debug!("request to AWS STS Services: expected: {:?}", &req);
 
         // let mut req2 = http::Request::new("");
         // *req2.method_mut() = http::Method::POST;
         // *req2.uri_mut() = url.parse()?;
 
-        // signer.sign(&mut req, &cred)?;
-        // debug!("request to AWS STS Services: real: {:?}", req);
+        signer.sign(&mut req, &cred)?;
+        debug!("request to AWS STS Services: real: {:?}", req);
 
-        let real_req = reqwest::Request::try_from(req)?;
-        let resp = self.client.execute(real_req).await?;
+        // let real_req = reqwest::Request::try_from(req)?;
+        let resp = self.client.execute(req).await?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.text().await?;
             return Err(anyhow!("request to AWS STS Services failed: {content}"));
