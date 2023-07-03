@@ -488,7 +488,6 @@ mod tests {
 
     use anyhow::Result;
     use http::{Request, StatusCode};
-    use log::LevelFilter;
     use once_cell::sync::Lazy;
     use quick_xml::de;
     use reqwest::Client;
