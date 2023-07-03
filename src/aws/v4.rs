@@ -12,6 +12,7 @@ use percent_encoding::percent_decode_str;
 use percent_encoding::utf8_percent_encode;
 
 use super::constants::AWS_QUERY_ENCODE_SET;
+use super::constants::EMPTY_STRING_SHA256;
 use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::constants::X_AMZ_DATE;
 use super::constants::X_AMZ_SECURITY_TOKEN;
@@ -75,7 +76,7 @@ impl Signer {
         canonicalize_query(&mut ctx, method, cred, now, &self.service, &self.region)?;
 
         // build canonical request and string to sign.
-        let creq = canonical_request_string(&mut ctx)?;
+        let creq = canonical_request_string(&mut ctx, &self.service)?;
         debug!("calculated canonical request: {creq}");
         let encoded_req = hex_sha256(creq.as_bytes());
 
@@ -212,7 +213,7 @@ impl Signer {
     }
 }
 
-fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
+fn canonical_request_string(ctx: &mut SigningContext, service: &str) -> Result<String> {
     // 256 is specially chosen to avoid reallocation for most requests.
     let mut f = String::with_capacity(256);
 
@@ -250,8 +251,13 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
     writeln!(f, "{}", signed_headers.join(";"))?;
 
     // HashedPayload – A string created using the payload in the body of the HTTP request as input to a hash function. This string uses lowercase hexadecimal characters. If the payload is empty, use an empty string as the input to the hash function.
+    // https://github.com/aws/aws-sdk-go/blob/v1.44.294/aws/signer/v4/v4.go#L692
     if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
-        write!(f, "{}", hex_sha256(b""))?;
+        if service == "s3" {
+            write!(f, "{}", "UNSIGNED-PAYLOAD")?;
+        } else {
+            write!(f, "{}", EMPTY_STRING_SHA256)?;
+        }
     } else {
         write!(f, "{}", ctx.headers[X_AMZ_CONTENT_SHA_256].to_str()?)?;
     }
