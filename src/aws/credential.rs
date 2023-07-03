@@ -333,7 +333,9 @@ impl Loader {
         let token = fs::read_to_string(token_file)?;
         let role_session_name = &self.config.role_session_name;
 
-        let endpoint = self.sts_endpoint(self.config.sts_regional_endpoints == "regional")?;
+        // let regional = self.config.sts_regional_endpoints == "regional";
+        let regional = true;
+        let endpoint = self.sts_endpoint(regional)?;
 
         // Construct request to AWS STS Service.
         let url = format!("https://{endpoint}/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
