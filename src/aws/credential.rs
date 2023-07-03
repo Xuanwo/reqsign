@@ -3,6 +3,7 @@ use std::fmt::Write;
 use std::fs;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use anyhow::anyhow;
 use anyhow::Result;
@@ -302,7 +303,7 @@ impl Loader {
                 "application/x-www-form-urlencoded",
             )
             .build()?;
-        signer.sign(&mut req, &cred)?;
+        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
 
         let resp = self.client.execute(req).await?;
         if resp.status() != http::StatusCode::OK {
@@ -333,8 +334,7 @@ impl Loader {
         let token = fs::read_to_string(token_file)?;
         let role_session_name = &self.config.role_session_name;
 
-        // let regional = self.config.sts_regional_endpoints == "regional";
-        let regional = true;
+        let regional = self.config.sts_regional_endpoints == "regional";
         let endpoint = self.sts_endpoint(regional)?;
 
         // Construct request to AWS STS Service.
