@@ -303,7 +303,7 @@ impl Loader {
                 "application/x-www-form-urlencoded",
             )
             .build()?;
-        signer.sign(&mut req, &cred)?;
+        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
         debug!("request to AWS STS Services: {:?}", req);
 
         let resp = self.client.execute(req).await?;
