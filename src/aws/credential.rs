@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 // use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::fmt::Write;
@@ -274,8 +275,7 @@ impl Loader {
 
     async fn load_via_assume_role(&self, cred: Credential) -> Result<Option<Credential>> {
         let role_arn = match &self.config.assume_role_arn {
-            // Some(role_arn) => role_arn,
-            Some(_) => "arn:aws:iam::123456789012:role/test-role",
+            Some(role_arn) => role_arn,
             None => return Ok(Some(cred)),
         };
         let duration_seconds = &self.config.duration_seconds;
@@ -294,33 +294,36 @@ impl Loader {
 
         // Construct request to AWS STS Service.
         let url = format!("https://{endpoint}/");
-        let mut body = format!("Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
-        if let Some(external_id) = &self.config.external_id {
-            write!(body, "&ExternalId={external_id}")?;
-        }
-        let body_hash = hex_sha256(body.as_bytes());
-
-        // let duration = duration_seconds.to_string();
-        // let mut params = BTreeMap::new();
-        // params.insert("Action", "AssumeRole");
-        // params.insert("Version", "2011-06-15");
-        // params.insert("RoleArn", role_arn);
-        // params.insert("RoleSessionName", role_session_name);
-        // params.insert("DurationSeconds", &duration);
+        // let mut body = format!("Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
         // if let Some(external_id) = &self.config.external_id {
-        //     params.insert("ExternalId", external_id);
+        //     write!(body, "&ExternalId={external_id}")?;
         // }
-        // let mut req = self.client.get(&url).form(&params).build()?;
+        // let body_hash = hex_sha256(body.as_bytes());
+        // let mut req = http::Request::new(body);
+        // *req.method_mut() = http::Method::POST;
+        // req.headers_mut().insert(
+        //     http::header::CONTENT_TYPE.as_str(),
+        //     HeaderValue::from_static("application/x-www-form-urlencoded"),
+        // );
+        // req.headers_mut()
+        //     .insert(X_AMZ_CONTENT_SHA_256, HeaderValue::from_str(&body_hash)?);
+        // *req.uri_mut() = url.parse()?;
 
-        let mut req = http::Request::new(body);
-        *req.method_mut() = http::Method::POST;
-        req.headers_mut().insert(
-            http::header::CONTENT_TYPE.as_str(),
-            HeaderValue::from_static("application/x-www-form-urlencoded"),
-        );
+        let duration = duration_seconds.to_string();
+        let mut params = BTreeMap::new();
+        params.insert("Action", "AssumeRole");
+        params.insert("Version", "2011-06-15");
+        params.insert("RoleArn", role_arn);
+        params.insert("RoleSessionName", role_session_name);
+        params.insert("DurationSeconds", &duration);
+        if let Some(external_id) = &self.config.external_id {
+            params.insert("ExternalId", external_id);
+        }
+        let mut req = self.client.get(&url).form(&params).build()?;
+        // we know the body is not empty, so unwrap is safe.
+        let body_hash = hex_sha256(req.body().unwrap().as_bytes().unwrap());
         req.headers_mut()
             .insert(X_AMZ_CONTENT_SHA_256, HeaderValue::from_str(&body_hash)?);
-        *req.uri_mut() = url.parse()?;
 
         signer.sign(&mut req, &cred)?;
         debug!("request to AWS STS Services: real: {:?}", req);
