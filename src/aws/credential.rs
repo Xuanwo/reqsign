@@ -12,6 +12,8 @@ use async_trait::async_trait;
 use http::header::CONTENT_LENGTH;
 use http::HeaderValue;
 use log::debug;
+use percent_encoding::utf8_percent_encode;
+use percent_encoding::NON_ALPHANUMERIC;
 use quick_xml::de;
 use reqwest::Client;
 use serde::Deserialize;
@@ -299,24 +301,28 @@ impl Loader {
         let signer = Signer::new("sts", region).time(now);
         // let signer = Signer::new("sts", DEFAULT_STS_REGION);
 
+        let encoded_role_arn = utf8_percent_encode(role_arn, NON_ALPHANUMERIC).to_string();
+        let url = format!("https://{endpoint}/?Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={encoded_role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
+        let mut req = self.client.get(&url).build()?;
+
         // Construct request to AWS STS Service.
-        let url = format!("https://{endpoint}/");
+        // let url = format!("https://{endpoint}/");
         // let mut body = format!("Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
         // if let Some(external_id) = &self.config.external_id {
         //     write!(body, "&ExternalId={external_id}")?;
         // }
 
-        let duration = duration_seconds.to_string();
-        let mut params = BTreeMap::new();
-        params.insert("Action", "AssumeRole");
-        params.insert("Version", "2011-06-15");
-        params.insert("RoleArn", role_arn);
-        params.insert("RoleSessionName", role_session_name);
-        params.insert("DurationSeconds", &duration);
-        if let Some(external_id) = &self.config.external_id {
-            params.insert("ExternalId", external_id);
-        }
-        let mut req = self.client.get(&url).form(&params).build()?;
+        // let duration = duration_seconds.to_string();
+        // let mut params = BTreeMap::new();
+        // params.insert("Action", "AssumeRole");
+        // params.insert("Version", "2011-06-15");
+        // params.insert("RoleArn", role_arn);
+        // params.insert("RoleSessionName", role_session_name);
+        // params.insert("DurationSeconds", &duration);
+        // if let Some(external_id) = &self.config.external_id {
+        //     params.insert("ExternalId", external_id);
+        // }
+        // let mut req = self.client.get(&url).form(&params).build()?;
 
         // let mut req = http::Request::new(body);
         // *req.method_mut() = http::Method::POST;
