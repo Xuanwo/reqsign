@@ -71,11 +71,12 @@ impl Signer {
         let mut ctx = req.build()?;
 
         // canonicalize context
-        canonicalize_header(&mut ctx, method, cred, now)?;
+        canonicalize_header(&mut ctx, method, cred, now, &self.service)?;
         canonicalize_query(&mut ctx, method, cred, now, &self.service, &self.region)?;
 
         // build canonical request and string to sign.
         let creq = canonical_request_string(&mut ctx)?;
+        debug!("calculated canonical request: {creq}");
         let encoded_req = hex_sha256(creq.as_bytes());
 
         // Scope: "20220313/<region>/<service>/aws4_request"
@@ -248,8 +249,10 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
     writeln!(f)?;
     writeln!(f, "{}", signed_headers.join(";"))?;
 
+    // HashedPayload – A string created using the payload in the body of the HTTP request as input to a hash function. This string uses lowercase hexadecimal characters. If the payload is empty, use an empty string as the input to the hash function.
     if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
-        write!(f, "UNSIGNED-PAYLOAD")?;
+        // write!(f, "UNSIGNED-PAYLOAD")?;
+        write!(f, "{}", hex_sha256(b""))?;
     } else {
         write!(f, "{}", ctx.headers[X_AMZ_CONTENT_SHA_256].to_str()?)?;
     }
@@ -262,6 +265,7 @@ fn canonicalize_header(
     method: SigningMethod,
     cred: &Credential,
     now: DateTime,
+    service: &str,
 ) -> Result<()> {
     // Header names and values need to be normalized according to Step 4 of https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
     for (_, value) in ctx.headers.iter_mut() {
@@ -281,8 +285,8 @@ fn canonicalize_header(
             ctx.headers.insert(X_AMZ_DATE, date_header);
         }
 
-        // Insert X_AMZ_CONTENT_SHA_256 header if not present.
-        if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
+        // Insert X_AMZ_CONTENT_SHA_256 header if not present only for s3 request.
+        if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() && service == "s3" {
             ctx.headers.insert(
                 X_AMZ_CONTENT_SHA_256,
                 HeaderValue::from_static("UNSIGNED-PAYLOAD"),
