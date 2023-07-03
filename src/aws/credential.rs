@@ -297,7 +297,7 @@ impl Loader {
         // let signer = Signer::new("sts", DEFAULT_STS_REGION);
 
         // Construct request to AWS STS Service.
-        let mut url = format!("https://{endpoint}/?Action=AssumeRole&RoleArn={role_arn}&Version=2011-06-15&RoleSessionName={role_session_name}");
+        let mut url = format!("https://{endpoint}?Action=AssumeRole&RoleArn={role_arn}&Version=2011-06-15&RoleSessionName={role_session_name}");
         if let Some(external_id) = &self.config.external_id {
             write!(url, "&ExternalId={external_id}")?;
         }
@@ -316,10 +316,6 @@ impl Loader {
         let mut req = http::Request::new("");
         *req.method_mut() = http::Method::POST;
         *req.uri_mut() = url.parse()?;
-
-        let mut req2 = http::Request::new("");
-        *req2.method_mut() = http::Method::POST;
-        *req2.uri_mut() = url.parse()?;
 
         let mut ss = SigningSettings::default();
         ss.percent_encoding_mode = PercentEncodingMode::Double;
@@ -348,6 +344,10 @@ impl Loader {
         let (aws_sig, _) = output.into_parts();
         aws_sig.apply_to_request(&mut req);
         debug!("request to AWS STS Services: expected: {:?}", &req);
+
+        let mut req2 = http::Request::new("");
+        *req2.method_mut() = http::Method::POST;
+        *req2.uri_mut() = url.parse()?;
 
         signer.sign(&mut req2, &cred)?;
         debug!("request to AWS STS Services: real: {:?}", req2);
