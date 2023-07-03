@@ -298,12 +298,12 @@ impl Loader {
         let mut req = self
             .client
             .post(&url)
-            .header(
-                http::header::CONTENT_TYPE.as_str(),
-                "application/x-www-form-urlencoded",
-            )
+            // .header(
+            //     http::header::CONTENT_TYPE.as_str(),
+            //     "application/x-www-form-urlencoded",
+            // )
             .build()?;
-        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
+        signer.sign(&mut req, &cred)?;
         debug!("request to AWS STS Services: {:?}", req);
 
         let resp = self.client.execute(req).await?;
