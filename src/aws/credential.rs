@@ -297,60 +297,61 @@ impl Loader {
         // let signer = Signer::new("sts", DEFAULT_STS_REGION);
 
         // Construct request to AWS STS Service.
-        let mut url = format!("https://{endpoint}/?Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
+        let mut url = format!("https://{endpoint}/");
         if let Some(external_id) = &self.config.external_id {
             write!(url, "&ExternalId={external_id}")?;
         }
-        // let mut req = self
-        //     .client
-        //     .post(&url)
-        //     // .header(
-        //     //     http::header::CONTENT_TYPE.as_str(),
-        //     //     "application/x-www-form-urlencoded",
-        //     // )
-        //     .body("")
-        //     .build()?;
-        let mut req = http::Request::new("");
-        *req.method_mut() = http::Method::POST;
-        *req.uri_mut() = url.parse()?;
+        let mut req = self
+            .client
+            .post(&url)
+            .header(
+                http::header::CONTENT_TYPE.as_str(),
+                "application/x-www-form-urlencoded",
+            )
+            .body(format!("Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15"))
+            .build()?;
 
-        let mut ss = SigningSettings::default();
-        ss.percent_encoding_mode = PercentEncodingMode::Double;
-        ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
-        let session_token = cred.session_token.clone().unwrap();
-        let sp = SigningParams::builder()
-            .access_key(&cred.access_key_id)
-            .secret_key(&cred.secret_access_key)
-            .security_token(&session_token)
-            .region(region)
-            .service_name("sts")
-            .time(SystemTime::from(now))
-            .settings(ss)
-            .build()
-            .expect("signing params must be valid");
+        // let mut req = http::Request::new("");
+        // *req.method_mut() = http::Method::POST;
+        // *req.uri_mut() = url.parse()?;
 
-        let mut body = SignableBody::UnsignedPayload;
-        if req.headers().get(X_AMZ_CONTENT_SHA_256).is_some() {
-            body = SignableBody::Bytes(req.body().as_bytes());
-        }
-        let output = aws_sigv4::http_request::sign(
-            SignableRequest::new(req.method(), req.uri(), req.headers(), body),
-            &sp,
-        )
-        .expect("signing must succeed");
-        let (aws_sig, _) = output.into_parts();
-        aws_sig.apply_to_request(&mut req);
-        debug!("request to AWS STS Services: expected: {:?}", &req);
+        // let mut ss = SigningSettings::default();
+        // ss.percent_encoding_mode = PercentEncodingMode::Double;
+        // ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+        // let session_token = cred.session_token.clone().unwrap();
+        // let sp = SigningParams::builder()
+        //     .access_key(&cred.access_key_id)
+        //     .secret_key(&cred.secret_access_key)
+        //     .security_token(&session_token)
+        //     .region(region)
+        //     .service_name("sts")
+        //     .time(SystemTime::from(now))
+        //     .settings(ss)
+        //     .build()
+        //     .expect("signing params must be valid");
 
-        let mut req2 = http::Request::new("");
-        *req2.method_mut() = http::Method::POST;
-        *req2.uri_mut() = url.parse()?;
+        // let mut body = SignableBody::UnsignedPayload;
+        // if req.headers().get(X_AMZ_CONTENT_SHA_256).is_some() {
+        //     body = SignableBody::Bytes(req.body().as_bytes());
+        // }
+        // let output = aws_sigv4::http_request::sign(
+        //     SignableRequest::new(req.method(), req.uri(), req.headers(), body),
+        //     &sp,
+        // )
+        // .expect("signing must succeed");
+        // let (aws_sig, _) = output.into_parts();
+        // aws_sig.apply_to_request(&mut req);
+        // debug!("request to AWS STS Services: expected: {:?}", &req);
 
-        signer.sign(&mut req2, &cred)?;
-        debug!("request to AWS STS Services: real: {:?}", req2);
+        // let mut req2 = http::Request::new("");
+        // *req2.method_mut() = http::Method::POST;
+        // *req2.uri_mut() = url.parse()?;
 
-        let real_req = reqwest::Request::try_from(req)?;
-        let resp = self.client.execute(real_req).await?;
+        signer.sign(&mut req, &cred)?;
+        debug!("request to AWS STS Services: real: {:?}", req);
+
+        // let real_req = reqwest::Request::try_from(req)?;
+        let resp = self.client.execute(req).await?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.text().await?;
             return Err(anyhow!("request to AWS STS Services failed: {content}"));
