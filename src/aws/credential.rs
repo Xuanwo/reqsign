@@ -370,6 +370,13 @@ impl Loader {
             "request to AWS STS Services: body: {}",
             String::from_utf8_lossy(req.body().unwrap().as_bytes().unwrap())
         );
+        debug!(
+            "request to AWS STS Services: headers: {:?}",
+            req.headers()
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+                .collect::<Vec<_>>()
+        );
 
         // let real_req = reqwest::Request::try_from(req)?;
         let resp = self.client.execute(req).await?;
