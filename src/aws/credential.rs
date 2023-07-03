@@ -124,6 +124,7 @@ impl Loader {
         let source_cred = self.load_inner().await?;
 
         let cred = if let Some(c) = source_cred {
+            debug!("assuming role with credential valid in: {:?}", c.expires_in);
             self.load_via_assume_role(c).await?
         } else {
             None
@@ -276,14 +277,14 @@ impl Loader {
         let duration_seconds = &self.config.duration_seconds;
         let role_session_name = &self.config.role_session_name;
 
-        // let region = match &self.config.region {
-        //     Some(region) => region,
-        //     None => return Ok(Some(cred)),
-        // };
+        let region = match &self.config.region {
+            Some(region) => region,
+            None => return Ok(Some(cred)),
+        };
         let endpoint = self.sts_endpoint()?;
 
-        // let signer = Signer::new("sts", region);
-        let signer = Signer::new("sts", DEFAULT_STS_REGION);
+        let signer = Signer::new("sts", region);
+        // let signer = Signer::new("sts", DEFAULT_STS_REGION);
 
         // Construct request to AWS STS Service.
         let mut url = format!("https://{endpoint}/?Action=AssumeRole&RoleArn={role_arn}&Version=2011-06-15&RoleSessionName={role_session_name}");
