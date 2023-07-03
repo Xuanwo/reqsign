@@ -292,7 +292,7 @@ impl Loader {
             Some(region) => region,
             None => return Ok(Some(cred)),
         };
-        let endpoint = self.sts_endpoint(true)?;
+        let endpoint = self.sts_endpoint(false)?;
 
         let signer = Signer::new("sts", region).time(now);
         // let signer = Signer::new("sts", DEFAULT_STS_REGION);
