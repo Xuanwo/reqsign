@@ -126,7 +126,6 @@ impl Loader {
         let source_cred = self.load_inner().await?;
 
         let cred = if let Some(c) = source_cred {
-            debug!("assuming role with credential valid in: {:?}", c.expires_in);
             self.load_via_assume_role(c).await?
         } else {
             None
@@ -286,27 +285,9 @@ impl Loader {
         let endpoint = self.sts_endpoint(true)?;
 
         let signer = Signer::new("sts", region);
-        // let signer = Signer::new("sts", DEFAULT_STS_REGION);
-
-        // let url = format!("https://{endpoint}/?Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={encoded_role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
 
         // Construct request to AWS STS Service.
         let url = format!("https://{endpoint}/");
-        // let mut body = format!("Action=AssumeRole&DurationSeconds={duration_seconds}&RoleArn={role_arn}&RoleSessionName={role_session_name}&Version=2011-06-15");
-        // if let Some(external_id) = &self.config.external_id {
-        //     write!(body, "&ExternalId={external_id}")?;
-        // }
-        // let body_hash = hex_sha256(body.as_bytes());
-        // let mut req = http::Request::new(body);
-        // *req.method_mut() = http::Method::POST;
-        // req.headers_mut().insert(
-        //     http::header::CONTENT_TYPE.as_str(),
-        //     HeaderValue::from_static("application/x-www-form-urlencoded"),
-        // );
-        // req.headers_mut()
-        //     .insert(X_AMZ_CONTENT_SHA_256, HeaderValue::from_str(&body_hash)?);
-        // *req.uri_mut() = url.parse()?;
-
         let duration = duration_seconds.to_string();
         let mut params = BTreeMap::new();
         params.insert("Action", "AssumeRole");
@@ -324,24 +305,14 @@ impl Loader {
             .insert(X_AMZ_CONTENT_SHA_256, HeaderValue::from_str(&body_hash)?);
 
         signer.sign(&mut req, &cred)?;
-        debug!("request to AWS STS Services: real: {:?}", req);
-        debug!(
-            "request to AWS STS Services: headers: {:?}",
-            req.headers()
-                .iter()
-                .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
-                .collect::<Vec<_>>()
-        );
 
         let resp = self.client.execute(req).await?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.text().await?;
             return Err(anyhow!("request to AWS STS Services failed: {content}"));
         }
-        let response_text = resp.text().await?;
-        debug!("response from AWS STS Services: {:?}", &response_text);
 
-        let resp: AssumeRoleResponse = de::from_str(&response_text)?;
+        let resp: AssumeRoleResponse = de::from_str(&resp.text().await?)?;
         let resp_cred = resp.result.credentials;
 
         let cred = Credential {

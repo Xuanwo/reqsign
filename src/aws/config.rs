@@ -91,15 +91,6 @@ pub struct Config {
     /// available values: `900` to `43200` or configured maximum session duration
     /// default to `3600`
     pub duration_seconds: i64,
-    // /// `credential_source` indicates the source of the credentials
-    // /// to use for the initial AssumeRole call.
-    // /// `credential_source` and `source_profile` are mutually exclusive.
-    // /// available values: `Environment`, `Ec2InstanceMetadata`
-    // pub credential_source: Option<String>,
-    // /// `source_profile` indicates the source profile to use for
-    // /// the initial AssumeRole call.
-    // /// `credential_source` and `source_profile` are mutually exclusive.
-    // pub source_profile: Option<String>,
 }
 
 impl Default for Config {

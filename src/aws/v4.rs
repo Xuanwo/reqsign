@@ -249,7 +249,7 @@ fn canonical_request_string(ctx: &mut SigningContext, service: &str) -> Result<S
     writeln!(f)?;
     writeln!(f, "{}", signed_headers.join(";"))?;
 
-    // HashedPayload – A string created using the payload in the body of the HTTP request as input to a hash function. This string uses lowercase hexadecimal characters. If the payload is empty, use an empty string as the input to the hash function.
+    // Insert HashedPayload – A string created using the payload in the body of the HTTP request as input to a hash function. This string uses lowercase hexadecimal characters. If the payload is empty, use an empty string as the input to the hash function.
     // https://github.com/aws/aws-sdk-go/blob/v1.44.294/aws/signer/v4/v4.go#L692
     if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
         if service == "s3" {
