@@ -251,7 +251,6 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
 
     // HashedPayload – A string created using the payload in the body of the HTTP request as input to a hash function. This string uses lowercase hexadecimal characters. If the payload is empty, use an empty string as the input to the hash function.
     if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
-        // write!(f, "UNSIGNED-PAYLOAD")?;
         write!(f, "{}", hex_sha256(b""))?;
     } else {
         write!(f, "{}", ctx.headers[X_AMZ_CONTENT_SHA_256].to_str()?)?;
