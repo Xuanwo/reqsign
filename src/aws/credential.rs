@@ -275,13 +275,14 @@ impl Loader {
         let duration_seconds = &self.config.duration_seconds;
         let role_session_name = &self.config.role_session_name;
 
-        let region = match &self.config.region {
-            Some(region) => region,
-            None => return Ok(Some(cred)),
-        };
+        // let region = match &self.config.region {
+        //     Some(region) => region,
+        //     None => return Ok(Some(cred)),
+        // };
         let endpoint = self.sts_endpoint()?;
 
-        let signer = Signer::new("sts", region);
+        // let signer = Signer::new("sts", region);
+        let signer = Signer::new("sts", "us-east-1");
 
         // Construct request to AWS STS Service.
         let mut url = format!("https://{endpoint}/?Action=AssumeRole&RoleArn={role_arn}&Version=2011-06-15&RoleSessionName={role_session_name}");
