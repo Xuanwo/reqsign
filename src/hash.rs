@@ -7,6 +7,7 @@ use hmac::Mac;
 use sha1::Sha1;
 use sha2::Digest;
 use sha2::Sha256;
+use anyhow::Result;
 
 /// Base64 encode
 pub fn base64_encode(content: &[u8]) -> String {
@@ -14,10 +15,8 @@ pub fn base64_encode(content: &[u8]) -> String {
 }
 
 // Base64 decode
-pub fn base64_decode(content: &str) -> Vec<u8> {
-    BASE64_STANDARD
-        .decode(content)
-        .expect("base64 decode must success")
+pub fn base64_decode(content: &str) -> Result<Vec<u8>> {
+    Ok(BASE64_STANDARD.decode(content)?)
 }
 
 /// SHA256 hash.
