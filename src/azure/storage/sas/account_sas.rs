@@ -1,5 +1,6 @@
 use crate::time::DateTime;
 use crate::{hash, time};
+use anyhow::Result;
 
 /// The default parameters that make up a SAS token
 /// https://learn.microsoft.com/en-us/rest/api/storageservices/create-account-sas#specify-the-account-sas-parameters
@@ -39,7 +40,7 @@ impl AccountSharedAccessSignature {
     }
 
     // Azure documentation: https://learn.microsoft.com/en-us/rest/api/storageservices/create-account-sas#construct-the-signature-string
-    fn signature(&self) -> String {
+    fn signature(&self) -> Result<String> {
         let string_to_sign = format!(
             "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n",
             self.account,
@@ -57,14 +58,16 @@ impl AccountSharedAccessSignature {
             self.version,
         );
 
-        hash::base64_hmac_sha256(
-            &hash::base64_decode(self.key.clone().as_str()),
+        let decode_content = hash::base64_decode(self.key.clone().as_str())?;
+
+        Ok(hash::base64_hmac_sha256(
+            &decode_content,
             string_to_sign.as_bytes(),
-        )
+        ))
     }
 
     /// [Example](https://docs.microsoft.com/rest/api/storageservices/create-service-sas#service-sas-example) from Azure documentation.
-    pub fn token(&self) -> Vec<(String, String)> {
+    pub fn token(&self) -> Result<Vec<(String, String)>> {
         let mut elements: Vec<(String, String)> = vec![
             ("sv".to_string(), self.version.to_string()),
             ("ss".to_string(), self.resource.to_string()),
@@ -86,10 +89,10 @@ impl AccountSharedAccessSignature {
             elements.push(("spr".to_string(), protocol.to_string()))
         }
 
-        let sig = AccountSharedAccessSignature::signature(self);
+        let sig = AccountSharedAccessSignature::signature(self)?;
         elements.push(("sig".to_string(), urlencoded(sig)));
 
-        elements
+        Ok(elements)
     }
 }
 
@@ -107,8 +110,8 @@ mod tests {
         let key = hash::base64_encode("key".as_bytes());
         let expiry = test_time() + chrono::Duration::minutes(5);
         let sign = AccountSharedAccessSignature::new("account".to_string(), key, expiry);
-        let token = sign
-            .token()
+        let token_content = sign.token().expect("token decode failed");
+        let token = token_content
             .iter()
             .map(|(k, v)| format!("{}={}", k, v))
             .collect::<Vec<String>>()

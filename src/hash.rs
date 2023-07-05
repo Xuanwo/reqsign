@@ -1,5 +1,7 @@
 //! Hash related utils.
 
+use anyhow::anyhow;
+use anyhow::Result;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use hmac::Hmac;
@@ -14,10 +16,10 @@ pub fn base64_encode(content: &[u8]) -> String {
 }
 
 // Base64 decode
-pub fn base64_decode(content: &str) -> Vec<u8> {
+pub fn base64_decode(content: &str) -> Result<Vec<u8>> {
     BASE64_STANDARD
         .decode(content)
-        .expect("base64 decode must success")
+        .map_err(|e| anyhow!("base64 decode failed for {e:?}"))
 }
 
 /// SHA256 hash.
