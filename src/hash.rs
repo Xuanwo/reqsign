@@ -1,5 +1,6 @@
 //! Hash related utils.
 
+use anyhow::Result;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use hmac::Hmac;
@@ -7,7 +8,6 @@ use hmac::Mac;
 use sha1::Sha1;
 use sha2::Digest;
 use sha2::Sha256;
-use anyhow::Result;
 
 /// Base64 encode
 pub fn base64_encode(content: &[u8]) -> String {

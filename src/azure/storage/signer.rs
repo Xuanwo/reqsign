@@ -90,8 +90,7 @@ impl Signer {
                     let now = self.time.unwrap_or_else(time::now);
                     let string_to_sign = string_to_sign(&mut ctx, ak, now)?;
                     let decode_content = base64_decode(sk)?;
-                    let signature =
-                        base64_hmac_sha256(&decode_content, string_to_sign.as_bytes());
+                    let signature = base64_hmac_sha256(&decode_content, string_to_sign.as_bytes());
 
                     ctx.headers.insert(AUTHORIZATION, {
                         let mut value: HeaderValue =

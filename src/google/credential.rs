@@ -130,7 +130,7 @@ impl CredentialLoader {
             return Ok(None);
         };
 
-            let decode_content = base64_decode(content)?;
+        let decode_content = base64_decode(content)?;
 
         let cred = serde_json::from_slice(&decode_content).map_err(|err| {
             debug!("load credential from content failed: {err:?}");
