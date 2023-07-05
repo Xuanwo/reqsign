@@ -188,4 +188,5 @@ jobs:
           REQSIGN_AWS_S3_TEST: on
           REQSIGN_AWS_S3_REGION: ap-northeast-1
           REQSIGN_AWS_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ROLE_ARN }}
+          REQSIGN_AWS_ASSUME_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ASSUME_ROLE_ARN }}
           REQSIGN_AWS_PROVIDER_ARN: ${{ secrets.REQSIGN_AWS_PROVIDER_ARN }}

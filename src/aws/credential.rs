@@ -620,7 +620,7 @@ mod tests {
         }
 
         // Ignore test if role_arn not set
-        let role_arn = if let Ok(v) = env::var("REQSIGN_AWS_ROLE_ARN") {
+        let role_arn = if let Ok(v) = env::var("REQSIGN_AWS_ASSUME_ROLE_ARN") {
             v
         } else {
             return Ok(());
