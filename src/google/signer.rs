@@ -150,7 +150,7 @@ impl Signer {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```rust,no_run
     /// use anyhow::Result;
     /// use reqsign::GoogleSigner;
     /// use reqwest::Client;
@@ -189,7 +189,7 @@ impl Signer {
     /// Sign the query with a duration.
     ///
     /// # Example
-    /// ```no_run
+    /// ```rust,no_run
     /// use anyhow::Result;
     /// use reqsign::GoogleSigner;
     /// use reqwest::Client;

@@ -110,8 +110,10 @@ impl Signer {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```rust,no_run
     /// use anyhow::Result;
+    /// use reqsign::AzureStorageConfig;
+    /// use reqsign::AzureStorageLoader;
     /// use reqsign::AzureStorageSigner;
     /// use reqwest::Client;
     /// use reqwest::Request;
@@ -119,16 +121,19 @@ impl Signer {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = AzureStorageSigner::builder()
-    ///         .account_name("account_name")
-    ///         .account_key("YWNjb3VudF9rZXkK")
-    ///         .build()?;
+    ///     let config = AzureStorageConfig {
+    ///         account_name: Some("account_name".to_string()),
+    ///         account_key: Some("YWNjb3VudF9rZXkK".to_string()),
+    ///         ..Default::default()
+    ///     };
+    ///     let loader = AzureStorageLoader::new(config);
+    ///     let signer = AzureStorageSigner::new();
     ///     // Construct request
     ///     let url = Url::parse("https://test.blob.core.windows.net/testbucket/testblob")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
-    ///     signer.sign(&mut req)?;
+    ///     let credential = loader.load().await?.unwrap();
+    ///     signer.sign(&mut req, &credential)?;
     ///     // Sending already signed request.
     ///     let resp = Client::new().execute(req).await?;
     ///     println!("resp got status: {}", resp.status());

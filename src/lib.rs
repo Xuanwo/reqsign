@@ -2,9 +2,10 @@
 //!
 //! # Example
 //!
-//! ```no_run
+//! ```rust,no_run
 //! use anyhow::Result;
-//! use reqsign::AwsConfigLoader;
+//! use reqsign::AwsConfig;
+//! use reqsign::AwsLoader;
 //! use reqsign::AwsV4Signer;
 //! use reqwest::Client;
 //! use reqwest::Request;
@@ -13,17 +14,18 @@
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
 //!     // Signer can load region and credentials from environment by default.
-//!     let signer = AwsV4Signer::builder()
-//!         .config_loader(AwsConfigLoader::with_loaded())
-//!         .service("s3")
-//!         .build()?;
+//!     let client = Client::new();
+//!     let config = AwsConfig::default().from_profile().from_env();
+//!     let loader = AwsLoader::new(client.clone(), config);
+//!     let signer = AwsV4Signer::new("s3", "us-east-1");
 //!     // Construct request
 //!     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
 //!     let mut req = reqwest::Request::new(http::Method::GET, url);
 //!     // Signing request with Signer
-//!     signer.sign(&mut req)?;
+//!     let credential = loader.load().await?.unwrap();
+//!     signer.sign(&mut req, &credential)?;
 //!     // Sending already signed request.
-//!     let resp = Client::new().execute(req).await?;
+//!     let resp = client.execute(req).await?;
 //!     println!("resp got status: {}", resp.status());
 //!     Ok(())
 //! }
