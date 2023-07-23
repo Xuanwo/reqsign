@@ -12,11 +12,10 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde::Serialize;
 
+use super::config::Config;
 use crate::time::now;
 use crate::time::parse_rfc3339;
 use crate::time::DateTime;
-
-use super::config::Config;
 
 /// Credential for cos.
 #[derive(Clone)]
@@ -115,7 +114,28 @@ impl CredentialLoader {
             (Some(region), Some(token_file), Some(role_arn), Some(provider_id)) => {
                 (region, token_file, role_arn, provider_id)
             }
-            _ => return Ok(None),
+            _ => {
+                let missing = [
+                    ("region", self.config.region.is_none()),
+                    (
+                        "web_identity_token_file",
+                        self.config.web_identity_token_file.is_none(),
+                    ),
+                    ("role_arn", self.config.role_arn.is_none()),
+                    ("provider_id", self.config.provider_id.is_none()),
+                ]
+                .iter()
+                .filter_map(|&(k, v)| if v { Some(k) } else { None })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+                debug!(
+                    "assume_role_with_web_identity is not configured fully: [{}] is missing",
+                    missing
+                );
+
+                return Ok(None);
+            }
         };
 
         let token = fs::read_to_string(token_file)?;
@@ -212,7 +232,8 @@ mod tests {
     use std::env;
     use std::str::FromStr;
 
-    use http::{Request, StatusCode};
+    use http::Request;
+    use http::StatusCode;
     use log::debug;
     use once_cell::sync::Lazy;
     use tokio::runtime::Runtime;

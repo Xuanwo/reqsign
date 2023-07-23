@@ -11,7 +11,8 @@ use rsa::pkcs8::DecodePrivateKey;
 use rsa::signature::RandomizedSigner;
 
 use super::constants::GOOG_QUERY_ENCODE_SET;
-use super::credential::{Credential, ServiceAccount};
+use super::credential::Credential;
+use super::credential::ServiceAccount;
 use super::token::Token;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
@@ -150,9 +151,10 @@ impl Signer {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```rust,no_run
     /// use anyhow::Result;
     /// use reqsign::GoogleSigner;
+    /// use reqsign::GoogleTokenLoader;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
@@ -160,16 +162,19 @@ impl Signer {
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = GoogleSigner::builder()
-    ///         .scope("https://www.googleapis.com/auth/devstorage.read_only")
-    ///         .build()?;
+    ///     let token_loader = GoogleTokenLoader::new(
+    ///         "https://www.googleapis.com/auth/devstorage.read_only",
+    ///         Client::new(),
+    ///     );
+    ///     let signer = GoogleSigner::new("storage");
     ///
     ///     // Construct request
     ///     let url = Url::parse("https://storage.googleapis.com/storage/v1/b/test")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///
     ///     // Signing request with Signer
-    ///     signer.sign(&mut req)?;
+    ///     let token = token_loader.load().await?.unwrap();
+    ///     signer.sign(&mut req, &token)?;
     ///
     ///     // Sending already signed request.
     ///     let resp = Client::new().execute(req).await?;
@@ -189,27 +194,28 @@ impl Signer {
     /// Sign the query with a duration.
     ///
     /// # Example
-    /// ```no_run
+    /// ```rust,no_run
+    /// use std::time::Duration;
+    ///
     /// use anyhow::Result;
+    /// use reqsign::GoogleCredentialLoader;
     /// use reqsign::GoogleSigner;
     /// use reqwest::Client;
     /// use reqwest::Url;
-    /// use time::Duration;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = GoogleSigner::builder()
-    ///         .credential_path("/Users/wolfv/Downloads/noted-throne-361708-bf95cdbf3fea.json")
-    ///         .scope("storage")
-    ///         .build()?;
+    ///     let credential_loader = GoogleCredentialLoader::default();
+    ///     let signer = GoogleSigner::new("stroage");
     ///
     ///     // Construct request
     ///     let url = Url::parse("https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///
     ///     // Signing request with Signer
-    ///     signer.sign_query(&mut req, Duration::hours(1))?;
+    ///     let credential = credential_loader.load()?.unwrap();
+    ///     signer.sign_query(&mut req, Duration::from_secs(3600), &credential)?;
     ///
     ///     println!("signed request: {:?}", req);
     ///     // Sending already signed request.
@@ -347,7 +353,8 @@ mod tests {
     use chrono::Utc;
     use pretty_assertions::assert_eq;
 
-    use super::{super::credential::CredentialLoader, *};
+    use super::super::credential::CredentialLoader;
+    use super::*;
 
     #[tokio::test]
     async fn test_sign_query() -> Result<()> {

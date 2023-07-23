@@ -100,8 +100,10 @@ jobs:
           REQSIGN_TENCENT_COS_ACCESS_KEY: ${{ secrets.REQSIGN_TENCENT_COS_ACCESS_KEY }}
           REQSIGN_TENCENT_COS_SECRET_KEY: ${{ secrets.REQSIGN_TENCENT_COS_SECRET_KEY }}
           REQSIGN_TENCENT_COS_URL: ${{ secrets.REQSIGN_TENCENT_COS_URL }}
+      - name: Doctest
+        run: cargo test --doc
 
-  test_gcs_wif:
+  test_gcs_web_identify:
     runs-on: ubuntu-latest
     permissions:
       contents: "read"
@@ -138,17 +140,14 @@ jobs:
       - name: Install cargo-nextest
         run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
-      - name: Install OIDC Client from Core Package
-        run: npm install @actions/core@1.6.0 @actions/http-client
       - name: Get Id Token
         uses: actions/github-script@v6
         id: idtoken
         with:
           script: |
-            const client = require('@actions/core')
-            let id_token = await client.getIDToken('sts.tencentcloudapi.com')
-            client.exportVariable('GITHUB_ID_TOKEN', id_token)
-            client.setSecret(id_token)
+            let id_token = await core.getIDToken('sts.tencentcloudapi.com')
+            core.exportVariable('GITHUB_ID_TOKEN', id_token)
+            core.setSecret(id_token)
 
       - name: Test
         run: cargo nextest run --no-fail-fast
@@ -162,3 +161,34 @@ jobs:
           REQSIGN_TENCENT_COS_ROLE_ARN: ${{ secrets.REQSIGN_TENCENT_COS_ROLE_ARN }}
           REQSIGN_TENCENT_COS_PROVIDER_ID: ${{ secrets.REQSIGN_TENCENT_COS_PROVIDER_ID }}
           REQSIGN_TENCENT_COS_REGION: ${{ secrets.REQSIGN_TENCENT_COS_REGION }}
+
+  test_aws_web_identity:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+    if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install cargo-nextest
+        run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
+
+      - name: Get Id Token
+        uses: actions/github-script@v6
+        id: idtoken
+        with:
+          script: |
+            let id_token = await core.getIDToken('sts.amazonaws.com')
+            core.exportVariable('GITHUB_ID_TOKEN', id_token)
+            core.setSecret(id_token)
+
+      - name: Test
+        run: cargo nextest run --no-fail-fast
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+          REQSIGN_AWS_S3_TEST: on
+          REQSIGN_AWS_S3_REGION: ap-northeast-1
+          REQSIGN_AWS_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ROLE_ARN }}
+          REQSIGN_AWS_ASSUME_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ASSUME_ROLE_ARN }}
+          REQSIGN_AWS_PROVIDER_ARN: ${{ secrets.REQSIGN_AWS_PROVIDER_ARN }}

@@ -4,7 +4,8 @@ use std::fmt::Debug;
 use std::fmt::Write;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
+use anyhow::Result;
 use http::header::*;
 use log::debug;
 
@@ -81,16 +82,16 @@ impl Signer {
                         sk.to_string(),
                         time::now() + chrono::Duration::from_std(d)?,
                     );
-
-                    signer.token().iter().for_each(|(k, v)| {
+                    let signer_token = signer.token()?;
+                    signer_token.iter().for_each(|(k, v)| {
                         ctx.query_push(k, v);
                     });
                 }
                 SigningMethod::Header => {
                     let now = self.time.unwrap_or_else(time::now);
                     let string_to_sign = string_to_sign(&mut ctx, ak, now)?;
-                    let signature =
-                        base64_hmac_sha256(&base64_decode(sk), string_to_sign.as_bytes());
+                    let decode_content = base64_decode(sk)?;
+                    let signature = base64_hmac_sha256(&decode_content, string_to_sign.as_bytes());
 
                     ctx.headers.insert(AUTHORIZATION, {
                         let mut value: HeaderValue =
@@ -110,8 +111,10 @@ impl Signer {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```rust,no_run
     /// use anyhow::Result;
+    /// use reqsign::AzureStorageConfig;
+    /// use reqsign::AzureStorageLoader;
     /// use reqsign::AzureStorageSigner;
     /// use reqwest::Client;
     /// use reqwest::Request;
@@ -119,16 +122,19 @@ impl Signer {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = AzureStorageSigner::builder()
-    ///         .account_name("account_name")
-    ///         .account_key("YWNjb3VudF9rZXkK")
-    ///         .build()?;
+    ///     let config = AzureStorageConfig {
+    ///         account_name: Some("account_name".to_string()),
+    ///         account_key: Some("YWNjb3VudF9rZXkK".to_string()),
+    ///         ..Default::default()
+    ///     };
+    ///     let loader = AzureStorageLoader::new(config);
+    ///     let signer = AzureStorageSigner::new();
     ///     // Construct request
     ///     let url = Url::parse("https://test.blob.core.windows.net/testbucket/testblob")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
-    ///     signer.sign(&mut req)?;
+    ///     let credential = loader.load().await?.unwrap();
+    ///     signer.sign(&mut req, &credential)?;
     ///     // Sending already signed request.
     ///     let resp = Client::new().execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
@@ -247,12 +253,14 @@ fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use http::Request;
     use std::time::Duration;
+
+    use http::Request;
 
     use super::super::config::Config;
     use crate::azure::storage::loader::Loader;
-    use crate::{AzureStorageCredential, AzureStorageSigner};
+    use crate::AzureStorageCredential;
+    use crate::AzureStorageSigner;
 
     #[tokio::test]
     async fn test_sas_url() {

@@ -137,9 +137,10 @@ impl Signer {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```rust,no_run
     /// use anyhow::Result;
-    /// use reqsign::AwsConfigLoader;
+    /// use reqsign::AwsConfig;
+    /// use reqsign::AwsDefaultLoader;
     /// use reqsign::AwsV4Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
@@ -147,18 +148,18 @@ impl Signer {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = AwsV4Signer::builder()
-    ///         .config_loader(AwsConfigLoader::with_loaded())
-    ///         .service("s3")
-    ///         .build()?;
+    ///     let client = Client::new();
+    ///     let config = AwsConfig::default().from_profile().from_env();
+    ///     let loader = AwsDefaultLoader::new(client.clone(), config);
+    ///     let signer = AwsV4Signer::new("s3", "us-east-1");
     ///     // Construct request
     ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
-    ///     signer.sign(&mut req)?;
+    ///     let credential = loader.load().await?.unwrap();
+    ///     signer.sign(&mut req, &credential)?;
     ///     // Sending already signed request.
-    ///     let resp = Client::new().execute(req).await?;
+    ///     let resp = client.execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
     ///     Ok(())
     /// }
@@ -172,29 +173,31 @@ impl Signer {
     ///
     /// # Example
     ///
-    /// ```no_run
+    /// ```rust,no_run
+    /// use std::time::Duration;
+    ///
     /// use anyhow::Result;
-    /// use reqsign::AwsConfigLoader;
+    /// use reqsign::AwsConfig;
+    /// use reqsign::AwsDefaultLoader;
     /// use reqsign::AwsV4Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
-    /// use time::Duration;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = AwsV4Signer::builder()
-    ///         .config_loader(AwsConfigLoader::with_loaded())
-    ///         .service("s3")
-    ///         .build()?;
+    ///     let client = Client::new();
+    ///     let config = AwsConfig::default().from_profile().from_env();
+    ///     let loader = AwsDefaultLoader::new(client.clone(), config);
+    ///     let signer = AwsV4Signer::new("s3", "us-east-1");
     ///     // Construct request
     ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
     ///     let mut req = reqwest::Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
-    ///     signer.sign_query(&mut req, Duration::hours(1))?;
+    ///     let credential = loader.load().await?.unwrap();
+    ///     signer.sign_query(&mut req, Duration::from_secs(3600), &credential)?;
     ///     // Sending already signed request.
-    ///     let resp = Client::new().execute(req).await?;
+    ///     let resp = client.execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
     ///     Ok(())
     /// }
@@ -388,7 +391,7 @@ mod tests {
     use http::header;
     use reqwest::Client;
 
-    use super::super::AwsLoader;
+    use super::super::AwsDefaultLoader;
     use super::*;
     use crate::aws::AwsConfig;
 
@@ -608,7 +611,7 @@ mod tests {
 
             let mut req = req_fn();
 
-            let loader = AwsLoader::new(
+            let loader = AwsDefaultLoader::new(
                 Client::new(),
                 AwsConfig {
                     access_key_id: Some("access_key_id".to_string()),
@@ -675,7 +678,7 @@ mod tests {
 
             let mut req = req_fn();
 
-            let loader = AwsLoader::new(
+            let loader = AwsDefaultLoader::new(
                 Client::new(),
                 AwsConfig {
                     access_key_id: Some("access_key_id".to_string()),
@@ -741,7 +744,7 @@ mod tests {
 
             let mut req = req_fn();
 
-            let loader = AwsLoader::new(
+            let loader = AwsDefaultLoader::new(
                 Client::new(),
                 AwsConfig {
                     access_key_id: Some("access_key_id".to_string()),
@@ -810,7 +813,7 @@ mod tests {
 
             let mut req = req_fn();
 
-            let loader = AwsLoader::new(
+            let loader = AwsDefaultLoader::new(
                 Client::new(),
                 AwsConfig {
                     access_key_id: Some("access_key_id".to_string()),

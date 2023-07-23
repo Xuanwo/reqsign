@@ -1,8 +1,9 @@
 //! An external account.
 
-pub use credential_source::{
-    CredentialSource, FileSourcedCredentials, FormatType, UrlSourcedCredentials,
-};
+pub use credential_source::CredentialSource;
+pub use credential_source::FileSourcedCredentials;
+pub use credential_source::FormatType;
+pub use credential_source::UrlSourcedCredentials;
 use serde::Deserialize;
 
 /// Credential is the file which stores service account's client_id and private key.
@@ -46,7 +47,8 @@ pub struct ServiceAccountImpersonation {
 mod credential_source {
     use std::collections::HashMap;
 
-    use anyhow::{bail, Result};
+    use anyhow::bail;
+    use anyhow::Result;
     use serde::Deserialize;
     use serde_json::Value;
 
@@ -86,8 +88,8 @@ mod credential_source {
                     subject_token_field_name,
                 } => {
                     let Value::Object(mut obj) = serde_json::from_slice(slice)? else {
-                    bail!("failed to decode token JSON");
-                };
+                        bail!("failed to decode token JSON");
+                    };
 
                     match obj.remove(subject_token_field_name) {
                         Some(Value::String(access_token)) => Ok(access_token),

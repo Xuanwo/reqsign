@@ -10,12 +10,13 @@ use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
 use reqsign::AwsConfig;
-use reqsign::AwsLoader;
+use reqsign::AwsDefaultLoader;
 use reqsign::AwsV4Signer;
 use reqwest::Client;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
+use sha2::Sha256;
 
-fn init_signer() -> Option<(AwsLoader, AwsV4Signer)> {
+fn init_signer() -> Option<(AwsDefaultLoader, AwsV4Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -42,7 +43,7 @@ fn init_signer() -> Option<(AwsLoader, AwsV4Signer)> {
 
     let region = config.region.as_deref().unwrap().to_string();
 
-    let loader = AwsLoader::new(Client::new(), config);
+    let loader = AwsDefaultLoader::new(Client::new(), config);
 
     let signer = AwsV4Signer::new(
         &env::var("REQSIGN_AWS_V4_SERVICE").expect("env REQSIGN_AWS_V4_SERVICE must set"),
