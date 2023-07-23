@@ -14,6 +14,7 @@ use reqwest::Client;
 use serde::Deserialize;
 
 use super::config::Config;
+use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::v4::Signer;
 use crate::time::now;
 use crate::time::parse_rfc3339;
@@ -346,10 +347,10 @@ impl AssumeRoleLoader {
 
     /// Load credential via assume role.
     pub async fn load(&self) -> Result<Option<Credential>> {
-        let role_arn = match &self.config.role_arn {
-            Some(role_arn) => role_arn,
-            None => return Ok(None),
-        };
+        let role_arn =self.config.role_arn.clone().ok_or_else(|| {
+            anyhow!("assume role loader requires role_arn, but not found, please check your configuration")
+        })?;
+
         let role_session_name = &self.config.role_session_name;
 
         let endpoint = self.sts_endpoint()?;
@@ -367,7 +368,7 @@ impl AssumeRoleLoader {
                 "application/x-www-form-urlencoded",
             )
             // Set content sha to empty string.
-            .header("X_AMZ_CONTENT_SHA_256", EMPTY_STRING_SHA256)
+            .header(X_AMZ_CONTENT_SHA_256, EMPTY_STRING_SHA256)
             .build()?;
 
         let source_cred = self
