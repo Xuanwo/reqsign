@@ -777,7 +777,6 @@ mod tests {
             return Ok(());
         };
 
-        // let provider_arn = env::var("REQSIGN_AWS_PROVIDER_ARN").expect("REQSIGN_AWS_PROVIDER_ARN not exist");
         let region = env::var("REQSIGN_AWS_S3_REGION").expect("REQSIGN_AWS_S3_REGION not exist");
 
         let github_token = env::var("GITHUB_ID_TOKEN").expect("GITHUB_ID_TOKEN not exist");
@@ -805,6 +804,7 @@ mod tests {
                     let cfg = Config {
                         role_arn: Some(assume_role_arn.clone()),
                         region: Some(region.clone()),
+                        sts_regional_endpoints: "regional".to_string(),
                         ..Default::default()
                     };
                     let loader =
