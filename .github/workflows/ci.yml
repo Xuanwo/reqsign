@@ -101,7 +101,7 @@ jobs:
           REQSIGN_TENCENT_COS_SECRET_KEY: ${{ secrets.REQSIGN_TENCENT_COS_SECRET_KEY }}
           REQSIGN_TENCENT_COS_URL: ${{ secrets.REQSIGN_TENCENT_COS_URL }}
 
-  test_gcs_wif:
+  test_gcs_web_identify:
     runs-on: ubuntu-latest
     permissions:
       contents: "read"

@@ -388,7 +388,7 @@ mod tests {
     use http::header;
     use reqwest::Client;
 
-    use super::super::AwsLoader;
+    use super::super::AwsDefaultLoader;
     use super::*;
     use crate::aws::AwsConfig;
 
@@ -608,7 +608,7 @@ mod tests {
 
             let mut req = req_fn();
 
-            let loader = AwsLoader::new(
+            let loader = AwsDefaultLoader::new(
                 Client::new(),
                 AwsConfig {
                     access_key_id: Some("access_key_id".to_string()),
@@ -675,7 +675,7 @@ mod tests {
 
             let mut req = req_fn();
 
-            let loader = AwsLoader::new(
+            let loader = AwsDefaultLoader::new(
                 Client::new(),
                 AwsConfig {
                     access_key_id: Some("access_key_id".to_string()),
@@ -741,7 +741,7 @@ mod tests {
 
             let mut req = req_fn();
 
-            let loader = AwsLoader::new(
+            let loader = AwsDefaultLoader::new(
                 Client::new(),
                 AwsConfig {
                     access_key_id: Some("access_key_id".to_string()),
@@ -810,7 +810,7 @@ mod tests {
 
             let mut req = req_fn();
 
-            let loader = AwsLoader::new(
+            let loader = AwsDefaultLoader::new(
                 Client::new(),
                 AwsConfig {
                     access_key_id: Some("access_key_id".to_string()),
