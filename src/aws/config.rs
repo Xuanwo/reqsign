@@ -89,7 +89,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            config_file: "`~/.aws/config".to_string(),
+            config_file: "~/.aws/config".to_string(),
             shared_credentials_file: "~/.aws/credentials".to_string(),
             profile: "default".to_string(),
             region: None,
@@ -153,6 +153,7 @@ impl Config {
         let _ = self.load_via_profile_config_file().map_err(|err| {
             debug!("load_via_profile_config_file failed: {err:?}");
         });
+
         let _ = self
             .load_via_profile_shared_credentials_file()
             .map_err(|err| debug!("load_via_profile_shared_credentials_file failed: {err:?}"));

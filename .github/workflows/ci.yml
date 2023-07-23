@@ -103,7 +103,7 @@ jobs:
       - name: Doctest
         run: cargo test --doc
 
-  test_gcs_wif:
+  test_gcs_web_identify:
     runs-on: ubuntu-latest
     permissions:
       contents: "read"
