@@ -64,15 +64,18 @@ pub trait CredentialLoad: 'static + Send + Sync + Debug {
 }
 
 /// CredentialLoader will load credential from different methods.
-#[cfg_attr(test, derive(Debug))]
 pub struct DefaultLoader {
     client: Client,
     config: Config,
 
     disable_ec2_metadata: bool,
-    customed_credential_loader: Option<Box<dyn CredentialLoad>>,
-
     credential: Arc<Mutex<Option<Credential>>>,
+}
+
+impl Debug for DefaultLoader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DefaultLoader").finish()
+    }
 }
 
 impl DefaultLoader {
@@ -83,7 +86,6 @@ impl DefaultLoader {
             config,
 
             disable_ec2_metadata: false,
-            customed_credential_loader: None,
 
             credential: Arc::default(),
         }
@@ -92,14 +94,6 @@ impl DefaultLoader {
     /// Disable load from ec2 metadata.
     pub fn with_disable_ec2_metadata(mut self) -> Self {
         self.disable_ec2_metadata = true;
-        self
-    }
-
-    /// Set customed credential loader.
-    ///
-    /// This loader will be used first.
-    pub fn with_customed_credential_loader(mut self, f: Box<dyn CredentialLoad>) -> Self {
-        self.customed_credential_loader = Some(f);
         self
     }
 
@@ -127,14 +121,6 @@ impl DefaultLoader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Ok(Some(cred)) = self
-            .load_via_customed_credential_load()
-            .await
-            .map_err(|err| debug!("load credential via customed_credential_load failed: {err:?}"))
-        {
-            return Ok(Some(cred));
-        }
-
         if let Ok(Some(cred)) = self
             .load_via_config()
             .map_err(|err| debug!("load credential via config failed: {err:?}"))
@@ -169,14 +155,6 @@ impl DefaultLoader {
         }
 
         Ok(None)
-    }
-
-    async fn load_via_customed_credential_load(&self) -> Result<Option<Credential>> {
-        if let Some(loader) = &self.customed_credential_loader {
-            loader.load_credential(self.client.clone()).await
-        } else {
-            Ok(None)
-        }
     }
 
     fn load_via_config(&self) -> Result<Option<Credential>> {
@@ -375,6 +353,13 @@ impl DefaultLoader {
                 Ok("sts.amazonaws.com".to_string())
             }
         }
+    }
+}
+
+#[async_trait]
+impl CredentialLoad for DefaultLoader {
+    async fn load_credential(&self, _: Client) -> Result<Option<Credential>> {
+        self.load().await
     }
 }
 
