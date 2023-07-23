@@ -7,7 +7,7 @@ pub use config::Config as AwsConfig;
 mod credential;
 pub use credential::Credential as AwsCredential;
 pub use credential::CredentialLoad as AwsCredentialLoad;
-pub use credential::Loader as AwsLoader;
+pub use credential::DefaultLoader as AwsDefaultLoader;
 
 mod v4;
 pub use v4::Signer as AwsV4Signer;

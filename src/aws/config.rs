@@ -153,6 +153,7 @@ impl Config {
         let _ = self.load_via_profile_config_file().map_err(|err| {
             debug!("load_via_profile_config_file failed: {err:?}");
         });
+
         let _ = self
             .load_via_profile_shared_credentials_file()
             .map_err(|err| debug!("load_via_profile_shared_credentials_file failed: {err:?}"));

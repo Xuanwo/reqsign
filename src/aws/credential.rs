@@ -65,7 +65,7 @@ pub trait CredentialLoad: 'static + Send + Sync + Debug {
 
 /// CredentialLoader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
-pub struct Loader {
+pub struct DefaultLoader {
     client: Client,
     config: Config,
 
@@ -75,7 +75,7 @@ pub struct Loader {
     credential: Arc<Mutex<Option<Credential>>>,
 }
 
-impl Loader {
+impl DefaultLoader {
     /// Create a new CredentialLoader
     pub fn new(client: Client, config: Config) -> Self {
         Self {
@@ -462,7 +462,7 @@ mod tests {
 
         temp_env::with_vars_unset(vec![AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY], || {
             RUNTIME.block_on(async {
-                let l = Loader::new(reqwest::Client::new(), Config::default())
+                let l = DefaultLoader::new(reqwest::Client::new(), Config::default())
                     .with_disable_ec2_metadata();
                 let x = l.load().await.expect("load must succeed");
                 assert!(x.is_none());
@@ -481,7 +481,7 @@ mod tests {
             ],
             || {
                 RUNTIME.block_on(async {
-                    let l = Loader::new(Client::new(), Config::default().from_env());
+                    let l = DefaultLoader::new(Client::new(), Config::default().from_env());
                     let x = l.load().await.expect("load must succeed");
 
                     let x = x.expect("must load succeed");
@@ -521,7 +521,10 @@ mod tests {
             ],
             || {
                 RUNTIME.block_on(async {
-                    let l = Loader::new(Client::new(), Config::default().from_env().from_profile());
+                    let l = DefaultLoader::new(
+                        Client::new(),
+                        Config::default().from_env().from_profile(),
+                    );
                     let x = l.load().await.unwrap().unwrap();
                     assert_eq!("config_access_key_id", x.access_key_id);
                     assert_eq!("config_secret_access_key", x.secret_access_key);
@@ -559,7 +562,10 @@ mod tests {
             ],
             || {
                 RUNTIME.block_on(async {
-                    let l = Loader::new(Client::new(), Config::default().from_env().from_profile());
+                    let l = DefaultLoader::new(
+                        Client::new(),
+                        Config::default().from_env().from_profile(),
+                    );
                     let x = l.load().await.unwrap().unwrap();
                     assert_eq!("shared_access_key_id", x.access_key_id);
                     assert_eq!("shared_secret_access_key", x.secret_access_key);
@@ -598,7 +604,10 @@ mod tests {
             ],
             || {
                 RUNTIME.block_on(async {
-                    let l = Loader::new(Client::new(), Config::default().from_env().from_profile());
+                    let l = DefaultLoader::new(
+                        Client::new(),
+                        Config::default().from_env().from_profile(),
+                    );
                     let x = l.load().await.expect("load must success").unwrap();
                     assert_eq!("shared_access_key_id", x.access_key_id);
                     assert_eq!("shared_secret_access_key", x.secret_access_key);
@@ -647,7 +656,7 @@ mod tests {
             || {
                 RUNTIME.block_on(async {
                     let config = Config::default().from_env();
-                    let loader = Loader::new(reqwest::Client::new(), config);
+                    let loader = DefaultLoader::new(reqwest::Client::new(), config);
 
                     let signer = Signer::new("s3", &region);
 
