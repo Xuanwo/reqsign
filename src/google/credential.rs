@@ -10,7 +10,6 @@ use log::debug;
 
 pub use self::external_account::ExternalAccount;
 pub use self::service_account::ServiceAccount;
-
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
 
@@ -199,10 +198,9 @@ impl CredentialLoader {
 mod tests {
     use log::warn;
 
-    use super::{
-        external_account::{CredentialSource, FormatType},
-        *,
-    };
+    use super::external_account::CredentialSource;
+    use super::external_account::FormatType;
+    use super::*;
 
     #[test]
     fn loader_returns_service_account() {

@@ -1,13 +1,16 @@
 use std::time::Duration;
 
-use anyhow::{bail, Result};
-use http::header::{ACCEPT, CONTENT_TYPE};
+use anyhow::bail;
+use anyhow::Result;
+use http::header::ACCEPT;
+use http::header::CONTENT_TYPE;
 use log::error;
 use serde::Deserialize;
 
-use crate::google::credential::{external_account::CredentialSource, ExternalAccount};
-
-use super::{Token, TokenLoader};
+use super::Token;
+use super::TokenLoader;
+use crate::google::credential::external_account::CredentialSource;
+use crate::google::credential::ExternalAccount;
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
 const MAX_LIFETIME: Duration = Duration::from_secs(3600);
@@ -102,7 +105,11 @@ impl TokenLoader {
     ///
     /// Reference: [External Account Credentials (Workload Identity Federation)](https://google.aip.dev/auth/4117)
     pub(super) async fn load_via_external_account(&self) -> Result<Option<Token>> {
-        let Some(cred) = self.credential.as_ref().and_then(|cred| cred.external_account.as_ref()) else {
+        let Some(cred) = self
+            .credential
+            .as_ref()
+            .and_then(|cred| cred.external_account.as_ref())
+        else {
             return Ok(None);
         };
 
@@ -121,10 +128,13 @@ impl TokenLoader {
 mod credential_source {
     use std::io::Read;
 
-    use http::{header::HeaderName, HeaderMap, HeaderValue};
+    use http::header::HeaderName;
+    use http::HeaderMap;
+    use http::HeaderValue;
 
     use super::*;
-    use crate::external_account::{FileSourcedCredentials, UrlSourcedCredentials};
+    use crate::external_account::FileSourcedCredentials;
+    use crate::external_account::UrlSourcedCredentials;
 
     pub(super) async fn load_oidc_token(
         source: &CredentialSource,

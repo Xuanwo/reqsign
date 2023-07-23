@@ -187,7 +187,8 @@ mod tests {
     use std::str::FromStr;
     use std::time::Duration;
 
-    use http::{Request, StatusCode};
+    use http::Request;
+    use http::StatusCode;
     use log::debug;
     use once_cell::sync::Lazy;
     use reqwest::blocking::Client;

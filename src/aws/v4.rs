@@ -140,7 +140,7 @@ impl Signer {
     /// ```rust,no_run
     /// use anyhow::Result;
     /// use reqsign::AwsConfig;
-    /// use reqsign::AwsLoader;
+    /// use reqsign::AwsDefaultLoader;
     /// use reqsign::AwsV4Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
@@ -150,7 +150,7 @@ impl Signer {
     /// async fn main() -> Result<()> {
     ///     let client = Client::new();
     ///     let config = AwsConfig::default().from_profile().from_env();
-    ///     let loader = AwsLoader::new(client.clone(), config);
+    ///     let loader = AwsDefaultLoader::new(client.clone(), config);
     ///     let signer = AwsV4Signer::new("s3", "us-east-1");
     ///     // Construct request
     ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
@@ -174,20 +174,21 @@ impl Signer {
     /// # Example
     ///
     /// ```rust,no_run
+    /// use std::time::Duration;
+    ///
     /// use anyhow::Result;
     /// use reqsign::AwsConfig;
-    /// use reqsign::AwsLoader;
+    /// use reqsign::AwsDefaultLoader;
     /// use reqsign::AwsV4Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
-    /// use std::time::Duration;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     let client = Client::new();
     ///     let config = AwsConfig::default().from_profile().from_env();
-    ///     let loader = AwsLoader::new(client.clone(), config);
+    ///     let loader = AwsDefaultLoader::new(client.clone(), config);
     ///     let signer = AwsV4Signer::new("s3", "us-east-1");
     ///     // Construct request
     ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;

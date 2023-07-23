@@ -8,9 +8,9 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-
+use reqsign::AzureStorageConfig;
+use reqsign::AzureStorageLoader;
 use reqsign::AzureStorageSigner;
-use reqsign::{AzureStorageConfig, AzureStorageLoader};
 use reqwest::Client;
 
 fn init_signer() -> Option<(AzureStorageLoader, AzureStorageSigner)> {

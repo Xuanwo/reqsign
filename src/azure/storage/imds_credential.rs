@@ -1,7 +1,11 @@
-use http::{HeaderValue, Method, Request};
-use reqwest::{Client, Url};
-use serde::Deserialize;
 use std::str;
+
+use http::HeaderValue;
+use http::Method;
+use http::Request;
+use reqwest::Client;
+use reqwest::Url;
+use serde::Deserialize;
 
 use super::config::Config;
 

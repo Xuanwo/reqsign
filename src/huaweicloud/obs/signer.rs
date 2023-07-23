@@ -103,6 +103,8 @@ impl Signer {
     ///
     /// ```no_run
     /// use anyhow::Result;
+    /// use reqsign::HuaweicloudObsConfig;
+    /// use reqsign::HuaweicloudObsCredentialLoader;
     /// use reqsign::HuaweicloudObsSigner;
     /// use reqwest::Client;
     /// use reqwest::Request;
@@ -110,17 +112,15 @@ impl Signer {
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    ///     // Signer will load region and credentials from environment by default.
-    ///     let signer = HuaweicloudObsSigner::builder()
-    ///         .access_key("access_key")
-    ///         .secret_key("123456")
-    ///         .bucket("bucket")
-    ///         .build()?;
+    ///     let loader = HuaweicloudObsCredentialLoader::new(HuaweicloudObsConfig::default());
+    ///     let signer = HuaweicloudObsSigner::new("bucket");
+    ///
     ///     // Construct request
     ///     let url = Url::parse("https://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt")?;
     ///     let mut req = Request::new(http::Method::GET, url);
     ///     // Signing request with Signer
-    ///     signer.sign(&mut req)?;
+    ///     let credential = loader.load().await?.unwrap();
+    ///     signer.sign(&mut req, &credential)?;
     ///     // Sending already signed request.
     ///     let resp = Client::new().execute(req).await?;
     ///     println!("resp got status: {}", resp.status());

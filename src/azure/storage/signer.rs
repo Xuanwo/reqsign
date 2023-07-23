@@ -4,7 +4,8 @@ use std::fmt::Debug;
 use std::fmt::Write;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
+use anyhow::Result;
 use http::header::*;
 use log::debug;
 
@@ -252,12 +253,14 @@ fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use http::Request;
     use std::time::Duration;
+
+    use http::Request;
 
     use super::super::config::Config;
     use crate::azure::storage::loader::Loader;
-    use crate::{AzureStorageCredential, AzureStorageSigner};
+    use crate::AzureStorageCredential;
+    use crate::AzureStorageSigner;
 
     #[tokio::test]
     async fn test_sas_url() {

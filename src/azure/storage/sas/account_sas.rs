@@ -1,6 +1,8 @@
-use crate::time::DateTime;
-use crate::{hash, time};
 use anyhow::Result;
+
+use crate::hash;
+use crate::time;
+use crate::time::DateTime;
 
 /// The default parameters that make up a SAS token
 /// https://learn.microsoft.com/en-us/rest/api/storageservices/create-account-sas#specify-the-account-sas-parameters
@@ -98,8 +100,9 @@ impl AccountSharedAccessSignature {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::str::FromStr;
+
+    use super::*;
 
     fn test_time() -> DateTime {
         DateTime::from_str("2022-03-01T08:12:34Z").unwrap()
