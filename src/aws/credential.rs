@@ -3,6 +3,7 @@ use std::fmt::Write;
 use std::fs;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use anyhow::anyhow;
 use anyhow::Result;
@@ -334,7 +335,10 @@ impl IMDSv2Loader {
             .client
             .put(url)
             .header(CONTENT_LENGTH, "0")
-            .header("x-aws-ec2-metadata-token-ttl-seconds", "21600");
+            // 21600s (6h) is recommended by AWS.
+            .header("x-aws-ec2-metadata-token-ttl-seconds", "21600")
+            // Set timeout to 1s to avoid hanging on non-s3 env.
+            .timeout(Duration::from_secs(1));
         let resp = req.send().await?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.text().await?;
