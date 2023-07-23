@@ -13,7 +13,8 @@ use reqsign::AwsConfig;
 use reqsign::AwsDefaultLoader;
 use reqsign::AwsV4Signer;
 use reqwest::Client;
-use sha2::{Digest, Sha256};
+use sha2::Digest;
+use sha2::Sha256;
 
 fn init_signer() -> Option<(AwsDefaultLoader, AwsV4Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();

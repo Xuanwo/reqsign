@@ -497,11 +497,13 @@ struct Ec2MetadataIamSecurityCredentials {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::str::FromStr;
-    use std::{env, vec};
+    use std::vec;
 
     use anyhow::Result;
-    use http::{Request, StatusCode};
+    use http::Request;
+    use http::StatusCode;
     use once_cell::sync::Lazy;
     use quick_xml::de;
     use reqwest::Client;

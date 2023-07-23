@@ -12,11 +12,10 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde::Serialize;
 
+use super::config::Config;
 use crate::time::now;
 use crate::time::parse_rfc3339;
 use crate::time::DateTime;
-
-use super::config::Config;
 
 /// Credential for cos.
 #[derive(Clone)]
@@ -233,7 +232,8 @@ mod tests {
     use std::env;
     use std::str::FromStr;
 
-    use http::{Request, StatusCode};
+    use http::Request;
+    use http::StatusCode;
     use log::debug;
     use once_cell::sync::Lazy;
     use tokio::runtime::Runtime;
