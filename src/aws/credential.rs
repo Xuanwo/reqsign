@@ -73,26 +73,27 @@ pub struct DefaultLoader {
     client: Client,
     config: Config,
 
-    disable_ec2_metadata: bool,
     credential: Arc<Mutex<Option<Credential>>>,
+
+    imds_v2_loader: Option<IMDSv2Loader>,
 }
 
 impl DefaultLoader {
     /// Create a new CredentialLoader
     pub fn new(client: Client, config: Config) -> Self {
         Self {
-            client,
+            client: client.clone(),
             config,
 
-            disable_ec2_metadata: false,
-
             credential: Arc::default(),
+
+            imds_v2_loader: Some(IMDSv2Loader::new(client)),
         }
     }
 
     /// Disable load from ec2 metadata.
     pub fn with_disable_ec2_metadata(mut self) -> Self {
-        self.disable_ec2_metadata = true;
+        self.imds_v2_loader = None;
         self
     }
 
@@ -164,78 +165,12 @@ impl DefaultLoader {
     }
 
     async fn load_via_imds_v2(&self) -> Result<Option<Credential>> {
-        if self.disable_ec2_metadata {
-            return Ok(None);
-        }
-
-        // Get ec2 metadata token
-        let url = "http://169.254.169.254/latest/api/token";
-        let req = self
-            .client
-            .put(url)
-            .header(CONTENT_LENGTH, "0")
-            .header("x-aws-ec2-metadata-token-ttl-seconds", "60");
-        let resp = req.send().await?;
-        if resp.status() != http::StatusCode::OK {
-            let content = resp.text().await?;
-            return Err(anyhow!(
-                "request to AWS EC2 Metadata Services failed: {content}"
-            ));
-        }
-        let ec2_token = resp.text().await?;
-
-        // List all credentials that node has.
-        let url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/";
-        let req = self
-            .client
-            .get(url)
-            .header("x-aws-ec2-metadata-token", &ec2_token);
-        let resp = req.send().await?;
-        if resp.status() != http::StatusCode::OK {
-            let content = resp.text().await?;
-            return Err(anyhow!(
-                "request to AWS EC2 Metadata Services failed: {content}"
-            ));
-        }
-        let content = resp.text().await?;
-        let credential_list: Vec<_> = content.split('\n').collect();
-        // credential list is empty, return None directly.
-        if credential_list.is_empty() {
-            return Ok(None);
-        }
-        let role_name = credential_list[0];
-
-        // Get the credentials via role_name.
-        let url =
-            format!("http://169.254.169.254/latest/meta-data/iam/security-credentials/{role_name}");
-        let req = self
-            .client
-            .get(&url)
-            .header("x-aws-ec2-metadata-token", &ec2_token);
-        let resp = req.send().await?;
-        if resp.status() != http::StatusCode::OK {
-            let content = resp.text().await?;
-            return Err(anyhow!(
-                "request to AWS EC2 Metadata Services failed: {content}"
-            ));
-        }
-
-        let content = resp.text().await?;
-        let resp: Ec2MetadataIamSecurityCredentials = serde_json::from_str(&content)?;
-        if resp.code != "Success" {
-            return Err(anyhow!(
-                "request to AWS EC2 Metadata Services failed: {content}"
-            ));
-        }
-
-        let cred = Credential {
-            access_key_id: resp.access_key_id,
-            secret_access_key: resp.secret_access_key,
-            session_token: Some(resp.token),
-            expires_in: Some(parse_rfc3339(&resp.expiration)?),
+        let loader = match &self.imds_v2_loader {
+            Some(loader) => loader,
+            None => return Ok(None),
         };
 
-        Ok(Some(cred))
+        loader.load().await
     }
 
     async fn load_via_assume_role_with_web_identity(&self) -> Result<Option<Credential>> {
@@ -311,6 +246,116 @@ impl DefaultLoader {
 
 #[async_trait]
 impl CredentialLoad for DefaultLoader {
+    async fn load_credential(&self, _: Client) -> Result<Option<Credential>> {
+        self.load().await
+    }
+}
+
+pub struct IMDSv2Loader {
+    client: Client,
+
+    token: Arc<Mutex<(String, DateTime)>>,
+}
+
+impl IMDSv2Loader {
+    /// Create a new IMDSv2Loader.
+    pub fn new(client: Client) -> Self {
+        Self {
+            client,
+            token: Arc::new(Mutex::new(("".to_string(), DateTime::MIN_UTC))),
+        }
+    }
+
+    pub async fn load(&self) -> Result<Option<Credential>> {
+        let token = self.load_ec2_metadata_token().await?;
+
+        // List all credentials that node has.
+        let url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/";
+        let req = self
+            .client
+            .get(url)
+            .header("x-aws-ec2-metadata-token", &token);
+        let resp = req.send().await?;
+        if resp.status() != http::StatusCode::OK {
+            let content = resp.text().await?;
+            return Err(anyhow!(
+                "request to AWS EC2 Metadata Services failed: {content}"
+            ));
+        }
+        let profile_name = resp.text().await?;
+
+        // Get the credentials via role_name.
+        let url = format!(
+            "http://169.254.169.254/latest/meta-data/iam/security-credentials/{profile_name}"
+        );
+        let req = self
+            .client
+            .get(&url)
+            .header("x-aws-ec2-metadata-token", &token);
+        let resp = req.send().await?;
+        if resp.status() != http::StatusCode::OK {
+            let content = resp.text().await?;
+            return Err(anyhow!(
+                "request to AWS EC2 Metadata Services failed: {content}"
+            ));
+        }
+
+        let content = resp.text().await?;
+        let resp: Ec2MetadataIamSecurityCredentials = serde_json::from_str(&content)?;
+        if resp.code != "Success" {
+            return Err(anyhow!(
+                "request to AWS EC2 Metadata Services failed: {content}"
+            ));
+        }
+
+        let cred = Credential {
+            access_key_id: resp.access_key_id,
+            secret_access_key: resp.secret_access_key,
+            session_token: Some(resp.token),
+            expires_in: Some(parse_rfc3339(&resp.expiration)?),
+        };
+
+        Ok(Some(cred))
+    }
+
+    /// load_ec2_metadata_token will load ec2 metadata token from IMDS.
+    ///
+    /// Return value is (token, expires_in).
+    async fn load_ec2_metadata_token(&self) -> Result<String> {
+        {
+            let (token, expires_in) = self.token.lock().expect("lock poisoned").clone();
+            if expires_in > now() {
+                return Ok(token);
+            }
+        }
+
+        let url = "http://169.254.169.254/latest/api/token";
+        let req = self
+            .client
+            .put(url)
+            .header(CONTENT_LENGTH, "0")
+            .header("x-aws-ec2-metadata-token-ttl-seconds", "21600");
+        let resp = req.send().await?;
+        if resp.status() != http::StatusCode::OK {
+            let content = resp.text().await?;
+            return Err(anyhow!(
+                "request to AWS EC2 Metadata Services failed: {content}"
+            ));
+        }
+        let ec2_token = resp.text().await?;
+        // Set expires_in to 10 minutes to enforce re-read.
+        let expires_in = now() + chrono::Duration::seconds(21600) - chrono::Duration::seconds(600);
+
+        {
+            *self.token.lock().expect("lock poisoned") = (ec2_token.clone(), expires_in);
+        }
+
+        Ok(ec2_token)
+    }
+}
+
+#[async_trait]
+impl CredentialLoad for IMDSv2Loader {
     async fn load_credential(&self, _: Client) -> Result<Option<Credential>> {
         self.load().await
     }
