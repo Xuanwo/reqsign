@@ -72,3 +72,41 @@ impl CredentialLoader {
         Ok(None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use once_cell::sync::Lazy;
+    use tokio::runtime::Runtime;
+
+    use super::super::super::constants::*;
+    use super::*;
+
+    static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("Should create a tokio runtime")
+    });
+
+    #[test]
+    fn test_credential_env_loader_with_env() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        temp_env::with_vars(
+            vec![
+                (HUAWEI_CLOUD_ACCESS_KEY_ID, Some("access_key_id")),
+                (HUAWEI_CLOUD_SECRET_ACCESS_KEY, Some("secret_access_key")),
+            ],
+            || {
+                RUNTIME.block_on(async {
+                    let l = CredentialLoader::new(Config::default().from_env());
+                    let x = l.load().await.expect("load must succeed");
+
+                    let x = x.expect("must load succeed");
+                    assert_eq!("access_key_id", x.access_key_id);
+                    assert_eq!("secret_access_key", x.secret_access_key);
+                })
+            },
+        );
+    }
+}
