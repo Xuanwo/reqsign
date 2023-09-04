@@ -16,7 +16,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/check
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -30,7 +30,7 @@ jobs:
           - macos-11
           - windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -45,7 +45,7 @@ jobs:
           - macos-11
           - windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build
         uses: actions-rs/cargo@v1
         with:
@@ -57,7 +57,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install cargo-nextest
         run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
       - name: Test
@@ -110,7 +110,7 @@ jobs:
       id-token: "write"
     if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install cargo-nextest
         run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
@@ -136,7 +136,7 @@ jobs:
       id-token: "write"
     if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install cargo-nextest
         run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
@@ -169,7 +169,7 @@ jobs:
       id-token: "write"
     if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install cargo-nextest
         run: curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ${CARGO_HOME:-~/.cargo}/bin
 
