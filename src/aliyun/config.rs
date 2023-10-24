@@ -67,6 +67,9 @@ impl Config {
         if let Some(v) = envs.get(ALIBABA_CLOUD_ACCESS_KEY_SECRET) {
             self.access_key_secret.get_or_insert(v.clone());
         }
+        if let Some(v) = envs.get(ALIBABA_CLOUD_SECURITY_TOKEN) {
+            self.security_token.get_or_insert(v.clone());
+        }
         if let Some(v) = envs.get(ALIBABA_CLOUD_ROLE_ARN) {
             self.role_arn.get_or_insert(v.clone());
         }
