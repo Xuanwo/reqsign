@@ -3,6 +3,7 @@ authors = ["Xuanwo <github@xuanwo.io>"]
 categories = ["command-line-utilities", "web-programming"]
 description = "Signing API requests without effort."
 documentation = "https://docs.rs/reqsign"
+repository = "https://github.com/Xuanwo/reqsign"
 edition = "2021"
 license = "Apache-2.0"
 name = "reqsign"
