@@ -18,6 +18,7 @@ pub const AWS_WEB_IDENTITY_TOKEN_FILE: &str = "AWS_WEB_IDENTITY_TOKEN_FILE";
 pub const AWS_ROLE_ARN: &str = "AWS_ROLE_ARN";
 pub const AWS_ROLE_SESSION_NAME: &str = "AWS_ROLE_SESSION_NAME";
 pub const AWS_STS_REGIONAL_ENDPOINTS: &str = "AWS_STS_REGIONAL_ENDPOINTS";
+pub const AWS_EC2_METADATA_DISABLED: &str = "AWS_EC2_METADATA_DISABLED";
 
 /// AsciiSet for [AWS UriEncode](https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html)
 ///

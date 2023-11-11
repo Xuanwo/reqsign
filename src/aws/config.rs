@@ -84,6 +84,11 @@ pub struct Config {
     /// - env value: [`AWS_WEB_IDENTITY_TOKEN_FILE`]
     /// - profile config: `web_identity_token_file`
     pub web_identity_token_file: Option<String>,
+    /// `ec2_metadata_disabled` value will be loaded from:
+    ///
+    /// - this field
+    /// - env value: [`AWS_EC2_METADATA_DISABLED`]
+    pub ec2_metadata_disabled: bool,
 }
 
 impl Default for Config {
@@ -101,6 +106,7 @@ impl Default for Config {
             role_session_name: "reqsign".to_string(),
             external_id: None,
             web_identity_token_file: None,
+            ec2_metadata_disabled: false,
         }
     }
 }
@@ -143,7 +149,9 @@ impl Config {
         if let Some(v) = envs.get(AWS_WEB_IDENTITY_TOKEN_FILE) {
             self.web_identity_token_file = Some(v.to_string());
         }
-
+        if let Some(v) = envs.get(AWS_EC2_METADATA_DISABLED) {
+            self.ec2_metadata_disabled = v == "true";
+        }
         self
     }
 

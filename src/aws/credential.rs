@@ -73,22 +73,21 @@ pub trait CredentialLoad: 'static + Send + Sync {
 pub struct DefaultLoader {
     client: Client,
     config: Config,
-
     credential: Arc<Mutex<Option<Credential>>>,
-
     imds_v2_loader: Option<IMDSv2Loader>,
 }
 
 impl DefaultLoader {
     /// Create a new CredentialLoader
     pub fn new(client: Client, config: Config) -> Self {
+        let imds_v2_loader = config
+            .ec2_metadata_disabled
+            .then(|| IMDSv2Loader::new(client.clone()));
         Self {
-            client: client.clone(),
+            client,
             config,
-
             credential: Arc::default(),
-
-            imds_v2_loader: Some(IMDSv2Loader::new(client)),
+            imds_v2_loader,
         }
     }
 
