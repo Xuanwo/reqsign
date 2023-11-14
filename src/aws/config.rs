@@ -271,7 +271,7 @@ mod tests {
         writeln!(tmp_file, "aws_access_key_id = DEFAULTACCESSKEYID")?;
         writeln!(tmp_file, "aws_secret_access_key = DEFAULTSECRETACCESSKEY")?;
         writeln!(tmp_file, "aws_session_token = DEFAULTSESSIONTOKEN")?;
-        writeln!(tmp_file, "")?;
+        writeln!(tmp_file)?;
         writeln!(tmp_file, "[profile1]")?;
         writeln!(tmp_file, "aws_access_key_id = PROFILE1ACCESSKEYID")?;
         writeln!(tmp_file, "aws_secret_access_key = PROFILE1SECRETACCESSKEY")?;
