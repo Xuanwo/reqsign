@@ -148,7 +148,15 @@ impl Config {
     }
 
     /// Load config from profile (and shared profile).
+    ///
+    /// If the env var AWS_PROFILE is set, this profile will be used,
+    /// otherwise the contents of `self.profile` will be used.
     pub fn from_profile(mut self) -> Self {
+        // self.profile is checked by the two load methods.
+        if let Ok(profile) = env::var(AWS_PROFILE) {
+            self.profile = profile;
+        }
+
         // Ignore all errors happened internally.
         let _ = self.load_via_profile_config_file().map_err(|err| {
             debug!("load_via_profile_config_file failed: {err:?}");
