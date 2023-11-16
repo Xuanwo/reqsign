@@ -156,7 +156,26 @@ impl Config {
     }
 
     /// Load config from profile (and shared profile).
+    ///
+    /// If the env var AWS_PROFILE is set, this profile will be used,
+    /// otherwise the contents of `self.profile` will be used.
     pub fn from_profile(mut self) -> Self {
+        // self.profile is checked by the two load methods.
+        if let Ok(profile) = env::var(AWS_PROFILE) {
+            self.profile = profile;
+        }
+
+        // make sure we're getting profile info from the correct place.
+        // Respecting these env vars also makes it possible to unit test
+        // this method.
+        if let Ok(config_file) = env::var(AWS_CONFIG_FILE) {
+            self.config_file = config_file;
+        }
+
+        if let Ok(shared_credentials_file) = env::var(AWS_SHARED_CREDENTIALS_FILE) {
+            self.shared_credentials_file = shared_credentials_file;
+        }
+
         // Ignore all errors happened internally.
         let _ = self.load_via_profile_config_file().map_err(|err| {
             debug!("load_via_profile_config_file failed: {err:?}");
@@ -235,6 +254,61 @@ impl Config {
         if let Some(v) = props.get("web_identity_token_file") {
             self.web_identity_token_file = Some(v.to_string())
         }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_config_from_profile_shared_credentials() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        // Create a dummy credentials file to test against
+        let tmp_dir = tempdir()?;
+        let file_path = tmp_dir.path().join("credentials");
+        let mut tmp_file = File::create(&file_path)?;
+        writeln!(tmp_file, "[default]")?;
+        writeln!(tmp_file, "aws_access_key_id = DEFAULTACCESSKEYID")?;
+        writeln!(tmp_file, "aws_secret_access_key = DEFAULTSECRETACCESSKEY")?;
+        writeln!(tmp_file, "aws_session_token = DEFAULTSESSIONTOKEN")?;
+        writeln!(tmp_file)?;
+        writeln!(tmp_file, "[profile1]")?;
+        writeln!(tmp_file, "aws_access_key_id = PROFILE1ACCESSKEYID")?;
+        writeln!(tmp_file, "aws_secret_access_key = PROFILE1SECRETACCESSKEY")?;
+        writeln!(tmp_file, "aws_session_token = PROFILE1SESSIONTOKEN")?;
+
+        temp_env::with_vars(
+            [
+                (AWS_PROFILE, Some("profile1".to_owned())),
+                (AWS_CONFIG_FILE, None::<String>),
+                (
+                    AWS_SHARED_CREDENTIALS_FILE,
+                    Some(file_path.to_str().unwrap().to_owned()),
+                ),
+            ],
+            || {
+                let config = Config::default().from_profile();
+
+                assert_eq!(config.profile, "profile1".to_owned());
+                assert_eq!(config.access_key_id, Some("PROFILE1ACCESSKEYID".to_owned()));
+                assert_eq!(
+                    config.secret_access_key,
+                    Some("PROFILE1SECRETACCESSKEY".to_owned())
+                );
+                assert_eq!(
+                    config.session_token,
+                    Some("PROFILE1SESSIONTOKEN".to_owned())
+                );
+            },
+        );
 
         Ok(())
     }
