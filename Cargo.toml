@@ -81,7 +81,7 @@ sha2 = { version = "0.10", features = ["oid"] }
 tokio = { version = "1", features = ["fs"], optional = true }
 
 [dev-dependencies]
-aws-sigv4 = "0.56"
+aws-sigv4 = "0.101"
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 dotenv = "0.15"
 env_logger = "0.10"
