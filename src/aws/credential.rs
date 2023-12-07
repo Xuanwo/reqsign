@@ -83,7 +83,7 @@ impl DefaultLoader {
         let imds_v2_loader = if config.ec2_metadata_disabled {
             None
         } else {
-            IMDSv2Loader::new(client.clone())
+            Some(IMDSv2Loader::new(client.clone()))
         };
         Self {
             client,
