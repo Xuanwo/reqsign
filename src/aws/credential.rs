@@ -80,9 +80,11 @@ pub struct DefaultLoader {
 impl DefaultLoader {
     /// Create a new CredentialLoader
     pub fn new(client: Client, config: Config) -> Self {
-        let imds_v2_loader = config
-            .ec2_metadata_disabled
-            .then(|| IMDSv2Loader::new(client.clone()));
+        let imds_v2_loader = if config.ec2_metadata_disabled {
+            None
+        } else {
+            Some(IMDSv2Loader::new(client.clone()))
+        };
         Self {
             client,
             config,
