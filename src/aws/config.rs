@@ -1,13 +1,19 @@
 use std::collections::HashMap;
 use std::env;
+#[cfg(not(target_arch = "wasm32"))]
 use std::fs;
 
+#[cfg(not(target_arch = "wasm32"))]
 use anyhow::anyhow;
+#[cfg(not(target_arch = "wasm32"))]
 use anyhow::Result;
+#[cfg(not(target_arch = "wasm32"))]
 use ini::Ini;
+#[cfg(not(target_arch = "wasm32"))]
 use log::debug;
 
 use super::constants::*;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::dirs::expand_homedir;
 
 /// Config for aws services.
@@ -159,6 +165,7 @@ impl Config {
     ///
     /// If the env var AWS_PROFILE is set, this profile will be used,
     /// otherwise the contents of `self.profile` will be used.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn from_profile(mut self) -> Self {
         // self.profile is checked by the two load methods.
         if let Ok(profile) = env::var(AWS_PROFILE) {
@@ -193,6 +200,7 @@ impl Config {
     /// - `aws_access_key_id`
     /// - `aws_secret_access_key`
     /// - `aws_session_token`
+    #[cfg(not(target_arch = "wasm32"))]
     fn load_via_profile_shared_credentials_file(&mut self) -> Result<()> {
         let path = expand_homedir(&self.shared_credentials_file)
             .ok_or_else(|| anyhow!("expand homedir failed"))?;
@@ -218,6 +226,7 @@ impl Config {
         Ok(())
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn load_via_profile_config_file(&mut self) -> Result<()> {
         let path =
             expand_homedir(&self.config_file).ok_or_else(|| anyhow!("expand homedir failed"))?;
@@ -268,6 +277,7 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    #[cfg(not(target_arch = "wasm32"))]
     fn test_config_from_profile_shared_credentials() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 

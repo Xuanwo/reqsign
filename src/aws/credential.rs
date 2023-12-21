@@ -3,7 +3,6 @@ use std::fmt::Write;
 use std::fs;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Duration;
 
 use anyhow::anyhow;
 use anyhow::Result;
@@ -59,7 +58,8 @@ impl Credential {
 }
 
 /// Loader trait will try to load credential from different sources.
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 pub trait CredentialLoad: 'static + Send + Sync {
     /// Load credential from sources.
     ///
@@ -246,7 +246,8 @@ impl DefaultLoader {
     }
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl CredentialLoad for DefaultLoader {
     async fn load_credential(&self, _: Client) -> Result<Option<Credential>> {
         self.load().await
@@ -332,14 +333,20 @@ impl IMDSv2Loader {
         }
 
         let url = "http://169.254.169.254/latest/api/token";
-        let req = self
+        #[allow(unused_mut)]
+        let mut req = self
             .client
             .put(url)
             .header(CONTENT_LENGTH, "0")
             // 21600s (6h) is recommended by AWS.
-            .header("x-aws-ec2-metadata-token-ttl-seconds", "21600")
-            // Set timeout to 1s to avoid hanging on non-s3 env.
-            .timeout(Duration::from_secs(1));
+            .header("x-aws-ec2-metadata-token-ttl-seconds", "21600");
+
+        // Set timeout to 1s to avoid hanging on non-s3 env.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            req = req.timeout(std::time::Duration::from_secs(1));
+        }
+
         let resp = req.send().await?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.text().await?;
@@ -359,7 +366,8 @@ impl IMDSv2Loader {
     }
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl CredentialLoad for IMDSv2Loader {
     async fn load_credential(&self, _: Client) -> Result<Option<Credential>> {
         self.load().await
@@ -483,7 +491,8 @@ impl AssumeRoleLoader {
     }
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl CredentialLoad for AssumeRoleLoader {
     async fn load_credential(&self, _: Client) -> Result<Option<Credential>> {
         self.load().await
