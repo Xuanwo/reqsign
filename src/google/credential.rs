@@ -1,6 +1,7 @@
 pub mod external_account;
 pub mod service_account;
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::env;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -96,14 +97,17 @@ impl CredentialLoader {
             return Ok(Some(cred));
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         if let Ok(Some(cred)) = self.load_via_path() {
             return Ok(Some(cred));
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         if let Ok(Some(cred)) = self.load_via_env() {
             return Ok(Some(cred));
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
         if let Ok(Some(cred)) = self.load_via_well_known_location() {
             return Ok(Some(cred));
         }
@@ -111,6 +115,7 @@ impl CredentialLoader {
         Ok(None)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn load_via_path(&self) -> Result<Option<Credential>> {
         let path = if let Some(path) = &self.path {
             path
@@ -139,6 +144,7 @@ impl CredentialLoader {
     }
 
     /// Load from env GOOGLE_APPLICATION_CREDENTIALS.
+    #[cfg(not(target_arch = "wasm32"))]
     fn load_via_env(&self) -> Result<Option<Credential>> {
         if self.disable_env {
             return Ok(None);
@@ -156,6 +162,7 @@ impl CredentialLoader {
     ///
     /// - `$HOME/.config/gcloud/application_default_credentials.json`
     /// - `%APPDATA%\gcloud\application_default_credentials.json`
+    #[cfg(not(target_arch = "wasm32"))]
     fn load_via_well_known_location(&self) -> Result<Option<Credential>> {
         if self.disable_well_known_location {
             return Ok(None);
