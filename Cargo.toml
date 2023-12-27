@@ -47,7 +47,7 @@ services-google = [
   "dep:serde_json",
   "dep:jsonwebtoken",
 ]
-services-huaweicloud = ["dep:serde", "dep:serde_json"]
+services-huaweicloud = ["dep:serde", "dep:serde_json", "dep:once_cell"]
 services-tencent = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 
 [[bench]]
@@ -65,7 +65,7 @@ hmac = "0.12"
 http = "0.2"
 jsonwebtoken = { version = "9.2", optional = true }
 log = "0.4"
-once_cell = "1"
+once_cell = {  version = "1", optional = true }
 percent-encoding = "2"
 quick-xml = { version = "0.31", features = ["serialize"], optional = true }
 rand = "0.8.5"
@@ -95,3 +95,4 @@ reqwest = { version = "0.11", features = ["blocking", "json"] }
 temp-env = "0.3"
 tempfile = "3.8"
 tokio = { version = "1", features = ["full"] }
+once_cell = "1"
