@@ -3,10 +3,10 @@ authors = ["Xuanwo <github@xuanwo.io>"]
 categories = ["command-line-utilities", "web-programming"]
 description = "Signing API requests without effort."
 documentation = "https://docs.rs/reqsign"
-repository = "https://github.com/Xuanwo/reqsign"
 edition = "2021"
 license = "Apache-2.0"
 name = "reqsign"
+repository = "https://github.com/Xuanwo/reqsign"
 version = "0.14.6"
 
 [package.metadata.docs.rs]
@@ -65,7 +65,7 @@ hmac = "0.12"
 http = "0.2"
 jsonwebtoken = { version = "9.2", optional = true }
 log = "0.4"
-once_cell = {  version = "1", optional = true }
+once_cell = { version = "1", optional = true }
 percent-encoding = "2"
 quick-xml = { version = "0.31", features = ["serialize"], optional = true }
 rand = "0.8.5"
@@ -90,9 +90,9 @@ aws-sigv4 = "0.56"
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 dotenv = "0.15"
 env_logger = "0.10"
+once_cell = "1"
 pretty_assertions = "1.3"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 temp-env = "0.3"
 tempfile = "3.8"
 tokio = { version = "1", features = ["full"] }
-once_cell = "1"
