@@ -1,5 +1,6 @@
 mod external_account;
 mod service_account;
+mod impersonated_service_account;
 
 use std::fmt::Debug;
 use std::fmt::Formatter;
@@ -202,6 +203,10 @@ impl TokenLoader {
         }
 
         if let Some(token) = self.load_via_service_account().await? {
+            return Ok(Some(token));
+        }
+
+        if let Some(token) = self.load_via_impersonated_service_account().await? {
             return Ok(Some(token));
         }
 
