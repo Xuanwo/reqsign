@@ -1,5 +1,6 @@
 pub mod external_account;
 pub mod service_account;
+pub mod impersonated_service_account;
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::env;
@@ -10,6 +11,7 @@ use anyhow::Result;
 use log::debug;
 
 pub use self::external_account::ExternalAccount;
+use self::impersonated_service_account::ImpersonatedServiceAccount;
 pub use self::service_account::ServiceAccount;
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
@@ -18,6 +20,7 @@ use crate::hash::base64_decode;
 #[cfg_attr(test, derive(Debug))]
 #[serde(rename_all = "snake_case")]
 pub enum CredentialType {
+    ImpersonatedServiceAccount,
     ExternalAccount,
     ServiceAccount,
 }
@@ -30,6 +33,8 @@ pub struct Credential {
     #[serde(rename = "type")]
     pub ty: CredentialType,
 
+    #[serde(flatten)]
+    pub(crate) impersonated_service_account: Option<ImpersonatedServiceAccount>,
     #[serde(flatten)]
     pub(crate) service_account: Option<ServiceAccount>,
     #[serde(flatten)]
@@ -208,6 +213,34 @@ mod tests {
     use super::external_account::CredentialSource;
     use super::external_account::FormatType;
     use super::*;
+
+    #[test]
+    fn loader_returns_impersonated_service_account() {
+        temp_env::with_vars(
+            vec![(
+                GOOGLE_APPLICATION_CREDENTIALS,
+                Some(format!(
+                    "{}/testdata/services/google/test_impersonated_service_account.json",
+                    env::current_dir()
+                        .expect("current_dir must exist")
+                        .to_string_lossy()
+                )),
+            )],
+            || {
+                let cred_loader = CredentialLoader::default();
+
+                let cred = cred_loader
+                    .load()
+                    .expect("credentail must be exist")
+                    .unwrap()
+                    .impersonated_service_account
+                    .expect("couldn't deserialize impersonated service account");
+
+                assert_eq!("xxx", &cred.service_account_impersonation_url)
+            },
+        );
+    }
+
 
     #[test]
     fn loader_returns_service_account() {
