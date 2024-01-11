@@ -1,6 +1,6 @@
 pub mod external_account;
-pub mod service_account;
 pub mod impersonated_service_account;
+pub mod service_account;
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::env;
@@ -284,8 +284,14 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
 
                 assert_eq!("https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/example-01-iam@example-01.iam.gserviceaccount.com:generateAccessToken", &cred.service_account_impersonation_url);
                 assert_eq!("placeholder_client_id", &cred.source_credentials.client_id);
-                assert_eq!("placeholder_client_secret", &cred.source_credentials.client_secret);
-                assert_eq!("placeholder_refresh_token", &cred.source_credentials.refresh_token);
+                assert_eq!(
+                    "placeholder_client_secret",
+                    &cred.source_credentials.client_secret
+                );
+                assert_eq!(
+                    "placeholder_refresh_token",
+                    &cred.source_credentials.refresh_token
+                );
             },
         );
     }

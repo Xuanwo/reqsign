@@ -33,7 +33,9 @@ impl TokenLoader {
         };
 
         let bearer_auth_token = self.generate_bearer_auth_token(cred).await?;
-        self.generate_access_token(cred, bearer_auth_token).await.map(Some)
+        self.generate_access_token(cred, bearer_auth_token)
+            .await
+            .map(Some)
     }
 
     async fn generate_bearer_auth_token(&self, cred: &ImpersonatedServiceAccount) -> Result<Token> {
@@ -56,7 +58,10 @@ impl TokenLoader {
 
         if !resp.status().is_success() {
             error!("bearer token loader for impersonated service account got unexpected response: {:?}", resp);
-            bail!("bearer token loader for impersonated service account failed: {}", resp.text().await?);
+            bail!(
+                "bearer token loader for impersonated service account failed: {}",
+                resp.text().await?
+            );
         }
 
         let token: Option<Token> = serde_json::from_slice(&resp.bytes().await?)?;
@@ -65,7 +70,11 @@ impl TokenLoader {
         Ok(token)
     }
 
-    async fn generate_access_token(&self, cred: &ImpersonatedServiceAccount, temp_token: Token) -> Result<Token> {
+    async fn generate_access_token(
+        &self,
+        cred: &ImpersonatedServiceAccount,
+        temp_token: Token,
+    ) -> Result<Token> {
         let req = serde_json::json!({
             "lifetime": format!("{}s", MAX_LIFETIME.as_secs()),
             "scope": &temp_token.scope.split(" ").collect::<Vec<&str>>(),
@@ -85,7 +94,10 @@ impl TokenLoader {
 
         if !resp.status().is_success() {
             error!("access token loader for impersonated service account got unexpected response: {:?}", resp);
-            bail!("access token loader for impersonated service account failed: {}", resp.text().await?);
+            bail!(
+                "access token loader for impersonated service account failed: {}",
+                resp.text().await?
+            );
         }
 
         let token: Option<ImpersonatedToken> = serde_json::from_slice(&resp.bytes().await?)?;
