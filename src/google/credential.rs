@@ -215,34 +215,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn loader_returns_impersonated_service_account() {
-        temp_env::with_vars(
-            vec![(
-                GOOGLE_APPLICATION_CREDENTIALS,
-                Some(format!(
-                    "{}/testdata/services/google/test_impersonated_service_account.json",
-                    env::current_dir()
-                        .expect("current_dir must exist")
-                        .to_string_lossy()
-                )),
-            )],
-            || {
-                let cred_loader = CredentialLoader::default();
-
-                let cred = cred_loader
-                    .load()
-                    .expect("credentail must be exist")
-                    .unwrap()
-                    .impersonated_service_account
-                    .expect("couldn't deserialize impersonated service account");
-
-                assert_eq!("xxx", &cred.service_account_impersonation_url)
-            },
-        );
-    }
-
-
-    #[test]
     fn loader_returns_service_account() {
         temp_env::with_vars(
             vec![(
@@ -284,6 +256,36 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
 ",
                     &cred.private_key
                 );
+            },
+        );
+    }
+
+    #[test]
+    fn loader_returns_impersonated_service_account() {
+        temp_env::with_vars(
+            vec![(
+                GOOGLE_APPLICATION_CREDENTIALS,
+                Some(format!(
+                    "{}/testdata/services/google/test_impersonated_service_account.json",
+                    env::current_dir()
+                        .expect("current_dir must exist")
+                        .to_string_lossy()
+                )),
+            )],
+            || {
+                let cred_loader = CredentialLoader::default();
+
+                let cred = cred_loader
+                    .load()
+                    .expect("credentail must be exist")
+                    .unwrap()
+                    .impersonated_service_account
+                    .expect("couldn't deserialize impersonated service account");
+
+                assert_eq!("https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/example-01-iam@example-01.iam.gserviceaccount.com:generateAccessToken", &cred.service_account_impersonation_url);
+                assert_eq!("placeholder_client_id", &cred.source_credentials.client_id);
+                assert_eq!("placeholder_client_secret", &cred.source_credentials.client_secret);
+                assert_eq!("placeholder_refresh_token", &cred.source_credentials.refresh_token);
             },
         );
     }
