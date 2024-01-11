@@ -34,9 +34,9 @@ pub struct Credential {
     pub ty: CredentialType,
 
     #[serde(flatten)]
-    pub(crate) impersonated_service_account: Option<ImpersonatedServiceAccount>,
-    #[serde(flatten)]
     pub(crate) service_account: Option<ServiceAccount>,
+    #[serde(flatten)]
+    pub(crate) impersonated_service_account: Option<ImpersonatedServiceAccount>,
     #[serde(flatten)]
     pub(crate) external_account: Option<ExternalAccount>,
 }
