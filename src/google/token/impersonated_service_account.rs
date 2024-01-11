@@ -77,7 +77,7 @@ impl TokenLoader {
     ) -> Result<Token> {
         let req = serde_json::json!({
             "lifetime": format!("{}s", MAX_LIFETIME.as_secs()),
-            "scope": &temp_token.scope.split(" ").collect::<Vec<&str>>(),
+            "scope": &temp_token.scope.split(' ').collect::<Vec<&str>>(),
             "delegates": &cred.delegates,
         });
 
