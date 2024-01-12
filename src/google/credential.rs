@@ -7,6 +7,7 @@ use std::env;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use anyhow::anyhow;
 use anyhow::Result;
 use log::debug;
 
@@ -27,19 +28,36 @@ pub enum CredentialType {
 }
 
 /// A Google API credential file.
-#[derive(Clone, serde::Deserialize)]
+#[derive(Clone, Default)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Credential {
-    /// The type of the credential file.
-    #[serde(rename = "type")]
-    pub ty: CredentialType,
-
-    #[serde(flatten)]
     pub(crate) service_account: Option<ServiceAccount>,
-    #[serde(flatten)]
     pub(crate) impersonated_service_account: Option<ImpersonatedServiceAccount>,
-    #[serde(flatten)]
     pub(crate) external_account: Option<ExternalAccount>,
+}
+
+impl Credential {
+    /// Deserialize credential file
+    pub fn from_slice(v: &[u8]) -> Result<Credential> {
+        let service_account = serde_json::from_slice(v).ok();
+        let impersonated_service_account = serde_json::from_slice(v).ok();
+        let external_account = serde_json::from_slice(v).ok();
+
+        let cred = Credential {
+            service_account,
+            impersonated_service_account,
+            external_account,
+        };
+
+        if cred.service_account.is_none()
+            && cred.impersonated_service_account.is_none()
+            && cred.external_account.is_none()
+        {
+            return Err(anyhow!("Couldn't deserialize credential file"));
+        }
+
+        Ok(cred)
+    }
 }
 
 /// CredentialLoader will load credential from different methods.
@@ -142,7 +160,7 @@ impl CredentialLoader {
 
         let decode_content = base64_decode(content)?;
 
-        let cred = serde_json::from_slice(&decode_content).map_err(|err| {
+        let cred = Credential::from_slice(&decode_content).map_err(|err| {
             debug!("load credential from content failed: {err:?}");
             err
         })?;
@@ -198,7 +216,7 @@ impl CredentialLoader {
             err
         })?;
 
-        let account = serde_json::from_slice(&content).map_err(|err| {
+        let account = Credential::from_slice(&content).map_err(|err| {
             debug!("load credential failed at serde_json: {err:?}");
             err
         })?;
