@@ -1,4 +1,5 @@
 pub mod external_account;
+pub mod impersonated_service_account;
 pub mod service_account;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -6,10 +7,12 @@ use std::env;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use anyhow::anyhow;
 use anyhow::Result;
 use log::debug;
 
 pub use self::external_account::ExternalAccount;
+use self::impersonated_service_account::ImpersonatedServiceAccount;
 pub use self::service_account::ServiceAccount;
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::hash::base64_decode;
@@ -17,23 +20,44 @@ use crate::hash::base64_decode;
 #[derive(Clone, serde::Deserialize)]
 #[cfg_attr(test, derive(Debug))]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::enum_variant_names)]
 pub enum CredentialType {
+    ImpersonatedServiceAccount,
     ExternalAccount,
     ServiceAccount,
 }
 
 /// A Google API credential file.
-#[derive(Clone, serde::Deserialize)]
+#[derive(Clone, Default)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Credential {
-    /// The type of the credential file.
-    #[serde(rename = "type")]
-    pub ty: CredentialType,
-
-    #[serde(flatten)]
     pub(crate) service_account: Option<ServiceAccount>,
-    #[serde(flatten)]
+    pub(crate) impersonated_service_account: Option<ImpersonatedServiceAccount>,
     pub(crate) external_account: Option<ExternalAccount>,
+}
+
+impl Credential {
+    /// Deserialize credential file
+    pub fn from_slice(v: &[u8]) -> Result<Credential> {
+        let service_account = serde_json::from_slice(v).ok();
+        let impersonated_service_account = serde_json::from_slice(v).ok();
+        let external_account = serde_json::from_slice(v).ok();
+
+        let cred = Credential {
+            service_account,
+            impersonated_service_account,
+            external_account,
+        };
+
+        if cred.service_account.is_none()
+            && cred.impersonated_service_account.is_none()
+            && cred.external_account.is_none()
+        {
+            return Err(anyhow!("Couldn't deserialize credential file"));
+        }
+
+        Ok(cred)
+    }
 }
 
 /// CredentialLoader will load credential from different methods.
@@ -136,7 +160,7 @@ impl CredentialLoader {
 
         let decode_content = base64_decode(content)?;
 
-        let cred = serde_json::from_slice(&decode_content).map_err(|err| {
+        let cred = Credential::from_slice(&decode_content).map_err(|err| {
             debug!("load credential from content failed: {err:?}");
             err
         })?;
@@ -192,7 +216,7 @@ impl CredentialLoader {
             err
         })?;
 
-        let account = serde_json::from_slice(&content).map_err(|err| {
+        let account = Credential::from_slice(&content).map_err(|err| {
             debug!("load credential failed at serde_json: {err:?}");
             err
         })?;
@@ -250,6 +274,42 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
 -----END RSA PRIVATE KEY-----
 ",
                     &cred.private_key
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn loader_returns_impersonated_service_account() {
+        temp_env::with_vars(
+            vec![(
+                GOOGLE_APPLICATION_CREDENTIALS,
+                Some(format!(
+                    "{}/testdata/services/google/test_impersonated_service_account.json",
+                    env::current_dir()
+                        .expect("current_dir must exist")
+                        .to_string_lossy()
+                )),
+            )],
+            || {
+                let cred_loader = CredentialLoader::default();
+
+                let cred = cred_loader
+                    .load()
+                    .expect("credentail must be exist")
+                    .unwrap()
+                    .impersonated_service_account
+                    .expect("couldn't deserialize impersonated service account");
+
+                assert_eq!("https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/example-01-iam@example-01.iam.gserviceaccount.com:generateAccessToken", &cred.service_account_impersonation_url);
+                assert_eq!("placeholder_client_id", &cred.source_credentials.client_id);
+                assert_eq!(
+                    "placeholder_client_secret",
+                    &cred.source_credentials.client_secret
+                );
+                assert_eq!(
+                    "placeholder_refresh_token",
+                    &cred.source_credentials.refresh_token
                 );
             },
         );

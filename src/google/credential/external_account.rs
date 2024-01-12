@@ -1,11 +1,13 @@
 //! An external account.
 
+use anyhow::bail;
+use anyhow::Result;
 pub use credential_source::CredentialSource;
 pub use credential_source::FileSourcedCredentials;
-pub use credential_source::FormatType;
 pub use credential_source::UrlSourcedCredentials;
 use serde::Deserialize;
 
+use serde_json::Value;
 /// Credential is the file which stores service account's client_id and private key.
 ///
 /// Reference: https://google.aip.dev/auth/4117#expected-behavior.
@@ -31,6 +33,41 @@ pub struct ExternalAccount {
     pub credential_source: CredentialSource,
 }
 
+/// A source format type.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum FormatType {
+    /// A raw token.
+    #[default]
+    Text,
+    /// A JSON payload containing the token.
+    Json {
+        /// The field containing the token.
+        subject_token_field_name: String,
+    },
+}
+
+impl FormatType {
+    /// Parse a slice of bytes as the expected format.
+    pub fn parse(&self, slice: &[u8]) -> Result<String> {
+        match &self {
+            Self::Text => Ok(String::from_utf8(slice.to_vec())?),
+            Self::Json {
+                subject_token_field_name,
+            } => {
+                let Value::Object(mut obj) = serde_json::from_slice(slice)? else {
+                    bail!("failed to decode token JSON");
+                };
+
+                match obj.remove(subject_token_field_name) {
+                    Some(Value::String(access_token)) => Ok(access_token),
+                    _ => bail!("JSON missing token field {subject_token_field_name}"),
+                }
+            }
+        }
+    }
+}
+
 /// Extra information about the impersonation exchange.
 #[derive(Clone, Deserialize)]
 #[cfg_attr(test, derive(Debug))]
@@ -45,12 +82,9 @@ pub struct ServiceAccountImpersonation {
 ///
 /// For reference, see <https://google.aip.dev/auth/4117>.
 mod credential_source {
-    use std::collections::HashMap;
-
-    use anyhow::bail;
-    use anyhow::Result;
+    use super::FormatType;
     use serde::Deserialize;
-    use serde_json::Value;
+    use std::collections::HashMap;
 
     /// An instruction on how to load a token for the local environment.
     ///
@@ -63,41 +97,6 @@ mod credential_source {
         FileSourced(FileSourcedCredentials),
         /// An OIDC token provided via a URL.
         UrlSourced(UrlSourcedCredentials),
-    }
-
-    /// A source format type.
-    #[derive(Clone, Debug, Default, Deserialize)]
-    #[serde(rename_all = "snake_case", tag = "type")]
-    pub enum FormatType {
-        /// A raw token.
-        #[default]
-        Text,
-        /// A JSON payload containing the token.
-        Json {
-            /// The field containing the token.
-            subject_token_field_name: String,
-        },
-    }
-
-    impl FormatType {
-        /// Parse a slice of bytes as the expected format.
-        pub fn parse(&self, slice: &[u8]) -> Result<String> {
-            match &self {
-                Self::Text => Ok(String::from_utf8(slice.to_vec())?),
-                Self::Json {
-                    subject_token_field_name,
-                } => {
-                    let Value::Object(mut obj) = serde_json::from_slice(slice)? else {
-                        bail!("failed to decode token JSON");
-                    };
-
-                    match obj.remove(subject_token_field_name) {
-                        Some(Value::String(access_token)) => Ok(access_token),
-                        _ => bail!("JSON missing token field {subject_token_field_name}"),
-                    }
-                }
-            }
-        }
     }
 
     /// A file sourced OIDC token.
