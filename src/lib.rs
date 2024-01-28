@@ -75,6 +75,11 @@ mod huaweicloud;
 #[cfg(feature = "services-huaweicloud")]
 pub use huaweicloud::*;
 
+#[cfg(feature = "services-oracle")]
+mod oracle;
+#[cfg(feature = "services-oracle")]
+pub use oracle::*;
+
 #[cfg(feature = "services-tencent")]
 mod tencent;
 #[cfg(feature = "services-tencent")]

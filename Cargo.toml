@@ -29,6 +29,7 @@ services-all = [
   "services-azblob",
   "services-google",
   "services-huaweicloud",
+  "services-oracle",
   "services-tencent",
 ]
 
@@ -48,6 +49,7 @@ services-google = [
   "dep:jsonwebtoken",
 ]
 services-huaweicloud = ["dep:serde", "dep:serde_json", "dep:once_cell"]
+services-oracle = ["dep:reqwest", "dep:openssl"]
 services-tencent = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 
 [[bench]]
@@ -66,6 +68,7 @@ http = "0.2"
 jsonwebtoken = { version = "9.2", optional = true }
 log = "0.4"
 once_cell = { version = "1", optional = true }
+openssl = { version = "0.10.63", optional = true }
 percent-encoding = "2"
 quick-xml = { version = "0.31", features = ["serialize"], optional = true }
 rand = "0.8.5"
