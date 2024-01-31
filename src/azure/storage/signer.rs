@@ -8,6 +8,7 @@ use anyhow::anyhow;
 use anyhow::Result;
 use http::header::*;
 use log::debug;
+use percent_encoding::percent_encode;
 
 use super::super::constants::*;
 use super::credential::Credential;
@@ -142,7 +143,11 @@ impl Signer {
     /// }
     /// ```
     pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Header, cred)?;
+        let mut ctx = self.build(req, SigningMethod::Header, cred)?;
+
+        for (_, v) in ctx.query.iter_mut() {
+            *v = percent_encode(v.as_bytes(), &AZURE_QUERY_ENCODE_SET).to_string();
+        }
         req.apply(ctx)
     }
 
@@ -247,7 +252,7 @@ fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
         "/{}{}\n{}",
         ak,
         ctx.path,
-        SigningContext::query_to_string(ctx.query.clone(), ":", "\n")
+        SigningContext::query_to_percent_decoded_string(ctx.query.clone(), ":", "\n")
     )
 }
 
