@@ -248,7 +248,11 @@ fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
         return format!("/{}{}", ak, ctx.path);
     }
 
-    let query = ctx.query.iter().map(|(k, _)| k.to_lowercase()).collect();
+    let query = ctx
+        .query
+        .iter()
+        .map(|(k, v)| (k.to_lowercase(), v.clone()))
+        .collect();
 
     format!(
         "/{}{}\n{}",
