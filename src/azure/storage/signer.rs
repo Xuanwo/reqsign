@@ -248,11 +248,13 @@ fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
         return format!("/{}{}", ak, ctx.path);
     }
 
+    let query = ctx.query.iter().map(|(k, _)| k.to_lowercase()).collect();
+
     format!(
         "/{}{}\n{}",
         ak,
         ctx.path,
-        SigningContext::query_to_percent_decoded_string(ctx.query.clone(), ":", "\n")
+        SigningContext::query_to_percent_decoded_string(query, ":", "\n")
     )
 }
 

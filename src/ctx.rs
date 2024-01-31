@@ -69,7 +69,7 @@ impl SigningContext {
                 s.push_str(join);
             }
 
-            s.push_str(&k.to_lowercase());
+            s.push_str(&k);
             if !v.is_empty() {
                 s.push_str(sep);
                 s.push_str(&v);
@@ -99,7 +99,7 @@ impl SigningContext {
                 s.push_str(join);
             }
 
-            s.push_str(&k.to_lowercase());
+            s.push_str(&k);
             if !v.is_empty() {
                 s.push_str(sep);
                 s.push_str(&percent_encoding::percent_decode_str(&v).decode_utf8_lossy());
