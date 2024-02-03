@@ -1,36 +1,31 @@
-use std::collections::HashMap;
-use std::env;
-
-use super::constants::*;
+use anyhow::Result;
+use serde::Deserialize;
+use std::fs::read_to_string;
+use toml::from_str;
 
 /// Config carries all the configuration for Oracle services.
-#[derive(Clone, Default)]
+/// will be loaded from default config file ~/.oci/config
+#[derive(Clone, Default, Deserialize)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Config {
-    /// `private_key` will be loaded from
-    ///
-    /// - this field if it's `is_some`
-    /// - env value: [`ORACLE_CLOUD_PRIVATE_KEY`]
-    pub private_key: Option<String>,
-    /// `fingerprint` will be loaded from
-    ///
-    /// - this field if it's `is_some`
-    /// - env value: [`ORACLE_CLOUD_FINGERPRINT`]
+    /// userID for Oracle Cloud Infrastructure.
+    pub user: String,
+    /// tenancyID for Oracle Cloud Infrastructure.
+    pub tenancy: String,
+    /// region for Oracle Cloud Infrastructure.
+    pub region: String,
+    /// private key file for Oracle Cloud Infrastructure.
+    pub key_file: Option<String>,
+    /// fingerprint for the key_file.
     pub fingerprint: Option<String>,
 }
 
 impl Config {
     /// Load config from env.
-    pub fn from_env(mut self) -> Self {
-        let envs = env::vars().collect::<HashMap<_, _>>();
+    pub fn from_config(path: &str) -> Result<Self> {
+        let content = read_to_string(path)?;
+        let config = from_str(&content)?;
 
-        if let Some(v) = envs.get(ORACLE_CLOUD_PRIVATE_KEY) {
-            self.private_key.get_or_insert(v.clone());
-        }
-        if let Some(v) = envs.get(ORACLE_CLOUD_FRINGERPRINT) {
-            self.fingerprint.get_or_insert(v.clone());
-        }
-
-        self
+        Ok(config)
     }
 }
