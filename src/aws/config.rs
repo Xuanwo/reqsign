@@ -235,8 +235,12 @@ impl Config {
 
         let conf = Ini::load_from_file(path)?;
 
+        let section = match self.profile.as_str() {
+            "default" => "default".to_string(),
+            x => format!("profile {x}"),
+        };
         let props = conf
-            .section(Some(&self.profile))
+            .section(Some(section))
             .ok_or_else(|| anyhow!("section {} is not found", self.profile))?;
 
         if let Some(v) = props.get("region") {
@@ -303,6 +307,53 @@ mod tests {
                     AWS_SHARED_CREDENTIALS_FILE,
                     Some(file_path.to_str().unwrap().to_owned()),
                 ),
+            ],
+            || {
+                let config = Config::default().from_profile();
+
+                assert_eq!(config.profile, "profile1".to_owned());
+                assert_eq!(config.access_key_id, Some("PROFILE1ACCESSKEYID".to_owned()));
+                assert_eq!(
+                    config.secret_access_key,
+                    Some("PROFILE1SECRETACCESSKEY".to_owned())
+                );
+                assert_eq!(
+                    config.session_token,
+                    Some("PROFILE1SESSIONTOKEN".to_owned())
+                );
+            },
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn test_config_from_profile_config() -> Result<()> {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        // Create a dummy credentials file to test against
+        let tmp_dir = tempdir()?;
+        let file_path = tmp_dir.path().join("config");
+        let mut tmp_file = File::create(&file_path)?;
+        writeln!(tmp_file, "[default]")?;
+        writeln!(tmp_file, "aws_access_key_id = DEFAULTACCESSKEYID")?;
+        writeln!(tmp_file, "aws_secret_access_key = DEFAULTSECRETACCESSKEY")?;
+        writeln!(tmp_file, "aws_session_token = DEFAULTSESSIONTOKEN")?;
+        writeln!(tmp_file)?;
+        writeln!(tmp_file, "[profile profile1]")?;
+        writeln!(tmp_file, "aws_access_key_id = PROFILE1ACCESSKEYID")?;
+        writeln!(tmp_file, "aws_secret_access_key = PROFILE1SECRETACCESSKEY")?;
+        writeln!(tmp_file, "aws_session_token = PROFILE1SESSIONTOKEN")?;
+
+        temp_env::with_vars(
+            [
+                (AWS_PROFILE, Some("profile1".to_owned())),
+                (
+                    AWS_CONFIG_FILE,
+                    Some(file_path.to_str().unwrap().to_owned()),
+                ),
+                (AWS_SHARED_CREDENTIALS_FILE, None::<String>),
             ],
             || {
                 let config = Config::default().from_profile();
