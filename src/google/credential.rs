@@ -250,10 +250,10 @@ mod tests {
 
                 let cred = cred_loader
                     .load()
-                    .expect("credentail must be exist")
+                    .expect("credential must exist")
                     .unwrap()
                     .service_account
-                    .unwrap();
+                    .expect("couldn't deserialize service account");
 
                 assert_eq!("test-234@test.iam.gserviceaccount.com", &cred.client_email);
                 assert_eq!(
@@ -296,7 +296,7 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
 
                 let cred = cred_loader
                     .load()
-                    .expect("credentail must be exist")
+                    .expect("credential must exist")
                     .unwrap()
                     .impersonated_service_account
                     .expect("couldn't deserialize impersonated service account");
@@ -332,10 +332,10 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
 
                 let cred = cred_loader
                     .load()
-                    .expect("credentail must be exist")
+                    .expect("credential must exist")
                     .unwrap()
                     .external_account
-                    .unwrap();
+                    .expect("couldn't deserialize external account");
 
                 assert_eq!(
                     "//iam.googleapis.com/projects/000000000000/locations/global/workloadIdentityPools/reqsign/providers/reqsign-provider",
@@ -374,10 +374,10 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
 
         let cred: ExternalAccount = cred_loader
             .load()
-            .expect("credentail must be exist")
+            .expect("credential must exist")
             .unwrap()
             .external_account
-            .unwrap();
+            .expect("couldn't deserialize external account from Github OIDC");
 
         assert_eq!(
             "urn:ietf:params:oauth:token-type:jwt",
