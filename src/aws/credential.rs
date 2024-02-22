@@ -123,27 +123,34 @@ impl DefaultLoader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Ok(Some(cred)) = self
+        if let Some(cred) = self
             .load_via_config()
-            .map_err(|err| debug!("load credential via config failed: {err:?}"))
+            .map_err(|err| {
+                debug!("load credential via config failed: {err:?}");
+                err
+            })?
         {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self
+        if let Some(cred) = self
             .load_via_assume_role_with_web_identity()
             .await
             .map_err(|err| {
-                debug!("load credential via assume_role_with_web_identity failed: {err:?}")
-            })
+                debug!("load credential via assume_role_with_web_identity failed: {err:?}");
+                err
+            })?
         {
             return Ok(Some(cred));
         }
 
-        if let Ok(Some(cred)) = self
+        if let Some(cred) = self
             .load_via_imds_v2()
             .await
-            .map_err(|err| debug!("load credential via imds_v2 failed: {err:?}"))
+            .map_err(|err| {
+                debug!("load credential via imds_v2 failed: {err:?}");
+                err
+            })?
         {
             return Ok(Some(cred));
         }
