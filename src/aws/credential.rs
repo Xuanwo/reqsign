@@ -123,13 +123,10 @@ impl DefaultLoader {
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Some(cred) = self
-            .load_via_config()
-            .map_err(|err| {
-                debug!("load credential via config failed: {err:?}");
-                err
-            })?
-        {
+        if let Some(cred) = self.load_via_config().map_err(|err| {
+            debug!("load credential via config failed: {err:?}");
+            err
+        })? {
             return Ok(Some(cred));
         }
 
@@ -144,14 +141,10 @@ impl DefaultLoader {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self
-            .load_via_imds_v2()
-            .await
-            .map_err(|err| {
-                debug!("load credential via imds_v2 failed: {err:?}");
-                err
-            })?
-        {
+        if let Some(cred) = self.load_via_imds_v2().await.map_err(|err| {
+            debug!("load credential via imds_v2 failed: {err:?}");
+            err
+        })? {
             return Ok(Some(cred));
         }
 
