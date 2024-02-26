@@ -47,9 +47,10 @@ services-google = [
   "dep:serde",
   "dep:serde_json",
   "dep:jsonwebtoken",
+  "dep:rsa",
 ]
 services-huaweicloud = ["dep:serde", "dep:serde_json", "dep:once_cell"]
-services-oracle = ["dep:reqwest", "dep:rsa", "dep:toml"]
+services-oracle = ["dep:reqwest", "dep:rsa", "dep:toml", "dep:serde"]
 services-tencent = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 
 [[bench]]
