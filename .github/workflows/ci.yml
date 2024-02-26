@@ -45,6 +45,26 @@ jobs:
           rustup target add wasm32-unknown-unknown
           cargo build --target wasm32-unknown-unknown
 
+  build_single_feature:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        feature:
+          - services-aliyun
+          - services-aws
+          - services-azblob
+          - services-google
+          - services-huaweicloud
+          - services-oracle
+          - services-tencent
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --no-default-features --features reqwest_request,${{ matrix.feature }}
+
   build_all_features:
     runs-on: ${{ matrix.os }}
     strategy:
