@@ -33,7 +33,12 @@ services-all = [
   "services-tencent",
 ]
 
-services-aliyun = ["dep:reqwest", "dep:serde", "dep:serde_json"]
+services-aliyun = [
+  "dep:reqwest",
+  "dep:serde",
+  "dep:serde_json",
+  "dep:once_cell",
+]
 services-aws = [
   "dep:reqwest",
   "dep:serde",
