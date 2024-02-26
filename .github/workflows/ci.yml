@@ -63,7 +63,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --no-default-features --features ${{ matrix.feature }}
+          args: --no-default-features --features reqwest_request,${{ matrix.feature }}
 
   build_all_features:
     runs-on: ${{ matrix.os }}
