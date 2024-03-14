@@ -95,7 +95,7 @@ getrandom = { version = "0.2", features = ["js"] }
 tokio = { version = "1", optional = true }
 
 [dev-dependencies]
-aws-sigv4 = "0.56"
+aws-sigv4 = "1.2"
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 dotenv = "0.15"
 env_logger = "0.11"
