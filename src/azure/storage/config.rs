@@ -44,4 +44,22 @@ pub struct Config {
     ///
     /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
     pub endpoint: Option<String>,
+    /// `azure_federated_token` value will be loaded from:
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: [`AZURE_FEDERATED_TOKEN`]
+    /// - profile config: `azure_federated_token_file`
+    pub azure_federated_token: Option<String>,
+    /// `azure_federated_token_file` value will be loaded from:
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: [`AZURE_FEDERATED_TOKEN_FILE`]
+    /// - profile config: `azure_federated_token_file`
+    pub azure_federated_token_file: Option<String>,
+    /// `azure_tenant_id_env_key` value will be loaded from:
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: [`AZURE_TENANT_ID_ENV_KEY`]
+    /// - profile config: `azure_tenant_id_env_key`
+    pub azure_tenant_id_env_key: Option<String>,
 }

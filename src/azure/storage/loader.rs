@@ -3,9 +3,9 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 
-use super::config::Config;
 use super::credential::Credential;
 use super::imds_credential;
+use super::{config::Config, workload_identity_credential};
 
 /// Loader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
@@ -45,6 +45,10 @@ impl Loader {
             return Ok(Some(cred));
         }
 
+        if let Some(cred) = self.load_via_workload_identity().await? {
+            return Ok(Some(cred));
+        }
+
         // try to load credential using AAD(Azure Active Directory) authenticate on Azure VM
         // we may get an error if not running on Azure VM
         // see https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol
@@ -71,5 +75,17 @@ impl Loader {
         let cred = Some(Credential::BearerToken(token.access_token));
 
         Ok(cred)
+    }
+
+    async fn load_via_workload_identity(&self) -> Result<Option<Credential>> {
+        let workload_identity_token = workload_identity_credential::get_workload_identity_token(
+            "https://storage.azure.com/",
+            &self.config,
+        )
+        .await?;
+        match workload_identity_token {
+            Some(token) => Ok(Some(Credential::BearerToken(token.access_token))),
+            None => Ok(None),
+        }
     }
 }
