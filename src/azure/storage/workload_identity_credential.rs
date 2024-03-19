@@ -25,10 +25,7 @@ pub async fn get_workload_identity_token(
         &config.azure_federated_token_file,
     ) {
         (Some(token), Some(_)) | (Some(token), None) => token.clone(),
-        (None, Some(token_file)) => {
-            let token = fs::read_to_string(token_file)?;
-            token
-        }
+        (None, Some(token_file)) => fs::read_to_string(token_file)?,
         _ => return Ok(None),
     };
     let tenant_id = if let Some(tenant_id) = &config.azure_tenant_id_env_key {
