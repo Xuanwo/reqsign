@@ -66,10 +66,11 @@ pub async fn get_workload_identity_token(
     let res = Client::new().execute(req.try_into()?).await?;
     let rsp_status = res.status();
     let rsp_body = res.text().await?;
-;
 
     if !rsp_status.is_success() {
-        return Err(anyhow::anyhow!("Failed to get token from working identity credential"));
+        return Err(anyhow::anyhow!(
+            "Failed to get token from working identity credential"
+        ));
     }
 
     let token: AccessToken = serde_json::from_str(&rsp_body)?;
@@ -81,5 +82,4 @@ pub async fn get_workload_identity_token(
 pub struct AccessToken {
     pub access_token: String,
     pub expires_on: String,
-
 }
