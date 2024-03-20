@@ -25,6 +25,15 @@ impl Loader {
         }
     }
 
+    /// Create a new loader via loading config from env.
+    pub fn from_env() -> Self {
+        Self {
+            config: Config::default().from_env(),
+
+            credential: Arc::default(),
+        }
+    }
+
     /// Load credential.
     pub async fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
@@ -78,11 +87,8 @@ impl Loader {
     }
 
     async fn load_via_workload_identity(&self) -> Result<Option<Credential>> {
-        let workload_identity_token = workload_identity_credential::get_workload_identity_token(
-            "https://storage.azure.com/",
-            &self.config,
-        )
-        .await?;
+        let workload_identity_token =
+            workload_identity_credential::get_workload_identity_token(&self.config).await?;
         match workload_identity_token {
             Some(token) => Ok(Some(Credential::BearerToken(token.access_token))),
             None => Ok(None),

@@ -1,3 +1,6 @@
+use std::env;
+use std::{collections::HashMap, fs};
+
 /// Config carries all the configuration for Azure Storage services.
 #[derive(Clone, Default)]
 #[cfg_attr(test, derive(Debug))]
@@ -44,22 +47,56 @@ pub struct Config {
     ///
     /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
     pub endpoint: Option<String>,
-    /// `azure_federated_token` value will be loaded from:
+    /// `federated_token` value will be loaded from:
     ///
     /// - this field if it's `is_some`
     /// - env value: [`AZURE_FEDERATED_TOKEN`]
-    /// - profile config: `azure_federated_token_file`
-    pub azure_federated_token: Option<String>,
-    /// `azure_federated_token_file` value will be loaded from:
+    /// - profile config: `federated_toen_file`
+    pub federated_token: Option<String>,
+    /// `tenant_id` value will be loaded from:
     ///
     /// - this field if it's `is_some`
-    /// - env value: [`AZURE_FEDERATED_TOKEN_FILE`]
-    /// - profile config: `azure_federated_token_file`
-    pub azure_federated_token_file: Option<String>,
-    /// `azure_tenant_id_env_key` value will be loaded from:
+    /// - env value: [`AZURE_TENANT_ID`]
+    /// - profile config: `tenant_id`
+    pub tenant_id: Option<String>,
+    /// `authority_host` value will be loaded from:
     ///
     /// - this field if it's `is_some`
-    /// - env value: [`AZURE_TENANT_ID_ENV_KEY`]
-    /// - profile config: `azure_tenant_id_env_key`
-    pub azure_tenant_id_env_key: Option<String>,
+    /// - env value: [`AZURE_AUTHORITY_HOST_ENV_KEY`]
+    /// - profile config: `authority_host`
+    pub authority_host: Option<String>,
+}
+
+pub const AZURE_FEDERATED_TOKEN: &str = "AZURE_FEDERATED_TOKEN";
+pub const AZURE_FEDERATED_TOKEN_FILE: &str = "AZURE_FEDERATED_TOKEN_FILE";
+pub const AZURE_TENANT_ID: &str = "AZURE_TENANT_ID_ENV_KEY";
+pub const AZURE_AUTHORITY_HOST_ENV_KEY: &str = "AZURE_AUTHORITY_HOST_ENV_KEY";
+const AZURE_PUBLIC_CLOUD: &str = "https://login.microsoftonline.com";
+
+impl Config {
+    /// Load config from env.
+    pub fn from_env(mut self) -> Self {
+        let envs = env::vars().collect::<HashMap<_, _>>();
+
+        // federated_token can be loaded from both `AZURE_FEDERATED_TOKEN` and `AZURE_FEDERATED_TOKEN_FILE`.
+        if let Some(v) = envs.get(AZURE_FEDERATED_TOKEN_FILE) {
+            self.federated_token = Some(fs::read_to_string(v).unwrap_or_default());
+        }
+
+        if let Some(v) = envs.get(AZURE_FEDERATED_TOKEN) {
+            self.federated_token = Some(v.to_string());
+        }
+
+        if let Some(v) = envs.get(AZURE_TENANT_ID) {
+            self.tenant_id = Some(v.to_string());
+        }
+
+        if let Some(v) = envs.get(AZURE_AUTHORITY_HOST_ENV_KEY) {
+            self.authority_host = Some(v.to_string());
+        } else {
+            self.authority_host = Some(AZURE_PUBLIC_CLOUD.to_string());
+        }
+
+        self
+    }
 }
