@@ -48,7 +48,7 @@ impl Credential {
         // Take 120s as buffer to avoid edge cases.
         if let Some(valid) = self
             .expires_in
-            .map(|v| v > now() + chrono::Duration::minutes(2))
+            .map(|v| v > now() + chrono::Duration::try_minutes(2).expect("in bounds"))
         {
             return valid;
         }
@@ -159,7 +159,7 @@ impl DefaultLoader {
                 session_token: self.config.session_token.clone(),
                 // Set expires_in to 10 minutes to enforce re-read
                 // from file.
-                expires_in: Some(now() + chrono::Duration::minutes(10)),
+                expires_in: Some(now() + chrono::Duration::try_minutes(10).expect("in bounds")),
             }))
         } else {
             Ok(None)
@@ -356,7 +356,8 @@ impl IMDSv2Loader {
         }
         let ec2_token = resp.text().await?;
         // Set expires_in to 10 minutes to enforce re-read.
-        let expires_in = now() + chrono::Duration::seconds(21600) - chrono::Duration::seconds(600);
+        let expires_in = now() + chrono::Duration::try_seconds(21600).expect("in bounds")
+            - chrono::Duration::try_seconds(600).expect("in bounds");
 
         {
             *self.token.lock().expect("lock poisoned") = (ec2_token.clone(), expires_in);
