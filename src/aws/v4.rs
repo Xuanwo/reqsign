@@ -381,13 +381,14 @@ mod tests {
     use std::time::SystemTime;
 
     use anyhow::Result;
+    use aws_credential_types::Credentials;
     use aws_sigv4::http_request::PayloadChecksumKind;
     use aws_sigv4::http_request::PercentEncodingMode;
     use aws_sigv4::http_request::SignableBody;
     use aws_sigv4::http_request::SignableRequest;
     use aws_sigv4::http_request::SignatureLocation;
     use aws_sigv4::http_request::SigningSettings;
-    use aws_sigv4::SigningParams;
+    use aws_sigv4::sign::v4;
     use http::header;
     use reqwest::Client;
 
@@ -584,12 +585,18 @@ mod tests {
             let mut ss = SigningSettings::default();
             ss.percent_encoding_mode = PercentEncodingMode::Double;
             ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
-
-            let sp = SigningParams::builder()
-                .access_key("access_key_id")
-                .secret_key("secret_access_key")
+            let id = Credentials::new(
+                "access_key_id",
+                "secret_access_key",
+                None,
+                None,
+                "hardcoded-credentials",
+            )
+            .into();
+            let sp = v4::SigningParams::builder()
+                .identity(&id)
                 .region("test")
-                .service_name("s3")
+                .name("s3")
                 .time(SystemTime::from(now))
                 .settings(ss)
                 .build()
@@ -601,12 +608,20 @@ mod tests {
             }
 
             let output = aws_sigv4::http_request::sign(
-                SignableRequest::new(req.method(), req.uri(), req.headers(), body),
-                &sp,
+                SignableRequest::new(
+                    req.method().as_str(),
+                    req.uri().to_string(),
+                    req.headers()
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), std::str::from_utf8(v.as_bytes()).unwrap())),
+                    body,
+                )
+                .unwrap(),
+                &sp.into(),
             )
             .expect("signing must succeed");
             let (aws_sig, _) = output.into_parts();
-            aws_sig.apply_to_request(&mut req);
+            aws_sig.apply_to_request_http1x(&mut req);
             let expected_req = req;
 
             let mut req = req_fn();
@@ -651,12 +666,18 @@ mod tests {
             ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
             ss.signature_location = SignatureLocation::QueryParams;
             ss.expires_in = Some(std::time::Duration::from_secs(3600));
-
-            let sp = SigningParams::builder()
-                .access_key("access_key_id")
-                .secret_key("secret_access_key")
+            let id = Credentials::new(
+                "access_key_id",
+                "secret_access_key",
+                None,
+                None,
+                "hardcoded-credentials",
+            )
+            .into();
+            let sp = v4::SigningParams::builder()
+                .identity(&id)
                 .region("test")
-                .service_name("s3")
+                .name("s3")
                 .time(SystemTime::from(now))
                 .settings(ss)
                 .build()
@@ -668,12 +689,20 @@ mod tests {
             }
 
             let output = aws_sigv4::http_request::sign(
-                SignableRequest::new(req.method(), req.uri(), req.headers(), body),
-                &sp,
+                SignableRequest::new(
+                    req.method().as_str(),
+                    req.uri().to_string(),
+                    req.headers()
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), std::str::from_utf8(v.as_bytes()).unwrap())),
+                    body,
+                )
+                .unwrap(),
+                &sp.into(),
             )
             .expect("signing must succeed");
             let (aws_sig, _) = output.into_parts();
-            aws_sig.apply_to_request(&mut req);
+            aws_sig.apply_to_request_http1x(&mut req);
             let expected_req = req;
 
             let mut req = req_fn();
@@ -716,13 +745,18 @@ mod tests {
             let mut ss = SigningSettings::default();
             ss.percent_encoding_mode = PercentEncodingMode::Double;
             ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
-
-            let sp = SigningParams::builder()
-                .access_key("access_key_id")
-                .secret_key("secret_access_key")
+            let id = Credentials::new(
+                "access_key_id",
+                "secret_access_key",
+                Some("security_token".to_string()),
+                None,
+                "hardcoded-credentials",
+            )
+            .into();
+            let sp = v4::SigningParams::builder()
+                .identity(&id)
                 .region("test")
-                .security_token("security_token")
-                .service_name("s3")
+                .name("s3")
                 .time(SystemTime::from(now))
                 .settings(ss)
                 .build()
@@ -734,12 +768,20 @@ mod tests {
             }
 
             let output = aws_sigv4::http_request::sign(
-                SignableRequest::new(req.method(), req.uri(), req.headers(), body),
-                &sp,
+                SignableRequest::new(
+                    req.method().as_str(),
+                    req.uri().to_string(),
+                    req.headers()
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), std::str::from_utf8(v.as_bytes()).unwrap())),
+                    body,
+                )
+                .unwrap(),
+                &sp.into(),
             )
             .expect("signing must succeed");
             let (aws_sig, _) = output.into_parts();
-            aws_sig.apply_to_request(&mut req);
+            aws_sig.apply_to_request_http1x(&mut req);
             let expected_req = req;
 
             let mut req = req_fn();
@@ -785,13 +827,19 @@ mod tests {
             ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
             ss.signature_location = SignatureLocation::QueryParams;
             ss.expires_in = Some(std::time::Duration::from_secs(3600));
-
-            let sp = SigningParams::builder()
-                .access_key("access_key_id")
-                .secret_key("secret_access_key")
+            let id = Credentials::new(
+                "access_key_id",
+                "secret_access_key",
+                Some("security_token".to_string()),
+                None,
+                "hardcoded-credentials",
+            )
+            .into();
+            let sp = v4::SigningParams::builder()
+                .identity(&id)
                 .region("test")
-                .security_token("security_token")
-                .service_name("s3")
+                // .security_token("security_token")
+                .name("s3")
                 .time(SystemTime::from(now))
                 .settings(ss)
                 .build()
@@ -803,12 +851,20 @@ mod tests {
             }
 
             let output = aws_sigv4::http_request::sign(
-                SignableRequest::new(req.method(), req.uri(), req.headers(), body),
-                &sp,
+                SignableRequest::new(
+                    req.method().as_str(),
+                    req.uri().to_string(),
+                    req.headers()
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), std::str::from_utf8(v.as_bytes()).unwrap())),
+                    body,
+                )
+                .unwrap(),
+                &sp.into(),
             )
             .expect("signing must succeed");
             let (aws_sig, _) = output.into_parts();
-            aws_sig.apply_to_request(&mut req);
+            aws_sig.apply_to_request_http1x(&mut req);
             let expected_req = req;
 
             let mut req = req_fn();
