@@ -86,6 +86,7 @@ impl Loader {
     }
 
     async fn load_via_workload_identity(&self) -> Result<Option<Credential>> {
+        println!("do workload_identity");
         let workload_identity_token =
             workload_identity_credential::get_workload_identity_token(&self.config).await?;
         match workload_identity_token {

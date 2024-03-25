@@ -24,7 +24,9 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         }
         _ => return Ok(None),
     };
-
+    println!("token = {}", token);
+    println!("client_id = {}", client_id);
+    println!("tenant_id = {}", tenant_id);
     let url = Url::parse(authority_host)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
 
     let scopes: &[&str] = &[&scope_from_url(&url)];
