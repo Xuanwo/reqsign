@@ -50,7 +50,7 @@ pub async fn get_access_token(resource: &str, config: &Config) -> anyhow::Result
     let rsp_body = res.text().await?;
 
     if !rsp_status.is_success() {
-        return Err(anyhow::anyhow!("Failed to get token from IMDS endpoint"));
+        return Err(anyhow::anyhow!("Failed to get token from IMDS endpoint xxx"));
     }
 
     let token: AccessToken = serde_json::from_str(&rsp_body)?;
