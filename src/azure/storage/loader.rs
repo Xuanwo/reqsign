@@ -19,7 +19,7 @@ impl Loader {
     /// Create a new loader via config.
     pub fn new(config: Config) -> Self {
         Self {
-            config,
+            config: Config::default().from_env(),
 
             credential: Arc::default(),
         }
@@ -40,7 +40,6 @@ impl Loader {
         if let Some(cred) = self.credential.lock().expect("lock poisoned").clone() {
             return Ok(Some(cred));
         }
-
         let cred = self.load_inner().await?;
 
         let mut lock = self.credential.lock().expect("lock poisoned");
@@ -53,7 +52,7 @@ impl Loader {
         if let Some(cred) = self.load_via_config().await? {
             return Ok(Some(cred));
         }
-
+        
         if let Some(cred) = self.load_via_workload_identity().await? {
             return Ok(Some(cred));
         }
