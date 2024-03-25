@@ -62,15 +62,15 @@ pub struct Config {
     /// `authority_host` value will be loaded from:
     ///
     /// - this field if it's `is_some`
-    /// - env value: [`AZURE_AUTHORITY_HOST_ENV_KEY`]
+    /// - env value: [`AZURE_AUTHORITY_HOST`]
     /// - profile config: `authority_host`
     pub authority_host: Option<String>,
 }
 
 pub const AZURE_FEDERATED_TOKEN: &str = "AZURE_FEDERATED_TOKEN";
 pub const AZURE_FEDERATED_TOKEN_FILE: &str = "AZURE_FEDERATED_TOKEN_FILE";
-pub const AZURE_TENANT_ID: &str = "AZURE_TENANT_ID_ENV_KEY";
-pub const AZURE_AUTHORITY_HOST_ENV_KEY: &str = "AZURE_AUTHORITY_HOST_ENV_KEY";
+pub const AZURE_TENANT_ID: &str = "AZURE_TENANT_ID";
+pub const AZURE_AUTHORITY_HOST: &str = "AZURE_AUTHORITY_HOST";
 const AZURE_PUBLIC_CLOUD: &str = "https://login.microsoftonline.com";
 
 impl Config {
@@ -91,7 +91,7 @@ impl Config {
             self.tenant_id = Some(v.to_string());
         }
 
-        if let Some(v) = envs.get(AZURE_AUTHORITY_HOST_ENV_KEY) {
+        if let Some(v) = envs.get(AZURE_AUTHORITY_HOST) {
             self.authority_host = Some(v.to_string());
         } else {
             self.authority_host = Some(AZURE_PUBLIC_CLOUD.to_string());
