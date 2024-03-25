@@ -26,6 +26,7 @@ pub struct Config {
     /// Specifies the application id (client id) associated with a user assigned managed service identity resource
     ///
     /// The values of object_id and msi_res_id are discarded
+     /// - nv value: [`AZURE_CLIENT_ID`]
     ///
     /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
     pub client_id: Option<String>,
@@ -70,6 +71,7 @@ pub struct Config {
 pub const AZURE_FEDERATED_TOKEN: &str = "AZURE_FEDERATED_TOKEN";
 pub const AZURE_FEDERATED_TOKEN_FILE: &str = "AZURE_FEDERATED_TOKEN_FILE";
 pub const AZURE_TENANT_ID: &str = "AZURE_TENANT_ID";
+pub const AZURE_CLIENT_ID: &str = "AZURE_CLIENT_ID";
 pub const AZURE_AUTHORITY_HOST: &str = "AZURE_AUTHORITY_HOST";
 const AZURE_PUBLIC_CLOUD: &str = "https://login.microsoftonline.com";
 
@@ -89,6 +91,10 @@ impl Config {
 
         if let Some(v) = envs.get(AZURE_TENANT_ID) {
             self.tenant_id = Some(v.to_string());
+        }
+
+        if let Some(v) = envs.get(AZURE_CLIENT_ID) {
+            self.client_id = Some(v.to_string());
         }
 
         if let Some(v) = envs.get(AZURE_AUTHORITY_HOST) {
