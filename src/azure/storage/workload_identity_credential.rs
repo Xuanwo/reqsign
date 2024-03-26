@@ -10,7 +10,7 @@ use serde::Deserialize;
 use super::config::Config;
 
 pub const API_VERSION: &str = "api-version";
-
+const AZURE_PUBLIC_CLOUD: &str = "https://login.microsoftonline.com";
 /// Gets an access token for the specified resource and configuration.
 ///
 /// See <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
@@ -29,7 +29,7 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
     println!("token = {}", token);
     println!("client_id = {}", client_id);
     println!("tenant_id = {}", tenant_id);
-    let url = Url::parse(authority_host)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
+    let url = Url::parse(AZURE_PUBLIC_CLOUD)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
     println!("authority_host  = {:?}", authority_host);
     println!("这里url = {:?}", url);
     let scopes: &[&str] = &[&scope_from_url(&url)];
