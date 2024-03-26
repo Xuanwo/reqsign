@@ -55,6 +55,7 @@ impl Loader {
         
         if let Some(cred) = self.load_via_workload_identity().await? {
             println!("load_via_workload_identity 成功 ");
+           
             return Ok(Some(cred));
         }
 
@@ -91,7 +92,7 @@ impl Loader {
         let workload_identity_token =
             workload_identity_credential::get_workload_identity_token(&self.config).await?;
         match workload_identity_token {
-            Some(token) => Ok(Some(Credential::BearerToken(token.access_token))),
+            Some(token) => {println!("return token = {:?}", token.access_token); Ok( Some(Credential::BearerToken(token.access_token)))},
             None => Ok(None),
         }
     }
