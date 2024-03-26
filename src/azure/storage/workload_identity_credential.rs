@@ -32,7 +32,7 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
     let url = Url::parse(AZURE_PUBLIC_CLOUD)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
     println!("authority_host  = {:?}", authority_host);
     println!("这里url = {:?}", url);
-    let scopes: &[&str] = &[&scope_from_url(&url)];
+    let scopes: &[&str] = &[authority_host];
     println!("scopes is {:?}", scopes);
     let encoded_body: String = form_urlencoded::Serializer::new(String::new())
         .append_pair("client_id", client_id)
