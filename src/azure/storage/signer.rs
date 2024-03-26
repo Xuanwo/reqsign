@@ -81,7 +81,7 @@ impl Signer {
                     let signer = account_sas::AccountSharedAccessSignature::new(
                         ak.to_string(),
                         sk.to_string(),
-                        time::now() + chrono::Duration::from_std(d)?,
+                        time::now() + chrono::TimeDelta::from_std(d)?,
                     );
                     let signer_token = signer.token()?;
                     signer_token.iter().for_each(|(k, v)| {

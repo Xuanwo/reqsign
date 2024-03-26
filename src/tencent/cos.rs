@@ -124,7 +124,7 @@ fn build_signature(
     let key_time = format!(
         "{};{}",
         now.timestamp(),
-        (now + chrono::Duration::from_std(expires).unwrap()).timestamp()
+        (now + chrono::TimeDelta::from_std(expires).unwrap()).timestamp()
     );
 
     let sign_key = hex_hmac_sha1(cred.secret_key.as_bytes(), key_time.as_bytes());
