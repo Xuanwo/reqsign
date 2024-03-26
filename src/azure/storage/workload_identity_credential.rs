@@ -42,7 +42,6 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         )
         .append_pair("client_assertion", token)
         .append_pair("grant_type", "client_credentials")
-        .append_pair(API_VERSION, "2019-06-01")
         .finish();
 
     let mut req = Request::builder()
@@ -54,10 +53,10 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         HeaderValue::from_static("application/x-www-form-urlencoded"),
     );
 
-    req.headers_mut().insert(
-        API_VERSION,
-        HeaderValue::from_static("2019-06-01"),
-    );
+    // req.headers_mut().insert(
+    //     API_VERSION,
+    //     HeaderValue::from_static("2019-06-01"),
+    // );
 
     let res = Client::new().execute(req.try_into()?).await?;
     let rsp_status = res.status();
