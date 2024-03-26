@@ -52,6 +52,11 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         HeaderValue::from_static("application/x-www-form-urlencoded"),
     );
 
+    req.headers_mut().insert(
+        "api-version",
+        HeaderValue::from_static("2019-06-01"),
+    );
+
     let res = Client::new().execute(req.try_into()?).await?;
     let rsp_status = res.status();
     let rsp_body = res.text().await?;
