@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use super::config::Config;
 
-pub const API_VERSION: &str = b"api-version";
+pub const API_VERSION: &str = "api-version";
 
 /// Gets an access token for the specified resource and configuration.
 ///
