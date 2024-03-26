@@ -9,6 +9,8 @@ use serde::Deserialize;
 
 use super::config::Config;
 
+pub const API_VERSION: &str = "api-version";
+
 /// Gets an access token for the specified resource and configuration.
 ///
 /// See <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
@@ -28,9 +30,9 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
     println!("client_id = {}", client_id);
     println!("tenant_id = {}", tenant_id);
     let url = Url::parse(authority_host)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
-    println!(" authority_host  = {:?}", authority_host);
+    println!("authority_host  = {:?}", authority_host);
     let scopes: &[&str] = &[&scope_from_url(&url)];
-    println!(" scopes  = {:?}", scopes);
+    println!("scopes is {:?}", scopes);
     let encoded_body: String = form_urlencoded::Serializer::new(String::new())
         .append_pair("client_id", client_id)
         .append_pair("scope", &scopes.join(" "))
@@ -40,6 +42,7 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         )
         .append_pair("client_assertion", token)
         .append_pair("grant_type", "client_credentials")
+        .append_pair(API_VERSION, "2019-06-01")
         .finish();
 
     let mut req = Request::builder()
@@ -52,10 +55,10 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         HeaderValue::from_static("application/x-www-form-urlencoded"),
     );
 
-    req.headers_mut().insert(
-        "api-version",
-        HeaderValue::from_static("2019-06-01"),
-    );
+    // req.headers_mut().insert(
+    //     API_VERSION,
+    //     HeaderValue::from_static("2019-06-01"),
+    // );
 
     let res = Client::new().execute(req.try_into()?).await?;
     let rsp_status = res.status();
