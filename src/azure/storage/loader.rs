@@ -54,6 +54,7 @@ impl Loader {
         }
         
         if let Some(cred) = self.load_via_workload_identity().await? {
+            println!("load_via_workload_identity 成功 ");
             return Ok(Some(cred));
         }
 
