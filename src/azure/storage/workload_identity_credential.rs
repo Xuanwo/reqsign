@@ -29,7 +29,7 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
     println!("token = {}", token);
     println!("client_id = {}", client_id);
     println!("tenant_id = {}", tenant_id);
-    let url = Url::parse(authority_host)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
+    let url = Url::parse(authority_host)?.join(&format!("/{tenant_id}/oauth2/v2.0/token/api-version=2019-06-01"))?;
     println!("authority_host  = {:?}", authority_host);
     let scopes: &[&str] = &[&scope_from_url(&url)];
     println!("scopes is {:?}", scopes);
@@ -49,16 +49,15 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         .method(Method::POST)
         .uri(url.to_string())
         .body(encoded_body)?;
-
     req.headers_mut().insert(
         http::header::CONTENT_TYPE.as_str(),
         HeaderValue::from_static("application/x-www-form-urlencoded"),
     );
 
-    // req.headers_mut().insert(
-    //     API_VERSION,
-    //     HeaderValue::from_static("2019-06-01"),
-    // );
+    req.headers_mut().insert(
+        API_VERSION,
+        HeaderValue::from_static("2019-06-01"),
+    );
 
     let res = Client::new().execute(req.try_into()?).await?;
     let rsp_status = res.status();
