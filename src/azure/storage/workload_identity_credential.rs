@@ -10,7 +10,7 @@ use serde::Deserialize;
 use super::config::Config;
 
 pub const API_VERSION: &str = "api-version";
-const AZURE_PUBLIC_CLOUD: &str = "https://login.microsoftonline.com";
+const STORAGE_TOKEN_SCOPE: &str = "https://storage.azure.com/.default";
 /// Gets an access token for the specified resource and configuration.
 ///
 /// See <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
@@ -26,14 +26,8 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         }
         _ => return Ok(None),
     };
-    println!("token = {}", token);
-    println!("client_id = {}", client_id);
-    println!("tenant_id = {}", tenant_id);
-    let url = Url::parse(AZURE_PUBLIC_CLOUD)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
-    println!("authority_host  = {:?}", authority_host);
-    println!("这里url = {:?}", url);
-    let scopes: &[&str] = &["https://storage.azure.com/.default"];
-    println!("scopes is {:?}", scopes);
+    let url = Url::parse(authority_host)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
+    let scopes: &[&str] = &[STORAGE_TOKEN_SCOPE];
     let encoded_body: String = form_urlencoded::Serializer::new(String::new())
         .append_pair("client_id", client_id)
         .append_pair("scope", &scopes.join(" "))
@@ -54,10 +48,8 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         HeaderValue::from_static("application/x-www-form-urlencoded"),
     );
 
-    req.headers_mut().insert(
-        API_VERSION,
-        HeaderValue::from_static("2019-06-01"),
-    );
+    req.headers_mut()
+        .insert(API_VERSION, HeaderValue::from_static("2019-06-01"));
 
     let res = Client::new().execute(req.try_into()?).await?;
     let rsp_status = res.status();
@@ -65,7 +57,9 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
 
     if !rsp_status.is_success() {
         return Err(anyhow::anyhow!(
-            "Failed to get token from working identity credential, rsp_status = {}, rsp_body = {}", rsp_status, rsp_body
+            "Failed to get token from working identity credential, rsp_status = {}, rsp_body = {}",
+            rsp_status,
+            rsp_body
         ));
     }
 
@@ -82,12 +76,4 @@ pub struct LoginResponse {
     pub not_before: Option<String>,
     pub resource: Option<String>,
     pub access_token: String,
-}
-
-/// This function generates the scope string from the passed url. The scope string is used to
-/// request the AAD token.
-fn scope_from_url(url: &Url) -> String {
-    let scheme = url.scheme();
-    let hostname = url.host_str().unwrap();
-    format!("{scheme}://{hostname}")
 }
