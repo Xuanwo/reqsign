@@ -19,7 +19,7 @@ impl Loader {
     /// Create a new loader via config.
     pub fn new(config: Config) -> Self {
         Self {
-            config: Config::default().from_env(),
+            config,
 
             credential: Arc::default(),
         }
