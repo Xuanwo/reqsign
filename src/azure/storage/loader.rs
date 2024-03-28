@@ -25,15 +25,6 @@ impl Loader {
         }
     }
 
-    /// Create a new loader via loading config from env.
-    pub fn from_env() -> Self {
-        Self {
-            config: Config::default().from_env(),
-
-            credential: Arc::default(),
-        }
-    }
-
     /// Load credential.
     pub async fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
