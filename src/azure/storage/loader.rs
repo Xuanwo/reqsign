@@ -3,9 +3,9 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 
-use super::config::Config;
 use super::credential::Credential;
 use super::imds_credential;
+use super::{config::Config, workload_identity_credential};
 
 /// Loader will load credential from different methods.
 #[cfg_attr(test, derive(Debug))]
@@ -31,7 +31,6 @@ impl Loader {
         if let Some(cred) = self.credential.lock().expect("lock poisoned").clone() {
             return Ok(Some(cred));
         }
-
         let cred = self.load_inner().await?;
 
         let mut lock = self.credential.lock().expect("lock poisoned");
@@ -42,6 +41,10 @@ impl Loader {
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
         if let Some(cred) = self.load_via_config().await? {
+            return Ok(Some(cred));
+        }
+
+        if let Some(cred) = self.load_via_workload_identity().await? {
             return Ok(Some(cred));
         }
 
@@ -71,5 +74,14 @@ impl Loader {
         let cred = Some(Credential::BearerToken(token.access_token));
 
         Ok(cred)
+    }
+
+    async fn load_via_workload_identity(&self) -> Result<Option<Credential>> {
+        let workload_identity_token =
+            workload_identity_credential::get_workload_identity_token(&self.config).await?;
+        match workload_identity_token {
+            Some(token) => Ok(Some(Credential::BearerToken(token.access_token))),
+            None => Ok(None),
+        }
     }
 }
