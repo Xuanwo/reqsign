@@ -26,7 +26,7 @@ pub struct Config {
     /// Specifies the application id (client id) associated with a user assigned managed service identity resource
     ///
     /// The values of object_id and msi_res_id are discarded
-    /// - nv value: [`AZURE_CLIENT_ID`]
+    /// - cnv value: [`AZURE_CLIENT_ID`]
     ///
     /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
     pub client_id: Option<String>,
