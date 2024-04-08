@@ -135,7 +135,7 @@ fn build_signature(
         .map(|(k, v)| {
             (
                 utf8_percent_encode(&k.to_lowercase(), &TENCENT_URI_ENCODE_SET).to_string(),
-                utf8_percent_encode(&v.to_lowercase(), &TENCENT_URI_ENCODE_SET).to_string(),
+                utf8_percent_encode(v, &TENCENT_URI_ENCODE_SET).to_string(),
             )
         })
         .collect::<Vec<_>>();
