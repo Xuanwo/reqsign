@@ -84,7 +84,7 @@ impl Loader {
             fingerprint: config.fingerprint,
             // Set expires_in to 10 minutes to enforce re-read
             // from file.
-            expires_in: Some(now() + chrono::Duration::minutes(10)),
+            expires_in: Some(now() + chrono::TimeDelta::try_minutes(10).expect("in bounds")),
         }))
     }
 }

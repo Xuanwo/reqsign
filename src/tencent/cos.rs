@@ -124,7 +124,7 @@ fn build_signature(
     let key_time = format!(
         "{};{}",
         now.timestamp(),
-        (now + chrono::Duration::from_std(expires).unwrap()).timestamp()
+        (now + chrono::TimeDelta::from_std(expires).unwrap()).timestamp()
     );
 
     let sign_key = hex_hmac_sha1(cred.secret_key.as_bytes(), key_time.as_bytes());
@@ -135,7 +135,7 @@ fn build_signature(
         .map(|(k, v)| {
             (
                 utf8_percent_encode(&k.to_lowercase(), &TENCENT_URI_ENCODE_SET).to_string(),
-                utf8_percent_encode(&v.to_lowercase(), &TENCENT_URI_ENCODE_SET).to_string(),
+                utf8_percent_encode(v, &TENCENT_URI_ENCODE_SET).to_string(),
             )
         })
         .collect::<Vec<_>>();
