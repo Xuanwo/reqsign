@@ -16,5 +16,40 @@ pub enum Credential {
     /// associated with the subscription that contains the storage account.
     ///
     /// ref: <https://docs.microsoft.com/rest/api/storageservices/authorize-with-azure-active-directory>
-    BearerToken(String),
+    BearerToken(String, String),
+}
+
+impl Credential {
+    /// is current cred is valid?
+    pub fn is_valid(&self) -> bool {
+        if self.is_empty() {
+            return false;
+        }
+
+        match self {
+            Credential::BearerToken(_, expires_on) => {
+                if let Ok(expires) = chrono::DateTime::parse_from_rfc3339(expires_on) {
+                    let buffer = chrono::Duration::seconds(120);
+                    if expires > (chrono::Utc::now() + buffer) {
+                        return false;
+                    }
+                }
+            }
+            _ => {}
+        };
+
+        true
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            Credential::SharedKey(account_name, account_key) => {
+                account_name.is_empty() || account_key.is_empty()
+            }
+            Credential::SharedAccessSignature(sas_token) => sas_token.is_empty(),
+            Credential::BearerToken(bearer_token, expire_on) => {
+                bearer_token.is_empty() || expire_on.is_empty()
+            }
+        }
+    }
 }

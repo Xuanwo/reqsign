@@ -28,8 +28,9 @@ impl Loader {
     /// Load credential.
     pub async fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it's valid.
-        if let Some(cred) = self.credential.lock().expect("lock poisoned").clone() {
-            return Ok(Some(cred));
+        match self.credential.lock().expect("lock poisoned").clone() {
+            Some(cred) if cred.is_valid() => return Ok(Some(cred)),
+            _ => (),
         }
 
         let cred = self.load_inner().await?;
@@ -72,7 +73,10 @@ impl Loader {
     async fn load_via_imds(&self) -> Result<Option<Credential>> {
         let token =
             imds_credential::get_access_token("https://storage.azure.com/", &self.config).await?;
-        let cred = Some(Credential::BearerToken(token.access_token));
+        let cred = Some(Credential::BearerToken(
+            token.access_token,
+            token.expires_on,
+        ));
 
         Ok(cred)
     }
@@ -84,7 +88,10 @@ impl Loader {
         )
         .await?;
         match workload_identity_token {
-            Some(token) => Ok(Some(Credential::BearerToken(token.access_token))),
+            Some(token) => Ok(Some(Credential::BearerToken(
+                token.access_token,
+                token.expires_on,
+            ))),
             None => Ok(None),
         }
     }
