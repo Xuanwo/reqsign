@@ -5,7 +5,7 @@ use aws_sigv4::http_request::PercentEncodingMode;
 use aws_sigv4::http_request::SignableBody;
 use aws_sigv4::http_request::SignableRequest;
 use aws_sigv4::http_request::SigningSettings;
-use aws_sigv4::SigningParams;
+use aws_sigv4::sign::v4::SigningParams;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
@@ -43,30 +43,47 @@ pub fn bench(c: &mut Criterion) {
         ss.percent_encoding_mode = PercentEncodingMode::Single;
         ss.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
 
+        let credentials = aws_credential_types::Credentials::new(
+            "access_key_id".to_string(),
+            "secret_access_key".to_string(),
+            None,
+            None,
+            "test",
+        )
+        .into();
+
         let sp = SigningParams::builder()
-            .access_key("access_key_id")
-            .secret_key("secret_access_key")
+            .identity(&credentials)
             .region("test")
-            .service_name("s3")
+            .name("s3")
             .time(SystemTime::now())
             .settings(ss)
             .build()
-            .expect("signing params must be valid");
+            .expect("signing params must be valid")
+            .into();
+
+        let mut req = http::Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() = "http://127.0.0.1:9000/hello"
+            .parse()
+            .expect("url must be valid");
+        let method = req.method().as_str();
+        let uri = req.uri().to_string();
+        let headers = req
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.as_str(), std::str::from_utf8(v.as_bytes()).unwrap()))
+            .collect::<Vec<_>>();
 
         b.iter(|| {
-            let mut req = http::Request::new("");
-            *req.method_mut() = http::Method::GET;
-            *req.uri_mut() = "http://127.0.0.1:9000/hello"
-                .parse()
-                .expect("url must be valid");
-
             let _ = aws_sigv4::http_request::sign(
                 SignableRequest::new(
-                    req.method(),
-                    req.uri(),
-                    req.headers(),
+                    method,
+                    uri.as_str(),
+                    headers.clone().into_iter(),
                     SignableBody::UnsignedPayload,
-                ),
+                )
+                .unwrap(),
                 &sp,
             )
             .expect("signing must succeed");

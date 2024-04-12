@@ -29,7 +29,7 @@ impl Credential {
         match self {
             Credential::BearerToken(_, expires_on) => {
                 if let Ok(expires) = chrono::DateTime::parse_from_rfc3339(expires_on) {
-                    let buffer = chrono::Duration::seconds(120);
+                    let buffer = chrono::Duration::try_minutes(2).expect("in bounds");
                     if expires > (chrono::Utc::now() + buffer) {
                         return false;
                     }

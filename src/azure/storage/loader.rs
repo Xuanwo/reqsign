@@ -32,7 +32,6 @@ impl Loader {
             Some(cred) if cred.is_valid() => return Ok(Some(cred)),
             _ => (),
         }
-
         let cred = self.load_inner().await?;
 
         let mut lock = self.credential.lock().expect("lock poisoned");
@@ -82,11 +81,8 @@ impl Loader {
     }
 
     async fn load_via_workload_identity(&self) -> Result<Option<Credential>> {
-        let workload_identity_token = workload_identity_credential::get_workload_identity_token(
-            "https://storage.azure.com/",
-            &self.config,
-        )
-        .await?;
+        let workload_identity_token =
+            workload_identity_credential::get_workload_identity_token(&self.config).await?;
         match workload_identity_token {
             Some(token) => Ok(Some(Credential::BearerToken(
                 token.access_token,

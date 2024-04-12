@@ -272,3 +272,38 @@ async fn test_list_bucket() -> Result<()> {
     assert_eq!(StatusCode::OK, status);
     Ok(())
 }
+
+#[tokio::test]
+async fn test_list_bucket_with_upper_cases() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_TENCENT_COS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let (loader, signer) = signer.unwrap();
+    let cred = loader.load().await?.unwrap();
+
+    let url = &env::var("REQSIGN_TENCENT_COS_URL").expect("env REQSIGN_TENCENT_COS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::GET;
+    *req.uri_mut() = http::Uri::from_str(&format!("{url}?prefix=stage/1712557668-ZgPY8Ql4"))?;
+
+    signer
+        .sign(&mut req, &cred)
+        .expect("sign request must success");
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .await
+        .expect("request must success");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text().await?);
+    assert_eq!(StatusCode::OK, status);
+    Ok(())
+}

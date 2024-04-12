@@ -177,7 +177,10 @@ impl TokenLoader {
     /// Load token from different sources.
     pub async fn load(&self) -> Result<Option<Token>> {
         match self.token.lock().expect("lock poisoned").clone() {
-            Some((token, expire_in)) if now() < expire_in - chrono::Duration::seconds(2 * 60) => {
+            Some((token, expire_in))
+                if now()
+                    < expire_in - chrono::TimeDelta::try_seconds(2 * 60).expect("in bounds") =>
+            {
                 return Ok(Some(token))
             }
             _ => (),
@@ -189,7 +192,8 @@ impl TokenLoader {
             return Ok(None);
         };
 
-        let expire_in = now() + chrono::Duration::seconds(token.expires_in() as i64);
+        let expire_in =
+            now() + chrono::TimeDelta::try_seconds(token.expires_in() as i64).expect("in bounds");
 
         let mut lock = self.token.lock().expect("lock poisoned");
         *lock = Some((token.clone(), expire_in));

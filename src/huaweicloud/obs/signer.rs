@@ -83,7 +83,7 @@ impl Signer {
                 ctx.query_push("AccessKeyId", &cred.access_key_id);
                 ctx.query_push(
                     "Expires",
-                    (now + chrono::Duration::from_std(expire).unwrap())
+                    (now + chrono::TimeDelta::from_std(expire).unwrap())
                         .timestamp()
                         .to_string(),
                 );
@@ -182,7 +182,7 @@ fn string_to_sign(
             writeln!(
                 &mut s,
                 "{}",
-                (now + chrono::Duration::from_std(expires).unwrap()).timestamp()
+                (now + chrono::TimeDelta::from_std(expires).unwrap()).timestamp()
             )?;
         }
     }

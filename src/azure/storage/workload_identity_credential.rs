@@ -6,59 +6,50 @@ use http::Request;
 use reqwest::Client;
 use reqwest::Url;
 use serde::Deserialize;
-use std::fs;
 
 use super::config::Config;
 
-const MSI_API_VERSION: &str = "2019-08-01";
-const MSI_ENDPOINT: &str = "http://169.254.169.254/metadata/identity/oauth2/token";
-
+pub const API_VERSION: &str = "api-version";
+const STORAGE_TOKEN_SCOPE: &str = "https://storage.azure.com/.default";
 /// Gets an access token for the specified resource and configuration.
 ///
 /// See <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
-pub async fn get_workload_identity_token(
-    resource: &str,
-    config: &Config,
-) -> anyhow::Result<Option<AccessToken>> {
-    let token = match (
-        &config.azure_federated_token,
-        &config.azure_federated_token_file,
+pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Option<AccessToken>> {
+    let (token, tenant_id, client_id, authority_host) = match (
+        &config.federated_token,
+        &config.tenant_id,
+        &config.client_id,
+        &config.authority_host,
     ) {
-        (Some(token), Some(_)) | (Some(token), None) => token.clone(),
-        (None, Some(token_file)) => fs::read_to_string(token_file)?,
+        (Some(token), Some(tenant_id), Some(client_id), Some(authority_host)) => {
+            (token, tenant_id, client_id, authority_host)
+        }
         _ => return Ok(None),
     };
-    let tenant_id = if let Some(tenant_id) = &config.azure_tenant_id_env_key {
-        tenant_id
-    } else {
-        return Ok(None);
-    };
-    let client_id = if let Some(client_id) = &config.client_id {
-        client_id
-    } else {
-        return Ok(None);
-    };
+    let url = Url::parse(authority_host)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
+    let scopes: &[&str] = &[STORAGE_TOKEN_SCOPE];
+    let encoded_body: String = form_urlencoded::Serializer::new(String::new())
+        .append_pair("client_id", client_id)
+        .append_pair("scope", &scopes.join(" "))
+        .append_pair(
+            "client_assertion_type",
+            "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+        )
+        .append_pair("client_assertion", token)
+        .append_pair("grant_type", "client_credentials")
+        .finish();
 
-    let endpoint = config.endpoint.as_deref().unwrap_or(MSI_ENDPOINT);
-
-    let mut query_items = vec![("api-version", MSI_API_VERSION), ("resource", resource)];
-    query_items.push(("token", &token));
-    query_items.push(("tenant_id", &tenant_id));
-    query_items.push(("client_id", &client_id));
-
-    let url = Url::parse_with_params(endpoint, &query_items)?;
     let mut req = Request::builder()
-        .method(Method::GET)
+        .method(Method::POST)
         .uri(url.to_string())
-        .body("")?;
+        .body(encoded_body)?;
+    req.headers_mut().insert(
+        http::header::CONTENT_TYPE.as_str(),
+        HeaderValue::from_static("application/x-www-form-urlencoded"),
+    );
 
     req.headers_mut()
-        .insert("metadata", HeaderValue::from_static("true"));
-
-    if let Some(secret) = &config.msi_secret {
-        req.headers_mut()
-            .insert("x-identity-header", HeaderValue::from_str(secret)?);
-    };
+        .insert(API_VERSION, HeaderValue::from_static("2019-06-01"));
 
     let res = Client::new().execute(req.try_into()?).await?;
     let rsp_status = res.status();
