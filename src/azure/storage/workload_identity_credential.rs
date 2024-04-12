@@ -14,7 +14,7 @@ const STORAGE_TOKEN_SCOPE: &str = "https://storage.azure.com/.default";
 /// Gets an access token for the specified resource and configuration.
 ///
 /// See <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
-pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Option<AccessToken>> {
+pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Option<LoginResponse>> {
     let (token, tenant_id, client_id, authority_host) = match (
         &config.federated_token,
         &config.tenant_id,
@@ -61,13 +61,17 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         ));
     }
 
-    let token: AccessToken = serde_json::from_str(&rsp_body)?;
+    let token: LoginResponse = serde_json::from_str(&rsp_body)?;
     Ok(Some(token))
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[allow(unused)]
-pub struct AccessToken {
+pub struct LoginResponse {
+    pub token_type: String,
+    pub expires_in: u64,
+    pub ext_expires_in: u64,
+    pub expires_on: Option<String>,
+    pub not_before: Option<String>,
+    pub resource: Option<String>,
     pub access_token: String,
-    pub expires_on: String,
 }

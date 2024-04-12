@@ -86,7 +86,7 @@ impl Loader {
         match workload_identity_token {
             Some(token) => Ok(Some(Credential::BearerToken(
                 token.access_token,
-                token.expires_on,
+                token.expires_on.unwrap_or("".to_string()),
             ))),
             None => Ok(None),
         }

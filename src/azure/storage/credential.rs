@@ -25,17 +25,13 @@ impl Credential {
         if self.is_empty() {
             return false;
         }
-
-        match self {
-            Credential::BearerToken(_, expires_on) => {
-                if let Ok(expires) = chrono::DateTime::parse_from_rfc3339(expires_on) {
-                    let buffer = chrono::Duration::try_minutes(2).expect("in bounds");
-                    if expires > (chrono::Utc::now() + buffer) {
-                        return false;
-                    }
+        if let Credential::BearerToken(_, expires_on) = self {
+            if let Ok(expires) = chrono::DateTime::parse_from_rfc3339(expires_on) {
+                let buffer = chrono::Duration::try_minutes(2).expect("in bounds");
+                if expires > (chrono::Utc::now() + buffer) {
+                    return false;
                 }
             }
-            _ => {}
         };
 
         true
