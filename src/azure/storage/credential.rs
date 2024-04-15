@@ -29,7 +29,7 @@ impl Credential {
         }
         if let Credential::BearerToken(_, expires_on) = self {
             let buffer = chrono::TimeDelta::try_minutes(2).expect("in bounds");
-            if expires_on > &(chrono::Utc::now() + buffer) {
+            if expires_on < &(chrono::Utc::now() - buffer) {
                 return false;
             }
         };
