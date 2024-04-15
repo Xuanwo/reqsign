@@ -74,9 +74,10 @@ impl Loader {
     async fn load_via_imds(&self) -> Result<Option<Credential>> {
         let token =
             imds_credential::get_access_token("https://storage.azure.com/", &self.config).await?;
-        let expires_on = match token.expires_on.is_empty() {
-            true => now() + chrono::TimeDelta::try_minutes(10).expect("in bounds"),
-            false => parse_rfc3339(&token.expires_on)?,
+        let expires_on = if token.expires_on.is_empty() {
+            now() + chrono::TimeDelta::try_minutes(10).expect("in bounds")
+        } else {
+            parse_rfc3339(&token.expires_on)?
         };
         let cred = Some(Credential::BearerToken(token.access_token, expires_on));
 
