@@ -1,3 +1,5 @@
+use crate::time::DateTime;
+
 /// Credential that holds the access_key and secret_key.
 #[derive(Clone)]
 #[cfg_attr(test, derive(Debug))]
@@ -16,7 +18,7 @@ pub enum Credential {
     /// associated with the subscription that contains the storage account.
     ///
     /// ref: <https://docs.microsoft.com/rest/api/storageservices/authorize-with-azure-active-directory>
-    BearerToken(String, String),
+    BearerToken(String, DateTime),
 }
 
 impl Credential {
@@ -26,11 +28,9 @@ impl Credential {
             return false;
         }
         if let Credential::BearerToken(_, expires_on) = self {
-            if let Ok(expires) = chrono::DateTime::parse_from_rfc3339(expires_on) {
-                let buffer = chrono::Duration::try_minutes(2).expect("in bounds");
-                if expires > (chrono::Utc::now() + buffer) {
-                    return false;
-                }
+            let buffer = chrono::TimeDelta::try_minutes(2).expect("in bounds");
+            if expires_on > &(chrono::Utc::now() + buffer) {
+                return false;
             }
         };
 
@@ -43,9 +43,7 @@ impl Credential {
                 account_name.is_empty() || account_key.is_empty()
             }
             Credential::SharedAccessSignature(sas_token) => sas_token.is_empty(),
-            Credential::BearerToken(bearer_token, expire_on) => {
-                bearer_token.is_empty() || expire_on.is_empty()
-            }
+            Credential::BearerToken(bearer_token, _) => bearer_token.is_empty(),
         }
     }
 }

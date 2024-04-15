@@ -3,6 +3,8 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 
+use crate::time::{now, parse_rfc3339};
+
 use super::credential::Credential;
 use super::imds_credential;
 use super::{config::Config, workload_identity_credential};
@@ -72,10 +74,11 @@ impl Loader {
     async fn load_via_imds(&self) -> Result<Option<Credential>> {
         let token =
             imds_credential::get_access_token("https://storage.azure.com/", &self.config).await?;
-        let cred = Some(Credential::BearerToken(
-            token.access_token,
-            token.expires_on,
-        ));
+        let expires_on = match token.expires_on.is_empty() {
+            true => now() + chrono::TimeDelta::try_minutes(10).expect("in bounds"),
+            false => parse_rfc3339(&token.expires_on)?,
+        };
+        let cred = Some(Credential::BearerToken(token.access_token, expires_on));
 
         Ok(cred)
     }
@@ -84,10 +87,16 @@ impl Loader {
         let workload_identity_token =
             workload_identity_credential::get_workload_identity_token(&self.config).await?;
         match workload_identity_token {
-            Some(token) => Ok(Some(Credential::BearerToken(
-                token.access_token,
-                token.expires_on.unwrap_or("".to_string()),
-            ))),
+            Some(token) => {
+                let expires_on_duration = match token.expires_on {
+                    None => now() + chrono::TimeDelta::try_minutes(10).expect("in bounds"),
+                    Some(expires_on) => parse_rfc3339(&expires_on)?,
+                };
+                Ok(Some(Credential::BearerToken(
+                    token.access_token,
+                    expires_on_duration,
+                )))
+            }
             None => Ok(None),
         }
     }
