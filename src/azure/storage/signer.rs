@@ -61,7 +61,7 @@ impl Signer {
                 ctx.query_append(token);
                 return Ok(ctx);
             }
-            Credential::BearerToken(token) => match method {
+            Credential::BearerToken(token, _) => match method {
                 SigningMethod::Query(_) => {
                     return Err(anyhow!("BearerToken can't be used in query string"));
                 }
@@ -269,9 +269,9 @@ mod tests {
     use http::Request;
 
     use super::super::config::Config;
-    use crate::azure::storage::loader::Loader;
     use crate::AzureStorageCredential;
     use crate::AzureStorageSigner;
+    use crate::{azure::storage::loader::Loader, time::now};
 
     #[tokio::test]
     async fn test_sas_url() {
@@ -307,7 +307,7 @@ mod tests {
             .uri("https://test.blob.core.windows.net/testbucket/testblob")
             .body(())
             .unwrap();
-        let cred = AzureStorageCredential::BearerToken("token".to_string());
+        let cred = AzureStorageCredential::BearerToken("token".to_string(), now());
 
         // Can effectively sign request with SigningMethod::Header
         assert!(signer.sign(&mut req, &cred).is_ok());
