@@ -46,7 +46,7 @@ impl CredentialLoader {
         let cred = self.load_inner().await?;
 
         let mut lock = self.credential.lock().expect("lock poisoned");
-        *lock = cred.clone();
+        lock.clone_from(&cred);
 
         Ok(cred)
     }
