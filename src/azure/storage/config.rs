@@ -1,5 +1,5 @@
+use std::collections::HashMap;
 use std::env;
-use std::{collections::HashMap};
 
 /// Config carries all the configuration for Azure Storage services.
 #[derive(Clone, Default)]
