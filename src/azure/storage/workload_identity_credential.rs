@@ -1,4 +1,4 @@
-use std::str;
+use std::{fs, str};
 
 use http::HeaderValue;
 use http::Method;
@@ -15,17 +15,19 @@ const STORAGE_TOKEN_SCOPE: &str = "https://storage.azure.com/.default";
 ///
 /// See <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
 pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Option<LoginResponse>> {
-    let (token, tenant_id, client_id, authority_host) = match (
-        &config.federated_token,
+    let (token_file, tenant_id, client_id, authority_host) = match (
+        &config.federated_token_file,
         &config.tenant_id,
         &config.client_id,
         &config.authority_host,
     ) {
-        (Some(token), Some(tenant_id), Some(client_id), Some(authority_host)) => {
-            (token, tenant_id, client_id, authority_host)
+        (Some(token_file), Some(tenant_id), Some(client_id), Some(authority_host)) => {
+            (token_file, tenant_id, client_id, authority_host)
         }
         _ => return Ok(None),
     };
+
+    let token = fs::read_to_string(token_file)?;
     let url = Url::parse(authority_host)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
     let scopes: &[&str] = &[STORAGE_TOKEN_SCOPE];
     let encoded_body: String = form_urlencoded::Serializer::new(String::new())
@@ -35,7 +37,7 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
             "client_assertion_type",
             "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
         )
-        .append_pair("client_assertion", token)
+        .append_pair("client_assertion", &token)
         .append_pair("grant_type", "client_credentials")
         .finish();
 
@@ -57,7 +59,7 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
 
     if !rsp_status.is_success() {
         return Err(anyhow::anyhow!(
-            "Failed to get token from working identity credential, rsp_status = {}, rsp_body = {}",
+            "Failed to get token from workload identity credential, rsp_status = {}, rsp_body = {}",
             rsp_status,
             rsp_body
         ));

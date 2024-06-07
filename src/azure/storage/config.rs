@@ -1,5 +1,5 @@
+use std::collections::HashMap;
 use std::env;
-use std::{collections::HashMap, fs};
 
 /// Config carries all the configuration for Azure Storage services.
 #[derive(Clone, Default)]
@@ -48,12 +48,12 @@ pub struct Config {
     ///
     /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
     pub endpoint: Option<String>,
-    /// `federated_token` value will be loaded from:
+    /// `federated_token_file` value will be loaded from:
     ///
     /// - this field if it's `is_some`
-    /// - env value: [`AZURE_FEDERATED_TOKEN`]
-    /// - profile config: `federated_toen_file`
-    pub federated_token: Option<String>,
+    /// - env value: [`AZURE_FEDERATED_TOKEN_FILE`]
+    /// - profile config: `federated_token_file`
+    pub federated_token_file: Option<String>,
     /// `tenant_id` value will be loaded from:
     ///
     /// - this field if it's `is_some`
@@ -68,7 +68,6 @@ pub struct Config {
     pub authority_host: Option<String>,
 }
 
-pub const AZURE_FEDERATED_TOKEN: &str = "AZURE_FEDERATED_TOKEN";
 pub const AZURE_FEDERATED_TOKEN_FILE: &str = "AZURE_FEDERATED_TOKEN_FILE";
 pub const AZURE_TENANT_ID: &str = "AZURE_TENANT_ID";
 pub const AZURE_CLIENT_ID: &str = "AZURE_CLIENT_ID";
@@ -85,11 +84,7 @@ impl Config {
 
         // federated_token can be loaded from both `AZURE_FEDERATED_TOKEN` and `AZURE_FEDERATED_TOKEN_FILE`.
         if let Some(v) = envs.get(AZURE_FEDERATED_TOKEN_FILE) {
-            self.federated_token = Some(fs::read_to_string(v).unwrap_or_default());
-        }
-
-        if let Some(v) = envs.get(AZURE_FEDERATED_TOKEN) {
-            self.federated_token = Some(v.to_string());
+            self.federated_token_file = Some(v.to_string());
         }
 
         if let Some(v) = envs.get(AZURE_TENANT_ID) {
