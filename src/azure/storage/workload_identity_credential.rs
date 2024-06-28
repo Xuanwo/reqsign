@@ -71,11 +71,6 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct LoginResponse {
-    pub token_type: String,
-    pub expires_in: u64,
-    pub ext_expires_in: u64,
     pub expires_on: Option<String>,
-    pub not_before: Option<String>,
-    pub resource: Option<String>,
     pub access_token: String,
 }
