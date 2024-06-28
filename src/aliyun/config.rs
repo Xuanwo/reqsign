@@ -40,6 +40,11 @@ pub struct Config {
     /// - this field if it's `is_some`
     /// - env value: [`ALIBABA_CLOUD_OIDC_TOKEN_FILE`]
     pub oidc_token_file: Option<String>,
+    /// `sts_endpoint` will be loaded from
+    ///
+    /// - this field if it's `is_some`
+    /// - env value: [`ALIBABA_CLOUD_STS_ENDPOINT`]
+    pub sts_endpoint: Option<String>,
 }
 
 impl Default for Config {
@@ -52,6 +57,7 @@ impl Default for Config {
             role_session_name: "resign".to_string(),
             oidc_provider_arn: None,
             oidc_token_file: None,
+            sts_endpoint: None,
         }
     }
 }
@@ -78,6 +84,9 @@ impl Config {
         }
         if let Some(v) = envs.get(ALIBABA_CLOUD_OIDC_TOKEN_FILE) {
             self.oidc_token_file.get_or_insert(v.clone());
+        }
+        if let Some(v) = envs.get(ALIBABA_CLOUD_STS_ENDPOINT) {
+            self.sts_endpoint.get_or_insert(v.clone());
         }
 
         self
