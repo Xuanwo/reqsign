@@ -138,8 +138,11 @@ impl Loader {
         let role_session_name = &self.config.role_session_name;
 
         // Construct request to Aliyun STS Service.
-        let url = format!("https://sts.aliyuncs.com/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}", provider_arn, role_arn, role_session_name, format_rfc3339(now()), token);
 
+        let url = match self.config.sts_endpoint{
+            Some(definde_sts_endpoint) =>  format!("https://{}/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}", definde_sts_endpoint,provider_arn, role_arn, role_session_name, format_rfc3339(now()), token),
+            None => format!("https://sts.aliyuncs.com/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}", provider_arn, role_arn, role_session_name, format_rfc3339(now()), token),
+        };
         let req = self.client.get(&url).header(
             http::header::CONTENT_TYPE.as_str(),
             "application/x-www-form-urlencoded",
