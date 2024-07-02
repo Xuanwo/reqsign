@@ -166,7 +166,13 @@ impl Loader {
 
     fn get_sts_endpoint(&self) -> String {
         match &self.config.sts_endpoint {
-            Some(defined_sts_endpoint) => format!("https://{}", defined_sts_endpoint),
+            Some(defined_sts_endpoint) => {
+                if defined_sts_endpoint.starts_with("https://") {
+                    defined_sts_endpoint.clone()
+                } else {
+                    format!("https://{}", defined_sts_endpoint)
+                }
+            }
             None => "https://sts.aliyuncs.com".to_string(),
         }
     }
