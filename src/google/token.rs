@@ -119,7 +119,7 @@ pub struct TokenLoader {
     credential: Option<Credential>,
     disable_vm_metadata: bool,
     service_account: Option<String>,
-    customed_token_loader: Option<Box<dyn TokenLoad>>,
+    customized_token_loader: Option<Box<dyn TokenLoad>>,
 
     token: Arc<Mutex<Option<(Token, DateTime)>>>,
 }
@@ -144,7 +144,7 @@ impl TokenLoader {
             credential: None,
             disable_vm_metadata: false,
             service_account: None,
-            customed_token_loader: None,
+            customized_token_loader: None,
 
             token: Arc::default(),
         }
@@ -168,9 +168,12 @@ impl TokenLoader {
         self
     }
 
-    /// Set the customed token loader for token loader.
-    pub fn with_customed_token_loader(mut self, customed_token_loader: Box<dyn TokenLoad>) -> Self {
-        self.customed_token_loader = Some(customed_token_loader);
+    /// Set the customized token loader for token loader.
+    pub fn with_customized_token_loader(
+        mut self,
+        customized_token_loader: Box<dyn TokenLoad>,
+    ) -> Self {
+        self.customized_token_loader = Some(customized_token_loader);
         self
     }
 
@@ -202,7 +205,7 @@ impl TokenLoader {
     }
 
     async fn load_inner(&self) -> Result<Option<Token>> {
-        if let Some(token) = self.load_via_customed_token_loader().await? {
+        if let Some(token) = self.load_via_customized_token_loader().await? {
             return Ok(Some(token));
         }
 
@@ -225,8 +228,8 @@ impl TokenLoader {
         Ok(None)
     }
 
-    async fn load_via_customed_token_loader(&self) -> Result<Option<Token>> {
-        match &self.customed_token_loader {
+    async fn load_via_customized_token_loader(&self) -> Result<Option<Token>> {
+        match &self.customized_token_loader {
             Some(f) => f.load(self.client.clone()).await,
             None => Ok(None),
         }
