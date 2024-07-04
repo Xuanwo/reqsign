@@ -7,7 +7,7 @@ edition = "2021"
 license = "Apache-2.0"
 name = "reqsign"
 repository = "https://github.com/Xuanwo/reqsign"
-version = "0.15.2"
+version = "0.16.0"
 
 [package.metadata.docs.rs]
 all-features = true
