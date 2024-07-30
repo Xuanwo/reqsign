@@ -66,11 +66,18 @@ pub struct Config {
     /// - env value: [`AZURE_AUTHORITY_HOST`]
     /// - profile config: `authority_host`
     pub authority_host: Option<String>,
+
+    /// `client_secret` value will be loaded from:
+    /// - this field if it's `is_some`
+    /// - profile config: `client_secret`
+    /// - env value: `AZURE_CLIENT_SECRET`
+    pub client_secret: Option<String>,
 }
 
 pub const AZURE_FEDERATED_TOKEN_FILE: &str = "AZURE_FEDERATED_TOKEN_FILE";
 pub const AZURE_TENANT_ID: &str = "AZURE_TENANT_ID";
 pub const AZURE_CLIENT_ID: &str = "AZURE_CLIENT_ID";
+pub const AZURE_CLIENT_SECRET: &str = "AZURE_CLIENT_SECRET";
 pub const AZURE_AUTHORITY_HOST: &str = "AZURE_AUTHORITY_HOST";
 const AZBLOB_ENDPOINT: &str = "AZBLOB_ENDPOINT";
 const AZBLOB_ACCOUNT_KEY: &str = "AZBLOB_ACCOUNT_KEY";
@@ -111,6 +118,10 @@ impl Config {
             self.authority_host = Some(v.to_string());
         } else {
             self.authority_host = Some(AZURE_PUBLIC_CLOUD.to_string());
+        }
+
+        if let Some(v) = envs.get(AZURE_CLIENT_SECRET) {
+            self.client_secret = Some(v.to_string());
         }
 
         self

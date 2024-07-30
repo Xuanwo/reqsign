@@ -47,6 +47,10 @@ impl Loader {
             return Ok(Some(cred));
         }
 
+        if let Some(cred) = self.load_via_client_secret().await? {
+            return Ok(Some(cred));
+        }
+
         if let Some(cred) = self.load_via_workload_identity().await? {
             return Ok(Some(cred));
         }
@@ -100,5 +104,11 @@ impl Loader {
             }
             None => Ok(None),
         }
+    }
+
+    async fn load_via_client_secret(&self) -> Result<Option<Credential>> {
+        super::client_secret_credential::get_client_secret_token(&self.config)
+            .await
+            .map(|token| token.map(Into::into))
     }
 }
