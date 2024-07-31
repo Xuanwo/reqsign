@@ -136,7 +136,9 @@ impl Loader {
             }
             _ => return Ok(None),
         };
-
+        #[cfg(target_arch = "wasm32")]
+        let token = fs::read_to_string(token_file)?;
+        #[cfg(not(target_arch = "wasm32"))]
         let token = fs::read_to_string(token_file).await?;
         let role_session_name = &self.config.role_session_name;
 
