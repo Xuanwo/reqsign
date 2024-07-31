@@ -6,6 +6,9 @@ use anyhow::Result;
 use log::debug;
 use reqwest::Client;
 use serde::Deserialize;
+#[cfg(target_arch = "wasm32")]
+use std::fs;
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::fs;
 
 use super::config::Config;
