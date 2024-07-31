@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 use std::fmt::Write;
-use std::fs;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -12,6 +11,7 @@ use log::debug;
 use quick_xml::de;
 use reqwest::Client;
 use serde::Deserialize;
+use tokio::fs;
 
 use super::config::Config;
 use super::constants::X_AMZ_CONTENT_SHA_256;
@@ -182,7 +182,7 @@ impl DefaultLoader {
                 _ => return Ok(None),
             };
 
-        let token = fs::read_to_string(token_file)?;
+        let token = fs::read_to_string(token_file).await?;
         let role_session_name = &self.config.role_session_name;
 
         let endpoint = self.sts_endpoint()?;
@@ -769,7 +769,7 @@ mod tests {
                 .expect("current_dir must exist")
                 .to_string_lossy()
         );
-        fs::write(&file_path, github_token)?;
+        std::fs::write(&file_path, github_token)?;
 
         temp_env::with_vars(
             vec![
@@ -849,7 +849,7 @@ mod tests {
                 .expect("current_dir must exist")
                 .to_string_lossy()
         );
-        fs::write(&file_path, github_token)?;
+        std::fs::write(&file_path, github_token)?;
 
         temp_env::with_vars(
             vec![

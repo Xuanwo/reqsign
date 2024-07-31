@@ -1,4 +1,3 @@
-use std::fs;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -7,6 +6,7 @@ use anyhow::Result;
 use log::debug;
 use reqwest::Client;
 use serde::Deserialize;
+use tokio::fs;
 
 use super::config::Config;
 use crate::time::format_rfc3339;
@@ -134,7 +134,7 @@ impl Loader {
             _ => return Ok(None),
         };
 
-        let token = fs::read_to_string(token_file)?;
+        let token = fs::read_to_string(token_file).await?;
         let role_session_name = &self.config.role_session_name;
 
         // Construct request to Aliyun STS Service.
@@ -296,7 +296,7 @@ mod tests {
                 .expect("current_dir must exist")
                 .to_string_lossy()
         );
-        fs::write(&file_path, token)?;
+        std::fs::write(&file_path, token)?;
 
         temp_env::with_vars(
             vec![
@@ -395,7 +395,7 @@ mod tests {
                 .expect("current_dir must exist")
                 .to_string_lossy()
         );
-        fs::write(&file_path, token)?;
+        std::fs::write(&file_path, token)?;
 
         temp_env::with_vars(
             vec![
