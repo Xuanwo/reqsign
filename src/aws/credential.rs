@@ -11,7 +11,6 @@ use log::debug;
 use quick_xml::de;
 use reqwest::Client;
 use serde::Deserialize;
-use tokio::fs;
 
 use super::config::Config;
 use super::constants::X_AMZ_CONTENT_SHA_256;
@@ -182,10 +181,7 @@ impl DefaultLoader {
                 _ => return Ok(None),
             };
 
-        #[cfg(target_arch = "wasm32")]
-        let token = fs::read_to_string(token_file)?;
-        #[cfg(not(target_arch = "wasm32"))]
-        let token = fs::read_to_string(token_file).await?;
+        let token = crate::io::read_file_to_string(token_file).await?;
         let role_session_name = &self.config.role_session_name;
 
         let endpoint = self.sts_endpoint()?;

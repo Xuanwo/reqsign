@@ -10,7 +10,6 @@ use log::debug;
 use reqwest::Client;
 use serde::Deserialize;
 use serde::Serialize;
-use tokio::fs;
 
 use super::config::Config;
 use crate::time::now;
@@ -138,10 +137,7 @@ impl CredentialLoader {
             }
         };
 
-        #[cfg(target_arch = "wasm32")]
-        let token = fs::read_to_string(token_file)?;
-        #[cfg(not(target_arch = "wasm32"))]
-        let token = fs::read_to_string(token_file).await?;
+        let token = crate::io::read_file_to_string(token_file).await?;
         let role_session_name = &self.config.role_session_name;
 
         // Construct request to Tencent Cloud STS Service.

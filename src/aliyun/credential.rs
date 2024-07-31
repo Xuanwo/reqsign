@@ -6,10 +6,6 @@ use anyhow::Result;
 use log::debug;
 use reqwest::Client;
 use serde::Deserialize;
-#[cfg(target_arch = "wasm32")]
-use std::fs;
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::fs;
 
 use super::config::Config;
 use crate::time::format_rfc3339;
@@ -136,10 +132,7 @@ impl Loader {
             }
             _ => return Ok(None),
         };
-        #[cfg(target_arch = "wasm32")]
-        let token = fs::read_to_string(token_file)?;
-        #[cfg(not(target_arch = "wasm32"))]
-        let token = fs::read_to_string(token_file).await?;
+        let token = crate::io::read_file_to_string(token_file).await?;
         let role_session_name = &self.config.role_session_name;
 
         // Construct request to Aliyun STS Service.
