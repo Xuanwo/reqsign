@@ -386,6 +386,14 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
         return Ok(());
     }
 
+    if env::var("REQSIGN_AZURE_STORAGE_CLIENT_SECRET")
+        .unwrap_or_default()
+        .is_empty()
+    {
+        warn!("REQSIGN_AZURE_STORAGE_CLIENT_SECRET is not set, skipped");
+        return Ok(());
+    }
+
     let config = AzureStorageConfig::default().from_env();
 
     assert!(config.client_secret.is_some());
@@ -439,6 +447,14 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
         || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"
     {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
+        return Ok(());
+    }
+
+    if env::var("REQSIGN_AZURE_STORAGE_CLIENT_SECRET")
+        .unwrap_or_default()
+        .is_empty()
+    {
+        warn!("REQSIGN_AZURE_STORAGE_CLIENT_SECRET is not set, skipped");
         return Ok(());
     }
 
