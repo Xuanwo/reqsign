@@ -22,6 +22,7 @@ use crate::hash::hex_hmac_sha256;
 use crate::hash::hex_sha256;
 use crate::hash::hmac_sha256;
 use crate::request::SignableRequest;
+use crate::sign::Sign;
 use crate::time::format_date;
 use crate::time::format_iso8601;
 use crate::time::now;
@@ -210,6 +211,24 @@ impl Signer {
     ) -> Result<()> {
         let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
         req.apply(ctx)
+    }
+}
+
+#[async_trait::async_trait]
+impl<R: SignableRequest + Send> Sign<R> for Signer {
+    type Credential = Credential;
+
+    async fn sign(&self, req: &mut R, cred: &Self::Credential) -> Result<()> {
+        self.sign(req, cred)
+    }
+
+    async fn sign_query(
+        &self,
+        req: &mut R,
+        expires: Duration,
+        cred: &Self::Credential,
+    ) -> Result<()> {
+        self.sign_query(req, expires, cred)
     }
 }
 
