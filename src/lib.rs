@@ -89,4 +89,6 @@ mod ctx;
 mod dirs;
 mod hash;
 mod request;
+mod sign;
 mod time;
+pub use sign::Sign;
