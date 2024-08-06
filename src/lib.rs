@@ -91,3 +91,4 @@ mod hash;
 mod request;
 mod sign;
 mod time;
+pub use sign::Sign;
