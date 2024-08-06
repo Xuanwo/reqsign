@@ -39,7 +39,7 @@ impl Credential {
         // Take 120s as buffer to avoid edge cases.
         if let Some(valid) = self
             .expires_in
-            .map(|v| v > now() + chrono::Duration::minutes(2))
+            .map(|v| v > now() + chrono::TimeDelta::try_minutes(2).expect("in bounds"))
         {
             return valid;
         }
@@ -115,7 +115,7 @@ impl Loader {
                 security_token: self.config.security_token.clone(),
                 // Set expires_in to 10 minutes to enforce re-read
                 // from file.
-                expires_in: Some(now() + chrono::Duration::minutes(10)),
+                expires_in: Some(now() + chrono::TimeDelta::try_minutes(10).expect("in bounds")),
             }))
         } else {
             Ok(None)
@@ -138,7 +138,7 @@ impl Loader {
         let role_session_name = &self.config.role_session_name;
 
         // Construct request to Aliyun STS Service.
-        let url = format!("https://sts.aliyuncs.com/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}", provider_arn, role_arn, role_session_name, format_rfc3339(now()), token);
+        let url = format!("{}/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}", self.get_sts_endpoint(), provider_arn, role_arn, role_session_name, format_rfc3339(now()), token);
 
         let req = self.client.get(&url).header(
             http::header::CONTENT_TYPE.as_str(),
@@ -162,6 +162,13 @@ impl Loader {
         };
 
         Ok(Some(cred))
+    }
+
+    fn get_sts_endpoint(&self) -> String {
+        match &self.config.sts_endpoint {
+            Some(defined_sts_endpoint) => format!("https://{}", defined_sts_endpoint),
+            None => "https://sts.aliyuncs.com".to_string(),
+        }
     }
 }
 

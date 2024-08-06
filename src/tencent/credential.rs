@@ -62,7 +62,7 @@ impl CredentialLoader {
         let cred = self.load_inner().await?;
 
         let mut lock = self.credential.lock().expect("lock poisoned");
-        *lock = cred.clone();
+        lock.clone_from(&cred);
 
         Ok(cred)
     }
@@ -96,7 +96,7 @@ impl CredentialLoader {
                 security_token: self.config.security_token.clone(),
                 // Set expires_in to 10 minutes to enforce re-read
                 // from file.
-                expires_in: Some(now() + chrono::Duration::minutes(10)),
+                expires_in: Some(now() + chrono::TimeDelta::try_minutes(10).expect("in bounds")),
             };
             return Ok(Some(cred));
         }
