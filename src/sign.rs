@@ -1,13 +1,12 @@
-use std::fmt::Debug;
 use std::time::Duration;
 
-/// On some cases like https://github.com/apache/iceberg-rust/issues/506, user may want to
-/// implement their own signing logic for their own services. This trait is defined to
-/// allow user to inject their own signing logic.
+/// Sign will be a trait that implement by all services providers supported by reqsign, user
+/// can implement their own too. It will take http::request::Parts and services Credential
+/// to perform sign over this request.
 #[async_trait::async_trait]
-pub trait Sign: Debug + Send + Sync + Unpin + 'static {
+pub trait Sign: Send + Sync + Unpin + 'static {
     /// Credential type for this signer.
-    type Credential: Debug + Send + Sync + Unpin + 'static;
+    type Credential: Send + Sync + Unpin + 'static;
 
     /// Sign the request with headers.
     async fn sign(
