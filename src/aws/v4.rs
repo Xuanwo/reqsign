@@ -215,16 +215,20 @@ impl Signer {
 }
 
 #[async_trait::async_trait]
-impl Sign for Signer {
+impl<T: Send> Sign<T> for Signer {
     type Credential = Credential;
 
-    async fn sign(&self, req: &mut http::request::Parts, cred: &Self::Credential) -> Result<()> {
+    async fn sign(
+        &self,
+        req: &mut http::request::Request<T>,
+        cred: &Self::Credential,
+    ) -> Result<()> {
         self.sign(req, cred)
     }
 
     async fn sign_query(
         &self,
-        req: &mut http::request::Parts,
+        req: &mut http::request::Request<T>,
         expires: Duration,
         cred: &Self::Credential,
     ) -> Result<()> {
