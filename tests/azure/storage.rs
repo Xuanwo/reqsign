@@ -371,3 +371,124 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
 
     Ok(())
 }
+
+/// This test must run on azure vm with imds enabled,
+#[tokio::test]
+async fn test_head_blob_with_client_secret() -> Result<()> {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    dotenv::from_filename(".env").ok();
+
+    if env::var("REQSIGN_AZURE_STORAGE_TEST").is_err()
+        || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"
+    {
+        warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
+        return Ok(());
+    }
+
+    let config = AzureStorageConfig::default().from_env();
+
+    assert!(config.client_secret.is_some());
+    assert!(config.tenant_id.is_some());
+    assert!(config.client_id.is_some());
+    assert!(config.authority_host.is_some());
+    assert!(config.account_key.is_none());
+
+    let loader = AzureStorageLoader::new(config);
+
+    let cred = loader
+        .load()
+        .await
+        .expect("load credential must success")
+        .unwrap();
+
+    let url =
+        &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
+
+    let mut req = http::Request::builder()
+        .method(http::Method::HEAD)
+        .header("x-ms-version", "2023-01-03")
+        .uri(format!("{}/{}", url, "not_exist_file"))
+        .body("")?;
+
+    AzureStorageSigner::new()
+        .sign(&mut req, &cred)
+        .expect("sign request must success");
+
+    println!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .await
+        .expect("request must success");
+
+    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+
+    Ok(())
+}
+
+/// This test must run on azure vm with imds enabled
+#[tokio::test]
+async fn test_can_list_container_blobs_client_secret() -> Result<()> {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    dotenv::from_filename(".env").ok();
+
+    if env::var("REQSIGN_AZURE_STORAGE_TEST").is_err()
+        || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"
+    {
+        warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
+        return Ok(());
+    }
+
+    let config = AzureStorageConfig::default().from_env();
+
+    assert!(config.client_secret.is_some());
+    assert!(config.tenant_id.is_some());
+    assert!(config.client_id.is_some());
+    assert!(config.authority_host.is_some());
+    assert!(config.account_key.is_none());
+
+    let loader = AzureStorageLoader::new(config);
+
+    let cred = loader
+        .load()
+        .await
+        .expect("load credential must success")
+        .unwrap();
+
+    let url =
+        &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
+    for query in [
+        // Without prefix
+        "restype=container&comp=list",
+        // With not encoded prefix
+        "restype=container&comp=list&prefix=test/path/to/dir",
+        // With encoded prefix
+        "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
+    ] {
+        let mut builder = http::Request::builder();
+        builder = builder.method(http::Method::GET);
+        builder = builder.header("x-ms-version", "2023-01-03");
+        builder = builder.uri(format!("{url}?{query}"));
+        let mut req = builder.body("")?;
+
+        AzureStorageSigner::new()
+            .sign(&mut req, &cred)
+            .expect("sign request must success");
+
+        let client = Client::new();
+        let resp = client
+            .execute(req.try_into()?)
+            .await
+            .expect("request must success");
+        let stat = resp.status();
+        debug!("got response: {:?}", resp);
+        debug!("{}", resp.text().await?);
+
+        assert_eq!(StatusCode::OK, stat);
+    }
+
+    Ok(())
+}
