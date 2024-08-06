@@ -20,4 +20,5 @@ mod loader;
 
 pub use loader::Loader as AzureStorageLoader;
 
+mod client_secret_credential;
 mod sas;
