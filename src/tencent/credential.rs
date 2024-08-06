@@ -1,4 +1,3 @@
-use std::fs;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -138,7 +137,7 @@ impl CredentialLoader {
             }
         };
 
-        let token = fs::read_to_string(token_file)?;
+        let token = crate::io::read_file_to_string(token_file).await?;
         let role_session_name = &self.config.role_session_name;
 
         // Construct request to Tencent Cloud STS Service.
@@ -315,7 +314,7 @@ mod tests {
                 .expect("current_dir must exist")
                 .to_string_lossy()
         );
-        fs::write(&file_path, github_token)?;
+        std::fs::write(&file_path, github_token)?;
 
         temp_env::with_vars(
             vec![

@@ -88,6 +88,7 @@ pub use tencent::*;
 mod ctx;
 mod dirs;
 mod hash;
+mod io;
 mod request;
 mod sign;
 mod time;

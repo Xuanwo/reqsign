@@ -1,4 +1,4 @@
-use std::{fs, str};
+use std::str;
 
 use http::HeaderValue;
 use http::Method;
@@ -27,7 +27,7 @@ pub async fn get_workload_identity_token(config: &Config) -> anyhow::Result<Opti
         _ => return Ok(None),
     };
 
-    let token = fs::read_to_string(token_file)?;
+    let token = crate::io::read_file_to_string(token_file).await?;
     let url = Url::parse(authority_host)?.join(&format!("/{tenant_id}/oauth2/v2.0/token"))?;
     let scopes: &[&str] = &[STORAGE_TOKEN_SCOPE];
     let encoded_body: String = form_urlencoded::Serializer::new(String::new())
