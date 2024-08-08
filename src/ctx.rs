@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::mem;
 use std::time::Duration;
 
+use anyhow::anyhow;
 use anyhow::Result;
 use http::header::HeaderName;
 use http::uri::Authority;
@@ -22,10 +23,8 @@ pub struct SigningContext {
     pub headers: HeaderMap,
 }
 
-impl TryFrom<http::request::Parts> for SigningContext {
-    type Error = anyhow::Error;
-
-    fn try_from(mut parts: http::request::Parts) -> Result<Self> {
+impl SigningContext {
+    pub fn build(parts: &mut &mut http::request::Parts) -> Result<Self> {
         let uri = mem::take(&mut parts.uri).into_parts();
         let paq = uri
             .path_and_query
@@ -52,17 +51,13 @@ impl TryFrom<http::request::Parts> for SigningContext {
             headers: mem::take(&mut parts.headers),
         })
     }
-}
 
-impl SigningContext {
-    pub fn into_parts(mut self) -> Result<http::request::Parts> {
-        let (mut parts, _) = http::request::Request::<()>::default().into_parts();
+    pub fn apply(mut self, parts: &mut http::request::Parts) -> Result<()> {
         let query_size = self.query_size();
 
         // Return headers back.
         mem::swap(&mut parts.headers, &mut self.headers);
         parts.method = self.method;
-
         parts.uri = {
             let mut uri_parts = mem::take(&mut parts.uri).into_parts();
             // Return scheme bakc.
@@ -98,7 +93,7 @@ impl SigningContext {
             Uri::from_parts(uri_parts)?
         };
 
-        Ok(parts)
+        Ok(())
     }
 
     pub fn path_percent_decoded(&self) -> Cow<str> {

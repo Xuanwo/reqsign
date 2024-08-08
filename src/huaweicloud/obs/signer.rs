@@ -56,12 +56,12 @@ impl Signer {
 
     fn build(
         &self,
-        req: &mut impl SignableRequest,
+        mut parts: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
     ) -> Result<SigningContext> {
         let now = self.time.unwrap_or_else(now);
-        let mut ctx = req.build()?;
+        let mut ctx = SigningContext::build(&mut parts)?;
 
         let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
         let signature =
@@ -127,20 +127,20 @@ impl Signer {
     ///     Ok(())
     /// }
     /// ```
-    pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Header, cred)?;
-        req.apply(ctx)
+    pub fn sign(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
+        let ctx = self.build(parts, SigningMethod::Header, cred)?;
+        ctx.apply(parts)
     }
 
     /// Signing request with query.
     pub fn sign_query(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         expire: Duration,
         cred: &Credential,
     ) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
-        req.apply(ctx)
+        let ctx = self.build(parts, SigningMethod::Query(expire), cred)?;
+        ctx.apply(parts)
     }
 }
 
@@ -353,8 +353,9 @@ mod tests {
         );
 
         // Signing request with Signer
-        signer.sign(&mut req, &cred)?;
-        let headers = req.headers();
+        let (mut parts, _) = req.into_parts();
+        signer.sign(&mut parts, &cred)?;
+        let headers = parts.headers;
         let auth = headers.get("Authorization").unwrap();
 
         // calculated from Huaweicloud OBS Signature tool
@@ -396,8 +397,9 @@ mod tests {
         );
 
         // Signing request with Signer
-        signer.sign(&mut req, &cred)?;
-        let headers = req.headers();
+        let (mut parts, _) = req.into_parts();
+        signer.sign(&mut parts, &cred)?;
+        let headers = parts.headers;
         let auth = headers.get("Authorization").unwrap();
 
         // calculated from Huaweicloud OBS Signature tool
@@ -439,8 +441,9 @@ mod tests {
         );
 
         // Signing request with Signer
-        signer.sign(&mut req, &cred)?;
-        let headers = req.headers();
+        let (mut parts, _) = req.into_parts();
+        signer.sign(&mut parts, &cred)?;
+        let headers = parts.headers;
         let auth = headers.get("Authorization").unwrap();
 
         // calculated from Huaweicloud OBS Signature tool
