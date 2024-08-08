@@ -55,12 +55,12 @@ impl Signer {
 
     fn build(
         &self,
-        mut parts: &mut http::request::Parts,
+        parts: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
     ) -> Result<SigningContext> {
         let now = self.time.unwrap_or_else(now);
-        let mut ctx = SigningContext::build(&mut parts)?;
+        let mut ctx = SigningContext::build(parts)?;
 
         let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
         let signature =

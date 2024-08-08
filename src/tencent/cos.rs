@@ -97,19 +97,19 @@ impl Signer {
     }
 
     /// Signing request with header.
-    pub fn sign(&self, mut parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
-        let ctx = self.build(&mut parts, SigningMethod::Header, cred)?;
+    pub fn sign(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
+        let ctx = self.build(parts, SigningMethod::Header, cred)?;
         ctx.apply(parts)
     }
 
     /// Signing request with query.
     pub fn sign_query(
         &self,
-        mut parts: &mut http::request::Parts,
+        parts: &mut http::request::Parts,
         expire: Duration,
         cred: &Credential,
     ) -> Result<()> {
-        let ctx = self.build(&mut parts, SigningMethod::Query(expire), cred)?;
+        let ctx = self.build(parts, SigningMethod::Query(expire), cred)?;
         ctx.apply(parts)
     }
 }

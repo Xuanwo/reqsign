@@ -441,12 +441,8 @@ impl AssumeRoleLoader {
 
         let (mut parts, body) = req.into_parts();
         self.sts_signer.sign(&mut parts, &source_cred)?;
-        let req =
-            reqwest::Request::try_from(http::Request::from_parts(parts, body)).or_else(|_| {
-                Err(anyhow!(
-                    "failed to convert http::Request to reqwest::Request"
-                ))
-            })?;
+        let req = reqwest::Request::try_from(http::Request::from_parts(parts, body))
+            .map_err(|_| anyhow!("failed to convert http::Request to reqwest::Request"))?;
 
         let resp = self.client.execute(req).await?;
         if resp.status() != http::StatusCode::OK {
