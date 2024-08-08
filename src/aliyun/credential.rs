@@ -328,9 +328,11 @@ mod tests {
                         .expect("credential must be valid")
                         .unwrap();
 
+                    let (mut parts, body) = req.into_parts();
                     signer
-                        .sign(&mut req, &cred)
+                        .sign(&mut parts, &cred)
                         .expect("sign request must success");
+                    let req = http::Request::from_parts(parts, body);
 
                     debug!("signed request url: {:?}", req.uri().to_string());
                     debug!("signed request: {:?}", req);
@@ -427,9 +429,11 @@ mod tests {
                         .expect("credential must be valid")
                         .unwrap();
 
+                    let (mut parts, body) = req.into_parts();
                     signer
-                        .sign_query(&mut req, Duration::from_secs(3600), &cred)
+                        .sign_query(&mut parts, Duration::from_secs(3600), &cred)
                         .expect("sign request must success");
+                    let req = http::Request::from_parts(parts, body);
 
                     debug!("signed request url: {:?}", req.uri().to_string());
                     debug!("signed request: {:?}", req);

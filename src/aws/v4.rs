@@ -21,7 +21,6 @@ use crate::ctx::SigningMethod;
 use crate::hash::hex_hmac_sha256;
 use crate::hash::hex_sha256;
 use crate::hash::hmac_sha256;
-use crate::request::SignableRequest;
 use crate::sign::Sign;
 use crate::time::format_date;
 use crate::time::format_iso8601;
@@ -63,12 +62,12 @@ impl Signer {
 
     fn build(
         &self,
-        req: &mut impl SignableRequest,
+        req: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
     ) -> Result<SigningContext> {
         let now = self.time.unwrap_or_else(now);
-        let mut ctx = req.build()?;
+        let mut ctx = SigningContext::build(req)?;
 
         // canonicalize context
         canonicalize_header(&mut ctx, method, cred, now)?;
@@ -154,20 +153,22 @@ impl Signer {
     ///     let loader = AwsDefaultLoader::new(client.clone(), config);
     ///     let signer = AwsV4Signer::new("s3", "us-east-1");
     ///     // Construct request
-    ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::default())?;
+    ///     let (mut parts, body) = req.into_parts();
     ///     // Signing request with Signer
     ///     let credential = loader.load().await?.unwrap();
-    ///     signer.sign(&mut req, &credential)?;
+    ///     signer.sign(&mut parts, &credential)?;
+    ///     let req = http::Request::from_parts(parts, body);
+    ///     let req = reqwest::Request::try_from(req)?;
     ///     // Sending already signed request.
     ///     let resp = client.execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
     ///     Ok(())
     /// }
     /// ```
-    pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Header, cred)?;
-        req.apply(ctx)
+    pub fn sign(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
+        let ctx = self.build(parts, SigningMethod::Header, cred)?;
+        ctx.apply(parts)
     }
 
     /// Signing request with query.
@@ -192,11 +193,13 @@ impl Signer {
     ///     let loader = AwsDefaultLoader::new(client.clone(), config);
     ///     let signer = AwsV4Signer::new("s3", "us-east-1");
     ///     // Construct request
-    ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let mut req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::default())?;
     ///     // Signing request with Signer
     ///     let credential = loader.load().await?.unwrap();
-    ///     signer.sign_query(&mut req, Duration::from_secs(3600), &credential)?;
+    ///     let (mut parts, body) = req.into_parts();
+    ///     signer.sign_query(&mut parts, Duration::from_secs(3600), &credential)?;
+    ///     let req = http::Request::from_parts(parts, body);
+    ///     let req = reqwest::Request::try_from(req)?;
     ///     // Sending already signed request.
     ///     let resp = client.execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
@@ -205,12 +208,12 @@ impl Signer {
     /// ```
     pub fn sign_query(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         expire: Duration,
         cred: &Credential,
     ) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
-        req.apply(ctx)
+        let ctx = self.build(parts, SigningMethod::Query(expire), cred)?;
+        ctx.apply(parts)
     }
 }
 
@@ -218,8 +221,8 @@ impl Signer {
 impl Sign for Signer {
     type Credential = Credential;
 
-    async fn sign(&self, req: &mut http::request::Parts, cred: &Self::Credential) -> Result<()> {
-        self.sign(req, cred)
+    async fn sign(&self, parts: &mut http::request::Parts, cred: &Self::Credential) -> Result<()> {
+        self.sign(parts, cred)
     }
 
     async fn sign_query(
@@ -409,6 +412,7 @@ mod tests {
     use aws_sigv4::http_request::SigningSettings;
     use aws_sigv4::sign::v4;
     use http::header;
+    use http::Request;
     use macro_rules_attribute::apply;
     use reqwest::Client;
 
@@ -645,7 +649,8 @@ mod tests {
         aws_sig.apply_to_request_http1x(&mut req);
         let expected_req = req;
 
-        let mut req = req_fn();
+        let req = req_fn();
+        let (mut parts, body) = req.into_parts();
 
         let loader = AwsDefaultLoader::new(
             Client::new(),
@@ -658,9 +663,9 @@ mod tests {
         let cred = loader.load().await?.unwrap();
 
         let signer = Signer::new("s3", "test").time(now);
-        signer.sign(&mut req, &cred).expect("must apply success");
+        signer.sign(&mut parts, &cred).expect("must apply success");
 
-        let actual_req = req;
+        let actual_req = http::request::Request::from_parts(parts, body);
 
         compare_request(&name, &expected_req, &actual_req);
 
@@ -725,7 +730,8 @@ mod tests {
         aws_sig.apply_to_request_http1x(&mut req);
         let expected_req = req;
 
-        let mut req = req_fn();
+        let req = req_fn();
+        let (mut parts, body) = req.into_parts();
 
         let loader = AwsDefaultLoader::new(
             Client::new(),
@@ -739,8 +745,8 @@ mod tests {
 
         let signer = Signer::new("s3", "test").time(now);
 
-        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
-        let actual_req = req;
+        signer.sign_query(&mut parts, Duration::from_secs(3600), &cred)?;
+        let actual_req = Request::from_parts(parts, body);
 
         compare_request(&name, &expected_req, &actual_req);
 
@@ -803,7 +809,8 @@ mod tests {
         aws_sig.apply_to_request_http1x(&mut req);
         let expected_req = req;
 
-        let mut req = req_fn();
+        let req = req_fn();
+        let (mut parts, body) = req.into_parts();
 
         let loader = AwsDefaultLoader::new(
             Client::new(),
@@ -818,8 +825,8 @@ mod tests {
 
         let signer = Signer::new("s3", "test").time(now);
 
-        signer.sign(&mut req, &cred).expect("must apply success");
-        let actual_req = req;
+        signer.sign(&mut parts, &cred).expect("must apply success");
+        let actual_req = Request::from_parts(parts, body);
 
         compare_request(&name, &expected_req, &actual_req);
 
@@ -887,7 +894,8 @@ mod tests {
         aws_sig.apply_to_request_http1x(&mut req);
         let expected_req = req;
 
-        let mut req = req_fn();
+        let req = req_fn();
+        let (mut parts, body) = req.into_parts();
 
         let loader = AwsDefaultLoader::new(
             Client::new(),
@@ -902,9 +910,9 @@ mod tests {
 
         let signer = Signer::new("s3", "test").time(now);
         signer
-            .sign_query(&mut req, Duration::from_secs(3600), &cred)
+            .sign_query(&mut parts, Duration::from_secs(3600), &cred)
             .expect("must apply success");
-        let actual_req = req;
+        let actual_req = Request::from_parts(parts, body);
 
         compare_request(&name, &expected_req, &actual_req);
 

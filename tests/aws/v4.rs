@@ -73,9 +73,14 @@ async fn test_head_object() -> Result<()> {
         .await
         .expect("load request must success")
         .unwrap();
-    signer
-        .sign(&mut req, &cred)
-        .expect("sign request must success");
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign(&mut parts, &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
 
     debug!("signed request: {:?}", req);
 
@@ -116,9 +121,14 @@ async fn test_put_object_with_query() -> Result<()> {
         .await
         .expect("load request must success")
         .unwrap();
-    signer
-        .sign_query(&mut req, Duration::from_secs(3600), &cred)
-        .expect("sign request must success");
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign(&mut parts, &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
 
     debug!("signed request: {:?}", req);
 
@@ -157,9 +167,14 @@ async fn test_get_object_with_query() -> Result<()> {
         .await
         .expect("load request must success")
         .unwrap();
-    signer
-        .sign_query(&mut req, Duration::from_secs(3600), &cred)
-        .expect("sign request must success");
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign_query(&mut parts, Duration::from_secs(3600), &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
 
     debug!("signed request: {:?}", req);
 
@@ -198,9 +213,14 @@ async fn test_head_object_with_special_characters() -> Result<()> {
         .await
         .expect("load request must success")
         .unwrap();
-    signer
-        .sign(&mut req, &cred)
-        .expect("sign request must success");
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign(&mut parts, &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
 
     debug!("signed request: {:?}", req);
 
@@ -239,9 +259,14 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
         .await
         .expect("load request must success")
         .unwrap();
-    signer
-        .sign(&mut req, &cred)
-        .expect("sign request must success");
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign(&mut parts, &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
 
     debug!("signed request: {:?}", req);
 
@@ -277,9 +302,14 @@ async fn test_list_bucket() -> Result<()> {
         .await
         .expect("load request must success")
         .unwrap();
-    signer
-        .sign(&mut req, &cred)
-        .expect("sign request must success");
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign(&mut parts, &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
 
     debug!("signed request: {:?}", req);
 

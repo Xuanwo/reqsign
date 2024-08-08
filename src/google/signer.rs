@@ -17,7 +17,6 @@ use super::token::Token;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::hex_sha256;
-use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_date;
 use crate::time::format_iso8601;
@@ -66,10 +65,10 @@ impl Signer {
 
     fn build_header(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         token: &Token,
     ) -> Result<SigningContext> {
-        let mut ctx = req.build()?;
+        let mut ctx = SigningContext::build(parts)?;
 
         ctx.headers.insert(header::AUTHORIZATION, {
             let mut value: http::HeaderValue =
@@ -84,11 +83,11 @@ impl Signer {
 
     fn build_query(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         expire: Duration,
         cred: &ServiceAccount,
     ) -> Result<SigningContext> {
-        let mut ctx = req.build()?;
+        let mut ctx = SigningContext::build(parts)?;
 
         let now = self.time.unwrap_or_else(time::now);
 
@@ -156,8 +155,7 @@ impl Signer {
     /// use reqsign::GoogleSigner;
     /// use reqsign::GoogleTokenLoader;
     /// use reqwest::Client;
-    /// use reqwest::Request;
-    /// use reqwest::Url;
+    /// use http::Request;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
@@ -169,14 +167,16 @@ impl Signer {
     ///     let signer = GoogleSigner::new("storage");
     ///
     ///     // Construct request
-    ///     let url = Url::parse("https://storage.googleapis.com/storage/v1/b/test")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let mut req = http::Request::get("https://storage.googleapis.com/storage/v1/b/test")
+    ///        .body(reqwest::Body::default())?;
     ///
     ///     // Signing request with Signer
     ///     let token = token_loader.load().await?.unwrap();
-    ///     signer.sign(&mut req, &token)?;
+    ///     let (mut parts, body) = req.into_parts();
+    ///     signer.sign(&mut parts, &token)?;
     ///
     ///     // Sending already signed request.
+    ///     let req = reqwest::Request::try_from(http::Request::from_parts(parts, body))?;
     ///     let resp = Client::new().execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
     ///     Ok(())
@@ -186,9 +186,9 @@ impl Signer {
     /// # TODO
     ///
     /// we can also send API via signed JWT: [Addendum: Service account authorization without OAuth](https://developers.google.com/identity/protocols/oauth2/service-account#jwt-auth)
-    pub fn sign(&self, req: &mut impl SignableRequest, token: &Token) -> Result<()> {
-        let ctx = self.build_header(req, token)?;
-        req.apply(ctx)
+    pub fn sign(&self, parts: &mut http::request::Parts, token: &Token) -> Result<()> {
+        let ctx = self.build_header(parts, token)?;
+        ctx.apply(parts)
     }
 
     /// Sign the query with a duration.
@@ -210,12 +210,14 @@ impl Signer {
     ///     let signer = GoogleSigner::new("stroage");
     ///
     ///     // Construct request
-    ///     let url = Url::parse("https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let mut req = http::Request::get("https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md").body(reqwest::Body::default())?;
     ///
     ///     // Signing request with Signer
     ///     let credential = credential_loader.load()?.unwrap();
-    ///     signer.sign_query(&mut req, Duration::from_secs(3600), &credential)?;
+    ///     let (mut parts, body) = req.into_parts();
+    ///     signer.sign_query(&mut parts, Duration::from_secs(3600), &credential)?;
+    ///     let req = http::Request::from_parts(parts, body);
+    ///     let req = reqwest::Request::try_from(req)?;
     ///
     ///     println!("signed request: {:?}", req);
     ///     // Sending already signed request.
@@ -227,7 +229,7 @@ impl Signer {
     /// ```
     pub fn sign_query(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         duration: Duration,
         cred: &Credential,
     ) -> Result<()> {
@@ -235,8 +237,8 @@ impl Signer {
             anyhow::bail!("expected service account credential, got external account");
         };
 
-        let ctx = self.build_query(req, duration, cred)?;
-        req.apply(ctx)
+        let ctx = self.build_query(parts, duration, cred)?;
+        ctx.apply(parts)
     }
 }
 
@@ -376,7 +378,9 @@ mod tests {
             .parse()
             .expect("url must be valid");
 
-        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
+        let (mut parts, body) = req.into_parts();
+        signer.sign_query(&mut parts, Duration::from_secs(3600), &cred)?;
+        let req = http::Request::from_parts(parts, body);
 
         let query = req.uri().query().unwrap();
         assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));
@@ -409,7 +413,9 @@ mod tests {
 
         let signer = Signer::new("storage").time(time_offset);
 
-        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
+        let (mut parts, body) = req.into_parts();
+        signer.sign_query(&mut parts, Duration::from_secs(3600), &cred)?;
+        let req = http::Request::from_parts(parts, body);
 
         let query = req.uri().query().unwrap();
         assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));

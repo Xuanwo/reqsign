@@ -34,7 +34,8 @@ pub fn bench(c: &mut Criterion) {
                 .parse()
                 .expect("url must be valid");
 
-            s.sign(&mut req, &cred).expect("must success")
+            let (mut parts, _) = req.into_parts();
+            s.sign(&mut parts, &cred).expect("must success")
         })
     });
 

@@ -51,12 +51,15 @@ async fn test_get_object() -> Result<()> {
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
     builder = builder.uri(format!("{}/o/{}", url, "not_exist_file"));
-    let mut req = builder.body("")?;
+    let req = builder.body("")?;
 
     let token = token_loader.load().await?.unwrap();
+
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut req, &token)
+        .sign(&mut parts, &token)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 
@@ -86,12 +89,14 @@ async fn test_list_objects() -> Result<()> {
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
     builder = builder.uri(format!("{url}/o"));
-    let mut req = builder.body("")?;
+    let req = builder.body("")?;
 
     let token = token_loader.load().await?.unwrap();
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut req, &token)
+        .sign(&mut parts, &token)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 
@@ -125,12 +130,15 @@ async fn test_get_object_with_query() -> Result<()> {
         url.replace("storage/v1/b/", ""),
         "not_exist_file"
     ));
-    let mut req = builder.body("")?;
+    let req = builder.body("")?;
 
     let cred = cred_loader.load()?.unwrap();
+
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign_query(&mut req, Duration::from_secs(3600), &cred)
+        .sign_query(&mut parts, Duration::from_secs(3600), &cred)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 

@@ -8,7 +8,6 @@
 //! use reqsign::AwsDefaultLoader;
 //! use reqsign::AwsV4Signer;
 //! use reqwest::Client;
-//! use reqwest::Request;
 //! use reqwest::Url;
 //!
 //! #[tokio::main]
@@ -19,11 +18,13 @@
 //!     let loader = AwsDefaultLoader::new(client.clone(), config);
 //!     let signer = AwsV4Signer::new("s3", "us-east-1");
 //!     // Construct request
-//!     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
-//!     let mut req = reqwest::Request::new(http::Method::GET, url);
+//!     let mut req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::default())?;
 //!     // Signing request with Signer
 //!     let credential = loader.load().await?.unwrap();
-//!     signer.sign(&mut req, &credential)?;
+//!     let (mut parts, body) = req.into_parts();
+//!     signer.sign(&mut parts, &credential)?;
+//!     let req = http::Request::from_parts(parts, body);
+//!     let req = reqwest::Request::try_from(req)?;
 //!     // Sending already signed request.
 //!     let resp = client.execute(req).await?;
 //!     println!("resp got status: {}", resp.status());
@@ -88,7 +89,6 @@ pub use tencent::*;
 mod ctx;
 mod dirs;
 mod hash;
-mod request;
 mod sign;
 mod time;
 pub use sign::Sign;

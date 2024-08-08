@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::Result;
+use http::Request;
 use http::StatusCode;
 use log::debug;
 use log::warn;
@@ -57,16 +58,21 @@ async fn test_head_blob() -> Result<()> {
     builder = builder.method(http::Method::HEAD);
     builder = builder.header("x-ms-version", "2023-01-03");
     builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
-    let mut req = builder.body("")?;
+    let req = builder.body("")?;
 
     let cred = loader
         .load()
         .await
         .expect("load credential must success")
         .unwrap();
-    signer
-        .sign(&mut req, &cred)
-        .expect("sign request must success");
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign(&mut parts, &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
 
     debug!("signed request: {:?}", req);
 
@@ -108,9 +114,14 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
         .await
         .expect("load credential must success")
         .unwrap();
-    signer
-        .sign(&mut req, &cred)
-        .expect("sign request must success");
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign(&mut parts, &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
 
     debug!("signed request: {:?}", req);
 
@@ -149,16 +160,21 @@ async fn test_list_container_blobs() -> Result<()> {
         builder = builder.method(http::Method::GET);
         builder = builder.uri(format!("{url}?{query}"));
         builder = builder.header("x-ms-version", "2023-01-03");
-        let mut req = builder.body("")?;
+        let req = builder.body("")?;
 
         let cred = loader
             .load()
             .await
             .expect("load credential must success")
             .unwrap();
-        signer
-            .sign(&mut req, &cred)
-            .expect("sign request must success");
+
+        let req = {
+            let (mut parts, body) = req.into_parts();
+            signer
+                .sign(&mut parts, &cred)
+                .expect("sign request must success");
+            Request::from_parts(parts, body)
+        };
 
         debug!("signed request: {:?}", req);
 
@@ -191,16 +207,21 @@ async fn test_can_head_blob_with_sas() -> Result<()> {
     builder = builder.method(http::Method::HEAD);
     builder = builder.header("x-ms-version", "2023-01-03");
     builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
-    let mut req = builder.body("")?;
+    let req = builder.body("")?;
 
     let cred = loader
         .load()
         .await
         .expect("load credential must success")
         .unwrap();
-    signer
-        .sign_query(&mut req, Duration::from_secs(60), &cred)
-        .expect("sign request must success");
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign_query(&mut parts, Duration::from_secs(60), &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
 
     println!("signed request: {:?}", req);
 
@@ -240,16 +261,19 @@ async fn test_can_list_container_blobs() -> Result<()> {
         builder = builder.method(http::Method::GET);
         builder = builder.header("x-ms-version", "2023-01-03");
         builder = builder.uri(format!("{url}?{query}"));
-        let mut req = builder.body("")?;
+        let req = builder.body("")?;
 
         let cred = loader
             .load()
             .await
             .expect("load credential must success")
             .unwrap();
+
+        let (mut parts, body) = req.into_parts();
         signer
-            .sign_query(&mut req, Duration::from_secs(60), &cred)
+            .sign_query(&mut parts, Duration::from_secs(60), &cred)
             .expect("sign request must success");
+        let req = Request::from_parts(parts, body);
 
         let client = Client::new();
         let resp = client
@@ -291,15 +315,17 @@ async fn test_head_blob_with_ldms() -> Result<()> {
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let mut req = http::Request::builder()
+    let req = http::Request::builder()
         .method(http::Method::HEAD)
         .header("x-ms-version", "2023-01-03")
         .uri(format!("{}/{}", url, "not_exist_file"))
         .body("")?;
 
+    let (mut parts, body) = req.into_parts();
     AzureStorageSigner::new()
-        .sign(&mut req, &cred)
+        .sign(&mut parts, &cred)
         .expect("sign request must success");
+    let req = Request::from_parts(parts, body);
 
     println!("signed request: {:?}", req);
 
@@ -353,11 +379,13 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
         builder = builder.method(http::Method::GET);
         builder = builder.header("x-ms-version", "2023-01-03");
         builder = builder.uri(format!("{url}?{query}"));
-        let mut req = builder.body("")?;
+        let req = builder.body("")?;
 
+        let (mut parts, body) = req.into_parts();
         AzureStorageSigner::new()
-            .sign(&mut req, &cred)
+            .sign(&mut parts, &cred)
             .expect("sign request must success");
+        let req = Request::from_parts(parts, body);
 
         let client = Client::new();
         let resp = client
@@ -413,15 +441,17 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let mut req = http::Request::builder()
+    let req = http::Request::builder()
         .method(http::Method::HEAD)
         .header("x-ms-version", "2023-01-03")
         .uri(format!("{}/{}", url, "not_exist_file"))
         .body("")?;
 
+    let (mut parts, body) = req.into_parts();
     AzureStorageSigner::new()
-        .sign(&mut req, &cred)
+        .sign(&mut parts, &cred)
         .expect("sign request must success");
+    let req = Request::from_parts(parts, body);
 
     println!("signed request: {:?}", req);
 
@@ -488,11 +518,13 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
         builder = builder.method(http::Method::GET);
         builder = builder.header("x-ms-version", "2023-01-03");
         builder = builder.uri(format!("{url}?{query}"));
-        let mut req = builder.body("")?;
+        let req = builder.body("")?;
 
+        let (mut parts, body) = req.into_parts();
         AzureStorageSigner::new()
-            .sign(&mut req, &cred)
+            .sign(&mut parts, &cred)
             .expect("sign request must success");
+        let req = Request::from_parts(parts, body);
 
         let client = Client::new();
         let resp = client
