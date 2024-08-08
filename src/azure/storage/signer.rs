@@ -50,11 +50,11 @@ impl Signer {
 
     fn build(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
     ) -> Result<SigningContext> {
-        let mut ctx = req.build()?;
+        let mut ctx = SigningContext::build(parts)?;
 
         match cred {
             Credential::SharedAccessSignature(token) => {
@@ -142,24 +142,24 @@ impl Signer {
     ///     Ok(())
     /// }
     /// ```
-    pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
-        let mut ctx = self.build(req, SigningMethod::Header, cred)?;
+    pub fn sign(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
+        let mut ctx = self.build(parts, SigningMethod::Header, cred)?;
 
         for (_, v) in ctx.query.iter_mut() {
             *v = percent_encode(v.as_bytes(), &AZURE_QUERY_ENCODE_SET).to_string();
         }
-        req.apply(ctx)
+        ctx.apply(parts)
     }
 
     /// Signing request with query.
     pub fn sign_query(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         expire: Duration,
         cred: &Credential,
     ) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
-        req.apply(ctx)
+        let ctx = self.build(parts, SigningMethod::Query(expire), cred)?;
+        ctx.apply(parts)
     }
 }
 
@@ -288,16 +288,17 @@ mod tests {
         let signer = AzureStorageSigner::new();
 
         // Construct request
-        let mut req = Request::builder()
+        let req = Request::builder()
             .uri("https://test.blob.core.windows.net/testbucket/testblob")
             .body(())
             .unwrap();
+        let (mut parts, _) = req.into_parts();
 
         // Signing request with Signer
         assert!(signer
-            .sign_query(&mut req, Duration::from_secs(1), &cred)
+            .sign_query(&mut parts, Duration::from_secs(1), &cred)
             .is_ok());
-        assert_eq!(req.uri(), "https://test.blob.core.windows.net/testbucket/testblob?sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
+        assert_eq!(parts.uri, "https://test.blob.core.windows.net/testbucket/testblob?sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D")
     }
 
     #[tokio::test]
@@ -308,11 +309,12 @@ mod tests {
             .body(())
             .unwrap();
         let cred = AzureStorageCredential::BearerToken("token".to_string(), now());
+        let (mut parts, _) = req.into_parts();
 
         // Can effectively sign request with SigningMethod::Header
-        assert!(signer.sign(&mut req, &cred).is_ok());
-        let authorization = req
-            .headers()
+        assert!(signer.sign(&mut parts, &cred).is_ok());
+        let authorization = parts
+            .headers
             .get("Authorization")
             .unwrap()
             .to_str()
@@ -320,9 +322,9 @@ mod tests {
         assert_eq!("Bearer token", authorization);
 
         // Will not sign request with SigningMethod::Query
-        *req.headers_mut() = http::header::HeaderMap::new();
+        parts.headers = http::header::HeaderMap::new();
         assert!(signer
-            .sign_query(&mut req, Duration::from_secs(1), &cred)
+            .sign_query(&mut parts, Duration::from_secs(1), &cred)
             .is_err());
     }
 }
