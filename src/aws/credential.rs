@@ -429,7 +429,7 @@ impl AssumeRoleLoader {
             )
             // Set content sha to empty string.
             .header(X_AMZ_CONTENT_SHA_256, EMPTY_STRING_SHA256)
-            .body(reqwest::Body::default())?;
+            .body(reqwest::Body::from(""))?;
 
         let source_cred = self
             .source_credential
