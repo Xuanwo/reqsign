@@ -304,7 +304,7 @@ mod tests {
     #[tokio::test]
     async fn test_can_sign_request_use_bearer_token() {
         let signer = AzureStorageSigner::new();
-        let mut req = Request::builder()
+        let req = Request::builder()
             .uri("https://test.blob.core.windows.net/testbucket/testblob")
             .body(())
             .unwrap();

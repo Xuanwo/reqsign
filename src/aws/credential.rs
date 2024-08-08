@@ -419,16 +419,17 @@ impl AssumeRoleLoader {
         if let Some(external_id) = &self.config.external_id {
             write!(url, "&ExternalId={external_id}")?;
         }
-        let mut req = self
-            .client
-            .get(&url)
+
+        let req = http::request::Request::builder()
+            .method("GET")
+            .uri(url)
             .header(
                 http::header::CONTENT_TYPE.as_str(),
                 "application/x-www-form-urlencoded",
             )
             // Set content sha to empty string.
             .header(X_AMZ_CONTENT_SHA_256, EMPTY_STRING_SHA256)
-            .build()?;
+            .body(reqwest::Body::default())?;
 
         let source_cred = self
             .source_credential
@@ -438,7 +439,14 @@ impl AssumeRoleLoader {
                 anyhow!("source credential is required for AssumeRole, but not found, please check your configuration")
             })?;
 
-        self.sts_signer.sign(&mut req, &source_cred)?;
+        let (mut parts, body) = req.into_parts();
+        self.sts_signer.sign(&mut parts, &source_cred)?;
+        let req =
+            reqwest::Request::try_from(http::Request::from_parts(parts, body)).or_else(|_| {
+                Err(anyhow!(
+                    "failed to convert http::Request to reqwest::Request"
+                ))
+            })?;
 
         let resp = self.client.execute(req).await?;
         if resp.status() != http::StatusCode::OK {
@@ -796,7 +804,9 @@ mod tests {
                         .expect("credential must be valid")
                         .unwrap();
 
+                    let (mut req, body) = req.into_parts();
                     signer.sign(&mut req, &cred).expect("sign must success");
+                    let req = Request::from_parts(req, body);
 
                     debug!("signed request url: {:?}", req.uri().to_string());
                     debug!("signed request: {:?}", req);
@@ -885,7 +895,11 @@ mod tests {
                         .await
                         .expect("credential must be valid")
                         .unwrap();
-                    signer.sign(&mut req, &cred).expect("sign must success");
+
+                    let (mut parts, body) = req.into_parts();
+                    signer.sign(&mut parts, &cred).expect("sign must success");
+                    let req = Request::from_parts(parts, body);
+
                     debug!("signed request url: {:?}", req.uri().to_string());
                     debug!("signed request: {:?}", req);
                     let client = Client::new();
