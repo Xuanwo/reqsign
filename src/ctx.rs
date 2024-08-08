@@ -1,13 +1,17 @@
 use std::borrow::Cow;
+use std::mem;
 use std::time::Duration;
 
 use anyhow::Result;
 use http::header::HeaderName;
 use http::uri::Authority;
+use http::uri::PathAndQuery;
 use http::uri::Scheme;
 use http::HeaderMap;
 use http::HeaderValue;
 use http::Method;
+use http::Uri;
+use std::str::FromStr;
 
 pub struct SigningContext {
     pub method: Method,
@@ -18,7 +22,85 @@ pub struct SigningContext {
     pub headers: HeaderMap,
 }
 
+impl TryFrom<http::request::Parts> for SigningContext {
+    type Error = anyhow::Error;
+
+    fn try_from(mut parts: http::request::Parts) -> Result<Self> {
+        let uri = mem::take(&mut parts.uri).into_parts();
+        let paq = uri
+            .path_and_query
+            .unwrap_or_else(|| PathAndQuery::from_static("/"));
+
+        Ok(SigningContext {
+            method: parts.method.clone(),
+            scheme: uri.scheme.unwrap_or(Scheme::HTTP),
+            authority: uri
+                .authority
+                .ok_or_else(|| anyhow!("request without authority is invalid for signing"))?,
+            path: paq.path().to_string(),
+            query: paq
+                .query()
+                .map(|v| {
+                    form_urlencoded::parse(v.as_bytes())
+                        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+                        .collect()
+                })
+                .unwrap_or_default(),
+
+            // Take the headers out of the request to avoid copy.
+            // We will return it back when apply the context.
+            headers: mem::take(&mut parts.headers),
+        })
+    }
+}
+
 impl SigningContext {
+    pub fn into_parts(mut self) -> Result<http::request::Parts> {
+        let (mut parts, _) = http::request::Request::<()>::default().into_parts();
+        let query_size = self.query_size();
+
+        // Return headers back.
+        mem::swap(&mut parts.headers, &mut self.headers);
+        parts.method = self.method;
+
+        parts.uri = {
+            let mut uri_parts = mem::take(&mut parts.uri).into_parts();
+            // Return scheme bakc.
+            uri_parts.scheme = Some(self.scheme);
+            // Return authority back.
+            uri_parts.authority = Some(self.authority);
+            // Build path and query.
+            uri_parts.path_and_query = {
+                let paq = if query_size == 0 {
+                    self.path
+                } else {
+                    let mut s = self.path;
+                    s.reserve(query_size + 1);
+
+                    s.push('?');
+                    for (i, (k, v)) in self.query.iter().enumerate() {
+                        if i > 0 {
+                            s.push('&');
+                        }
+
+                        s.push_str(k);
+                        if !v.is_empty() {
+                            s.push('=');
+                            s.push_str(v);
+                        }
+                    }
+
+                    s
+                };
+
+                Some(PathAndQuery::from_str(&paq)?)
+            };
+            Uri::from_parts(uri_parts)?
+        };
+
+        Ok(parts)
+    }
+
     pub fn path_percent_decoded(&self) -> Cow<str> {
         percent_encoding::percent_decode_str(&self.path).decode_utf8_lossy()
     }
