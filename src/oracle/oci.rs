@@ -15,7 +15,6 @@ use std::fmt::Write;
 
 use super::credential::Credential;
 use crate::ctx::SigningContext;
-use crate::request::SignableRequest;
 use crate::time;
 use crate::time::DateTime;
 
@@ -25,9 +24,9 @@ pub struct APIKeySigner {}
 
 impl APIKeySigner {
     /// Building a signing context.
-    fn build(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<SigningContext> {
+    fn build(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<SigningContext> {
         let now = time::now();
-        let mut ctx = req.build()?;
+        let mut ctx = SigningContext::build(parts)?;
 
         let string_to_sign = string_to_sign(&mut ctx, now)?;
         let private_key = if let Some(path) = &cred.key_file {
@@ -62,10 +61,9 @@ impl APIKeySigner {
     }
 
     /// Signing request with header.
-    pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
-        let ctx = self.build(req, cred)?;
-
-        req.apply(ctx)
+    pub fn sign(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
+        let ctx = self.build(parts, cred)?;
+        ctx.apply(parts)
     }
 }
 

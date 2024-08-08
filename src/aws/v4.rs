@@ -21,7 +21,6 @@ use crate::ctx::SigningMethod;
 use crate::hash::hex_hmac_sha256;
 use crate::hash::hex_sha256;
 use crate::hash::hmac_sha256;
-use crate::request::SignableRequest;
 use crate::sign::Sign;
 use crate::time::format_date;
 use crate::time::format_iso8601;

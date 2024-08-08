@@ -17,7 +17,6 @@ use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::base64_decode;
 use crate::hash::base64_hmac_sha256;
-use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
