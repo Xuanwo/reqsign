@@ -18,7 +18,6 @@ use super::credential::Credential;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::base64_hmac_sha1;
-use crate::request::SignableRequest;
 use crate::time::format_http_date;
 use crate::time::now;
 use crate::time::DateTime;

@@ -24,7 +24,7 @@ pub struct SigningContext {
 }
 
 impl SigningContext {
-    pub fn build(parts: &mut &mut http::request::Parts) -> Result<Self> {
+    pub fn build(parts: &mut http::request::Parts) -> Result<Self> {
         let uri = mem::take(&mut parts.uri).into_parts();
         let paq = uri
             .path_and_query

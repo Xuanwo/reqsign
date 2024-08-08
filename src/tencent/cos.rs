@@ -16,7 +16,6 @@ use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::hex_hmac_sha1;
 use crate::hash::hex_sha1;
-use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
@@ -52,12 +51,12 @@ impl Signer {
 
     fn build(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
     ) -> Result<SigningContext> {
         let now = self.time.unwrap_or_else(time::now);
-        let mut ctx = req.build()?;
+        let mut ctx = SigningContext::build(parts)?;
 
         match method {
             SigningMethod::Header => {
@@ -98,20 +97,20 @@ impl Signer {
     }
 
     /// Signing request with header.
-    pub fn sign(&self, req: &mut impl SignableRequest, cred: &Credential) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Header, cred)?;
-        req.apply(ctx)
+    pub fn sign(&self, mut parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
+        let ctx = self.build(&mut parts, SigningMethod::Header, cred)?;
+        ctx.apply(parts)
     }
 
     /// Signing request with query.
     pub fn sign_query(
         &self,
-        req: &mut impl SignableRequest,
+        mut parts: &mut http::request::Parts,
         expire: Duration,
         cred: &Credential,
     ) -> Result<()> {
-        let ctx = self.build(req, SigningMethod::Query(expire), cred)?;
-        req.apply(ctx)
+        let ctx = self.build(&mut parts, SigningMethod::Query(expire), cred)?;
+        ctx.apply(parts)
     }
 }
 
