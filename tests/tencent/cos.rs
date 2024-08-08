@@ -58,9 +58,11 @@ async fn test_get_object() -> Result<()> {
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut req, &cred)
+        .sign(&mut parts, &cred)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req.headers().get(AUTHORIZATION));
 
@@ -105,9 +107,11 @@ async fn test_delete_objects() -> Result<()> {
     req.headers_mut()
         .insert("CONTENT-MD5", "WOctCY1SS662e7ziElh4cw==".parse().unwrap());
 
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut req, &cred)
+        .sign(&mut parts, &cred)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 
@@ -140,9 +144,11 @@ async fn test_get_object_with_query_sign() -> Result<()> {
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign_query(&mut req, Duration::from_secs(3600), &cred)
+        .sign_query(&mut parts, Duration::from_secs(3600), &cred)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 
@@ -179,9 +185,11 @@ async fn test_head_object_with_special_characters() -> Result<()> {
         utf8_percent_encode("not-exist-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut req, &cred)
+        .sign(&mut parts, &cred)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 
@@ -218,9 +226,11 @@ async fn test_put_object_with_special_characters() -> Result<()> {
     req.headers_mut()
         .insert(CONTENT_LENGTH, "0".parse().unwrap());
 
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut req, &cred)
+        .sign(&mut parts, &cred)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 
@@ -254,9 +264,11 @@ async fn test_list_bucket() -> Result<()> {
     *req.uri_mut() =
         http::Uri::from_str(&format!("{url}?list-type=2&delimiter=/&encoding-type=url"))?;
 
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut req, &cred)
+        .sign(&mut parts, &cred)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 
@@ -289,9 +301,11 @@ async fn test_list_bucket_with_upper_cases() -> Result<()> {
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{url}?prefix=stage/1712557668-ZgPY8Ql4"))?;
 
+    let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut req, &cred)
+        .sign(&mut parts, &cred)
         .expect("sign request must success");
+    let req = http::Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 

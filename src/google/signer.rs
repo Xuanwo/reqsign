@@ -17,7 +17,6 @@ use super::token::Token;
 use crate::ctx::SigningContext;
 use crate::ctx::SigningMethod;
 use crate::hash::hex_sha256;
-use crate::request::SignableRequest;
 use crate::time;
 use crate::time::format_date;
 use crate::time::format_iso8601;
@@ -66,10 +65,10 @@ impl Signer {
 
     fn build_header(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         token: &Token,
     ) -> Result<SigningContext> {
-        let mut ctx = req.build()?;
+        let mut ctx = SigningContext::build(parts)?;
 
         ctx.headers.insert(header::AUTHORIZATION, {
             let mut value: http::HeaderValue =
@@ -186,9 +185,9 @@ impl Signer {
     /// # TODO
     ///
     /// we can also send API via signed JWT: [Addendum: Service account authorization without OAuth](https://developers.google.com/identity/protocols/oauth2/service-account#jwt-auth)
-    pub fn sign(&self, req: &mut impl SignableRequest, token: &Token) -> Result<()> {
-        let ctx = self.build_header(req, token)?;
-        req.apply(ctx)
+    pub fn sign(&self, parts: &mut http::request::Parts, token: &Token) -> Result<()> {
+        let ctx = self.build_header(parts, token)?;
+        ctx.apply(parts)
     }
 
     /// Sign the query with a duration.
