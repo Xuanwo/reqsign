@@ -84,11 +84,11 @@ impl Signer {
 
     fn build_query(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         expire: Duration,
         cred: &ServiceAccount,
     ) -> Result<SigningContext> {
-        let mut ctx = req.build()?;
+        let mut ctx = SigningContext::build(parts)?;
 
         let now = self.time.unwrap_or_else(time::now);
 
@@ -227,7 +227,7 @@ impl Signer {
     /// ```
     pub fn sign_query(
         &self,
-        req: &mut impl SignableRequest,
+        parts: &mut http::request::Parts,
         duration: Duration,
         cred: &Credential,
     ) -> Result<()> {
@@ -235,8 +235,8 @@ impl Signer {
             anyhow::bail!("expected service account credential, got external account");
         };
 
-        let ctx = self.build_query(req, duration, cred)?;
-        req.apply(ctx)
+        let ctx = self.build_query(parts, duration, cred)?;
+        ctx.apply(parts)
     }
 }
 
@@ -376,7 +376,9 @@ mod tests {
             .parse()
             .expect("url must be valid");
 
-        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
+        let (mut parts, body) = req.into_parts();
+        signer.sign_query(&mut parts, Duration::from_secs(3600), &cred)?;
+        let req = http::Request::from_parts(parts, body);
 
         let query = req.uri().query().unwrap();
         assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));
@@ -409,7 +411,9 @@ mod tests {
 
         let signer = Signer::new("storage").time(time_offset);
 
-        signer.sign_query(&mut req, Duration::from_secs(3600), &cred)?;
+        let (mut parts, body) = req.into_parts();
+        signer.sign_query(&mut parts, Duration::from_secs(3600), &cred)?;
+        let req = http::Request::from_parts(parts, body);
 
         let query = req.uri().query().unwrap();
         assert!(query.contains("X-Goog-Algorithm=GOOG4-RSA-SHA256"));
