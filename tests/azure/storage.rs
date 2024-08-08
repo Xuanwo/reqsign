@@ -58,7 +58,7 @@ async fn test_head_blob() -> Result<()> {
     builder = builder.method(http::Method::HEAD);
     builder = builder.header("x-ms-version", "2023-01-03");
     builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
-    let mut req = builder.body("")?;
+    let req = builder.body("")?;
 
     let cred = loader
         .load()
@@ -160,7 +160,7 @@ async fn test_list_container_blobs() -> Result<()> {
         builder = builder.method(http::Method::GET);
         builder = builder.uri(format!("{url}?{query}"));
         builder = builder.header("x-ms-version", "2023-01-03");
-        let mut req = builder.body("")?;
+        let req = builder.body("")?;
 
         let cred = loader
             .load()
@@ -207,7 +207,7 @@ async fn test_can_head_blob_with_sas() -> Result<()> {
     builder = builder.method(http::Method::HEAD);
     builder = builder.header("x-ms-version", "2023-01-03");
     builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
-    let mut req = builder.body("")?;
+    let req = builder.body("")?;
 
     let cred = loader
         .load()

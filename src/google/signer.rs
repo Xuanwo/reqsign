@@ -155,8 +155,7 @@ impl Signer {
     /// use reqsign::GoogleSigner;
     /// use reqsign::GoogleTokenLoader;
     /// use reqwest::Client;
-    /// use reqwest::Request;
-    /// use reqwest::Url;
+    /// use http::Request;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
@@ -168,14 +167,16 @@ impl Signer {
     ///     let signer = GoogleSigner::new("storage");
     ///
     ///     // Construct request
-    ///     let url = Url::parse("https://storage.googleapis.com/storage/v1/b/test")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let mut req = http::Request::get("https://storage.googleapis.com/storage/v1/b/test")
+    ///        .body(reqwest::Body::default())?;
     ///
     ///     // Signing request with Signer
     ///     let token = token_loader.load().await?.unwrap();
-    ///     signer.sign(&mut req, &token)?;
+    ///     let (mut parts, body) = req.into_parts();
+    ///     signer.sign(&mut parts, &token)?;
     ///
     ///     // Sending already signed request.
+    ///     let req = reqwest::Request::try_from(http::Request::from_parts(parts, body))?;
     ///     let resp = Client::new().execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
     ///     Ok(())
@@ -209,12 +210,14 @@ impl Signer {
     ///     let signer = GoogleSigner::new("stroage");
     ///
     ///     // Construct request
-    ///     let url = Url::parse("https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let mut req = http::Request::get("https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md").body(reqwest::Body::default())?;
     ///
     ///     // Signing request with Signer
     ///     let credential = credential_loader.load()?.unwrap();
-    ///     signer.sign_query(&mut req, Duration::from_secs(3600), &credential)?;
+    ///     let (mut parts, body) = req.into_parts();
+    ///     signer.sign_query(&mut parts, Duration::from_secs(3600), &credential)?;
+    ///     let req = http::Request::from_parts(parts, body);
+    ///     let req = reqwest::Request::try_from(req)?;
     ///
     ///     println!("signed request: {:?}", req);
     ///     // Sending already signed request.

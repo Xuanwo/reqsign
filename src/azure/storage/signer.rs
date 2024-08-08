@@ -130,11 +130,15 @@ impl Signer {
     ///     let loader = AzureStorageLoader::new(config);
     ///     let signer = AzureStorageSigner::new();
     ///     // Construct request
-    ///     let url = Url::parse("https://test.blob.core.windows.net/testbucket/testblob")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let mut req = http::Request::get("https://test.blob.core.windows.net/testbucket/testblob").body(reqwest::Body::default())?;
     ///     // Signing request with Signer
     ///     let credential = loader.load().await?.unwrap();
-    ///     signer.sign(&mut req, &credential)?;
+    ///
+    ///     let (mut parts, body) = req.into_parts();
+    ///     signer.sign(&mut parts, &credential)?;
+    ///     let req = http::Request::from_parts(parts, body);
+    ///     let req = reqwest::Request::try_from(req)?;
+    ///
     ///     // Sending already signed request.
     ///     let resp = Client::new().execute(req).await?;
     ///     println!("resp got status: {}", resp.status());

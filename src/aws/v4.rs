@@ -153,11 +153,13 @@ impl Signer {
     ///     let loader = AwsDefaultLoader::new(client.clone(), config);
     ///     let signer = AwsV4Signer::new("s3", "us-east-1");
     ///     // Construct request
-    ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::default())?;
+    ///     let (mut parts, body) = req.into_parts();
     ///     // Signing request with Signer
     ///     let credential = loader.load().await?.unwrap();
-    ///     signer.sign(&mut req, &credential)?;
+    ///     signer.sign(&mut parts, &credential)?;
+    ///     let req = http::Request::from_parts(parts, body);
+    ///     let req = reqwest::Request::try_from(req)?;
     ///     // Sending already signed request.
     ///     let resp = client.execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
@@ -191,11 +193,13 @@ impl Signer {
     ///     let loader = AwsDefaultLoader::new(client.clone(), config);
     ///     let signer = AwsV4Signer::new("s3", "us-east-1");
     ///     // Construct request
-    ///     let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
-    ///     let mut req = reqwest::Request::new(http::Method::GET, url);
+    ///     let mut req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::default())?;
     ///     // Signing request with Signer
     ///     let credential = loader.load().await?.unwrap();
-    ///     signer.sign_query(&mut req, Duration::from_secs(3600), &credential)?;
+    ///     let (mut parts, body) = req.into_parts();
+    ///     signer.sign_query(&mut parts, Duration::from_secs(3600), &credential)?;
+    ///     let req = http::Request::from_parts(parts, body);
+    ///     let req = reqwest::Request::try_from(req)?;
     ///     // Sending already signed request.
     ///     let resp = client.execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
@@ -890,7 +894,7 @@ mod tests {
         aws_sig.apply_to_request_http1x(&mut req);
         let expected_req = req;
 
-        let mut req = req_fn();
+        let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
         let loader = AwsDefaultLoader::new(
