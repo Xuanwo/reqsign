@@ -419,6 +419,10 @@ impl AssumeRoleLoader {
         if let Some(external_id) = &self.config.external_id {
             write!(url, "&ExternalId={external_id}")?;
         }
+        if let Some(duration_seconds) = &self.config.duration_seconds {
+            write!(url, "&DurationSeconds={duration_seconds}")?;
+        }
+
         let mut req = self
             .client
             .get(&url)
