@@ -84,7 +84,7 @@ pub struct Config {
     /// - this field if it's `is_some`.
     /// - profile config: `duration_seconds`
     /// - default to `3600`.
-    pub duration_seconds: Option<i32>,
+    pub duration_seconds: Option<usize>,
     /// `external_id` value will be load from:
     ///
     /// - this field if it's `is_some`.
@@ -272,7 +272,7 @@ impl Config {
             self.role_session_name = v.to_string()
         }
         if let Some(v) = props.get("duration_seconds") {
-            self.duration_seconds = Some(v.to_string().parse::<i32>().unwrap())
+            self.duration_seconds = Some(v.to_string().parse::<usize>().unwrap())
         }
         if let Some(v) = props.get("web_identity_token_file") {
             self.web_identity_token_file = Some(v.to_string())
