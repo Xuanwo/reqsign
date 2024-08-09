@@ -79,12 +79,12 @@ pub struct Config {
     /// - profile config: `role_session_name`
     /// - default to `reqsign`.
     pub role_session_name: String,
-    /// `role_session_duration` value will be load from:
+    /// `duration_seconds` value will be load from:
     ///
     /// - this field if it's `is_some`.
     /// - profile config: `duration_seconds`
     /// - default to `3600`.
-    pub role_session_duration: Option<i32>,
+    pub duration_seconds: Option<i32>,
     /// `external_id` value will be load from:
     ///
     /// - this field if it's `is_some`.
@@ -116,7 +116,7 @@ impl Default for Config {
             session_token: None,
             role_arn: None,
             role_session_name: "reqsign".to_string(),
-            role_session_duration: Some(3600),
+            duration_seconds: Some(3600),
             external_id: None,
             web_identity_token_file: None,
             ec2_metadata_disabled: false,
@@ -272,7 +272,7 @@ impl Config {
             self.role_session_name = v.to_string()
         }
         if let Some(v) = props.get("duration_seconds") {
-            self.role_session_duration = Some(v.to_string().parse::<i32>().unwrap())
+            self.duration_seconds = Some(v.to_string().parse::<i32>().unwrap())
         }
         if let Some(v) = props.get("web_identity_token_file") {
             self.web_identity_token_file = Some(v.to_string())

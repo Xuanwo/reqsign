@@ -419,8 +419,8 @@ impl AssumeRoleLoader {
         if let Some(external_id) = &self.config.external_id {
             write!(url, "&ExternalId={external_id}")?;
         }
-        if let Some(role_session_duration) = &self.config.role_session_duration {
-            write!(url, "&DurationSeconds={role_session_duration}")?;
+        if let Some(duration_seconds) = &self.config.duration_seconds {
+            write!(url, "&DurationSeconds={duration_seconds}")?;
         }
 
         let req = http::request::Request::builder()
