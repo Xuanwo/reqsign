@@ -176,7 +176,7 @@ impl Signer {
     ///     signer.sign(&mut parts, &token)?;
     ///
     ///     // Sending already signed request.
-    ///     let req = reqwest::Request::try_from(http::Request::from_parts(parts, body))?;
+    ///     let req = http::Request::from_parts(parts, body).try_into()?;
     ///     let resp = Client::new().execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
     ///     Ok(())
@@ -216,8 +216,7 @@ impl Signer {
     ///     let credential = credential_loader.load()?.unwrap();
     ///     let (mut parts, body) = req.into_parts();
     ///     signer.sign_query(&mut parts, Duration::from_secs(3600), &credential)?;
-    ///     let req = http::Request::from_parts(parts, body);
-    ///     let req = reqwest::Request::try_from(req)?;
+    ///     let req = http::Request::from_parts(parts, body).try_into()?;
     ///
     ///     println!("signed request: {:?}", req);
     ///     // Sending already signed request.
