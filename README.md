@@ -20,8 +20,6 @@ use reqsign::AwsConfig;
 use reqsign::AwsLoader;
 use reqsign::AwsV4Signer;
 use reqwest::Client;
-use reqwest::Request;
-use reqwest::Url;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,12 +28,13 @@ async fn main() -> Result<()> {
     let config = AwsConfig::default().from_profile().from_env();
     let loader = AwsLoader::new(client.clone(), config);
     let signer = AwsV4Signer::new("s3", "us-east-1");
-    // Construct request
-    let url = Url::parse("https://s3.amazonaws.com/testbucket")?;
-    let mut req = reqwest::Request::new(http::Method::GET, url);
-    // Signing request with Signer
+    // Construct http::Request, and convert it into parts and body
+    let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::from(""))?;
+    let (mut parts, body) = req.into_parts();
+    // Signing request with Signer, and convert it back to reqwest::Request
     let credential = loader.load().await?.unwrap();
-    signer.sign(&mut req, &credential)?;
+    signer.sign(&mut parts, &credential)?;
+    let req = http::Request::from_parts(parts, body).try_into()?;
     // Sending already signed request.
     let resp = client.execute(req).await?;
     println!("resp got status: {}", resp.status());

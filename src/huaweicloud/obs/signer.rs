@@ -122,8 +122,7 @@ impl Signer {
     ///
     ///     let (mut parts, body) = req.into_parts();
     ///     signer.sign(&mut parts, &credential)?;
-    ///     let req = http::Request::from_parts(parts, body);
-    ///     let req = reqwest::Request::try_from(req)?;
+    ///     let req = http::Request::from_parts(parts, body).try_into()?;
     ///
     ///     // Sending already signed request.
     ///     let resp = Client::new().execute(req).await?;
