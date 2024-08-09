@@ -13,15 +13,6 @@ version = "0.16.0"
 all-features = true
 
 [features]
-default = ["reqwest_request", "services-all"]
-
-native-tls = ["reqwest?/default-tls"]
-rustls = ["reqwest?/rustls-tls"]
-
-# requests that reqwest supports
-reqwest_blocking_request = ["reqwest?/blocking"]
-reqwest_request = ["dep:reqwest"]
-
 # services that reqsign supports
 services-all = [
     "services-aliyun",
