@@ -1,4 +1,4 @@
-//! Tencent COS Singer
+//! Tencent COS Signer
 
 use std::time::Duration;
 
@@ -20,7 +20,7 @@ use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
 
-/// Singer for Tencent COS.
+/// Signer for Tencent COS.
 #[derive(Default)]
 pub struct Signer {
     time: Option<DateTime>,

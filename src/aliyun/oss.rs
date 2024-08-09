@@ -1,4 +1,4 @@
-//! Aliyun OSS Singer
+//! Aliyun OSS Signer
 
 use std::collections::HashSet;
 use std::fmt::Write;
@@ -23,7 +23,7 @@ use crate::time::DateTime;
 
 const CONTENT_MD5: &str = "content-md5";
 
-/// Singer for Aliyun OSS.
+/// Signer for Aliyun OSS.
 pub struct Signer {
     bucket: String,
 }

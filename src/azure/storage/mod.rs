@@ -1,4 +1,4 @@
-//! Azure Storage Singer
+//! Azure Storage Signer
 
 mod signer;
 

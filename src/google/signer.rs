@@ -22,7 +22,7 @@ use crate::time::format_date;
 use crate::time::format_iso8601;
 use crate::time::DateTime;
 
-/// Singer that implement Google OAuth2 Authentication.
+/// Signer that implement Google OAuth2 Authentication.
 ///
 /// ## Reference
 ///

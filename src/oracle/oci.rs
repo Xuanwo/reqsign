@@ -1,4 +1,4 @@
-//! Oracle Cloud Infrastructure Singer
+//! Oracle Cloud Infrastructure Signer
 
 use anyhow::{Error, Result};
 use base64::{engine::general_purpose, Engine as _};
@@ -18,7 +18,7 @@ use crate::ctx::SigningContext;
 use crate::time;
 use crate::time::DateTime;
 
-/// Singer for Oracle Cloud Infrastructure using API Key.
+/// Signer for Oracle Cloud Infrastructure using API Key.
 #[derive(Default)]
 pub struct APIKeySigner {}
 
