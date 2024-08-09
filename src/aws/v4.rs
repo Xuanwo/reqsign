@@ -193,13 +193,12 @@ impl Signer {
     ///     let loader = AwsDefaultLoader::new(client.clone(), config);
     ///     let signer = AwsV4Signer::new("s3", "us-east-1");
     ///     // Construct request
-    ///     let mut req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::default())?;
+    ///     let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::from(""))?;
     ///     // Signing request with Signer
     ///     let credential = loader.load().await?.unwrap();
     ///     let (mut parts, body) = req.into_parts();
     ///     signer.sign_query(&mut parts, Duration::from_secs(3600), &credential)?;
-    ///     let req = http::Request::from_parts(parts, body);
-    ///     let req = reqwest::Request::try_from(req)?;
+    ///     let req = http::Request::from_parts(parts, body).try_into()?;
     ///     // Sending already signed request.
     ///     let resp = client.execute(req).await?;
     ///     println!("resp got status: {}", resp.status());
