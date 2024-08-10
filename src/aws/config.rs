@@ -90,6 +90,10 @@ pub struct Config {
     /// - this field if it's `is_some`.
     /// - profile config: `external_id`
     pub external_id: Option<String>,
+    /// `tags` value will be loaded from:
+    ///
+    /// - this field if it's `is_some`
+    pub tags: Option<Vec<(String, String)>>,
     /// `web_identity_token_file` value will be loaded from:
     ///
     /// - this field if it's `is_some`
@@ -118,6 +122,7 @@ impl Default for Config {
             role_session_name: "reqsign".to_string(),
             duration_seconds: Some(3600),
             external_id: None,
+            tags: None,
             web_identity_token_file: None,
             ec2_metadata_disabled: false,
         }
