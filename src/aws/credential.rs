@@ -422,6 +422,15 @@ impl AssumeRoleLoader {
         if let Some(duration_seconds) = &self.config.duration_seconds {
             write!(url, "&DurationSeconds={duration_seconds}")?;
         }
+        if let Some(tags) = &self.config.tags {
+            for (idx, (key, value)) in tags.iter().enumerate() {
+                let tag_index = idx + 1;
+                write!(
+                    url,
+                    "&Tags.member.{tag_index}.Key={key}&Tags.member.{tag_index}.Value={value}"
+                )?;
+            }
+        }
 
         let req = http::request::Request::builder()
             .method("GET")
