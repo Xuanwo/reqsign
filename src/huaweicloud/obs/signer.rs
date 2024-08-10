@@ -22,7 +22,7 @@ use crate::time::format_http_date;
 use crate::time::now;
 use crate::time::DateTime;
 
-/// Singer that implement Huawei Cloud Object Storage Service Authorization.
+/// Signer that implement Huawei Cloud Object Storage Service Authorization.
 ///
 /// - [User Signature Authentication](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0009.html)
 #[derive(Debug)]

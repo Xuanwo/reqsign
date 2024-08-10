@@ -27,7 +27,7 @@ use crate::time::format_iso8601;
 use crate::time::now;
 use crate::time::DateTime;
 
-/// Singer that implement AWS SigV4.
+/// Signer that implement AWS SigV4.
 ///
 /// - [Signature Version 4 signing process](https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html)
 #[derive(Debug)]

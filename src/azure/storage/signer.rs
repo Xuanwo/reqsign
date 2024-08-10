@@ -1,4 +1,4 @@
-//! Azure Storage Singer
+//! Azure Storage Signer
 
 use std::fmt::Debug;
 use std::fmt::Write;
@@ -21,7 +21,7 @@ use crate::time;
 use crate::time::format_http_date;
 use crate::time::DateTime;
 
-/// Singer that implement Azure Storage Shared Key Authorization.
+/// Signer that implement Azure Storage Shared Key Authorization.
 ///
 /// - [Authorize with Shared Key](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
 #[derive(Debug, Default)]
