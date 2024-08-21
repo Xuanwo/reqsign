@@ -43,4 +43,4 @@ sha2.workspace = true
 temp-env.workspace = true
 tempfile.workspace = true
 test-case.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["full"] }
