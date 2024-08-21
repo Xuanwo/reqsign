@@ -39,6 +39,7 @@ hex.workspace = true
 macro_rules_attribute.workspace = true
 once_cell.workspace = true
 pretty_assertions.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls"] }
 sha2.workspace = true
 temp-env.workspace = true
 tempfile.workspace = true
