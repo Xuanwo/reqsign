@@ -15,10 +15,10 @@ use serde::Deserialize;
 
 use super::config::Config;
 use super::constants::X_AMZ_CONTENT_SHA_256;
-use super::v4::Signer;
-use crate::time::now;
-use crate::time::parse_rfc3339;
-use crate::time::DateTime;
+use crate::Signer;
+use reqsign::time::now;
+use reqsign::time::parse_rfc3339;
+use reqsign::time::DateTime;
 
 pub const EMPTY_STRING_SHA256: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -587,8 +587,8 @@ mod tests {
     use tokio::runtime::Runtime;
 
     use super::*;
-    use crate::aws::constants::*;
-    use crate::aws::v4::Signer;
+    use crate::constants::*;
+    use crate::signer::Signer;
 
     static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         tokio::runtime::Builder::new_multi_thread()
@@ -644,7 +644,7 @@ mod tests {
                 (
                     AWS_CONFIG_FILE,
                     Some(format!(
-                        "{}/testdata/services/aws/default_config",
+                        "{}/testdata/default_config",
                         env::current_dir()
                             .expect("current_dir must exist")
                             .to_string_lossy()
@@ -653,7 +653,7 @@ mod tests {
                 (
                     AWS_SHARED_CREDENTIALS_FILE,
                     Some(format!(
-                        "{}/testdata/services/aws/not_exist",
+                        "{}/testdata/not_exist",
                         env::current_dir()
                             .expect("current_dir must exist")
                             .to_string_lossy()
@@ -685,7 +685,7 @@ mod tests {
                 (
                     AWS_CONFIG_FILE,
                     Some(format!(
-                        "{}/testdata/services/aws/not_exist",
+                        "{}/testdata/not_exist",
                         env::current_dir()
                             .expect("load must exist")
                             .to_string_lossy()
@@ -694,7 +694,7 @@ mod tests {
                 (
                     AWS_SHARED_CREDENTIALS_FILE,
                     Some(format!(
-                        "{}/testdata/services/aws/default_credential",
+                        "{}/testdata/default_credential",
                         env::current_dir()
                             .expect("load must exist")
                             .to_string_lossy()
@@ -727,7 +727,7 @@ mod tests {
                 (
                     AWS_CONFIG_FILE,
                     Some(format!(
-                        "{}/testdata/services/aws/default_config",
+                        "{}/testdata/default_config",
                         env::current_dir()
                             .expect("current_dir must exist")
                             .to_string_lossy()
@@ -736,7 +736,7 @@ mod tests {
                 (
                     AWS_SHARED_CREDENTIALS_FILE,
                     Some(format!(
-                        "{}/testdata/services/aws/default_credential",
+                        "{}/testdata/default_credential",
                         env::current_dir()
                             .expect("current_dir must exist")
                             .to_string_lossy()
@@ -781,7 +781,7 @@ mod tests {
 
         let github_token = env::var("GITHUB_ID_TOKEN").expect("GITHUB_ID_TOKEN not exist");
         let file_path = format!(
-            "{}/testdata/services/aws/web_identity_token_file",
+            "{}/testdata/web_identity_token_file",
             env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()
@@ -863,7 +863,7 @@ mod tests {
 
         let github_token = env::var("GITHUB_ID_TOKEN").expect("GITHUB_ID_TOKEN not exist");
         let file_path = format!(
-            "{}/testdata/services/aws/web_identity_token_file",
+            "{}/testdata/web_identity_token_file",
             env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()

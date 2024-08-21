@@ -15,7 +15,7 @@ pub fn base64_encode(content: &[u8]) -> String {
     BASE64_STANDARD.encode(content)
 }
 
-// Base64 decode
+/// Base64 decode
 pub fn base64_decode(content: &str) -> Result<Vec<u8>> {
     BASE64_STANDARD
         .decode(content)
