@@ -15,7 +15,6 @@ all-features = true
 [features]
 # services that reqsign supports
 services-all = [
-  "services-aliyun",
   "services-azblob",
   "services-google",
   "services-huaweicloud",
@@ -23,14 +22,6 @@ services-all = [
   "services-tencent",
 ]
 
-services-aliyun = [
-  "dep:reqwest",
-  "reqwest/blocking",
-  "reqwest/json",
-  "dep:serde",
-  "dep:serde_json",
-  "dep:once_cell",
-]
 services-azblob = ["dep:serde", "dep:serde_json", "dep:reqwest"]
 services-google = [
   "dep:reqwest",

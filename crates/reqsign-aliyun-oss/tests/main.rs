@@ -10,12 +10,12 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign::AliyunConfig;
-use reqsign::AliyunLoader;
-use reqsign::AliyunOssSigner;
+use reqsign_aliyun_oss::Config;
+use reqsign_aliyun_oss::Loader;
+use reqsign_aliyun_oss::Signer;
 use reqwest::Client;
 
-fn init_signer() -> Option<(AliyunLoader, AliyunOssSigner)> {
+fn init_signer() -> Option<(Loader, Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -26,7 +26,7 @@ fn init_signer() -> Option<(AliyunLoader, AliyunOssSigner)> {
         return None;
     }
 
-    let config = AliyunConfig {
+    let config = Config {
         access_key_id: Some(
             env::var("REQSIGN_ALIYUN_OSS_ACCESS_KEY")
                 .expect("env REQSIGN_ALIYUN_OSS_ACCESS_KEY must set"),
@@ -38,9 +38,9 @@ fn init_signer() -> Option<(AliyunLoader, AliyunOssSigner)> {
         ..Default::default()
     };
 
-    let loader = AliyunLoader::new(Client::new(), config);
+    let loader = Loader::new(Client::new(), config);
 
-    let signer = AliyunOssSigner::new(
+    let signer = Signer::new(
         &env::var("REQSIGN_ALIYUN_OSS_BUCKET").expect("env REQSIGN_ALIYUN_OSS_BUCKET must set"),
     );
 

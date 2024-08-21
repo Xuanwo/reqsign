@@ -1,0 +1,37 @@
+name: Aliyun OSS Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  unit_test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        working-directory: ./crates/reqsign-aliyun-oss
+        run: cargo test --no-fail-fast
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+          # Aliyun OSS Test
+          REQSIGN_ALIYUN_OSS_TEST: ${{ secrets.REQSIGN_ALIYUN_OSS_TEST }}
+          REQSIGN_ALIYUN_OSS_BUCKET: ${{ secrets.REQSIGN_ALIYUN_OSS_BUCKET }}
+          REQSIGN_ALIYUN_OSS_URL: ${{ secrets.REQSIGN_ALIYUN_OSS_URL }}
+          REQSIGN_ALIYUN_OSS_ACCESS_KEY: ${{ secrets.REQSIGN_ALIYUN_OSS_ACCESS_KEY }}
+          REQSIGN_ALIYUN_OSS_SECRET_KEY: ${{ secrets.REQSIGN_ALIYUN_OSS_SECRET_KEY }}
+          REQSIGN_ALIYUN_PROVIDER_ARN: ${{ secrets.REQSIGN_ALIYUN_PROVIDER_ARN }}
+          REQSIGN_ALIYUN_ROLE_ARN: ${{ secrets.REQSIGN_ALIYUN_ROLE_ARN }}
+          REQSIGN_ALIYUN_IDP_URL: ${{ secrets.REQSIGN_ALIYUN_IDP_URL }}
+          REQSIGN_ALIYUN_IDP_BODY: ${{ secrets.REQSIGN_ALIYUN_IDP_BODY }}

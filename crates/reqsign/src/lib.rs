@@ -11,11 +11,6 @@
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
-#[cfg(feature = "services-aliyun")]
-mod aliyun;
-#[cfg(feature = "services-aliyun")]
-pub use aliyun::*;
-
 #[cfg(feature = "services-azblob")]
 mod azure;
 #[cfg(feature = "services-azblob")]
