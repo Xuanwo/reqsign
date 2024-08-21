@@ -1,51 +1,12 @@
 //! Signing API requests without effort.
 //!
-//! # Example
-//!
-//! ```rust,no_run
-//! use anyhow::Result;
-//! use reqsign::AwsConfig;
-//! use reqsign::AwsDefaultLoader;
-//! use reqsign::AwsV4Signer;
-//! use reqwest::Client;
-//! use reqwest::Url;
-//!
-//! #[tokio::main]
-//! async fn main() -> Result<()> {
-//!     // Signer can load region and credentials from environment by default.
-//!     let client = Client::new();
-//!     let config = AwsConfig::default().from_profile().from_env();
-//!     let loader = AwsDefaultLoader::new(client.clone(), config);
-//!     let signer = AwsV4Signer::new("s3", "us-east-1");
-//!     // Construct request
-//!     let mut req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::default())?;
-//!     // Signing request with Signer
-//!     let credential = loader.load().await?.unwrap();
-//!     let (mut parts, body) = req.into_parts();
-//!     signer.sign(&mut parts, &credential)?;
-//!     let req = http::Request::from_parts(parts, body).try_into()?;
-//!     // Sending already signed request.
-//!     let resp = client.execute(req).await?;
-//!     println!("resp got status: {}", resp.status());
-//!     Ok(())
-//! }
-//! ```
-//!
-//! # Available Services
+//! # Services
 //!
 //! - [Aliyun OSS][crate::AliyunOssSigner] for Aliyun OSS.
-//! - [AWS SigV4][crate::AwsV4Signer] for AWS services like S3.
+//! - [AWS SigV4][`reqsign-aws-v4`] for AWS services like S3.
 //! - [Azure Storage][crate::AzureStorageSigner] for Azure Storage services like Azure Blob Service.
 //! - [Google][crate::GoogleSigner] for All google cloud services like Google Cloud Storage Service.
 //! - [Huawei Cloud OBS][crate::HuaweicloudObsSigner] for Huawei Cloud Object Storage Service (OBS).
-//!
-//! # Features
-//!
-//! reqsign support [`http::Request`] by default. Other request types support are hided
-//! under feature gates to reduce dependencies.
-//!
-//! - `reqwest_request`: Enable to support signing [`reqwest::Request`]
-//! - `reqwest_blocking_request`: Enable to support signing [`reqwest::blocking::Request`]
 
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
