@@ -138,9 +138,9 @@ impl Signer {
     ///
     /// ```rust,no_run
     /// use anyhow::Result;
-    /// use reqsign::AwsConfig;
-    /// use reqsign::AwsDefaultLoader;
-    /// use reqsign::AwsV4Signer;
+    /// use reqsign_aws_v4::Config;
+    /// use reqsign_aws_v4::DefaultLoader;
+    /// use reqsign_aws_v4::Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
@@ -148,9 +148,9 @@ impl Signer {
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     let client = Client::new();
-    ///     let config = AwsConfig::default().from_profile().from_env();
-    ///     let loader = AwsDefaultLoader::new(client.clone(), config);
-    ///     let signer = AwsV4Signer::new("s3", "us-east-1");
+    ///     let config = Config::default().from_profile().from_env();
+    ///     let loader = DefaultLoader::new(client.clone(), config);
+    ///     let signer = Signer::new("s3", "us-east-1");
     ///     // Construct request
     ///     let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::default())?;
     ///     let (mut parts, body) = req.into_parts();
@@ -175,11 +175,10 @@ impl Signer {
     ///
     /// ```rust,no_run
     /// use std::time::Duration;
-    ///
     /// use anyhow::Result;
-    /// use reqsign::AwsConfig;
-    /// use reqsign::AwsDefaultLoader;
-    /// use reqsign::AwsV4Signer;
+    /// use reqsign_aws_v4::Config;
+    /// use reqsign_aws_v4::DefaultLoader;
+    /// use reqsign_aws_v4::Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
@@ -187,9 +186,9 @@ impl Signer {
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     let client = Client::new();
-    ///     let config = AwsConfig::default().from_profile().from_env();
-    ///     let loader = AwsDefaultLoader::new(client.clone(), config);
-    ///     let signer = AwsV4Signer::new("s3", "us-east-1");
+    ///     let config = Config::default().from_profile().from_env();
+    ///     let loader = DefaultLoader::new(client.clone(), config);
+    ///     let signer = Signer::new("s3", "us-east-1");
     ///     // Construct request
     ///     let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::from(""))?;
     ///     // Signing request with Signer
