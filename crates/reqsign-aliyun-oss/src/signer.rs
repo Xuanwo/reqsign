@@ -14,12 +14,12 @@ use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 
 use super::credential::Credential;
-use crate::ctx::SigningContext;
-use crate::ctx::SigningMethod;
-use crate::hash::base64_hmac_sha1;
-use crate::time;
-use crate::time::format_http_date;
-use crate::time::DateTime;
+use reqsign::ctx::SigningContext;
+use reqsign::ctx::SigningMethod;
+use reqsign::hash::base64_hmac_sha1;
+use reqsign::time;
+use reqsign::time::format_http_date;
+use reqsign::time::DateTime;
 
 const CONTENT_MD5: &str = "content-md5";
 

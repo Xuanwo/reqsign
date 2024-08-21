@@ -15,7 +15,6 @@ all-features = true
 [features]
 # services that reqsign supports
 services-all = [
-  "services-aliyun",
   "services-azblob",
   "services-google",
   "services-huaweicloud",
@@ -23,14 +22,6 @@ services-all = [
   "services-tencent",
 ]
 
-services-aliyun = [
-  "dep:reqwest",
-  "reqwest/blocking",
-  "reqwest/json",
-  "dep:serde",
-  "dep:serde_json",
-  "dep:once_cell",
-]
 services-azblob = ["dep:serde", "dep:serde_json", "dep:reqwest"]
 services-google = [
   "dep:reqwest",
@@ -56,11 +47,9 @@ jsonwebtoken = { version = "9.2", optional = true }
 log.workspace = true
 once_cell = { workspace = true, optional = true }
 percent-encoding.workspace = true
-quick-xml = { workspace = true, optional = true }
 rand.workspace = true
 reqwest = { workspace = true, optional = true }
 rsa = { workspace = true, optional = true }
-rust-ini = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 sha1.workspace = true

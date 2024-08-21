@@ -9,10 +9,10 @@ use reqwest::Client;
 use serde::Deserialize;
 
 use super::config::Config;
-use crate::time::format_rfc3339;
-use crate::time::now;
-use crate::time::parse_rfc3339;
-use crate::time::DateTime;
+use reqsign::time::format_rfc3339;
+use reqsign::time::now;
+use reqsign::time::parse_rfc3339;
+use reqsign::time::DateTime;
 
 /// Credential that holds the access_key and secret_key.
 #[derive(Default, Clone)]
@@ -202,8 +202,8 @@ mod tests {
     use tokio::runtime::Runtime;
 
     use super::super::constants::*;
-    use super::super::oss::Signer;
     use super::*;
+    use crate::Signer;
 
     static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         tokio::runtime::Builder::new_multi_thread()
@@ -291,7 +291,7 @@ mod tests {
             .id_token;
 
         let file_path = format!(
-            "{}/testdata/services/aliyun/oidc_token_file",
+            "{}/testdata/oidc_token_file",
             env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()
@@ -392,7 +392,7 @@ mod tests {
             .id_token;
 
         let file_path = format!(
-            "{}/testdata/services/aliyun/oidc_token_file",
+            "{}/testdata/oidc_token_file",
             env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()
