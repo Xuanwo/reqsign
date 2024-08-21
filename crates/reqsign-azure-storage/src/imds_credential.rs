@@ -7,7 +7,7 @@ use reqwest::Client;
 use reqwest::Url;
 use serde::Deserialize;
 
-use super::config::Config;
+use crate::Config;
 
 const MSI_API_VERSION: &str = "2019-08-01";
 const MSI_ENDPOINT: &str = "http://169.254.169.254/metadata/identity/oauth2/token";

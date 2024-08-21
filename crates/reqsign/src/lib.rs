@@ -11,11 +11,6 @@
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
-#[cfg(feature = "services-azblob")]
-mod azure;
-#[cfg(feature = "services-azblob")]
-pub use azure::*;
-
 #[cfg(feature = "services-google")]
 mod google;
 #[cfg(feature = "services-google")]

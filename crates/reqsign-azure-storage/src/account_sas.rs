@@ -1,8 +1,8 @@
 use anyhow::Result;
 
-use crate::hash;
-use crate::time;
-use crate::time::DateTime;
+use reqsign::hash;
+use reqsign::time;
+use reqsign::time::DateTime;
 
 /// The default parameters that make up a SAS token
 /// https://learn.microsoft.com/en-us/rest/api/storageservices/create-account-sas#specify-the-account-sas-parameters

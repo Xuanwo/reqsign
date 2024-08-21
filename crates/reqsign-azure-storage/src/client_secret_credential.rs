@@ -1,4 +1,4 @@
-use crate::azure::storage::config::Config;
+use crate::Config;
 
 use http::HeaderValue;
 use http::Method;

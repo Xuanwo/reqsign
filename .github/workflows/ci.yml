@@ -50,7 +50,6 @@ jobs:
     strategy:
       matrix:
         feature:
-          - services-azblob
           - services-google
           - services-huaweicloud
           - services-oracle
@@ -85,11 +84,6 @@ jobs:
         env:
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full
-          # Azure Storage Test
-          REQSIGN_AZURE_STORAGE_TEST: ${{ secrets.REQSIGN_AZURE_STORAGE_TEST }}
-          REQSIGN_AZURE_STORAGE_URL: ${{ secrets.REQSIGN_AZURE_STORAGE_URL }}
-          REQSIGN_AZURE_STORAGE_ACCOUNT_NAME: ${{ secrets.REQSIGN_AZURE_STORAGE_ACCOUNT_NAME }}
-          REQSIGN_AZURE_STORAGE_ACCOUNT_KEY: ${{ secrets.REQSIGN_AZURE_STORAGE_ACCOUNT_KEY }}
           # Google Cloud Storage Test
           REQSIGN_GOOGLE_TEST: ${{ secrets.REQSIGN_GOOGLE_TEST }}
           REQSIGN_GOOGLE_CREDENTIAL: ${{ secrets.REQSIGN_GOOGLE_CREDENTIAL }}
