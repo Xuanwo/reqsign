@@ -291,7 +291,7 @@ mod tests {
             .id_token;
 
         let file_path = format!(
-            "{}/testdata/services/aliyun/oidc_token_file",
+            "{}/testdata/oidc_token_file",
             env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()
@@ -392,7 +392,7 @@ mod tests {
             .id_token;
 
         let file_path = format!(
-            "{}/testdata/services/aliyun/oidc_token_file",
+            "{}/testdata/oidc_token_file",
             env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()
