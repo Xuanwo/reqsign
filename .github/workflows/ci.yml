@@ -51,7 +51,6 @@ jobs:
       matrix:
         feature:
           - services-aliyun
-          - services-aws
           - services-azblob
           - services-google
           - services-huaweicloud
