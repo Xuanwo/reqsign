@@ -14,30 +14,30 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Format
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os:
-          - ubuntu-22.04
-          - macos-13
-          - windows-2022
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: cargo build
+        run: cargo build --workspace
 
   build_under_wasm:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build
@@ -46,7 +46,7 @@ jobs:
           cargo build --target wasm32-unknown-unknown
 
   build_single_feature:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         feature:
@@ -66,21 +66,22 @@ jobs:
     strategy:
       matrix:
         os:
-          - ubuntu-22.04
-          - macos-13
-          - windows-2022
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
     steps:
       - uses: actions/checkout@v4
       - name: Build
         run: cargo build --all-features
 
   unit:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
     steps:
       - uses: actions/checkout@v4
       - name: Test
+        working-directory: ./crates/reqsign
         run: cargo test --no-fail-fast --features=services-all
         env:
           RUST_LOG: DEBUG
@@ -112,7 +113,7 @@ jobs:
           REQSIGN_TENCENT_COS_URL: ${{ secrets.REQSIGN_TENCENT_COS_URL }}
 
   test_gcs_web_identify:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     permissions:
       contents: "read"
       id-token: "write"
@@ -129,6 +130,7 @@ jobs:
           service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
 
       - name: Test
+        working-directory: ./crates/reqsign
         run: cargo test --no-fail-fast --features=services-all
         env:
           RUST_LOG: DEBUG
@@ -154,6 +156,7 @@ jobs:
             core.setSecret(id_token)
 
       - name: Test
+        working-directory: ./crates/reqsign
         run: cargo test --no-fail-fast --features=services-all
         env:
           RUST_LOG: DEBUG
