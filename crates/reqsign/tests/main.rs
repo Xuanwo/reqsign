@@ -1,3 +1,2 @@
-mod azure;
 mod google;
 mod tencent;

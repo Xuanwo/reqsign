@@ -1,0 +1,32 @@
+name: Azure Storage Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  unit_test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        working-directory: ./crates/reqsign-aws-v4
+        run: cargo test --no-fail-fast
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+          # Azure Storage Test
+          REQSIGN_AZURE_STORAGE_TEST: ${{ secrets.REQSIGN_AZURE_STORAGE_TEST }}
+          REQSIGN_AZURE_STORAGE_URL: ${{ secrets.REQSIGN_AZURE_STORAGE_URL }}
+          REQSIGN_AZURE_STORAGE_ACCOUNT_NAME: ${{ secrets.REQSIGN_AZURE_STORAGE_ACCOUNT_NAME }}
+          REQSIGN_AZURE_STORAGE_ACCOUNT_KEY: ${{ secrets.REQSIGN_AZURE_STORAGE_ACCOUNT_KEY }}

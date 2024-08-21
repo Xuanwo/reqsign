@@ -9,12 +9,12 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign::AzureStorageConfig;
-use reqsign::AzureStorageLoader;
-use reqsign::AzureStorageSigner;
+use reqsign_azure_storage::Config;
+use reqsign_azure_storage::Loader;
+use reqsign_azure_storage::Signer;
 use reqwest::Client;
 
-fn init_signer() -> Option<(AzureStorageLoader, AzureStorageSigner)> {
+fn init_signer() -> Option<(Loader, Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -25,7 +25,7 @@ fn init_signer() -> Option<(AzureStorageLoader, AzureStorageSigner)> {
         return None;
     }
 
-    let config = AzureStorageConfig {
+    let config = Config {
         account_name: Some(
             env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
                 .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),
@@ -37,9 +37,9 @@ fn init_signer() -> Option<(AzureStorageLoader, AzureStorageSigner)> {
         ..Default::default()
     };
 
-    let loader = AzureStorageLoader::new(config);
+    let loader = Loader::new(config);
 
-    Some((loader, AzureStorageSigner::new()))
+    Some((loader, Signer::new()))
 }
 
 #[tokio::test]
@@ -302,10 +302,10 @@ async fn test_head_blob_with_ldms() -> Result<()> {
         return Ok(());
     }
 
-    let config = AzureStorageConfig {
+    let config = Config {
         ..Default::default()
     };
-    let loader = AzureStorageLoader::new(config);
+    let loader = Loader::new(config);
     let cred = loader
         .load()
         .await
@@ -322,7 +322,7 @@ async fn test_head_blob_with_ldms() -> Result<()> {
         .body("")?;
 
     let (mut parts, body) = req.into_parts();
-    AzureStorageSigner::new()
+    Signer::new()
         .sign(&mut parts, &cred)
         .expect("sign request must success");
     let req = Request::from_parts(parts, body);
@@ -354,10 +354,10 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
         return Ok(());
     }
 
-    let config = AzureStorageConfig {
+    let config = Config {
         ..Default::default()
     };
-    let loader = AzureStorageLoader::new(config);
+    let loader = Loader::new(config);
     let cred = loader
         .load()
         .await
@@ -382,7 +382,7 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
         let req = builder.body("")?;
 
         let (mut parts, body) = req.into_parts();
-        AzureStorageSigner::new()
+        Signer::new()
             .sign(&mut parts, &cred)
             .expect("sign request must success");
         let req = Request::from_parts(parts, body);
@@ -422,7 +422,7 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
         return Ok(());
     }
 
-    let config = AzureStorageConfig::default().from_env();
+    let config = Config::default().from_env();
 
     assert!(config.client_secret.is_some());
     assert!(config.tenant_id.is_some());
@@ -430,7 +430,7 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
     assert!(config.authority_host.is_some());
     assert!(config.account_key.is_none());
 
-    let loader = AzureStorageLoader::new(config);
+    let loader = Loader::new(config);
 
     let cred = loader
         .load()
@@ -448,7 +448,7 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
         .body("")?;
 
     let (mut parts, body) = req.into_parts();
-    AzureStorageSigner::new()
+    Signer::new()
         .sign(&mut parts, &cred)
         .expect("sign request must success");
     let req = Request::from_parts(parts, body);
@@ -488,7 +488,7 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
         return Ok(());
     }
 
-    let config = AzureStorageConfig::default().from_env();
+    let config = Config::default().from_env();
 
     assert!(config.client_secret.is_some());
     assert!(config.tenant_id.is_some());
@@ -496,7 +496,7 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
     assert!(config.authority_host.is_some());
     assert!(config.account_key.is_none());
 
-    let loader = AzureStorageLoader::new(config);
+    let loader = Loader::new(config);
 
     let cred = loader
         .load()
@@ -521,7 +521,7 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
         let req = builder.body("")?;
 
         let (mut parts, body) = req.into_parts();
-        AzureStorageSigner::new()
+        Signer::new()
             .sign(&mut parts, &cred)
             .expect("sign request must success");
         let req = Request::from_parts(parts, body);

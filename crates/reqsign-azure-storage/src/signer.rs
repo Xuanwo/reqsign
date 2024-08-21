@@ -10,16 +10,16 @@ use http::header::*;
 use log::debug;
 use percent_encoding::percent_encode;
 
-use super::super::constants::*;
 use super::credential::Credential;
-use crate::azure::storage::sas::account_sas;
-use crate::ctx::SigningContext;
-use crate::ctx::SigningMethod;
-use crate::hash::base64_decode;
-use crate::hash::base64_hmac_sha256;
-use crate::time;
-use crate::time::format_http_date;
-use crate::time::DateTime;
+use crate::account_sas;
+use crate::constants::*;
+use reqsign::ctx::SigningContext;
+use reqsign::ctx::SigningMethod;
+use reqsign::hash::base64_decode;
+use reqsign::hash::base64_hmac_sha256;
+use reqsign::time;
+use reqsign::time::format_http_date;
+use reqsign::time::DateTime;
 
 /// Signer that implement Azure Storage Shared Key Authorization.
 ///
@@ -113,22 +113,22 @@ impl Signer {
     ///
     /// ```rust,no_run
     /// use anyhow::Result;
-    /// use reqsign::AzureStorageConfig;
-    /// use reqsign::AzureStorageLoader;
-    /// use reqsign::AzureStorageSigner;
+    /// use reqsign_azure_storage::Config;
+    /// use reqsign_azure_storage::Loader;
+    /// use reqsign_azure_storage::Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    ///     let config = AzureStorageConfig {
+    ///     let config = Config {
     ///         account_name: Some("account_name".to_string()),
     ///         account_key: Some("YWNjb3VudF9rZXkK".to_string()),
     ///         ..Default::default()
     ///     };
-    ///     let loader = AzureStorageLoader::new(config);
-    ///     let signer = AzureStorageSigner::new();
+    ///     let loader = Loader::new(config);
+    ///     let signer = Signer::new();
     ///     // Construct request
     ///     let mut req = http::Request::get("https://test.blob.core.windows.net/testbucket/testblob").body(reqwest::Body::default())?;
     ///     // Signing request with Signer
@@ -271,9 +271,10 @@ mod tests {
     use http::Request;
 
     use super::super::config::Config;
-    use crate::AzureStorageCredential;
-    use crate::AzureStorageSigner;
-    use crate::{azure::storage::loader::Loader, time::now};
+    use crate::Credential;
+    use crate::Loader;
+    use crate::Signer;
+    use reqsign::time::now;
 
     #[tokio::test]
     async fn test_sas_url() {
@@ -287,7 +288,7 @@ mod tests {
         let loader = Loader::new(config);
         let cred = loader.load().await.unwrap().unwrap();
 
-        let signer = AzureStorageSigner::new();
+        let signer = Signer::new();
 
         // Construct request
         let req = Request::builder()
@@ -305,12 +306,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_can_sign_request_use_bearer_token() {
-        let signer = AzureStorageSigner::new();
+        let signer = Signer::new();
         let req = Request::builder()
             .uri("https://test.blob.core.windows.net/testbucket/testblob")
             .body(())
             .unwrap();
-        let cred = AzureStorageCredential::BearerToken("token".to_string(), now());
+        let cred = Credential::BearerToken("token".to_string(), now());
         let (mut parts, _) = req.into_parts();
 
         // Can effectively sign request with SigningMethod::Header

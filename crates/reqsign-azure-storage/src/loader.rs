@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 
-use crate::time::{now, parse_rfc3339};
+use reqsign::time::{now, parse_rfc3339};
 
 use super::credential::Credential;
 use super::imds_credential;

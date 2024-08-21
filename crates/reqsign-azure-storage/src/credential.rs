@@ -1,4 +1,4 @@
-use crate::time::DateTime;
+use reqsign::time::DateTime;
 
 /// Credential that holds the access_key and secret_key.
 #[derive(Clone)]
