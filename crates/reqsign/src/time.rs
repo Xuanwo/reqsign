@@ -9,6 +9,7 @@ use chrono::format::Pad;
 use chrono::SecondsFormat;
 use chrono::Utc;
 
+/// DateTime is the alias for chrono::DateTime<Utc>.
 pub type DateTime = chrono::DateTime<Utc>;
 
 /// Create datetime of now.

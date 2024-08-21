@@ -16,16 +16,15 @@ use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::constants::X_AMZ_DATE;
 use super::constants::X_AMZ_SECURITY_TOKEN;
 use super::credential::Credential;
-use crate::ctx::SigningContext;
-use crate::ctx::SigningMethod;
-use crate::hash::hex_hmac_sha256;
-use crate::hash::hex_sha256;
-use crate::hash::hmac_sha256;
-use crate::sign::Sign;
-use crate::time::format_date;
-use crate::time::format_iso8601;
-use crate::time::now;
-use crate::time::DateTime;
+use reqsign::ctx::SigningContext;
+use reqsign::ctx::SigningMethod;
+use reqsign::hash::hex_hmac_sha256;
+use reqsign::hash::hex_sha256;
+use reqsign::hash::hmac_sha256;
+use reqsign::time::format_date;
+use reqsign::time::format_iso8601;
+use reqsign::time::now;
+use reqsign::time::DateTime;
 
 /// Signer that implement AWS SigV4.
 ///
@@ -215,24 +214,6 @@ impl Signer {
     }
 }
 
-#[async_trait::async_trait]
-impl Sign for Signer {
-    type Credential = Credential;
-
-    async fn sign(&self, parts: &mut http::request::Parts, cred: &Self::Credential) -> Result<()> {
-        self.sign(parts, cred)
-    }
-
-    async fn sign_query(
-        &self,
-        req: &mut http::request::Parts,
-        expires: Duration,
-        cred: &Self::Credential,
-    ) -> Result<()> {
-        self.sign_query(req, expires, cred)
-    }
-}
-
 fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
     // 256 is specially chosen to avoid reallocation for most requests.
     let mut f = String::with_capacity(256);
@@ -414,9 +395,9 @@ mod tests {
     use macro_rules_attribute::apply;
     use reqwest::Client;
 
-    use super::super::AwsDefaultLoader;
     use super::*;
-    use crate::aws::AwsConfig;
+    use crate::Config;
+    use crate::DefaultLoader;
 
     fn test_get_request() -> http::Request<&'static str> {
         let mut req = http::Request::new("");
@@ -650,9 +631,9 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
-        let loader = AwsDefaultLoader::new(
+        let loader = DefaultLoader::new(
             Client::new(),
-            AwsConfig {
+            Config {
                 access_key_id: Some("access_key_id".to_string()),
                 secret_access_key: Some("secret_access_key".to_string()),
                 ..Default::default()
@@ -731,9 +712,9 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
-        let loader = AwsDefaultLoader::new(
+        let loader = DefaultLoader::new(
             Client::new(),
-            AwsConfig {
+            Config {
                 access_key_id: Some("access_key_id".to_string()),
                 secret_access_key: Some("secret_access_key".to_string()),
                 ..Default::default()
@@ -810,9 +791,9 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
-        let loader = AwsDefaultLoader::new(
+        let loader = DefaultLoader::new(
             Client::new(),
-            AwsConfig {
+            Config {
                 access_key_id: Some("access_key_id".to_string()),
                 secret_access_key: Some("secret_access_key".to_string()),
                 session_token: Some("security_token".to_string()),
@@ -895,9 +876,9 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
-        let loader = AwsDefaultLoader::new(
+        let loader = DefaultLoader::new(
             Client::new(),
-            AwsConfig {
+            Config {
                 access_key_id: Some("access_key_id".to_string()),
                 secret_access_key: Some("secret_access_key".to_string()),
                 session_token: Some("security_token".to_string()),

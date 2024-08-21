@@ -14,7 +14,7 @@ use log::debug;
 
 use super::constants::*;
 #[cfg(not(target_arch = "wasm32"))]
-use crate::dirs::expand_homedir;
+use reqsign::dirs::expand_homedir;
 
 /// Config for aws services.
 #[derive(Clone)]

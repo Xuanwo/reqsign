@@ -14,16 +14,24 @@ use http::Method;
 use http::Uri;
 use std::str::FromStr;
 
+/// Signing context for request.
 pub struct SigningContext {
+    /// HTTP method.
     pub method: Method,
+    /// HTTP scheme.
     pub scheme: Scheme,
+    /// HTTP authority.
     pub authority: Authority,
+    /// HTTP path.
     pub path: String,
+    /// HTTP query parameters.
     pub query: Vec<(String, String)>,
+    /// HTTP headers.
     pub headers: HeaderMap,
 }
 
 impl SigningContext {
+    /// Build a signing context from http::request::Parts.
     pub fn build(parts: &mut http::request::Parts) -> Result<Self> {
         let uri = mem::take(&mut parts.uri).into_parts();
         let paq = uri
@@ -52,6 +60,7 @@ impl SigningContext {
         })
     }
 
+    /// Apply the signing context back to http::request::Parts.
     pub fn apply(mut self, parts: &mut http::request::Parts) -> Result<()> {
         let query_size = self.query_size();
 
@@ -96,10 +105,12 @@ impl SigningContext {
         Ok(())
     }
 
+    /// Get the path percent decoded.
     pub fn path_percent_decoded(&self) -> Cow<str> {
         percent_encoding::percent_decode_str(&self.path).decode_utf8_lossy()
     }
 
+    /// Get query size.
     #[inline]
     pub fn query_size(&self) -> usize {
         self.query
@@ -120,6 +131,7 @@ impl SigningContext {
         self.query.push((query.to_string(), "".to_string()));
     }
 
+    /// Get query value by filter.
     pub fn query_to_vec_with_filter(&self, filter: impl Fn(&str) -> bool) -> Vec<(String, String)> {
         self.query
             .iter()
@@ -186,6 +198,9 @@ impl SigningContext {
         s
     }
 
+    /// Get header value by name.
+    ///
+    /// Returns empty string if header not found.
     #[inline]
     pub fn header_get_or_default(&self, key: &HeaderName) -> Result<&str> {
         match self.headers.get(key) {
@@ -194,6 +209,7 @@ impl SigningContext {
         }
     }
 
+    /// Normalize header value.
     pub fn header_value_normalize(v: &mut HeaderValue) {
         let bs = v.as_bytes();
 
@@ -206,6 +222,7 @@ impl SigningContext {
             .expect("invalid header value")
     }
 
+    /// Get header names as sorted vector.
     pub fn header_name_to_vec_sorted(&self) -> Vec<&str> {
         let mut h = self
             .headers
@@ -217,6 +234,7 @@ impl SigningContext {
         h
     }
 
+    /// Get header names with given prefix.
     pub fn header_to_vec_with_prefix(&self, prefix: &str) -> Vec<(String, String)> {
         self.headers
             .iter()

@@ -55,11 +55,6 @@ mod aliyun;
 #[cfg(feature = "services-aliyun")]
 pub use aliyun::*;
 
-#[cfg(feature = "services-aws")]
-mod aws;
-#[cfg(feature = "services-aws")]
-pub use aws::*;
-
 #[cfg(feature = "services-azblob")]
 mod azure;
 #[cfg(feature = "services-azblob")]
@@ -85,9 +80,11 @@ mod tencent;
 #[cfg(feature = "services-tencent")]
 pub use tencent::*;
 
-mod ctx;
-mod dirs;
-mod hash;
 mod sign;
-mod time;
 pub use sign::Sign;
+
+/// Signing context for request.
+pub mod ctx;
+pub mod dirs;
+pub mod hash;
+pub mod time;
