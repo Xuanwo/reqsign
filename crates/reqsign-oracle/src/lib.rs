@@ -2,10 +2,10 @@
 //!
 
 mod signer;
-pub use signer::APIKeySigner as APIKeySigner;
+pub use signer::APIKeySigner;
 
 mod config;
-pub use config::Config ;
+pub use config::Config;
 
 mod credential;
 pub use credential::Credential;
