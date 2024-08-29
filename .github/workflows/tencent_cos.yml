@@ -50,7 +50,7 @@ jobs:
             core.setSecret(id_token)
 
       - name: Test
-        working-directory: ./crates/reqsign-tencent_cos
+        working-directory: ./crates/reqsign-tencent-cos
         run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG
