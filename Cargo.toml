@@ -19,7 +19,6 @@ criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
 dotenv = "0.15"
 env_logger = "0.11"
 form_urlencoded = "1"
-getrandom = { version = "0.2", features = ["js"] }
 hex = "0.4"
 hmac = "0.12"
 home = "0.5"
