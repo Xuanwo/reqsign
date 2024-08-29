@@ -1,5 +1,5 @@
 [package]
-name = "reqsign-aws-v4"
+name = "reqsign-huaweicloud-obs"
 version = "0.1.0"
 
 categories.workspace = true
@@ -8,10 +8,6 @@ documentation.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-
-[[bench]]
-harness = false
-name = "aws"
 
 [dependencies]
 anyhow.workspace = true
@@ -27,8 +23,7 @@ reqwest.workspace = true
 rust-ini.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-
-
+once_cell.workspace = true
 
 [dev-dependencies]
 aws-credential-types = "1.1.8"

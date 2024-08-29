@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::env;
 
-use super::super::constants::*;
+use super::constants::*;
 
 /// Config carries all the configuration for Huawei Cloud OBS services.
 #[derive(Clone, Default)]
