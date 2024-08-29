@@ -11,11 +11,6 @@
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
-#[cfg(feature = "services-huaweicloud")]
-mod huaweicloud;
-#[cfg(feature = "services-huaweicloud")]
-pub use huaweicloud::*;
-
 #[cfg(feature = "services-oracle")]
 mod oracle;
 #[cfg(feature = "services-oracle")]

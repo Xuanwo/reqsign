@@ -78,8 +78,8 @@ mod tests {
     use once_cell::sync::Lazy;
     use tokio::runtime::Runtime;
 
-    use super::super::super::constants::*;
     use super::*;
+    use crate::constants::*;
 
     static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         tokio::runtime::Builder::new_multi_thread()

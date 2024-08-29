@@ -13,14 +13,14 @@ use log::debug;
 use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 
-use super::super::constants::*;
+use super::constants::*;
 use super::credential::Credential;
-use crate::ctx::SigningContext;
-use crate::ctx::SigningMethod;
-use crate::hash::base64_hmac_sha1;
-use crate::time::format_http_date;
-use crate::time::now;
-use crate::time::DateTime;
+use reqsign::ctx::SigningContext;
+use reqsign::ctx::SigningMethod;
+use reqsign::hash::base64_hmac_sha1;
+use reqsign::time::format_http_date;
+use reqsign::time::now;
+use reqsign::time::DateTime;
 
 /// Signer that implement Huawei Cloud Object Storage Service Authorization.
 ///
@@ -102,17 +102,17 @@ impl Signer {
     ///
     /// ```no_run
     /// use anyhow::Result;
-    /// use reqsign::HuaweicloudObsConfig;
-    /// use reqsign::HuaweicloudObsCredentialLoader;
-    /// use reqsign::HuaweicloudObsSigner;
+    /// use reqsign_huaweicloud_obs::Config;
+    /// use reqsign_huaweicloud_obs::CredentialLoader;
+    /// use reqsign_huaweicloud_obs::Signer;
     /// use reqwest::Client;
     /// use reqwest::Request;
     /// use reqwest::Url;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
-    ///     let loader = HuaweicloudObsCredentialLoader::new(HuaweicloudObsConfig::default());
-    ///     let signer = HuaweicloudObsSigner::new("bucket");
+    ///     let loader = CredentialLoader::new(Config::default());
+    ///     let signer = Signer::new("bucket");
     ///
     ///     // Construct request
     ///     let mut req = http::Request::get("https://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt")
