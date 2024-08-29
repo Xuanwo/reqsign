@@ -21,5 +21,6 @@ reqsign.workspace = true
 [dev-dependencies]
 env_logger.workspace = true
 once_cell.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls"] }
 temp-env.workspace = true
 tokio = { workspace = true, features = ["full"] }

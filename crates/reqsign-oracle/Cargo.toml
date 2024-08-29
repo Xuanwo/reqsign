@@ -22,4 +22,3 @@ toml.workspace = true
 
 
 [dev-dependencies]
-reqwest = { workspace = true, features = ["rustls-tls"] }
