@@ -29,7 +29,6 @@ serde.workspace = true
 serde_json.workspace = true
 
 
-
 [dev-dependencies]
 aws-credential-types = "1.1.8"
 aws-sigv4 = "1.2.0"
