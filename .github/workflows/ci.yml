@@ -53,7 +53,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test
         working-directory: ./crates/reqsign
-        run: cargo test --no-fail-fast --features=services-all
+        run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full
