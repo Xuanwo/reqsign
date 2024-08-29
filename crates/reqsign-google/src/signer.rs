@@ -152,19 +152,19 @@ impl Signer {
     ///
     /// ```rust,no_run
     /// use anyhow::Result;
-    /// use reqsign::GoogleSigner;
-    /// use reqsign::GoogleTokenLoader;
+    /// use reqsign_google::Signer;
+    /// use reqsign_google::TokenLoader;
     /// use reqwest::Client;
     /// use http::Request;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let token_loader = GoogleTokenLoader::new(
+    ///     let token_loader = TokenLoader::new(
     ///         "https://www.googleapis.com/auth/devstorage.read_only",
     ///         Client::new(),
     ///     );
-    ///     let signer = GoogleSigner::new("storage");
+    ///     let signer = Signer::new("storage");
     ///
     ///     // Construct request
     ///     let mut req = http::Request::get("https://storage.googleapis.com/storage/v1/b/test")
@@ -198,16 +198,16 @@ impl Signer {
     /// use std::time::Duration;
     ///
     /// use anyhow::Result;
-    /// use reqsign::GoogleCredentialLoader;
-    /// use reqsign::GoogleSigner;
+    /// use reqsign_google::CredentialLoader;
+    /// use reqsign_google::Signer;
     /// use reqwest::Client;
     /// use reqwest::Url;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let credential_loader = GoogleCredentialLoader::default();
-    ///     let signer = GoogleSigner::new("stroage");
+    ///     let credential_loader = CredentialLoader::default();
+    ///     let signer = Signer::new("stroage");
     ///
     ///     // Construct request
     ///     let mut req = http::Request::get("https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md").body(reqwest::Body::default())?;
