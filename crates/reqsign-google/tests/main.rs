@@ -5,12 +5,12 @@ use anyhow::Result;
 use http::StatusCode;
 use log::debug;
 use log::warn;
-use reqsign::GoogleCredentialLoader;
-use reqsign::GoogleSigner;
-use reqsign::GoogleTokenLoader;
+use reqsign_google::CredentialLoader;
+use reqsign_google::Signer;
+use reqsign_google::TokenLoader;
 use reqwest::Client;
 
-async fn init_signer() -> Option<(GoogleCredentialLoader, GoogleTokenLoader, GoogleSigner)> {
+async fn init_signer() -> Option<(CredentialLoader, TokenLoader, Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -20,18 +20,18 @@ async fn init_signer() -> Option<(GoogleCredentialLoader, GoogleTokenLoader, Goo
         return None;
     }
 
-    let cred_loader = GoogleCredentialLoader::default().with_content(
+    let cred_loader = CredentialLoader::default().with_content(
         &env::var("REQSIGN_GOOGLE_CREDENTIAL").expect("env REQSIGN_GOOGLE_CREDENTIAL must set"),
     );
 
-    let token_loader = GoogleTokenLoader::new(
+    let token_loader = TokenLoader::new(
         &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE")
             .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE must set"),
         Client::new(),
     )
     .with_credentials(cred_loader.load().unwrap().unwrap());
 
-    let signer = GoogleSigner::new("storage");
+    let signer = Signer::new("storage");
 
     Some((cred_loader, token_loader, signer))
 }

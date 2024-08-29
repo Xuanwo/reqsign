@@ -14,13 +14,13 @@ use super::constants::GOOG_QUERY_ENCODE_SET;
 use super::credential::Credential;
 use super::credential::ServiceAccount;
 use super::token::Token;
-use crate::ctx::SigningContext;
-use crate::ctx::SigningMethod;
-use crate::hash::hex_sha256;
-use crate::time;
-use crate::time::format_date;
-use crate::time::format_iso8601;
-use crate::time::DateTime;
+use reqsign::ctx::SigningContext;
+use reqsign::ctx::SigningMethod;
+use reqsign::hash::hex_sha256;
+use reqsign::time;
+use reqsign::time::format_date;
+use reqsign::time::format_iso8601;
+use reqsign::time::DateTime;
 
 /// Signer that implement Google OAuth2 Authentication.
 ///
@@ -360,7 +360,7 @@ mod tests {
     #[tokio::test]
     async fn test_sign_query() -> Result<()> {
         let credential_path = format!(
-            "{}/testdata/services/google/testbucket_credential.json",
+            "{}/testdata/testbucket_credential.json",
             std::env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()
@@ -391,7 +391,7 @@ mod tests {
     #[tokio::test]
     async fn test_sign_query_deterministic() -> Result<()> {
         let credential_path = format!(
-            "{}/testdata/services/google/testbucket_credential.json",
+            "{}/testdata/testbucket_credential.json",
             std::env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()

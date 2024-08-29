@@ -15,7 +15,7 @@ pub use self::external_account::ExternalAccount;
 use self::impersonated_service_account::ImpersonatedServiceAccount;
 pub use self::service_account::ServiceAccount;
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
-use crate::hash::base64_decode;
+use reqsign::hash::base64_decode;
 
 #[derive(Clone, serde::Deserialize)]
 #[cfg_attr(test, derive(Debug))]
@@ -239,7 +239,7 @@ mod tests {
             vec![(
                 GOOGLE_APPLICATION_CREDENTIALS,
                 Some(format!(
-                    "{}/testdata/services/google/test_credential.json",
+                    "{}/testdata/test_credential.json",
                     env::current_dir()
                         .expect("current_dir must exist")
                         .to_string_lossy()
@@ -285,7 +285,7 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
             vec![(
                 GOOGLE_APPLICATION_CREDENTIALS,
                 Some(format!(
-                    "{}/testdata/services/google/test_impersonated_service_account.json",
+                    "{}/testdata/test_impersonated_service_account.json",
                     env::current_dir()
                         .expect("current_dir must exist")
                         .to_string_lossy()
@@ -321,7 +321,7 @@ V08rl535r74rMilnQ37X1/zaKBYyxpfhnd2XXgoCgTM=
             vec![(
                 GOOGLE_APPLICATION_CREDENTIALS,
                 Some(format!(
-                    "{}/testdata/services/google/test_external_account.json",
+                    "{}/testdata/test_external_account.json",
                     env::current_dir()
                         .expect("current_dir must exist")
                         .to_string_lossy()

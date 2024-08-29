@@ -9,8 +9,8 @@ use serde::Deserialize;
 
 use super::Token;
 use super::TokenLoader;
-use crate::google::credential::external_account::CredentialSource;
-use crate::google::credential::ExternalAccount;
+use crate::credential::external_account::CredentialSource;
+use crate::credential::ExternalAccount;
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
 const MAX_LIFETIME: Duration = Duration::from_secs(3600);

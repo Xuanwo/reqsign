@@ -15,18 +15,9 @@ all-features = true
 [features]
 # services that reqsign supports
 services-all = [
-  "services-google",
-  "services-huaweicloud",
-  "services-oracle",
-  "services-tencent",
-]
-
-services-google = [
-  "dep:reqwest",
-  "dep:serde",
-  "dep:serde_json",
-  "dep:jsonwebtoken",
-  "dep:rsa",
+    "services-huaweicloud",
+    "services-oracle",
+    "services-tencent",
 ]
 services-huaweicloud = ["dep:serde", "dep:serde_json", "dep:once_cell"]
 services-oracle = ["dep:reqwest", "dep:rsa", "dep:toml", "dep:serde"]
@@ -41,11 +32,9 @@ form_urlencoded.workspace = true
 hex.workspace = true
 hmac.workspace = true
 http.workspace = true
-jsonwebtoken = { version = "9.2", optional = true }
 log.workspace = true
 once_cell = { workspace = true, optional = true }
 percent-encoding.workspace = true
-rand.workspace = true
 reqwest = { workspace = true, optional = true }
 rsa = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
