@@ -14,11 +14,7 @@ all-features = true
 
 [features]
 # services that reqsign supports
-services-all = [
-    "services-huaweicloud",
-    "services-oracle",
-    "services-tencent",
-]
+services-all = ["services-huaweicloud", "services-oracle", "services-tencent"]
 services-huaweicloud = ["dep:serde", "dep:serde_json", "dep:once_cell"]
 services-oracle = ["dep:reqwest", "dep:rsa", "dep:toml", "dep:serde"]
 services-tencent = ["dep:reqwest", "dep:serde", "dep:serde_json"]
