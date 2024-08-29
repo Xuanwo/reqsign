@@ -6,7 +6,7 @@ use http::header::CONTENT_TYPE;
 use log::error;
 use serde::Deserialize;
 
-use crate::google::credential::impersonated_service_account::ImpersonatedServiceAccount;
+use crate::credential::impersonated_service_account::ImpersonatedServiceAccount;
 
 use super::Token;
 use super::TokenLoader;

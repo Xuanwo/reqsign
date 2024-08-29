@@ -1,0 +1,57 @@
+name: Google Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  unit_test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        working-directory: ./crates/reqsign-google
+        run: cargo test --no-fail-fast
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+          # Google Cloud Storage Test
+          REQSIGN_GOOGLE_TEST: ${{ secrets.REQSIGN_GOOGLE_TEST }}
+          REQSIGN_GOOGLE_CREDENTIAL: ${{ secrets.REQSIGN_GOOGLE_CREDENTIAL }}
+          REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE: ${{ secrets.REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE }}
+          REQSIGN_GOOGLE_CLOUD_STORAGE_URL: ${{ secrets.REQSIGN_GOOGLE_CLOUD_STORAGE_URL }}
+
+  gcs_web_identify_test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: "read"
+      id-token: "write"
+    if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2.1.5
+        with:
+          token_format: "access_token"
+          create_credentials_file: true
+          workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_ID }}
+          service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+
+      - name: Test
+        working-directory: ./crates/reqsign-google
+        run: cargo test --no-fail-fast
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+          REQSIGN_GOOGLE_CREDENTIAL_PATH: ${{steps.auth.outputs.credentials_file_path}}

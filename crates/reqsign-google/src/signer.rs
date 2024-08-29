@@ -14,13 +14,13 @@ use super::constants::GOOG_QUERY_ENCODE_SET;
 use super::credential::Credential;
 use super::credential::ServiceAccount;
 use super::token::Token;
-use crate::ctx::SigningContext;
-use crate::ctx::SigningMethod;
-use crate::hash::hex_sha256;
-use crate::time;
-use crate::time::format_date;
-use crate::time::format_iso8601;
-use crate::time::DateTime;
+use reqsign::ctx::SigningContext;
+use reqsign::ctx::SigningMethod;
+use reqsign::hash::hex_sha256;
+use reqsign::time;
+use reqsign::time::format_date;
+use reqsign::time::format_iso8601;
+use reqsign::time::DateTime;
 
 /// Signer that implement Google OAuth2 Authentication.
 ///
@@ -152,19 +152,19 @@ impl Signer {
     ///
     /// ```rust,no_run
     /// use anyhow::Result;
-    /// use reqsign::GoogleSigner;
-    /// use reqsign::GoogleTokenLoader;
+    /// use reqsign_google::Signer;
+    /// use reqsign_google::TokenLoader;
     /// use reqwest::Client;
     /// use http::Request;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let token_loader = GoogleTokenLoader::new(
+    ///     let token_loader = TokenLoader::new(
     ///         "https://www.googleapis.com/auth/devstorage.read_only",
     ///         Client::new(),
     ///     );
-    ///     let signer = GoogleSigner::new("storage");
+    ///     let signer = Signer::new("storage");
     ///
     ///     // Construct request
     ///     let mut req = http::Request::get("https://storage.googleapis.com/storage/v1/b/test")
@@ -198,16 +198,16 @@ impl Signer {
     /// use std::time::Duration;
     ///
     /// use anyhow::Result;
-    /// use reqsign::GoogleCredentialLoader;
-    /// use reqsign::GoogleSigner;
+    /// use reqsign_google::CredentialLoader;
+    /// use reqsign_google::Signer;
     /// use reqwest::Client;
     /// use reqwest::Url;
     ///
     /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     // Signer will load region and credentials from environment by default.
-    ///     let credential_loader = GoogleCredentialLoader::default();
-    ///     let signer = GoogleSigner::new("stroage");
+    ///     let credential_loader = CredentialLoader::default();
+    ///     let signer = Signer::new("stroage");
     ///
     ///     // Construct request
     ///     let mut req = http::Request::get("https://storage.googleapis.com/testbucket-reqsign/CONTRIBUTING.md").body(reqwest::Body::default())?;
@@ -360,7 +360,7 @@ mod tests {
     #[tokio::test]
     async fn test_sign_query() -> Result<()> {
         let credential_path = format!(
-            "{}/testdata/services/google/testbucket_credential.json",
+            "{}/testdata/testbucket_credential.json",
             std::env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()
@@ -391,7 +391,7 @@ mod tests {
     #[tokio::test]
     async fn test_sign_query_deterministic() -> Result<()> {
         let credential_path = format!(
-            "{}/testdata/services/google/testbucket_credential.json",
+            "{}/testdata/testbucket_credential.json",
             std::env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()

@@ -14,8 +14,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use super::credential::Credential;
-use crate::time::now;
-use crate::time::DateTime;
+use reqsign::time::now;
+use reqsign::time::DateTime;
 
 /// Token is the authentication methods used by google services.
 ///

@@ -11,11 +11,6 @@
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
-#[cfg(feature = "services-google")]
-mod google;
-#[cfg(feature = "services-google")]
-pub use google::*;
-
 #[cfg(feature = "services-huaweicloud")]
 mod huaweicloud;
 #[cfg(feature = "services-huaweicloud")]

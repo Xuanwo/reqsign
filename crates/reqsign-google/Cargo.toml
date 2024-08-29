@@ -1,0 +1,41 @@
+[package]
+name = "reqsign-google"
+version = "0.1.0"
+
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+http.workspace = true
+jsonwebtoken = "9.2"
+log.workspace = true
+percent-encoding.workspace = true
+rand.workspace = true
+reqsign.workspace = true
+reqwest.workspace = true
+rsa.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+dotenv.workspace = true
+env_logger.workspace = true
+hex.workspace = true
+macro_rules_attribute.workspace = true
+once_cell.workspace = true
+pretty_assertions.workspace = true
+reqwest = { workspace = true, features = ["rustls-tls"] }
+sha2.workspace = true
+temp-env.workspace = true
+tempfile.workspace = true
+test-case.workspace = true
+tokio = { workspace = true, features = ["full"] }
