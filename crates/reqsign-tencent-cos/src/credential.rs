@@ -13,9 +13,9 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use super::config::Config;
-use crate::time::now;
-use crate::time::parse_rfc3339;
-use crate::time::DateTime;
+use reqsign::time::now;
+use reqsign::time::parse_rfc3339;
+use reqsign::time::DateTime;
 
 /// Credential for cos.
 #[derive(Clone)]
@@ -239,7 +239,7 @@ mod tests {
     use tokio::runtime::Runtime;
 
     use super::super::constants::*;
-    use super::super::cos::Signer;
+    use super::super::signer::Signer;
     use super::*;
 
     static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
@@ -288,7 +288,7 @@ mod tests {
     fn test_signer_with_web_identidy_token() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        dotenv::from_filename(".env").ok();
+        dotenv::from_filename("../../../.env").ok();
 
         if env::var("REQSIGN_TENCENT_COS_TEST").is_err()
             || env::var("REQSIGN_TENCENT_COS_TEST").unwrap() != "on"
@@ -310,7 +310,7 @@ mod tests {
 
         let github_token = env::var("GITHUB_ID_TOKEN").expect("GITHUB_ID_TOKEN not exist");
         let file_path = format!(
-            "{}/testdata/services/tencent/web_identity_token_file",
+            "{}/testdata/web_identity_token_file",
             env::current_dir()
                 .expect("current_dir must exist")
                 .to_string_lossy()

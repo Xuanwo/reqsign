@@ -14,9 +14,8 @@ all-features = true
 
 [features]
 # services that reqsign supports
-services-all = ["services-oracle", "services-tencent"]
+services-all = ["services-oracle"]
 services-oracle = ["dep:reqwest", "dep:rsa", "dep:toml", "dep:serde"]
-services-tencent = ["dep:reqwest", "dep:serde", "dep:serde_json"]
 
 [dependencies]
 anyhow.workspace = true

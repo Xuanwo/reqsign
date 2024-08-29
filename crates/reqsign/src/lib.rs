@@ -16,11 +16,6 @@ mod oracle;
 #[cfg(feature = "services-oracle")]
 pub use oracle::*;
 
-#[cfg(feature = "services-tencent")]
-mod tencent;
-#[cfg(feature = "services-tencent")]
-pub use tencent::*;
-
 mod sign;
 pub use sign::Sign;
 

@@ -1,0 +1,64 @@
+name: Tencent COS Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  unit_test:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        working-directory: ./crates/reqsign-tencent-cos
+        run: cargo test --no-fail-fast
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+          # Tencent COS Test
+          REQSIGN_TENCENT_COS_TEST: ${{ secrets.REQSIGN_TENCENT_COS_TEST }}
+          REQSIGN_TENCENT_COS_ACCESS_KEY: ${{ secrets.REQSIGN_TENCENT_COS_ACCESS_KEY }}
+          REQSIGN_TENCENT_COS_SECRET_KEY: ${{ secrets.REQSIGN_TENCENT_COS_SECRET_KEY }}
+          REQSIGN_TENCENT_COS_URL: ${{ secrets.REQSIGN_TENCENT_COS_URL }}
+
+  tencent_cloud_web_identify_test:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: "read"
+      id-token: "write"
+    if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Id Token
+        uses: actions/github-script@v7
+        id: idtoken
+        with:
+          script: |
+            let id_token = await core.getIDToken('sts.tencentcloudapi.com')
+            core.exportVariable('GITHUB_ID_TOKEN', id_token)
+            core.setSecret(id_token)
+
+      - name: Test
+        working-directory: ./crates/reqsign-tencent-cos
+        run: cargo test --no-fail-fast
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+          REQSIGN_TENCENT_COS_TEST: ${{ secrets.REQSIGN_TENCENT_COS_TEST }}
+          REQSIGN_TENCENT_COS_ACCESS_KEY: ${{ secrets.REQSIGN_TENCENT_COS_ACCESS_KEY }}
+          REQSIGN_TENCENT_COS_SECRET_KEY: ${{ secrets.REQSIGN_TENCENT_COS_SECRET_KEY }}
+          REQSIGN_TENCENT_COS_URL: ${{ secrets.REQSIGN_TENCENT_COS_URL }}
+          REQSIGN_TENCENT_COS_ROLE_ARN: ${{ secrets.REQSIGN_TENCENT_COS_ROLE_ARN }}
+          REQSIGN_TENCENT_COS_PROVIDER_ID: ${{ secrets.REQSIGN_TENCENT_COS_PROVIDER_ID }}
+          REQSIGN_TENCENT_COS_REGION: ${{ secrets.REQSIGN_TENCENT_COS_REGION }}
