@@ -11,12 +11,12 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign::TencentCosConfig;
-use reqsign::TencentCosCredentialLoader;
-use reqsign::TencentCosSigner;
+use reqsign_tencent_cos::Config;
+use reqsign_tencent_cos::CredentialLoader;
+use reqsign_tencent_cos::Signer;
 use reqwest::Client;
 
-fn init_signer() -> Option<(TencentCosCredentialLoader, TencentCosSigner)> {
+fn init_signer() -> Option<(CredentialLoader, Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -26,7 +26,7 @@ fn init_signer() -> Option<(TencentCosCredentialLoader, TencentCosSigner)> {
         return None;
     }
 
-    let config = TencentCosConfig {
+    let config = Config {
         secret_id: Some(
             env::var("REQSIGN_TENCENT_COS_ACCESS_KEY")
                 .expect("env REQSIGN_TENCENT_COS_ACCESS_KEY must set"),
@@ -37,9 +37,9 @@ fn init_signer() -> Option<(TencentCosCredentialLoader, TencentCosSigner)> {
         ),
         ..Default::default()
     };
-    let loader = TencentCosCredentialLoader::new(reqwest::Client::new(), config);
+    let loader = CredentialLoader::new(reqwest::Client::new(), config);
 
-    Some((loader, TencentCosSigner::new()))
+    Some((loader, Signer::new()))
 }
 
 #[tokio::test]

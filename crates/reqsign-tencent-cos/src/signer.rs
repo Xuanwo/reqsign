@@ -12,13 +12,13 @@ use percent_encoding::utf8_percent_encode;
 
 use super::constants::*;
 use super::credential::Credential;
-use crate::ctx::SigningContext;
-use crate::ctx::SigningMethod;
-use crate::hash::hex_hmac_sha1;
-use crate::hash::hex_sha1;
-use crate::time;
-use crate::time::format_http_date;
-use crate::time::DateTime;
+use reqsign::ctx::SigningContext;
+use reqsign::ctx::SigningMethod;
+use reqsign::hash::hex_hmac_sha1;
+use reqsign::hash::hex_sha1;
+use reqsign::time;
+use reqsign::time::format_http_date;
+use reqsign::time::DateTime;
 
 /// Signer for Tencent COS.
 #[derive(Default)]
