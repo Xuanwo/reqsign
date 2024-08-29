@@ -9,13 +9,6 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[package.metadata.docs.rs]
-all-features = true
-
-[features]
-# services that reqsign supports
-services-all = ["services-oracle"]
-services-oracle = ["dep:reqwest", "dep:rsa", "dep:toml", "dep:serde"]
 
 [dependencies]
 anyhow.workspace = true
@@ -26,16 +19,9 @@ form_urlencoded.workspace = true
 hex.workspace = true
 hmac.workspace = true
 http.workspace = true
-log.workspace = true
-once_cell = { workspace = true, optional = true }
 percent-encoding.workspace = true
-reqwest = { workspace = true, optional = true }
-rsa = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
 sha1.workspace = true
 sha2.workspace = true
-toml = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 home.workspace = true
