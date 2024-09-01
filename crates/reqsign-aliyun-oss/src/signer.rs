@@ -14,12 +14,12 @@ use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 
 use super::credential::Credential;
-use reqsign::ctx::SigningContext;
-use reqsign::ctx::SigningMethod;
 use reqsign::hash::base64_hmac_sha1;
 use reqsign::time;
 use reqsign::time::format_http_date;
 use reqsign::time::DateTime;
+use reqsign::SigningMethod;
+use reqsign::SigningRequest;
 
 const CONTENT_MD5: &str = "content-md5";
 
@@ -42,9 +42,9 @@ impl Signer {
         req: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
-    ) -> Result<SigningContext> {
+    ) -> Result<SigningRequest> {
         let now = time::now();
-        let mut ctx = SigningContext::build(req)?;
+        let mut ctx = SigningRequest::build(req)?;
 
         let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
         let signature =
@@ -111,7 +111,7 @@ impl Signer {
 /// + CanonicalizedResource
 /// ```
 fn string_to_sign(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     cred: &Credential,
     now: DateTime,
     method: SigningMethod,
@@ -159,7 +159,7 @@ fn string_to_sign(
 ///
 /// [Building CanonicalizedOSSHeaders](https://help.aliyun.com/document_detail/31951.html#section-w2k-sw2-xdb)
 fn canonicalize_header(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     method: SigningMethod,
     cred: &Credential,
 ) -> Result<String> {
@@ -170,7 +170,7 @@ fn canonicalize_header(
         }
     }
 
-    Ok(SigningContext::header_to_string(
+    Ok(SigningRequest::header_to_string(
         ctx.header_to_vec_with_prefix("x-oss-"),
         ":",
         "\n",
@@ -183,7 +183,7 @@ fn canonicalize_header(
 ///
 /// [Building CanonicalizedResource](https://help.aliyun.com/document_detail/31951.html#section-w2k-sw2-xdb)
 fn canonicalize_resource(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     bucket: &str,
     method: SigningMethod,
     cred: &Credential,
@@ -201,7 +201,7 @@ fn canonicalize_resource(
     let params = ctx.query_to_vec_with_filter(is_sub_resource);
 
     // OSS requires that the query string be percent-decoded.
-    let params_str = SigningContext::query_to_percent_decoded_string(params, "=", "&");
+    let params_str = SigningRequest::query_to_percent_decoded_string(params, "=", "&");
 
     if params_str.is_empty() {
         format!("/{bucket}{}", ctx.path_percent_decoded())

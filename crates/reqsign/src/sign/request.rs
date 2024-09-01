@@ -15,7 +15,7 @@ use http::Uri;
 use std::str::FromStr;
 
 /// Signing context for request.
-pub struct SigningContext {
+pub struct SigningRequest {
     /// HTTP method.
     pub method: Method,
     /// HTTP scheme.
@@ -30,7 +30,7 @@ pub struct SigningContext {
     pub headers: HeaderMap,
 }
 
-impl SigningContext {
+impl SigningRequest {
     /// Build a signing context from http::request::Parts.
     pub fn build(parts: &mut http::request::Parts) -> Result<Self> {
         let uri = mem::take(&mut parts.uri).into_parts();
@@ -38,7 +38,7 @@ impl SigningContext {
             .path_and_query
             .unwrap_or_else(|| PathAndQuery::from_static("/"));
 
-        Ok(SigningContext {
+        Ok(SigningRequest {
             method: parts.method.clone(),
             scheme: uri.scheme.unwrap_or(Scheme::HTTP),
             authority: uri

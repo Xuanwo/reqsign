@@ -14,9 +14,9 @@ use rsa::{pkcs8::DecodePrivateKey, RsaPrivateKey};
 use std::fmt::Write;
 
 use super::credential::Credential;
-use reqsign::ctx::SigningContext;
 use reqsign::time;
 use reqsign::time::DateTime;
+use reqsign::SigningRequest;
 
 /// Signer for Oracle Cloud Infrastructure using API Key.
 #[derive(Default)]
@@ -24,9 +24,9 @@ pub struct APIKeySigner {}
 
 impl APIKeySigner {
     /// Building a signing context.
-    fn build(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<SigningContext> {
+    fn build(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<SigningRequest> {
         let now = time::now();
-        let mut ctx = SigningContext::build(parts)?;
+        let mut ctx = SigningRequest::build(parts)?;
 
         let string_to_sign = string_to_sign(&mut ctx, now)?;
         let private_key = if let Some(path) = &cred.key_file {
@@ -76,7 +76,7 @@ impl APIKeySigner {
 /// + "(request-target): {verb} {uri}" + "\n"
 /// + "host: {Host}"
 /// ```
-fn string_to_sign(ctx: &mut SigningContext, now: DateTime) -> Result<String> {
+fn string_to_sign(ctx: &mut SigningRequest, now: DateTime) -> Result<String> {
     let string_to_sign = {
         let mut f = String::new();
         writeln!(f, "date: {}", time::format_http_date(now))?;
