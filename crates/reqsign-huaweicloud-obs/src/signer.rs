@@ -15,12 +15,12 @@ use percent_encoding::utf8_percent_encode;
 
 use super::constants::*;
 use super::credential::Credential;
-use reqsign::ctx::SigningContext;
-use reqsign::ctx::SigningMethod;
 use reqsign::hash::base64_hmac_sha1;
 use reqsign::time::format_http_date;
 use reqsign::time::now;
 use reqsign::time::DateTime;
+use reqsign::SigningMethod;
+use reqsign::SigningRequest;
 
 /// Signer that implement Huawei Cloud Object Storage Service Authorization.
 ///
@@ -58,9 +58,9 @@ impl Signer {
         parts: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
-    ) -> Result<SigningContext> {
+    ) -> Result<SigningRequest> {
         let now = self.time.unwrap_or_else(now);
-        let mut ctx = SigningContext::build(parts)?;
+        let mut ctx = SigningRequest::build(parts)?;
 
         let string_to_sign = string_to_sign(&mut ctx, cred, now, method, &self.bucket)?;
         let signature =
@@ -164,7 +164,7 @@ impl Signer {
 ///
 /// - [User Signature Authentication (OBS)](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0009.html)
 fn string_to_sign(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     cred: &Credential,
     now: DateTime,
     method: SigningMethod,
@@ -210,7 +210,7 @@ fn string_to_sign(
 ///
 /// - [Authentication of Signature in a Header](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0010.html)
 fn canonicalize_header(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     method: SigningMethod,
     cred: &Credential,
 ) -> Result<String> {
@@ -221,7 +221,7 @@ fn canonicalize_header(
         }
     }
 
-    Ok(SigningContext::header_to_string(
+    Ok(SigningRequest::header_to_string(
         ctx.header_to_vec_with_prefix("x-obs-"),
         ":",
         "\n",
@@ -232,7 +232,7 @@ fn canonicalize_header(
 ///
 /// - [Authentication of Signature in a Header](https://support.huaweicloud.com/intl/en-us/api-obs/obs_04_0010.html)
 fn canonicalize_resource(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     bucket: &str,
     method: SigningMethod,
     cred: &Credential,
@@ -247,7 +247,7 @@ fn canonicalize_resource(
 
     let params = ctx.query_to_vec_with_filter(is_sub_resource);
 
-    let params_str = SigningContext::query_to_string(params, "=", "&");
+    let params_str = SigningRequest::query_to_string(params, "=", "&");
 
     if params_str.is_empty() {
         format!("/{bucket}{}", ctx.path)

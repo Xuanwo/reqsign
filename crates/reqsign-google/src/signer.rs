@@ -14,13 +14,13 @@ use super::constants::GOOG_QUERY_ENCODE_SET;
 use super::credential::Credential;
 use super::credential::ServiceAccount;
 use super::token::Token;
-use reqsign::ctx::SigningContext;
-use reqsign::ctx::SigningMethod;
 use reqsign::hash::hex_sha256;
 use reqsign::time;
 use reqsign::time::format_date;
 use reqsign::time::format_iso8601;
 use reqsign::time::DateTime;
+use reqsign::SigningMethod;
+use reqsign::SigningRequest;
 
 /// Signer that implement Google OAuth2 Authentication.
 ///
@@ -67,8 +67,8 @@ impl Signer {
         &self,
         parts: &mut http::request::Parts,
         token: &Token,
-    ) -> Result<SigningContext> {
-        let mut ctx = SigningContext::build(parts)?;
+    ) -> Result<SigningRequest> {
+        let mut ctx = SigningRequest::build(parts)?;
 
         ctx.headers.insert(header::AUTHORIZATION, {
             let mut value: http::HeaderValue =
@@ -86,8 +86,8 @@ impl Signer {
         parts: &mut http::request::Parts,
         expire: Duration,
         cred: &ServiceAccount,
-    ) -> Result<SigningContext> {
-        let mut ctx = SigningContext::build(parts)?;
+    ) -> Result<SigningRequest> {
+        let mut ctx = SigningRequest::build(parts)?;
 
         let now = self.time.unwrap_or_else(time::now);
 
@@ -241,7 +241,7 @@ impl Signer {
     }
 }
 
-fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
+fn canonical_request_string(ctx: &mut SigningRequest) -> Result<String> {
     // 256 is specially chosen to avoid reallocation for most requests.
     let mut f = String::with_capacity(256);
 
@@ -258,7 +258,7 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
     f.push('\n');
 
     // Insert query
-    f.push_str(&SigningContext::query_to_string(
+    f.push_str(&SigningRequest::query_to_string(
         ctx.query.clone(),
         "=",
         "&",
@@ -283,9 +283,9 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
     Ok(f)
 }
 
-fn canonicalize_header(ctx: &mut SigningContext) -> Result<()> {
+fn canonicalize_header(ctx: &mut SigningRequest) -> Result<()> {
     for (_, value) in ctx.headers.iter_mut() {
-        SigningContext::header_value_normalize(value)
+        SigningRequest::header_value_normalize(value)
     }
 
     // Insert HOST header if not present.
@@ -298,7 +298,7 @@ fn canonicalize_header(ctx: &mut SigningContext) -> Result<()> {
 }
 
 fn canonicalize_query(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     method: SigningMethod,
     cred: &ServiceAccount,
     now: DateTime,

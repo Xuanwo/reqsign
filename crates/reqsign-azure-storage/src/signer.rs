@@ -13,13 +13,13 @@ use percent_encoding::percent_encode;
 use super::credential::Credential;
 use crate::account_sas;
 use crate::constants::*;
-use reqsign::ctx::SigningContext;
-use reqsign::ctx::SigningMethod;
 use reqsign::hash::base64_decode;
 use reqsign::hash::base64_hmac_sha256;
 use reqsign::time;
 use reqsign::time::format_http_date;
 use reqsign::time::DateTime;
+use reqsign::SigningMethod;
+use reqsign::SigningRequest;
 
 /// Signer that implement Azure Storage Shared Key Authorization.
 ///
@@ -52,8 +52,8 @@ impl Signer {
         parts: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
-    ) -> Result<SigningContext> {
-        let mut ctx = SigningContext::build(parts)?;
+    ) -> Result<SigningRequest> {
+        let mut ctx = SigningRequest::build(parts)?;
 
         match cred {
             Credential::SharedAccessSignature(token) => {
@@ -192,7 +192,7 @@ impl Signer {
 /// ## Reference
 ///
 /// - [Blob, Queue, and File Services (Shared Key authorization)](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key)
-fn string_to_sign(ctx: &mut SigningContext, ak: &str, now: DateTime) -> Result<String> {
+fn string_to_sign(ctx: &mut SigningRequest, ak: &str, now: DateTime) -> Result<String> {
     let mut s = String::with_capacity(128);
 
     writeln!(&mut s, "{}", ctx.method.as_str())?;
@@ -231,11 +231,11 @@ fn string_to_sign(ctx: &mut SigningContext, ak: &str, now: DateTime) -> Result<S
 /// ## Reference
 ///
 /// - [Constructing the canonicalized headers string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string)
-fn canonicalize_header(ctx: &mut SigningContext, now: DateTime) -> Result<String> {
+fn canonicalize_header(ctx: &mut SigningRequest, now: DateTime) -> Result<String> {
     ctx.headers
         .insert(X_MS_DATE, format_http_date(now).parse()?);
 
-    Ok(SigningContext::header_to_string(
+    Ok(SigningRequest::header_to_string(
         ctx.header_to_vec_with_prefix("x-ms-"),
         ":",
         "\n",
@@ -245,7 +245,7 @@ fn canonicalize_header(ctx: &mut SigningContext, now: DateTime) -> Result<String
 /// ## Reference
 ///
 /// - [Constructing the canonicalized resource string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-resource-string)
-fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
+fn canonicalize_resource(ctx: &mut SigningRequest, ak: &str) -> String {
     if ctx.query.is_empty() {
         return format!("/{}{}", ak, ctx.path);
     }
@@ -260,7 +260,7 @@ fn canonicalize_resource(ctx: &mut SigningContext, ak: &str) -> String {
         "/{}{}\n{}",
         ak,
         ctx.path,
-        SigningContext::query_to_percent_decoded_string(query, ":", "\n")
+        SigningRequest::query_to_percent_decoded_string(query, ":", "\n")
     )
 }
 

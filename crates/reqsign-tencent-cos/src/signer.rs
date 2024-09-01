@@ -12,13 +12,13 @@ use percent_encoding::utf8_percent_encode;
 
 use super::constants::*;
 use super::credential::Credential;
-use reqsign::ctx::SigningContext;
-use reqsign::ctx::SigningMethod;
 use reqsign::hash::hex_hmac_sha1;
 use reqsign::hash::hex_sha1;
 use reqsign::time;
 use reqsign::time::format_http_date;
 use reqsign::time::DateTime;
+use reqsign::SigningMethod;
+use reqsign::SigningRequest;
 
 /// Signer for Tencent COS.
 #[derive(Default)]
@@ -54,9 +54,9 @@ impl Signer {
         parts: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
-    ) -> Result<SigningContext> {
+    ) -> Result<SigningRequest> {
         let now = self.time.unwrap_or_else(time::now);
-        let mut ctx = SigningContext::build(parts)?;
+        let mut ctx = SigningRequest::build(parts)?;
 
         match method {
             SigningMethod::Header => {
@@ -115,7 +115,7 @@ impl Signer {
 }
 
 fn build_signature(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     cred: &Credential,
     now: DateTime,
     expires: Duration,

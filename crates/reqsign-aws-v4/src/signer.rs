@@ -16,8 +16,6 @@ use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::constants::X_AMZ_DATE;
 use super::constants::X_AMZ_SECURITY_TOKEN;
 use super::credential::Credential;
-use reqsign::ctx::SigningContext;
-use reqsign::ctx::SigningMethod;
 use reqsign::hash::hex_hmac_sha256;
 use reqsign::hash::hex_sha256;
 use reqsign::hash::hmac_sha256;
@@ -25,6 +23,8 @@ use reqsign::time::format_date;
 use reqsign::time::format_iso8601;
 use reqsign::time::now;
 use reqsign::time::DateTime;
+use reqsign::SigningMethod;
+use reqsign::SigningRequest;
 
 /// Signer that implement AWS SigV4.
 ///
@@ -64,9 +64,9 @@ impl Signer {
         req: &mut http::request::Parts,
         method: SigningMethod,
         cred: &Credential,
-    ) -> Result<SigningContext> {
+    ) -> Result<SigningRequest> {
         let now = self.time.unwrap_or_else(now);
-        let mut ctx = SigningContext::build(req)?;
+        let mut ctx = SigningRequest::build(req)?;
 
         // canonicalize context
         canonicalize_header(&mut ctx, method, cred, now)?;
@@ -213,7 +213,7 @@ impl Signer {
     }
 }
 
-fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
+fn canonical_request_string(ctx: &mut SigningRequest) -> Result<String> {
     // 256 is specially chosen to avoid reallocation for most requests.
     let mut f = String::with_capacity(256);
 
@@ -260,14 +260,14 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
 }
 
 fn canonicalize_header(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     method: SigningMethod,
     cred: &Credential,
     now: DateTime,
 ) -> Result<()> {
     // Header names and values need to be normalized according to Step 4 of https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
     for (_, value) in ctx.headers.iter_mut() {
-        SigningContext::header_value_normalize(value)
+        SigningRequest::header_value_normalize(value)
     }
 
     // Insert HOST header if not present.
@@ -305,7 +305,7 @@ fn canonicalize_header(
 }
 
 fn canonicalize_query(
-    ctx: &mut SigningContext,
+    ctx: &mut SigningRequest,
     method: SigningMethod,
     cred: &Credential,
     now: DateTime,

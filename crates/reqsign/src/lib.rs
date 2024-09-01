@@ -12,10 +12,8 @@
 #![warn(missing_docs)]
 
 mod sign;
-pub use sign::Sign;
+pub use sign::*;
 
-/// Signing context for request.
-pub mod ctx;
 pub mod dirs;
 pub mod hash;
 pub mod time;
