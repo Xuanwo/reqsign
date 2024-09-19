@@ -22,12 +22,6 @@ pub fn base64_decode(content: &str) -> Result<Vec<u8>> {
         .map_err(|e| anyhow!("base64 decode failed for {e:?}"))
 }
 
-/// SHA256 hash.
-#[allow(dead_code)]
-pub fn sha256(content: &[u8]) -> Vec<u8> {
-    Sha256::digest(content).as_slice().to_vec()
-}
-
 /// Hex encoded SHA1 hash.
 ///
 /// Use this function instead of `hex::encode(sha1(content))` can reduce
