@@ -30,7 +30,7 @@ impl Env for OsEnv {
         windows::home_dir_inner()
     }
 
-    #[cfg(target_os = "wasm32")]
+    #[cfg(target_arch = "wasm32")]
     fn home_dir(&self) -> Option<PathBuf> {
         None
     }
