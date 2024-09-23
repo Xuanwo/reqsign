@@ -27,7 +27,7 @@ impl Env for OsEnv {
 
     #[cfg(windows)]
     fn home_dir(&self) -> Option<PathBuf> {
-        windows::home_dir_inner
+        windows::home_dir_inner()
     }
 }
 
