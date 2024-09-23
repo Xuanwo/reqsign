@@ -1,6 +1,6 @@
 mod api;
 pub use api::Build;
-pub use api::Context;
+pub use api::Key;
 pub use api::Load;
 
 mod request;
