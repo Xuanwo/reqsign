@@ -1,23 +1,23 @@
-use crate::{Build, Context, Load};
+use crate::{Build, Key, Load};
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// Signer is the main struct used to sign the request.
 #[derive(Clone, Debug)]
-pub struct Signer<Ctx: Context> {
-    loader: Arc<dyn Load<Context = Ctx>>,
-    builder: Arc<dyn Build<Context = Ctx>>,
-    context: Arc<Mutex<Option<Ctx>>>,
+pub struct Signer<K: Key> {
+    loader: Arc<dyn Load<Key = K>>,
+    builder: Arc<dyn Build<Key = K>>,
+    key: Arc<Mutex<Option<K>>>,
 }
 
-impl<Ctx: Context> Signer<Ctx> {
+impl<K: Key> Signer<K> {
     /// Create a new signer.
-    pub fn new(loader: impl Load<Context = Ctx>, builder: impl Build<Context = Ctx>) -> Self {
+    pub fn new(loader: impl Load<Key = K>, builder: impl Build<Key = K>) -> Self {
         Self {
             loader: Arc::new(loader),
             builder: Arc::new(builder),
-            context: Arc::new(Mutex::new(None)),
+            key: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -27,16 +27,16 @@ impl<Ctx: Context> Signer<Ctx> {
         req: &mut http::request::Parts,
         expires_in: Option<Duration>,
     ) -> Result<()> {
-        let ctx = self.context.lock().expect("lock poisoned").clone();
-        let ctx = if ctx.is_valid() {
-            ctx
+        let key = self.key.lock().expect("lock poisoned").clone();
+        let key = if key.is_valid() {
+            key
         } else {
             let ctx = self.loader.load().await?;
-            *self.context.lock().expect("lock poisoned") = ctx.clone();
+            *self.key.lock().expect("lock poisoned") = ctx.clone();
             ctx
         };
 
-        let signing = self.builder.build(req, ctx.as_ref(), expires_in).await?;
+        let signing = self.builder.build(req, key.as_ref(), expires_in).await?;
         signing.apply(req)
     }
 }
