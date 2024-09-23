@@ -1,4 +1,5 @@
 use super::SigningRequest;
+use crate::Context;
 use std::fmt::Debug;
 use std::time::Duration;
 
@@ -30,7 +31,7 @@ pub trait Load: Debug + Send + Sync + Unpin + 'static {
     type Key: Send + Sync + Unpin + 'static;
 
     /// Load signing key from current env.
-    async fn load(&self) -> anyhow::Result<Option<Self::Key>>;
+    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>>;
 }
 
 /// Build is the trait used by signer to build the signing request.
@@ -56,6 +57,7 @@ pub trait Build: Debug + Send + Sync + Unpin + 'static {
     /// AWS uses a query string that includes an `Expires` parameter.
     async fn build(
         &self,
+        ctx: &Context,
         req: &mut http::request::Parts,
         key: Option<&Self::Key>,
         expires_in: Option<Duration>,
