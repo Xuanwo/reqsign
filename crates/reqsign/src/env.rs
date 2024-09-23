@@ -29,6 +29,11 @@ impl Env for OsEnv {
     fn home_dir(&self) -> Option<PathBuf> {
         windows::home_dir_inner()
     }
+
+    #[cfg(target_os = "wasm32")]
+    fn home_dir(&self) -> Option<PathBuf> {
+        None
+    }
 }
 
 /// Implements Env for the mock context.
