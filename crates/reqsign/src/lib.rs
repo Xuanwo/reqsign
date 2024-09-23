@@ -22,5 +22,7 @@ mod fs;
 pub use fs::FileRead;
 mod http;
 pub use http::HttpSend;
+mod env;
+pub use env::Env;
 mod context;
 pub use context::Context;
