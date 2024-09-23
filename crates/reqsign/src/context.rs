@@ -1,3 +1,4 @@
+use crate::env::{Env, OsEnv};
 use crate::{FileRead, HttpSend};
 use anyhow::Result;
 use bytes::Bytes;
@@ -8,15 +9,25 @@ use std::sync::Arc;
 pub struct Context {
     fs: Arc<dyn FileRead>,
     http: Arc<dyn HttpSend>,
+    env: Arc<dyn Env>,
 }
 
 impl Context {
     /// Create a new context.
+    #[inline]
     pub fn new(fs: impl FileRead, http: impl HttpSend) -> Self {
         Self {
             fs: Arc::new(fs),
             http: Arc::new(http),
+            env: Arc::new(OsEnv),
         }
+    }
+
+    /// Set the environment for the context. Use this if you want to mock the environment.
+    #[inline]
+    pub fn with_env(mut self, env: impl Env) -> Self {
+        self.env = Arc::new(env);
+        self
     }
 
     /// Read the file content entirely in `Vec<u8>`.

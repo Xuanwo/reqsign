@@ -26,3 +26,6 @@ sha2.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 home.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = "0.59.0"
