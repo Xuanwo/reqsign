@@ -9,10 +9,10 @@ use reqwest::Client;
 use serde::Deserialize;
 
 use super::config::Config;
-use reqsign::time::format_rfc3339;
-use reqsign::time::now;
-use reqsign::time::parse_rfc3339;
-use reqsign::time::DateTime;
+use reqsign_core::time::format_rfc3339;
+use reqsign_core::time::now;
+use reqsign_core::time::parse_rfc3339;
+use reqsign_core::time::DateTime;
 
 /// Credential that holds the access_key and secret_key.
 #[derive(Default, Clone)]

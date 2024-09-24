@@ -16,9 +16,9 @@ use serde::Deserialize;
 use super::config::Config;
 use super::constants::X_AMZ_CONTENT_SHA_256;
 use crate::Signer;
-use reqsign::time::now;
-use reqsign::time::parse_rfc3339;
-use reqsign::time::DateTime;
+use reqsign_core::time::now;
+use reqsign_core::time::parse_rfc3339;
+use reqsign_core::time::DateTime;
 
 pub const EMPTY_STRING_SHA256: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
@@ -587,7 +587,7 @@ mod tests {
     use http::StatusCode;
     use once_cell::sync::Lazy;
     use quick_xml::de;
-    use reqsign::{Context, StaticEnv};
+    use reqsign_core::{Context, StaticEnv};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
     use reqwest::Client;

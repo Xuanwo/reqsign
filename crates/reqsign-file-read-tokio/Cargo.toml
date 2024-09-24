@@ -11,5 +11,5 @@ version = "0.1.0"
 [dependencies]
 anyhow = "1"
 async-trait = "0.1"
-reqsign = { version = "0.16", path = "../reqsign" }
+reqsign-core.workspace = true
 tokio = { version = "1", features = ["fs"] }

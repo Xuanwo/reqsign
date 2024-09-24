@@ -1,5 +1,5 @@
 [package]
-name = "reqsign"
+name = "reqsign-core"
 version = "0.16.0"
 
 categories.workspace = true

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use reqsign::FileRead;
+use reqsign_core::FileRead;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TokioFileRead;

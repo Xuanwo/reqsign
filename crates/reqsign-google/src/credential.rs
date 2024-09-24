@@ -15,7 +15,7 @@ pub use self::external_account::ExternalAccount;
 use self::impersonated_service_account::ImpersonatedServiceAccount;
 pub use self::service_account::ServiceAccount;
 use super::constants::GOOGLE_APPLICATION_CREDENTIALS;
-use reqsign::hash::base64_decode;
+use reqsign_core::hash::base64_decode;
 
 #[derive(Clone, serde::Deserialize)]
 #[cfg_attr(test, derive(Debug))]

@@ -1,8 +1,8 @@
 use anyhow::Result;
 
-use reqsign::hash;
-use reqsign::time;
-use reqsign::time::DateTime;
+use reqsign_core::hash;
+use reqsign_core::time;
+use reqsign_core::time::DateTime;
 
 /// The default parameters that make up a SAS token
 /// https://learn.microsoft.com/en-us/rest/api/storageservices/create-account-sas#specify-the-account-sas-parameters

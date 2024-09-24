@@ -7,7 +7,7 @@ use anyhow::Result;
 use ini::Ini;
 #[cfg(not(target_arch = "wasm32"))]
 use log::debug;
-use reqsign::Context;
+use reqsign_core::Context;
 
 /// Config for aws services.
 #[derive(Clone)]
@@ -285,7 +285,7 @@ impl Config {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use reqsign::StaticEnv;
+    use reqsign_core::StaticEnv;
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
     use std::collections::HashMap;

@@ -1,4 +1,4 @@
-use reqsign::time::DateTime;
+use reqsign_core::time::DateTime;
 
 /// Credential that holds the access_key and secret_key.
 #[derive(Clone)]
