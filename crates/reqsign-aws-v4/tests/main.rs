@@ -9,14 +9,17 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
+use reqsign::Context;
 use reqsign_aws_v4::Config;
 use reqsign_aws_v4::DefaultLoader;
 use reqsign_aws_v4::Signer;
+use reqsign_file_read_tokio::TokioFileRead;
+use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
 use sha2::Digest;
 use sha2::Sha256;
 
-fn init_signer() -> Option<(DefaultLoader, Signer)> {
+async fn init_signer() -> Option<(DefaultLoader, Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
     dotenv::from_filename(".env").ok();
@@ -25,6 +28,8 @@ fn init_signer() -> Option<(DefaultLoader, Signer)> {
     {
         return None;
     }
+
+    let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
     let config = Config {
         region: Some(
@@ -38,8 +43,9 @@ fn init_signer() -> Option<(DefaultLoader, Signer)> {
         ),
         ..Default::default()
     }
-    .from_env()
-    .from_profile();
+    .from_env(&context)
+    .from_profile(&context)
+    .await;
 
     let region = config.region.as_deref().unwrap().to_string();
 
@@ -55,7 +61,7 @@ fn init_signer() -> Option<(DefaultLoader, Signer)> {
 
 #[tokio::test]
 async fn test_head_object() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
@@ -97,7 +103,7 @@ async fn test_head_object() -> Result<()> {
 
 #[tokio::test]
 async fn test_put_object_with_query() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
@@ -149,7 +155,7 @@ async fn test_put_object_with_query() -> Result<()> {
 
 #[tokio::test]
 async fn test_get_object_with_query() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
@@ -191,7 +197,7 @@ async fn test_get_object_with_query() -> Result<()> {
 
 #[tokio::test]
 async fn test_head_object_with_special_characters() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
@@ -237,7 +243,7 @@ async fn test_head_object_with_special_characters() -> Result<()> {
 
 #[tokio::test]
 async fn test_head_object_with_encoded_characters() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());
@@ -283,7 +289,7 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
 
 #[tokio::test]
 async fn test_list_bucket() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
         return Ok(());

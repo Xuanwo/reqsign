@@ -133,75 +133,12 @@ impl Signer {
     }
 
     /// Signing request with header.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// use anyhow::Result;
-    /// use reqsign_aws_v4::Config;
-    /// use reqsign_aws_v4::DefaultLoader;
-    /// use reqsign_aws_v4::Signer;
-    /// use reqwest::Client;
-    /// use reqwest::Request;
-    /// use reqwest::Url;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<()> {
-    ///     let client = Client::new();
-    ///     let config = Config::default().from_profile().from_env();
-    ///     let loader = DefaultLoader::new(client.clone(), config);
-    ///     let signer = Signer::new("s3", "us-east-1");
-    ///     // Construct request
-    ///     let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::default())?;
-    ///     let (mut parts, body) = req.into_parts();
-    ///     // Signing request with Signer
-    ///     let credential = loader.load().await?.unwrap();
-    ///     signer.sign(&mut parts, &credential)?;
-    ///     let req = http::Request::from_parts(parts, body).try_into()?;
-    ///     // Sending already signed request.
-    ///     let resp = client.execute(req).await?;
-    ///     println!("resp got status: {}", resp.status());
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn sign(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
         let ctx = self.build(parts, SigningMethod::Header, cred)?;
         ctx.apply(parts)
     }
 
     /// Signing request with query.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// use std::time::Duration;
-    /// use anyhow::Result;
-    /// use reqsign_aws_v4::Config;
-    /// use reqsign_aws_v4::DefaultLoader;
-    /// use reqsign_aws_v4::Signer;
-    /// use reqwest::Client;
-    /// use reqwest::Request;
-    /// use reqwest::Url;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<()> {
-    ///     let client = Client::new();
-    ///     let config = Config::default().from_profile().from_env();
-    ///     let loader = DefaultLoader::new(client.clone(), config);
-    ///     let signer = Signer::new("s3", "us-east-1");
-    ///     // Construct request
-    ///     let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::from(""))?;
-    ///     // Signing request with Signer
-    ///     let credential = loader.load().await?.unwrap();
-    ///     let (mut parts, body) = req.into_parts();
-    ///     signer.sign_query(&mut parts, Duration::from_secs(3600), &credential)?;
-    ///     let req = http::Request::from_parts(parts, body).try_into()?;
-    ///     // Sending already signed request.
-    ///     let resp = client.execute(req).await?;
-    ///     println!("resp got status: {}", resp.status());
-    ///     Ok(())
-    /// }
-    /// ```
     pub fn sign_query(
         &self,
         parts: &mut http::request::Parts,

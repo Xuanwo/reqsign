@@ -14,7 +14,6 @@
 mod sign;
 pub use sign::*;
 
-pub mod dirs;
 pub mod hash;
 pub mod time;
 
@@ -24,5 +23,6 @@ mod http;
 pub use http::HttpSend;
 mod env;
 pub use env::Env;
+pub use env::StaticEnv;
 mod context;
 pub use context::Context;

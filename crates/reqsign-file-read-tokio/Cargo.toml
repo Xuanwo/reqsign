@@ -1,0 +1,15 @@
+[package]
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+license.workspace = true
+name = "reqsign-file-read-tokio"
+repository.workspace = true
+version = "0.1.0"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+reqsign = { version = "0.16", path = "../reqsign" }
+tokio = { version = "1", features = ["fs"] }

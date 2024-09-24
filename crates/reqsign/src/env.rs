@@ -1,10 +1,18 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
-use std::{ffi::OsString, path::PathBuf};
+use std::path::PathBuf;
 
 /// Permits parameterizing the home functions via the _from variants
 pub trait Env: Debug + 'static {
-    /// Get an environment variable, as per std::env::var_os.
-    fn var_os(&self, key: &str) -> Option<OsString>;
+    /// Get an environment variable.
+    ///
+    /// - Returns `Some(v)` if the environment variable is found and is valid utf-8.
+    /// - Returns `None` if the environment variable is not found or value is invalid.
+    fn var(&self, key: &str) -> Option<String>;
+
+    /// Returns an hashmap of (variable, value) pairs of strings, for all the
+    /// environment variables of the current process.
+    fn vars(&self) -> HashMap<String, String>;
 
     /// Return the path to the users home dir, returns `None` if any error occurs.
     fn home_dir(&self) -> Option<PathBuf>;
@@ -15,8 +23,12 @@ pub trait Env: Debug + 'static {
 pub struct OsEnv;
 
 impl Env for OsEnv {
-    fn var_os(&self, key: &str) -> Option<OsString> {
-        std::env::var_os(key)
+    fn var(&self, key: &str) -> Option<String> {
+        std::env::var_os(key)?.into_string().ok()
+    }
+
+    fn vars(&self) -> HashMap<String, String> {
+        std::env::vars().collect()
     }
 
     #[cfg(any(unix, target_os = "redox"))]
@@ -36,18 +48,24 @@ impl Env for OsEnv {
     }
 }
 
-/// Implements Env for the mock context.
-#[cfg(test)]
+/// StaticEnv provides a static env environment.
+///
+/// This is useful for testing or for providing a fixed environment.
 #[derive(Debug, Clone)]
-pub struct MockEnv {
+pub struct StaticEnv {
+    /// The home directory to use.
     pub home_dir: Option<PathBuf>,
-    pub envs: std::collections::HashMap<String, OsString>,
+    /// The environment variables to use.
+    pub envs: HashMap<String, String>,
 }
 
-#[cfg(test)]
-impl Env for MockEnv {
-    fn var_os(&self, key: &str) -> Option<OsString> {
+impl Env for StaticEnv {
+    fn var(&self, key: &str) -> Option<String> {
         self.envs.get(key).cloned()
+    }
+
+    fn vars(&self) -> HashMap<String, String> {
+        self.envs.clone()
     }
 
     fn home_dir(&self) -> Option<PathBuf> {

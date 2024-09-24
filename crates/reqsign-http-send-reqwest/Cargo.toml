@@ -1,0 +1,18 @@
+[package]
+categories.workspace = true
+description.workspace = true
+documentation.workspace = true
+edition.workspace = true
+license.workspace = true
+name = "reqsign-http-send-reqwest"
+repository.workspace = true
+version = "0.1.0"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+bytes.workspace = true
+http-body-util = "0.1.2"
+http.workspace = true
+reqsign = { version = "0.16.0", path = "../reqsign" }
+reqwest = { version = "0.12", default-features = false }
