@@ -55,7 +55,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test
-        working-directory: ./crates/reqsign-core
         run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG

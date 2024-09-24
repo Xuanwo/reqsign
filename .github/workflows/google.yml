@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test
-        working-directory: ./crates/reqsign-google
+        working-directory: ./services/google
         run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG
@@ -49,7 +49,7 @@ jobs:
           service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
 
       - name: Test
-        working-directory: ./crates/reqsign-google
+        working-directory: ./services/google
         run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG

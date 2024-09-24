@@ -257,7 +257,7 @@ mod tests {
     fn test_signer_with_oidc() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        dotenv::from_filename(".env").ok();
+        dotenv::from_filename("../../../.env").ok();
 
         if env::var("REQSIGN_ALIYUN_OSS_TEST").is_err()
             || env::var("REQSIGN_ALIYUN_OSS_TEST").unwrap() != "on"
@@ -358,7 +358,7 @@ mod tests {
     fn test_signer_with_oidc_query() -> Result<()> {
         let _ = env_logger::builder().try_init();
 
-        dotenv::from_filename(".env").ok();
+        dotenv::from_filename("../../../.env").ok();
 
         if env::var("REQSIGN_ALIYUN_OSS_TEST").is_err()
             || env::var("REQSIGN_ALIYUN_OSS_TEST").unwrap() != "on"

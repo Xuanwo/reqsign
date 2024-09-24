@@ -3,75 +3,63 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::Result;
+use http::header::CONTENT_LENGTH;
 use http::Request;
 use http::StatusCode;
 use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign_aws_v4::Config;
-use reqsign_aws_v4::DefaultLoader;
-use reqsign_aws_v4::Signer;
-use reqsign_core::Context;
-use reqsign_file_read_tokio::TokioFileRead;
-use reqsign_http_send_reqwest::ReqwestHttpSend;
+use reqsign_aliyun_oss::Config;
+use reqsign_aliyun_oss::Loader;
+use reqsign_aliyun_oss::Signer;
 use reqwest::Client;
-use sha2::Digest;
-use sha2::Sha256;
 
-async fn init_signer() -> Option<(DefaultLoader, Signer)> {
+fn init_signer() -> Option<(Loader, Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    dotenv::from_filename(".env").ok();
+    dotenv::from_filename("../../../.env").ok();
 
-    if env::var("REQSIGN_AWS_V4_TEST").is_err() || env::var("REQSIGN_AWS_V4_TEST").unwrap() != "on"
+    if env::var("REQSIGN_ALIYUN_OSS_TEST").is_err()
+        || env::var("REQSIGN_ALIYUN_OSS_TEST").unwrap() != "on"
     {
         return None;
     }
 
-    let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
-
     let config = Config {
-        region: Some(
-            env::var("REQSIGN_AWS_V4_REGION").expect("env REQSIGN_AWS_V4_REGION must set"),
-        ),
         access_key_id: Some(
-            env::var("REQSIGN_AWS_V4_ACCESS_KEY").expect("env REQSIGN_AWS_V4_ACCESS_KEY must set"),
+            env::var("REQSIGN_ALIYUN_OSS_ACCESS_KEY")
+                .expect("env REQSIGN_ALIYUN_OSS_ACCESS_KEY must set"),
         ),
-        secret_access_key: Some(
-            env::var("REQSIGN_AWS_V4_SECRET_KEY").expect("env REQSIGN_AWS_V4_SECRET_KEY must set"),
+        access_key_secret: Some(
+            env::var("REQSIGN_ALIYUN_OSS_SECRET_KEY")
+                .expect("env REQSIGN_ALIYUN_OSS_SECRET_KEY must set"),
         ),
         ..Default::default()
-    }
-    .from_env(&context)
-    .from_profile(&context)
-    .await;
+    };
 
-    let region = config.region.as_deref().unwrap().to_string();
-
-    let loader = DefaultLoader::new(Client::new(), config);
+    let loader = Loader::new(Client::new(), config);
 
     let signer = Signer::new(
-        &env::var("REQSIGN_AWS_V4_SERVICE").expect("env REQSIGN_AWS_V4_SERVICE must set"),
-        &region,
+        &env::var("REQSIGN_ALIYUN_OSS_BUCKET").expect("env REQSIGN_ALIYUN_OSS_BUCKET must set"),
     );
 
     Some((loader, signer))
 }
 
 #[tokio::test]
-async fn test_head_object() -> Result<()> {
-    let signer = init_signer().await;
+async fn test_get_object() -> Result<()> {
+    let signer = init_signer();
     if signer.is_none() {
-        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
     let (loader, signer) = signer.unwrap();
 
-    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
     let mut req = Request::new("");
-    *req.method_mut() = http::Method::HEAD;
+    *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
     let cred = loader
@@ -96,31 +84,38 @@ async fn test_head_object() -> Result<()> {
         .await
         .expect("request must succeed");
 
+    let status = resp.status();
     debug!("got response: {:?}", resp);
-    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    debug!("got response content: {}", resp.text().await?);
+    assert_eq!(StatusCode::NOT_FOUND, status);
     Ok(())
 }
 
 #[tokio::test]
-async fn test_put_object_with_query() -> Result<()> {
-    let signer = init_signer().await;
+async fn test_delete_objects() -> Result<()> {
+    let signer = init_signer();
     if signer.is_none() {
-        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
     let (loader, signer) = signer.unwrap();
 
-    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
-    let body = "Hello, World!";
-    let body_digest = hex::encode(Sha256::digest(body).as_slice());
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
-    let mut req = Request::new(body);
-    req.headers_mut().insert(
-        "x-amz-content-sha256",
-        body_digest.parse().expect("parse digest failed"),
+    let mut req = Request::new(
+        r#"<Delete>
+<Object>
+ <Key>sample1.txt</Key>
+ </Object>
+ <Object>
+   <Key>sample2.txt</Key>
+ </Object>
+ </Delete>"#,
     );
-    *req.method_mut() = http::Method::PUT;
-    *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "put_object_test"))?;
+    *req.method_mut() = http::Method::POST;
+    *req.uri_mut() = http::Uri::from_str(&format!("{}/?delete", url))?;
+    req.headers_mut()
+        .insert("CONTENT-MD5", "WOctCY1SS662e7ziElh4cw==".parse().unwrap());
 
     let cred = loader
         .load()
@@ -145,24 +140,22 @@ async fn test_put_object_with_query() -> Result<()> {
         .expect("request must succeed");
 
     let status = resp.status();
-    debug!(
-        "got response: {:?}",
-        String::from_utf8(resp.bytes().await?.to_vec())?
-    );
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text().await?);
     assert_eq!(StatusCode::OK, status);
     Ok(())
 }
 
 #[tokio::test]
-async fn test_get_object_with_query() -> Result<()> {
-    let signer = init_signer().await;
+async fn test_get_object_with_query_sign() -> Result<()> {
+    let signer = init_signer();
     if signer.is_none() {
-        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
     let (loader, signer) = signer.unwrap();
 
-    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
     let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;
@@ -188,30 +181,32 @@ async fn test_get_object_with_query() -> Result<()> {
     let resp = client
         .execute(req.try_into()?)
         .await
-        .expect("request must success");
+        .expect("request must succeed");
 
+    let status = resp.status();
     debug!("got response: {:?}", resp);
-    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    debug!("got response content: {}", resp.text().await?);
+    assert_eq!(StatusCode::NOT_FOUND, status);
     Ok(())
 }
 
 #[tokio::test]
 async fn test_head_object_with_special_characters() -> Result<()> {
-    let signer = init_signer().await;
+    let signer = init_signer();
     if signer.is_none() {
-        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
     let (loader, signer) = signer.unwrap();
 
-    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
     let mut req = Request::new("");
     *req.method_mut() = http::Method::HEAD;
     *req.uri_mut() = http::Uri::from_str(&format!(
         "{}/{}",
         url,
-        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
+        utf8_percent_encode("not-exist-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
     let cred = loader
@@ -242,23 +237,25 @@ async fn test_head_object_with_special_characters() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_head_object_with_encoded_characters() -> Result<()> {
-    let signer = init_signer().await;
+async fn test_put_object_with_special_characters() -> Result<()> {
+    let signer = init_signer();
     if signer.is_none() {
-        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
     let (loader, signer) = signer.unwrap();
 
-    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
     let mut req = Request::new("");
-    *req.method_mut() = http::Method::HEAD;
+    *req.method_mut() = http::Method::PUT;
     *req.uri_mut() = http::Uri::from_str(&format!(
         "{}/{}",
         url,
-        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
+        utf8_percent_encode("put-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
+    req.headers_mut()
+        .insert(CONTENT_LENGTH, 0.to_string().parse()?);
 
     let cred = loader
         .load()
@@ -282,21 +279,23 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
         .await
         .expect("request must success");
 
+    let status = resp.status();
     debug!("got response: {:?}", resp);
-    assert_eq!(StatusCode::NOT_FOUND, resp.status());
+    debug!("got response content: {:?}", resp.text().await?);
+    assert_eq!(StatusCode::OK, status);
     Ok(())
 }
 
 #[tokio::test]
 async fn test_list_bucket() -> Result<()> {
-    let signer = init_signer().await;
+    let signer = init_signer();
     if signer.is_none() {
-        warn!("REQSIGN_AWS_V4_TEST is not set, skipped");
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
     let (loader, signer) = signer.unwrap();
 
-    let url = &env::var("REQSIGN_AWS_V4_URL").expect("env REQSIGN_AWS_V4_URL must set");
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
     let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;
@@ -325,7 +324,57 @@ async fn test_list_bucket() -> Result<()> {
         .await
         .expect("request must success");
 
+    let status = resp.status();
     debug!("got response: {:?}", resp);
-    assert_eq!(StatusCode::OK, resp.status());
+    debug!("got response content: {}", resp.text().await?);
+    assert_eq!(StatusCode::OK, status);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_list_bucket_with_invalid_token() -> Result<()> {
+    let signer = init_signer();
+    if signer.is_none() {
+        warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
+        return Ok(());
+    }
+    let (loader, signer) = signer.unwrap();
+
+    let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
+
+    let mut req = Request::new("");
+    *req.method_mut() = http::Method::GET;
+    *req.uri_mut() = http::Uri::from_str(&format!(
+        "{}?list-type=2&delimiter=/&encoding-type=url&continuation-token={}",
+        url,
+        utf8_percent_encode("hello.txt", NON_ALPHANUMERIC)
+    ))?;
+
+    let cred = loader
+        .load()
+        .await
+        .expect("load request must success")
+        .unwrap();
+
+    let req = {
+        let (mut parts, body) = req.into_parts();
+        signer
+            .sign(&mut parts, &cred)
+            .expect("sign request must success");
+        Request::from_parts(parts, body)
+    };
+
+    debug!("signed request: {:?}", req);
+
+    let client = Client::new();
+    let resp = client
+        .execute(req.try_into()?)
+        .await
+        .expect("request must success");
+
+    let status = resp.status();
+    debug!("got response: {:?}", resp);
+    debug!("got response content: {}", resp.text().await?);
+    assert_eq!(StatusCode::BAD_REQUEST, status);
     Ok(())
 }

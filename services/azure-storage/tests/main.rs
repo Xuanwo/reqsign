@@ -17,7 +17,7 @@ use reqwest::Client;
 fn init_signer() -> Option<(Loader, Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    dotenv::from_filename(".env").ok();
+    dotenv::from_filename("../../../.env").ok();
 
     if env::var("REQSIGN_AZURE_STORAGE_TEST").is_err()
         || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"
@@ -292,7 +292,7 @@ async fn test_can_list_container_blobs() -> Result<()> {
 #[tokio::test]
 async fn test_head_blob_with_ldms() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
-    dotenv::from_filename(".env").ok();
+    dotenv::from_filename("../../../.env").ok();
 
     if env::var("REQSIGN_AZURE_STORAGE_TEST").is_err()
         || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"
@@ -344,7 +344,7 @@ async fn test_head_blob_with_ldms() -> Result<()> {
 #[tokio::test]
 async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
-    dotenv::from_filename(".env").ok();
+    dotenv::from_filename("../../../.env").ok();
 
     if env::var("REQSIGN_AZURE_STORAGE_TEST").is_err()
         || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"
@@ -405,7 +405,7 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
 async fn test_head_blob_with_client_secret() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    dotenv::from_filename(".env").ok();
+    dotenv::from_filename("../../../.env").ok();
 
     if env::var("REQSIGN_AZURE_STORAGE_TEST").is_err()
         || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"
@@ -471,7 +471,7 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
 async fn test_can_list_container_blobs_client_secret() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    dotenv::from_filename(".env").ok();
+    dotenv::from_filename("../../../.env").ok();
 
     if env::var("REQSIGN_AZURE_STORAGE_TEST").is_err()
         || env::var("REQSIGN_AZURE_STORAGE_TEST").unwrap() != "on"

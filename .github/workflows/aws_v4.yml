@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test
-        working-directory: ./crates/reqsign-aws-v4
+        working-directory: ./services/aws-v4
         run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG
@@ -54,7 +54,7 @@ jobs:
             core.setSecret(id_token)
 
       - name: Test
-        working-directory: ./crates/reqsign-aws-v4
+        working-directory: ./services/aws-v4
         run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG
