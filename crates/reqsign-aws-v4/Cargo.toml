@@ -28,7 +28,6 @@ rust-ini.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
-
 [dev-dependencies]
 aws-credential-types = "1.1.8"
 aws-sigv4 = "1.2.0"
@@ -39,7 +38,6 @@ hex.workspace = true
 macro_rules_attribute.workspace = true
 once_cell.workspace = true
 pretty_assertions.workspace = true
-reqsign-file-read-tokio = { path = "../reqsign-file-read-tokio" }
 reqsign-http-send-reqwest = { path = "../reqsign-http-send-reqwest" }
 reqwest = { workspace = true, features = ["rustls-tls"] }
 sha2.workspace = true
@@ -47,3 +45,6 @@ temp-env.workspace = true
 tempfile.workspace = true
 test-case.workspace = true
 tokio = { workspace = true, features = ["full"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+reqsign-file-read-tokio = { path = "../reqsign-file-read-tokio" }
