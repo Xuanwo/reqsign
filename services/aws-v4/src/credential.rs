@@ -766,7 +766,7 @@ mod tests {
     async fn test_signer_with_web_loader() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        dotenv::from_filename(".env").ok();
+        dotenv::from_filename("../../../.env").ok();
 
         if env::var("REQSIGN_AWS_S3_TEST").is_err()
             || env::var("REQSIGN_AWS_S3_TEST").unwrap() != "on"
@@ -844,7 +844,7 @@ mod tests {
     async fn test_signer_with_web_loader_assume_role() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        dotenv::from_filename(".env").ok();
+        dotenv::from_filename("../../../.env").ok();
 
         if env::var("REQSIGN_AWS_S3_TEST").is_err()
             || env::var("REQSIGN_AWS_S3_TEST").unwrap() != "on"

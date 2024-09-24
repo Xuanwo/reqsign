@@ -13,7 +13,7 @@ use reqwest::Client;
 async fn init_signer() -> Option<(CredentialLoader, TokenLoader, Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    dotenv::from_filename(".env").ok();
+    dotenv::from_filename("../../../.env").ok();
 
     if env::var("REQSIGN_GOOGLE_TEST").is_err() || env::var("REQSIGN_GOOGLE_TEST").unwrap() != "on"
     {

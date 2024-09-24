@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test
-        working-directory: ./crates/reqsign-aliyun-oss
+        working-directory: ./services/aliyun-oss
         run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG

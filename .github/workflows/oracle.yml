@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test
-        working-directory: ./crates/reqsign-oracle
+        working-directory: ./services/oracle
         run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG

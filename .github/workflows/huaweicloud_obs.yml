@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test
-        working-directory: ./crates/reqsign-huaweicloud-obs
+        working-directory: ./services/huaweicloud-obs
         run: cargo test --no-fail-fast
         env:
           RUST_LOG: DEBUG
