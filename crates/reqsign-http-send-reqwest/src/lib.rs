@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use http_body_util::BodyExt;
-use reqsign::HttpSend;
+use reqsign_core::HttpSend;
 use reqwest::{Client, Request};
 
 #[derive(Debug, Default)]

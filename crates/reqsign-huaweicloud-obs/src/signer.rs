@@ -15,12 +15,12 @@ use percent_encoding::utf8_percent_encode;
 
 use super::constants::*;
 use super::credential::Credential;
-use reqsign::hash::base64_hmac_sha1;
-use reqsign::time::format_http_date;
-use reqsign::time::now;
-use reqsign::time::DateTime;
-use reqsign::SigningMethod;
-use reqsign::SigningRequest;
+use reqsign_core::hash::base64_hmac_sha1;
+use reqsign_core::time::format_http_date;
+use reqsign_core::time::now;
+use reqsign_core::time::DateTime;
+use reqsign_core::SigningMethod;
+use reqsign_core::SigningRequest;
 
 /// Signer that implement Huawei Cloud Object Storage Service Authorization.
 ///

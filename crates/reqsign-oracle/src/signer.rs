@@ -14,9 +14,9 @@ use rsa::{pkcs8::DecodePrivateKey, RsaPrivateKey};
 use std::fmt::Write;
 
 use super::credential::Credential;
-use reqsign::time;
-use reqsign::time::DateTime;
-use reqsign::SigningRequest;
+use reqsign_core::time;
+use reqsign_core::time::DateTime;
+use reqsign_core::SigningRequest;
 
 /// Signer for Oracle Cloud Infrastructure using API Key.
 #[derive(Default)]

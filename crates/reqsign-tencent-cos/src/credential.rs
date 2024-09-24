@@ -13,9 +13,9 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use super::config::Config;
-use reqsign::time::now;
-use reqsign::time::parse_rfc3339;
-use reqsign::time::DateTime;
+use reqsign_core::time::now;
+use reqsign_core::time::parse_rfc3339;
+use reqsign_core::time::DateTime;
 
 /// Credential for cos.
 #[derive(Clone)]

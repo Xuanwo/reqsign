@@ -14,5 +14,5 @@ async-trait = "0.1"
 bytes.workspace = true
 http-body-util = "0.1.2"
 http.workspace = true
-reqsign = { version = "0.16.0", path = "../reqsign" }
+reqsign-core.workspace = true
 reqwest = { version = "0.12", default-features = false }

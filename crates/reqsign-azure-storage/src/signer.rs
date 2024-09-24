@@ -13,13 +13,13 @@ use percent_encoding::percent_encode;
 use super::credential::Credential;
 use crate::account_sas;
 use crate::constants::*;
-use reqsign::hash::base64_decode;
-use reqsign::hash::base64_hmac_sha256;
-use reqsign::time;
-use reqsign::time::format_http_date;
-use reqsign::time::DateTime;
-use reqsign::SigningMethod;
-use reqsign::SigningRequest;
+use reqsign_core::hash::base64_decode;
+use reqsign_core::hash::base64_hmac_sha256;
+use reqsign_core::time;
+use reqsign_core::time::format_http_date;
+use reqsign_core::time::DateTime;
+use reqsign_core::SigningMethod;
+use reqsign_core::SigningRequest;
 
 /// Signer that implement Azure Storage Shared Key Authorization.
 ///
@@ -274,7 +274,7 @@ mod tests {
     use crate::Credential;
     use crate::Loader;
     use crate::Signer;
-    use reqsign::time::now;
+    use reqsign_core::time::now;
 
     #[tokio::test]
     async fn test_sas_url() {

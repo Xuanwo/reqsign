@@ -14,13 +14,13 @@ use super::constants::GOOG_QUERY_ENCODE_SET;
 use super::credential::Credential;
 use super::credential::ServiceAccount;
 use super::token::Token;
-use reqsign::hash::hex_sha256;
-use reqsign::time;
-use reqsign::time::format_date;
-use reqsign::time::format_iso8601;
-use reqsign::time::DateTime;
-use reqsign::SigningMethod;
-use reqsign::SigningRequest;
+use reqsign_core::hash::hex_sha256;
+use reqsign_core::time;
+use reqsign_core::time::format_date;
+use reqsign_core::time::format_iso8601;
+use reqsign_core::time::DateTime;
+use reqsign_core::SigningMethod;
+use reqsign_core::SigningRequest;
 
 /// Signer that implement Google OAuth2 Authentication.
 ///

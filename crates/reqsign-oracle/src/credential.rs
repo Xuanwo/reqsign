@@ -6,8 +6,8 @@ use log::debug;
 
 use super::config::Config;
 use super::constants::ORACLE_CONFIG_PATH;
-use reqsign::time::now;
-use reqsign::time::DateTime;
+use reqsign_core::time::now;
+use reqsign_core::time::DateTime;
 
 /// Credential that holds the API private key.
 /// private_key_path is optional, because some other credential will be added later

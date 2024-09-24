@@ -16,15 +16,15 @@ use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::constants::X_AMZ_DATE;
 use super::constants::X_AMZ_SECURITY_TOKEN;
 use super::credential::Credential;
-use reqsign::hash::hex_hmac_sha256;
-use reqsign::hash::hex_sha256;
-use reqsign::hash::hmac_sha256;
-use reqsign::time::format_date;
-use reqsign::time::format_iso8601;
-use reqsign::time::now;
-use reqsign::time::DateTime;
-use reqsign::SigningMethod;
-use reqsign::SigningRequest;
+use reqsign_core::hash::hex_hmac_sha256;
+use reqsign_core::hash::hex_sha256;
+use reqsign_core::hash::hmac_sha256;
+use reqsign_core::time::format_date;
+use reqsign_core::time::format_iso8601;
+use reqsign_core::time::now;
+use reqsign_core::time::DateTime;
+use reqsign_core::SigningMethod;
+use reqsign_core::SigningRequest;
 
 /// Signer that implement AWS SigV4.
 ///
