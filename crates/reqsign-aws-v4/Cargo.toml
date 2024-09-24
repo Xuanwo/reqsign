@@ -39,6 +39,8 @@ hex.workspace = true
 macro_rules_attribute.workspace = true
 once_cell.workspace = true
 pretty_assertions.workspace = true
+reqsign-file-read-tokio = { path = "../reqsign-file-read-tokio" }
+reqsign-http-send-reqwest = { path = "../reqsign-http-send-reqwest" }
 reqwest = { workspace = true, features = ["rustls-tls"] }
 sha2.workspace = true
 temp-env.workspace = true

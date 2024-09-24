@@ -574,21 +574,24 @@ struct Ec2MetadataIamSecurityCredentials {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::env;
     use std::str::FromStr;
     use std::vec;
 
+    use super::*;
+    use crate::constants::*;
+    use crate::signer::Signer;
     use anyhow::Result;
     use http::Request;
     use http::StatusCode;
     use once_cell::sync::Lazy;
     use quick_xml::de;
+    use reqsign::{Context, StaticEnv};
+    use reqsign_file_read_tokio::TokioFileRead;
+    use reqsign_http_send_reqwest::ReqwestHttpSend;
     use reqwest::Client;
     use tokio::runtime::Runtime;
-
-    use super::*;
-    use crate::constants::*;
-    use crate::signer::Signer;
 
     static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         tokio::runtime::Builder::new_multi_thread()
@@ -611,154 +614,156 @@ mod tests {
         });
     }
 
-    #[test]
-    fn test_credential_env_loader_with_env() {
+    #[tokio::test]
+    async fn test_credential_env_loader_with_env() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        temp_env::with_vars(
-            vec![
-                (AWS_ACCESS_KEY_ID, Some("access_key_id")),
-                (AWS_SECRET_ACCESS_KEY, Some("secret_access_key")),
-            ],
-            || {
-                RUNTIME.block_on(async {
-                    let l = DefaultLoader::new(Client::new(), Config::default().from_env());
-                    let x = l.load().await.expect("load must succeed");
+        let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let context = context.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                (AWS_ACCESS_KEY_ID.to_string(), "access_key_id".to_string()),
+                (
+                    AWS_SECRET_ACCESS_KEY.to_string(),
+                    "secret_access_key".to_string(),
+                ),
+            ]),
+        });
 
-                    let x = x.expect("must load succeed");
-                    assert_eq!("access_key_id", x.access_key_id);
-                    assert_eq!("secret_access_key", x.secret_access_key);
-                })
-            },
-        );
+        let l = DefaultLoader::new(Client::new(), Config::default().from_env(&context));
+        let x = l.load().await.expect("load must succeed");
+
+        let x = x.expect("must load succeed");
+        assert_eq!("access_key_id", x.access_key_id);
+        assert_eq!("secret_access_key", x.secret_access_key);
     }
 
-    #[test]
-    fn test_credential_profile_loader_from_config() {
+    #[tokio::test]
+    async fn test_credential_profile_loader_from_config() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        temp_env::with_vars(
-            vec![
-                (AWS_ACCESS_KEY_ID, None),
-                (AWS_SECRET_ACCESS_KEY, None),
+        let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let context = context.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
                 (
-                    AWS_CONFIG_FILE,
-                    Some(format!(
+                    AWS_CONFIG_FILE.to_string(),
+                    format!(
                         "{}/testdata/default_config",
                         env::current_dir()
                             .expect("current_dir must exist")
                             .to_string_lossy()
-                    )),
+                    ),
                 ),
                 (
-                    AWS_SHARED_CREDENTIALS_FILE,
-                    Some(format!(
+                    AWS_SHARED_CREDENTIALS_FILE.to_string(),
+                    format!(
                         "{}/testdata/not_exist",
                         env::current_dir()
                             .expect("current_dir must exist")
                             .to_string_lossy()
-                    )),
+                    ),
                 ),
-            ],
-            || {
-                RUNTIME.block_on(async {
-                    let l = DefaultLoader::new(
-                        Client::new(),
-                        Config::default().from_env().from_profile(),
-                    );
-                    let x = l.load().await.unwrap().unwrap();
-                    assert_eq!("config_access_key_id", x.access_key_id);
-                    assert_eq!("config_secret_access_key", x.secret_access_key);
-                })
-            },
+            ]),
+        });
+
+        let l = DefaultLoader::new(
+            Client::new(),
+            Config::default()
+                .from_env(&context)
+                .from_profile(&context)
+                .await,
         );
+        let x = l.load().await.unwrap().unwrap();
+        assert_eq!("config_access_key_id", x.access_key_id);
+        assert_eq!("config_secret_access_key", x.secret_access_key);
     }
 
-    #[test]
-    fn test_credential_profile_loader_from_shared() {
+    #[tokio::test]
+    async fn test_credential_profile_loader_from_shared() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        temp_env::with_vars(
-            vec![
-                (AWS_ACCESS_KEY_ID, None),
-                (AWS_SECRET_ACCESS_KEY, None),
+        let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let context = context.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
                 (
-                    AWS_CONFIG_FILE,
-                    Some(format!(
+                    AWS_CONFIG_FILE.to_string(),
+                    format!(
                         "{}/testdata/not_exist",
                         env::current_dir()
-                            .expect("load must exist")
+                            .expect("current_dir must exist")
                             .to_string_lossy()
-                    )),
+                    ),
                 ),
                 (
-                    AWS_SHARED_CREDENTIALS_FILE,
-                    Some(format!(
+                    AWS_SHARED_CREDENTIALS_FILE.to_string(),
+                    format!(
                         "{}/testdata/default_credential",
                         env::current_dir()
-                            .expect("load must exist")
+                            .expect("current_dir must exist")
                             .to_string_lossy()
-                    )),
+                    ),
                 ),
-            ],
-            || {
-                RUNTIME.block_on(async {
-                    let l = DefaultLoader::new(
-                        Client::new(),
-                        Config::default().from_env().from_profile(),
-                    );
-                    let x = l.load().await.unwrap().unwrap();
-                    assert_eq!("shared_access_key_id", x.access_key_id);
-                    assert_eq!("shared_secret_access_key", x.secret_access_key);
-                })
-            },
+            ]),
+        });
+
+        let l = DefaultLoader::new(
+            Client::new(),
+            Config::default()
+                .from_env(&context)
+                .from_profile(&context)
+                .await,
         );
+        let x = l.load().await.unwrap().unwrap();
+        assert_eq!("shared_access_key_id", x.access_key_id);
+        assert_eq!("shared_secret_access_key", x.secret_access_key);
     }
 
     /// AWS_SHARED_CREDENTIALS_FILE should be taken first.
-    #[test]
-    fn test_credential_profile_loader_from_both() {
+    #[tokio::test]
+    async fn test_credential_profile_loader_from_both() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        temp_env::with_vars(
-            vec![
-                (AWS_ACCESS_KEY_ID, None),
-                (AWS_SECRET_ACCESS_KEY, None),
+        let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let context = context.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
                 (
-                    AWS_CONFIG_FILE,
-                    Some(format!(
+                    AWS_CONFIG_FILE.to_string(),
+                    format!(
                         "{}/testdata/default_config",
                         env::current_dir()
                             .expect("current_dir must exist")
                             .to_string_lossy()
-                    )),
+                    ),
                 ),
                 (
-                    AWS_SHARED_CREDENTIALS_FILE,
-                    Some(format!(
+                    AWS_SHARED_CREDENTIALS_FILE.to_string(),
+                    format!(
                         "{}/testdata/default_credential",
                         env::current_dir()
                             .expect("current_dir must exist")
                             .to_string_lossy()
-                    )),
+                    ),
                 ),
-            ],
-            || {
-                RUNTIME.block_on(async {
-                    let l = DefaultLoader::new(
-                        Client::new(),
-                        Config::default().from_env().from_profile(),
-                    );
-                    let x = l.load().await.expect("load must success").unwrap();
-                    assert_eq!("shared_access_key_id", x.access_key_id);
-                    assert_eq!("shared_secret_access_key", x.secret_access_key);
-                })
-            },
+            ]),
+        });
+
+        let l = DefaultLoader::new(
+            Client::new(),
+            Config::default()
+                .from_env(&context)
+                .from_profile(&context)
+                .await,
         );
+        let x = l.load().await.expect("load must success").unwrap();
+        assert_eq!("shared_access_key_id", x.access_key_id);
+        assert_eq!("shared_secret_access_key", x.secret_access_key);
     }
 
-    #[test]
-    fn test_signer_with_web_loader() -> Result<()> {
+    #[tokio::test]
+    async fn test_signer_with_web_loader() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         dotenv::from_filename(".env").ok();
@@ -788,54 +793,55 @@ mod tests {
         );
         fs::write(&file_path, github_token)?;
 
-        temp_env::with_vars(
-            vec![
-                (AWS_REGION, Some(&region)),
-                (AWS_ROLE_ARN, Some(&role_arn)),
-                (AWS_WEB_IDENTITY_TOKEN_FILE, Some(&file_path)),
-            ],
-            || {
-                RUNTIME.block_on(async {
-                    let config = Config::default().from_env();
-                    let loader = DefaultLoader::new(reqwest::Client::new(), config);
+        let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let context = context.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                (AWS_REGION.to_string(), region.to_string()),
+                (AWS_ROLE_ARN.to_string(), role_arn.to_string()),
+                (
+                    AWS_WEB_IDENTITY_TOKEN_FILE.to_string(),
+                    file_path.to_string(),
+                ),
+            ]),
+        });
 
-                    let signer = Signer::new("s3", &region);
+        let config = Config::default().from_env(&context);
+        let loader = DefaultLoader::new(reqwest::Client::new(), config);
 
-                    let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
-                    let mut req = Request::new("");
-                    *req.method_mut() = http::Method::GET;
-                    *req.uri_mut() =
-                        http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
+        let signer = Signer::new("s3", &region);
 
-                    let cred = loader
-                        .load()
-                        .await
-                        .expect("credential must be valid")
-                        .unwrap();
+        let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
+        let mut req = Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() =
+            http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
 
-                    let (mut req, body) = req.into_parts();
-                    signer.sign(&mut req, &cred).expect("sign must success");
-                    let req = Request::from_parts(req, body);
+        let cred = loader
+            .load()
+            .await
+            .expect("credential must be valid")
+            .unwrap();
 
-                    debug!("signed request url: {:?}", req.uri().to_string());
-                    debug!("signed request: {:?}", req);
+        let (mut req, body) = req.into_parts();
+        signer.sign(&mut req, &cred).expect("sign must success");
+        let req = Request::from_parts(req, body);
 
-                    let client = Client::new();
-                    let resp = client.execute(req.try_into().unwrap()).await.unwrap();
+        debug!("signed request url: {:?}", req.uri().to_string());
+        debug!("signed request: {:?}", req);
 
-                    let status = resp.status();
-                    debug!("got response: {:?}", resp);
-                    debug!("got response content: {:?}", resp.text().await.unwrap());
-                    assert_eq!(status, StatusCode::NOT_FOUND);
-                })
-            },
-        );
+        let client = Client::new();
+        let resp = client.execute(req.try_into().unwrap()).await.unwrap();
 
+        let status = resp.status();
+        debug!("got response: {:?}", resp);
+        debug!("got response content: {:?}", resp.text().await.unwrap());
+        assert_eq!(status, StatusCode::NOT_FOUND);
         Ok(())
     }
 
-    #[test]
-    fn test_signer_with_web_loader_assume_role() -> Result<()> {
+    #[tokio::test]
+    async fn test_signer_with_web_loader_assume_role() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         dotenv::from_filename(".env").ok();
@@ -870,56 +876,57 @@ mod tests {
         );
         fs::write(&file_path, github_token)?;
 
-        temp_env::with_vars(
-            vec![
-                (AWS_REGION, Some(&region)),
-                (AWS_ROLE_ARN, Some(&role_arn)),
-                (AWS_WEB_IDENTITY_TOKEN_FILE, Some(&file_path)),
-            ],
-            || {
-                RUNTIME.block_on(async {
-                    let client = reqwest::Client::new();
-                    let default_loader =
-                        DefaultLoader::new(client.clone(), Config::default().from_env())
-                            .with_disable_ec2_metadata();
+        let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let context = context.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                (AWS_REGION.to_string(), region.to_string()),
+                (AWS_ROLE_ARN.to_string(), role_arn.to_string()),
+                (
+                    AWS_WEB_IDENTITY_TOKEN_FILE.to_string(),
+                    file_path.to_string(),
+                ),
+            ]),
+        });
 
-                    let cfg = Config {
-                        role_arn: Some(assume_role_arn.clone()),
-                        region: Some(region.clone()),
-                        sts_regional_endpoints: "regional".to_string(),
-                        ..Default::default()
-                    };
-                    let loader =
-                        AssumeRoleLoader::new(client.clone(), cfg, Box::new(default_loader))
-                            .expect("AssumeRoleLoader must be valid");
+        let client = reqwest::Client::new();
+        let default_loader =
+            DefaultLoader::new(client.clone(), Config::default().from_env(&context))
+                .with_disable_ec2_metadata();
 
-                    let signer = Signer::new("s3", &region);
-                    let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
-                    let mut req = Request::new("");
-                    *req.method_mut() = http::Method::GET;
-                    *req.uri_mut() =
-                        http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
-                    let cred = loader
-                        .load()
-                        .await
-                        .expect("credential must be valid")
-                        .unwrap();
+        let cfg = Config {
+            role_arn: Some(assume_role_arn.clone()),
+            region: Some(region.clone()),
+            sts_regional_endpoints: "regional".to_string(),
+            ..Default::default()
+        };
+        let loader = AssumeRoleLoader::new(client.clone(), cfg, Box::new(default_loader))
+            .expect("AssumeRoleLoader must be valid");
 
-                    let (mut parts, body) = req.into_parts();
-                    signer.sign(&mut parts, &cred).expect("sign must success");
-                    let req = Request::from_parts(parts, body);
+        let signer = Signer::new("s3", &region);
+        let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
+        let mut req = Request::new("");
+        *req.method_mut() = http::Method::GET;
+        *req.uri_mut() =
+            http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
+        let cred = loader
+            .load()
+            .await
+            .expect("credential must be valid")
+            .unwrap();
 
-                    debug!("signed request url: {:?}", req.uri().to_string());
-                    debug!("signed request: {:?}", req);
-                    let client = Client::new();
-                    let resp = client.execute(req.try_into().unwrap()).await.unwrap();
-                    let status = resp.status();
-                    debug!("got response: {:?}", resp);
-                    debug!("got response content: {:?}", resp.text().await.unwrap());
-                    assert_eq!(status, StatusCode::NOT_FOUND);
-                })
-            },
-        );
+        let (mut parts, body) = req.into_parts();
+        signer.sign(&mut parts, &cred).expect("sign must success");
+        let req = Request::from_parts(parts, body);
+
+        debug!("signed request url: {:?}", req.uri().to_string());
+        debug!("signed request: {:?}", req);
+        let client = Client::new();
+        let resp = client.execute(req.try_into().unwrap()).await.unwrap();
+        let status = resp.status();
+        debug!("got response: {:?}", resp);
+        debug!("got response content: {:?}", resp.text().await.unwrap());
+        assert_eq!(status, StatusCode::NOT_FOUND);
         Ok(())
     }
 

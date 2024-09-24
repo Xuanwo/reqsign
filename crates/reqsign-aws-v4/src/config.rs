@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-use std::env;
-#[cfg(not(target_arch = "wasm32"))]
-use std::fs;
-
+use super::constants::*;
 #[cfg(not(target_arch = "wasm32"))]
 use anyhow::anyhow;
 #[cfg(not(target_arch = "wasm32"))]
@@ -11,10 +7,7 @@ use anyhow::Result;
 use ini::Ini;
 #[cfg(not(target_arch = "wasm32"))]
 use log::debug;
-
-use super::constants::*;
-#[cfg(not(target_arch = "wasm32"))]
-use reqsign::dirs::expand_homedir;
+use reqsign::Context;
 
 /// Config for aws services.
 #[derive(Clone)]
@@ -131,8 +124,8 @@ impl Default for Config {
 
 impl Config {
     /// Load config from env.
-    pub fn from_env(mut self) -> Self {
-        let envs = env::vars().collect::<HashMap<_, _>>();
+    pub fn from_env(mut self, ctx: &Context) -> Self {
+        let envs = ctx.env_vars();
 
         if let Some(v) = envs.get(AWS_CONFIG_FILE) {
             self.config_file = v.to_string();
@@ -178,30 +171,31 @@ impl Config {
     /// If the env var AWS_PROFILE is set, this profile will be used,
     /// otherwise the contents of `self.profile` will be used.
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn from_profile(mut self) -> Self {
+    pub async fn from_profile(mut self, ctx: &Context) -> Self {
         // self.profile is checked by the two load methods.
-        if let Ok(profile) = env::var(AWS_PROFILE) {
+        if let Some(profile) = ctx.env_var(AWS_PROFILE) {
             self.profile = profile;
         }
 
         // make sure we're getting profile info from the correct place.
         // Respecting these env vars also makes it possible to unit test
         // this method.
-        if let Ok(config_file) = env::var(AWS_CONFIG_FILE) {
+        if let Some(config_file) = ctx.env_var(AWS_CONFIG_FILE) {
             self.config_file = config_file;
         }
 
-        if let Ok(shared_credentials_file) = env::var(AWS_SHARED_CREDENTIALS_FILE) {
+        if let Some(shared_credentials_file) = ctx.env_var(AWS_SHARED_CREDENTIALS_FILE) {
             self.shared_credentials_file = shared_credentials_file;
         }
 
         // Ignore all errors happened internally.
-        let _ = self.load_via_profile_config_file().map_err(|err| {
+        let _ = self.load_via_profile_config_file(ctx).await.map_err(|err| {
             debug!("load_via_profile_config_file failed: {err:?}");
         });
 
         let _ = self
-            .load_via_profile_shared_credentials_file()
+            .load_via_profile_shared_credentials_file(ctx)
+            .await
             .map_err(|err| debug!("load_via_profile_shared_credentials_file failed: {err:?}"));
 
         self
@@ -213,13 +207,13 @@ impl Config {
     /// - `aws_secret_access_key`
     /// - `aws_session_token`
     #[cfg(not(target_arch = "wasm32"))]
-    fn load_via_profile_shared_credentials_file(&mut self) -> Result<()> {
-        let path = expand_homedir(&self.shared_credentials_file)
+    async fn load_via_profile_shared_credentials_file(&mut self, ctx: &Context) -> Result<()> {
+        let path = ctx
+            .expand_home_dir(&self.shared_credentials_file)
             .ok_or_else(|| anyhow!("expand homedir failed"))?;
 
-        let _ = fs::metadata(&path)?;
-
-        let conf = Ini::load_from_file(path)?;
+        let content = ctx.file_read(&path).await?;
+        let conf = Ini::load_from_str(&String::from_utf8_lossy(&content))?;
 
         let props = conf
             .section(Some(&self.profile))
@@ -239,13 +233,13 @@ impl Config {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn load_via_profile_config_file(&mut self) -> Result<()> {
-        let path =
-            expand_homedir(&self.config_file).ok_or_else(|| anyhow!("expand homedir failed"))?;
+    async fn load_via_profile_config_file(&mut self, ctx: &Context) -> Result<()> {
+        let path = ctx
+            .expand_home_dir(&self.config_file)
+            .ok_or_else(|| anyhow!("expand homedir failed"))?;
 
-        let _ = fs::metadata(&path)?;
-
-        let conf = Ini::load_from_file(path)?;
+        let content = ctx.file_read(&path).await?;
+        let conf = Ini::load_from_str(&String::from_utf8_lossy(&content))?;
 
         let section = match self.profile.as_str() {
             "default" => "default".to_string(),
@@ -291,13 +285,17 @@ impl Config {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use reqsign::StaticEnv;
+    use reqsign_file_read_tokio::TokioFileRead;
+    use reqsign_http_send_reqwest::ReqwestHttpSend;
+    use std::collections::HashMap;
     use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
 
-    #[test]
+    #[tokio::test]
     #[cfg(not(target_arch = "wasm32"))]
-    fn test_config_from_profile_shared_credentials() -> Result<()> {
+    async fn test_config_from_profile_shared_credentials() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // Create a dummy credentials file to test against
@@ -314,37 +312,37 @@ mod tests {
         writeln!(tmp_file, "aws_secret_access_key = PROFILE1SECRETACCESSKEY")?;
         writeln!(tmp_file, "aws_session_token = PROFILE1SESSIONTOKEN")?;
 
-        temp_env::with_vars(
-            [
-                (AWS_PROFILE, Some("profile1".to_owned())),
-                (AWS_CONFIG_FILE, None::<String>),
+        let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let context = context.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                (AWS_PROFILE.to_string(), "profile1".to_string()),
                 (
-                    AWS_SHARED_CREDENTIALS_FILE,
-                    Some(file_path.to_str().unwrap().to_owned()),
+                    AWS_SHARED_CREDENTIALS_FILE.to_string(),
+                    file_path.to_str().unwrap().to_owned(),
                 ),
-            ],
-            || {
-                let config = Config::default().from_profile();
+            ]),
+        });
 
-                assert_eq!(config.profile, "profile1".to_owned());
-                assert_eq!(config.access_key_id, Some("PROFILE1ACCESSKEYID".to_owned()));
-                assert_eq!(
-                    config.secret_access_key,
-                    Some("PROFILE1SECRETACCESSKEY".to_owned())
-                );
-                assert_eq!(
-                    config.session_token,
-                    Some("PROFILE1SESSIONTOKEN".to_owned())
-                );
-            },
+        let config = Config::default().from_profile(&context).await;
+
+        assert_eq!(config.profile, "profile1".to_owned());
+        assert_eq!(config.access_key_id, Some("PROFILE1ACCESSKEYID".to_owned()));
+        assert_eq!(
+            config.secret_access_key,
+            Some("PROFILE1SECRETACCESSKEY".to_owned())
+        );
+        assert_eq!(
+            config.session_token,
+            Some("PROFILE1SESSIONTOKEN".to_owned())
         );
 
         Ok(())
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(not(target_arch = "wasm32"))]
-    fn test_config_from_profile_config() -> Result<()> {
+    async fn test_config_from_profile_config() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // Create a dummy credentials file to test against
@@ -361,29 +359,29 @@ mod tests {
         writeln!(tmp_file, "aws_secret_access_key = PROFILE1SECRETACCESSKEY")?;
         writeln!(tmp_file, "aws_session_token = PROFILE1SESSIONTOKEN")?;
 
-        temp_env::with_vars(
-            [
-                (AWS_PROFILE, Some("profile1".to_owned())),
+        let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let context = context.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                (AWS_PROFILE.to_string(), "profile1".to_string()),
                 (
-                    AWS_CONFIG_FILE,
-                    Some(file_path.to_str().unwrap().to_owned()),
+                    AWS_CONFIG_FILE.to_string(),
+                    file_path.to_str().unwrap().to_owned(),
                 ),
-                (AWS_SHARED_CREDENTIALS_FILE, None::<String>),
-            ],
-            || {
-                let config = Config::default().from_profile();
+            ]),
+        });
 
-                assert_eq!(config.profile, "profile1".to_owned());
-                assert_eq!(config.access_key_id, Some("PROFILE1ACCESSKEYID".to_owned()));
-                assert_eq!(
-                    config.secret_access_key,
-                    Some("PROFILE1SECRETACCESSKEY".to_owned())
-                );
-                assert_eq!(
-                    config.session_token,
-                    Some("PROFILE1SESSIONTOKEN".to_owned())
-                );
-            },
+        let config = Config::default().from_profile(&context).await;
+
+        assert_eq!(config.profile, "profile1".to_owned());
+        assert_eq!(config.access_key_id, Some("PROFILE1ACCESSKEYID".to_owned()));
+        assert_eq!(
+            config.secret_access_key,
+            Some("PROFILE1SECRETACCESSKEY".to_owned())
+        );
+        assert_eq!(
+            config.session_token,
+            Some("PROFILE1SESSIONTOKEN".to_owned())
         );
 
         Ok(())
