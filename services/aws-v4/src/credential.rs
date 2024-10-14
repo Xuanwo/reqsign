@@ -23,20 +23,6 @@ use reqsign_core::time::DateTime;
 pub const EMPTY_STRING_SHA256: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
-/// Credential that holds the access_key and secret_key.
-#[derive(Default, Clone)]
-#[cfg_attr(test, derive(Debug))]
-pub struct Credential {
-    /// Access key id for aws services.
-    pub access_key_id: String,
-    /// Secret access key for aws services.
-    pub secret_access_key: String,
-    /// Session token for aws services.
-    pub session_token: Option<String>,
-    /// Expiration time for this credential.
-    pub expires_in: Option<DateTime>,
-}
-
 impl Credential {
     /// is current cred is valid?
     pub fn is_valid(&self) -> bool {
