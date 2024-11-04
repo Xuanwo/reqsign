@@ -38,10 +38,26 @@ impl Context {
         self.fs.file_read(path).await
     }
 
+    /// Read the file content entirely in `String`.
+    pub async fn file_read_as_string(&self, path: &str) -> Result<String> {
+        let bytes = self.file_read(path).await?;
+        Ok(String::from_utf8_lossy(&bytes).to_string())
+    }
+
     /// Send http request and return the response.
     #[inline]
     pub async fn http_send(&self, req: http::Request<Bytes>) -> Result<http::Response<Bytes>> {
         self.http.http_send(req).await
+    }
+
+    /// Send http request and return the response as string.
+    pub async fn http_send_as_string(
+        &self,
+        req: http::Request<Bytes>,
+    ) -> Result<http::Response<String>> {
+        let (parts, body) = self.http.http_send(req).await?.into_parts();
+        let body = String::from_utf8_lossy(&body).to_string();
+        Ok(http::Response::from_parts(parts, body))
     }
 
     /// Get the home directory of the current user.

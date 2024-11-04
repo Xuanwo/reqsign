@@ -1,3 +1,5 @@
+use std::fmt;
+
 use super::constants::*;
 #[cfg(not(target_arch = "wasm32"))]
 use anyhow::anyhow;
@@ -7,11 +9,11 @@ use anyhow::Result;
 use ini::Ini;
 #[cfg(not(target_arch = "wasm32"))]
 use log::debug;
+use reqsign_core::utils::Redact;
 use reqsign_core::Context;
 
 /// Config for aws services.
 #[derive(Clone)]
-#[cfg_attr(test, derive(Debug))]
 pub struct Config {
     /// `config_file` will be load from:
     ///
@@ -125,6 +127,29 @@ impl Default for Config {
             ec2_metadata_disabled: false,
             endpoint_url: None,
         }
+    }
+}
+
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Config")
+            .field("config_file", &self.config_file)
+            .field("shared_credentials_file", &self.shared_credentials_file)
+            .field("profile", &self.profile)
+            .field("region", &self.region)
+            .field("sts_regional_endpoints", &self.sts_regional_endpoints)
+            .field("access_key_id", &Redact::from(&self.access_key_id))
+            .field("secret_access_key", &Redact::from(&self.secret_access_key))
+            .field("session_token", &Redact::from(&self.session_token))
+            .field("role_arn", &self.role_arn)
+            .field("role_session_name", &self.role_session_name)
+            .field("duration_seconds", &self.duration_seconds)
+            .field("external_id", &Redact::from(&self.external_id))
+            .field("tags", &self.tags)
+            .field("web_identity_token_file", &self.web_identity_token_file)
+            .field("ec2_metadata_disabled", &self.ec2_metadata_disabled)
+            .field("endpoint_url", &self.endpoint_url)
+            .finish()
     }
 }
 

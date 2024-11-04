@@ -1,4 +1,3 @@
-use super::SigningRequest;
 use crate::Context;
 use std::fmt::Debug;
 use std::time::Duration;
@@ -61,5 +60,5 @@ pub trait Build: Debug + Send + Sync + Unpin + 'static {
         req: &mut http::request::Parts,
         key: Option<&Self::Key>,
         expires_in: Option<Duration>,
-    ) -> anyhow::Result<SigningRequest>;
+    ) -> anyhow::Result<()>;
 }

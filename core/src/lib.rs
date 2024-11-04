@@ -5,6 +5,7 @@
 
 pub mod hash;
 pub mod time;
+pub mod utils;
 
 mod context;
 pub use context::Context;

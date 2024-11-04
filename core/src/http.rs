@@ -7,7 +7,7 @@ use std::fmt::Debug;
 /// For example, fetch IMDS token from AWS or OAuth2 refresh token. This trait is designed
 /// especially for the signer, please don't use it as a general http client.
 #[async_trait::async_trait]
-pub trait HttpSend: Debug + 'static {
+pub trait HttpSend: Debug + Send + Sync + 'static {
     /// Send http request and return the response.
     async fn http_send(&self, req: http::Request<Bytes>) -> Result<http::Response<Bytes>>;
 }
