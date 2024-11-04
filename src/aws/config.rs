@@ -396,11 +396,11 @@ mod tests {
                     config.session_token,
                     Some("PROFILE1SESSIONTOKEN".to_owned())
                 );
+                assert_eq!(
+                    config.endpoint_url,
+                    Some("http://localhost:8080".to_owned())
+                );
             },
-        );
-        assert_eq!(
-            config.endpoint_url,
-            Some("http://localhost:8080".to_owned())
         );
 
         Ok(())
