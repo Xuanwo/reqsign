@@ -111,6 +111,8 @@ impl Build for Builder {
         let signature = hex_hmac_sha256(&signing_key, string_to_sign.as_bytes());
 
         if expires_in.is_some() {
+            signed_req.query.push(("X-Amz-Signature".into(), signature));
+        } else {
             let mut authorization = HeaderValue::from_str(&format!(
                 "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
                 cred.access_key_id,
@@ -123,8 +125,6 @@ impl Build for Builder {
             signed_req
                 .headers
                 .insert(header::AUTHORIZATION, authorization);
-        } else {
-            signed_req.query.push(("X-Amz-Signature".into(), signature));
         }
 
         // Apply to the request.
@@ -463,6 +463,7 @@ mod tests {
         req
     }
 
+    #[track_caller]
     fn compare_request(name: &str, l: &Request<&str>, r: &Request<&str>) {
         fn format_headers(req: &Request<&str>) -> Vec<String> {
             let mut hs = req
@@ -567,8 +568,7 @@ mod tests {
             )
             .unwrap(),
             &sp.into(),
-        )
-        .expect("signing must succeed");
+        )?;
         let (aws_sig, _) = output.into_parts();
         aws_sig.apply_to_request_http1x(&mut req);
         let expected_req = req;

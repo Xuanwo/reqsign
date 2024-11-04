@@ -15,6 +15,7 @@ use http::Uri;
 use std::str::FromStr;
 
 /// Signing context for request.
+#[derive(Debug)]
 pub struct SigningRequest {
     /// HTTP method.
     pub method: Method,
