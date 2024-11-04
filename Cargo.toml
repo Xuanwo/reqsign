@@ -29,7 +29,7 @@ macro_rules_attribute = "0.2.0"
 once_cell = "1"
 percent-encoding = "2"
 pretty_assertions = "1.3"
-quick-xml = { version = "0.36", features = ["serialize"] }
+quick-xml = { version = "0.37", features = ["serialize"] }
 rand = "0.8.5"
 reqsign-core = { version = "0.16", path = "core" }
 reqwest = { version = "0.12", default-features = false }
