@@ -1,4 +1,4 @@
-use crate::Credential;
+use crate::{Config, Credential};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -11,7 +11,18 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct IMDSv2Loader {
+    config: Arc<Config>,
     token: Arc<Mutex<(String, DateTime)>>,
+}
+
+impl IMDSv2Loader {
+    /// Create a new `IMDSv2Loader` instance.
+    pub fn new(cfg: Arc<Config>) -> Self {
+        Self {
+            config: cfg,
+            token: Arc::new(Mutex::new((String::new(), DateTime::default()))),
+        }
+    }
 }
 
 impl IMDSv2Loader {
@@ -31,8 +42,7 @@ impl IMDSv2Loader {
             // 21600s (6h) is recommended by AWS.
             .header("x-aws-ec2-metadata-token-ttl-seconds", "21600")
             .body(Bytes::new())?;
-        let mut resp = ctx.http_send_as_string(req).await?;
-
+        let resp = ctx.http_send_as_string(req).await?;
         if resp.status() != http::StatusCode::OK {
             return Err(anyhow!(
                 "request to AWS EC2 Metadata Services failed: {}",
@@ -57,6 +67,11 @@ impl Load for IMDSv2Loader {
     type Key = Credential;
 
     async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+        // If ec2_metadata_disabled is set, return None.
+        if self.config.ec2_metadata_disabled {
+            return Ok(None);
+        }
+
         let token = self.load_ec2_metadata_token(ctx).await?;
 
         // List all credentials that node has.
@@ -67,7 +82,7 @@ impl Load for IMDSv2Loader {
             // 21600s (6h) is recommended by AWS.
             .header("x-aws-ec2-metadata-token", &token)
             .body(Bytes::new())?;
-        let mut resp = ctx.http_send_as_string(req).await?;
+        let resp = ctx.http_send_as_string(req).await?;
         if resp.status() != http::StatusCode::OK {
             return Err(anyhow!(
                 "request to AWS EC2 Metadata Services failed: {}",
@@ -88,7 +103,7 @@ impl Load for IMDSv2Loader {
             .header("x-aws-ec2-metadata-token", &token)
             .body(Bytes::new())?;
 
-        let mut resp = ctx.http_send_as_string(req).await?;
+        let resp = ctx.http_send_as_string(req).await?;
         if resp.status() != http::StatusCode::OK {
             return Err(anyhow!(
                 "request to AWS EC2 Metadata Services failed: {}",
@@ -102,7 +117,7 @@ impl Load for IMDSv2Loader {
             return Err(anyhow!(
                 "Incorrect IMDS/IAM configuration: [{}] {}. \
                         Hint: Does this role have a trust relationship with EC2?",
-                resp.code
+                resp.code,
                 resp.message
             ));
         }

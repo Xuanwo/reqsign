@@ -1,3 +1,5 @@
+//! Utility functions and types.
+
 use std::fmt::Debug;
 
 /// Redacts a string by replacing all but the first and last three characters with asterisks.
@@ -12,6 +14,12 @@ pub struct Redact<'a>(&'a str);
 impl<'a> From<&'a str> for Redact<'a> {
     fn from(value: &'a str) -> Self {
         Redact(value)
+    }
+}
+
+impl<'a> From<&'a String> for Redact<'a> {
+    fn from(value: &'a String) -> Self {
+        Redact(value.as_str())
     }
 }
 

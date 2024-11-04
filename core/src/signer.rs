@@ -39,10 +39,8 @@ impl<K: Key> Signer<K> {
             ctx
         };
 
-        let signing = self
-            .builder
+        self.builder
             .build(&self.ctx, req, key.as_ref(), expires_in)
-            .await?;
-        signing.apply(req)
+            .await
     }
 }

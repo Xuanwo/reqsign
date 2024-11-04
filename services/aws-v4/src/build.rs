@@ -1,48 +1,36 @@
-//! AWS service sigv4 signer
-
-use std::fmt::Debug;
+use crate::constants::{
+    AWS_QUERY_ENCODE_SET, X_AMZ_CONTENT_SHA_256, X_AMZ_DATE, X_AMZ_SECURITY_TOKEN,
+};
+use crate::Credential;
+use async_trait::async_trait;
+use http::request::Parts;
+use http::{header, HeaderValue};
+use log::debug;
+use percent_encoding::{percent_decode_str, utf8_percent_encode};
+use reqsign_core::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
+use reqsign_core::time::{format_date, format_iso8601, now, DateTime};
+use reqsign_core::{Build, Context, SigningRequest};
 use std::fmt::Write;
 use std::time::Duration;
 
-use anyhow::Result;
-use http::header;
-use http::HeaderValue;
-use log::debug;
-use percent_encoding::percent_decode_str;
-use percent_encoding::utf8_percent_encode;
-
-use super::constants::AWS_QUERY_ENCODE_SET;
-use super::constants::X_AMZ_CONTENT_SHA_256;
-use super::constants::X_AMZ_DATE;
-use super::constants::X_AMZ_SECURITY_TOKEN;
-use super::credential::Credential;
-use reqsign_core::hash::hex_hmac_sha256;
-use reqsign_core::hash::hex_sha256;
-use reqsign_core::hash::hmac_sha256;
-use reqsign_core::time::format_date;
-use reqsign_core::time::format_iso8601;
-use reqsign_core::time::now;
-use reqsign_core::time::DateTime;
-use reqsign_core::SigningMethod;
-use reqsign_core::SigningRequest;
-
-/// Signer that implement AWS SigV4.
+/// Builder that implement AWS SigV4.
 ///
 /// - [Signature Version 4 signing process](https://docs.aws.amazon.com/general/latest/gr/signature-version-4.html)
 #[derive(Debug)]
-pub struct Signer {
+pub struct Builder {
     service: String,
     region: String,
 
     time: Option<DateTime>,
 }
 
-impl Signer {
-    /// Create a builder.
+impl Builder {
+    /// Create a new builder for AWS V4 signer.
     pub fn new(service: &str, region: &str) -> Self {
         Self {
-            service: service.to_string(),
-            region: region.to_string(),
+            service: service.into(),
+            region: region.into(),
+
             time: None,
         }
     }
@@ -54,26 +42,43 @@ impl Signer {
     /// We should always take current time to sign requests.
     /// Only use this function for testing.
     #[cfg(test)]
-    pub fn time(mut self, time: DateTime) -> Self {
+    pub fn with_time(mut self, time: DateTime) -> Self {
         self.time = Some(time);
         self
     }
+}
 
-    fn build(
+#[async_trait]
+impl Build for Builder {
+    type Key = Credential;
+
+    async fn build(
         &self,
-        req: &mut http::request::Parts,
-        method: SigningMethod,
-        cred: &Credential,
-    ) -> Result<SigningRequest> {
+        _: &Context,
+        req: &mut Parts,
+        key: Option<&Self::Key>,
+        expires_in: Option<Duration>,
+    ) -> anyhow::Result<()> {
         let now = self.time.unwrap_or_else(now);
-        let mut ctx = SigningRequest::build(req)?;
+        let mut signed_req = SigningRequest::build(req)?;
+
+        let Some(cred) = key else {
+            return Ok(());
+        };
 
         // canonicalize context
-        canonicalize_header(&mut ctx, method, cred, now)?;
-        canonicalize_query(&mut ctx, method, cred, now, &self.service, &self.region)?;
+        canonicalize_header(&mut signed_req, cred, expires_in, now)?;
+        canonicalize_query(
+            &mut signed_req,
+            cred,
+            expires_in,
+            now,
+            &self.service,
+            &self.region,
+        )?;
 
         // build canonical request and string to sign.
-        let creq = canonical_request_string(&mut ctx)?;
+        let creq = canonical_request_string(&mut signed_req)?;
         let encoded_req = hex_sha256(creq.as_bytes());
 
         // Scope: "20220313/<region>/<service>/aws4_request"
@@ -105,52 +110,29 @@ impl Signer {
             generate_signing_key(&cred.secret_access_key, now, &self.region, &self.service);
         let signature = hex_hmac_sha256(&signing_key, string_to_sign.as_bytes());
 
-        match method {
-            SigningMethod::Header => {
-                let mut authorization = HeaderValue::from_str(&format!(
-                    "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
-                    cred.access_key_id,
-                    scope,
-                    ctx.header_name_to_vec_sorted().join(";"),
-                    signature
-                ))?;
-                authorization.set_sensitive(true);
+        if expires_in.is_some() {
+            let mut authorization = HeaderValue::from_str(&format!(
+                "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
+                cred.access_key_id,
+                scope,
+                signed_req.header_name_to_vec_sorted().join(";"),
+                signature
+            ))?;
+            authorization.set_sensitive(true);
 
-                ctx.headers
-                    .insert(http::header::AUTHORIZATION, authorization);
-            }
-            SigningMethod::Query(_) => {
-                ctx.query.push(("X-Amz-Signature".into(), signature));
-            }
+            signed_req
+                .headers
+                .insert(header::AUTHORIZATION, authorization);
+        } else {
+            signed_req.query.push(("X-Amz-Signature".into(), signature));
         }
 
-        Ok(ctx)
-    }
-
-    /// Get the region of this signer.
-    pub fn region(&self) -> &str {
-        &self.region
-    }
-
-    /// Signing request with header.
-    pub fn sign(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
-        let ctx = self.build(parts, SigningMethod::Header, cred)?;
-        ctx.apply(parts)
-    }
-
-    /// Signing request with query.
-    pub fn sign_query(
-        &self,
-        parts: &mut http::request::Parts,
-        expire: Duration,
-        cred: &Credential,
-    ) -> Result<()> {
-        let ctx = self.build(parts, SigningMethod::Query(expire), cred)?;
-        ctx.apply(parts)
+        // Apply to the request.
+        signed_req.apply(req)
     }
 }
 
-fn canonical_request_string(ctx: &mut SigningRequest) -> Result<String> {
+fn canonical_request_string(ctx: &mut SigningRequest) -> anyhow::Result<String> {
     // 256 is specially chosen to avoid reallocation for most requests.
     let mut f = String::with_capacity(256);
 
@@ -198,10 +180,10 @@ fn canonical_request_string(ctx: &mut SigningRequest) -> Result<String> {
 
 fn canonicalize_header(
     ctx: &mut SigningRequest,
-    method: SigningMethod,
     cred: &Credential,
+    expires_in: Option<Duration>,
     now: DateTime,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     // Header names and values need to be normalized according to Step 4 of https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
     for (_, value) in ctx.headers.iter_mut() {
         SigningRequest::header_value_normalize(value)
@@ -213,7 +195,7 @@ fn canonicalize_header(
             .insert(header::HOST, ctx.authority.as_str().parse()?);
     }
 
-    if method == SigningMethod::Header {
+    if expires_in.is_none() {
         // Insert DATE header if not present.
         if ctx.headers.get(X_AMZ_DATE).is_none() {
             let date_header = HeaderValue::try_from(format_iso8601(now))?;
@@ -243,13 +225,13 @@ fn canonicalize_header(
 
 fn canonicalize_query(
     ctx: &mut SigningRequest,
-    method: SigningMethod,
     cred: &Credential,
+    expires_in: Option<Duration>,
     now: DateTime,
     service: &str,
     region: &str,
-) -> Result<()> {
-    if let SigningMethod::Query(expire) = method {
+) -> anyhow::Result<()> {
+    if let Some(expire) = expires_in {
         ctx.query
             .push(("X-Amz-Algorithm".into(), "AWS4-HMAC-SHA256".into()));
         ctx.query.push((
@@ -317,6 +299,9 @@ fn generate_signing_key(secret: &str, time: DateTime, region: &str, service: &st
 mod tests {
     use std::time::SystemTime;
 
+    use super::*;
+    use crate::Config;
+    use crate::DefaultLoader;
     use anyhow::Result;
     use aws_credential_types::Credentials;
     use aws_sigv4::http_request::PayloadChecksumKind;
@@ -328,15 +313,34 @@ mod tests {
     use aws_sigv4::sign::v4;
     use http::header;
     use http::Request;
-    use macro_rules_attribute::apply;
-    use reqwest::Client;
+    use reqsign_core::Load;
+    use reqsign_file_read_tokio::TokioFileRead;
+    use reqsign_http_send_reqwest::ReqwestHttpSend;
 
-    use super::*;
-    use crate::Config;
-    use crate::DefaultLoader;
+    /// (name, request_builder)
+    type TestCase = (&'static str, fn() -> Request<&'static str>);
 
-    fn test_get_request() -> http::Request<&'static str> {
-        let mut req = http::Request::new("");
+    fn test_cases() -> Vec<TestCase> {
+        vec![
+            ("get_request", test_get_request),
+            ("get_request_with_sse", test_get_request_with_sse),
+            ("get_request_with_query", test_get_request_with_query),
+            ("get_request_virtual_host", test_get_request_virtual_host),
+            (
+                "get_request_with_query_virtual_host",
+                test_get_request_with_query_virtual_host,
+            ),
+            ("put_request", test_put_request),
+            (
+                "put_request_with_body_digest",
+                test_put_request_with_body_digest,
+            ),
+            ("put_request_virtual_host", test_put_request_virtual_host),
+        ]
+    }
+
+    fn test_get_request() -> Request<&'static str> {
+        let mut req = Request::new("");
         *req.method_mut() = http::Method::GET;
         *req.uri_mut() = "http://127.0.0.1:9000/hello"
             .parse()
@@ -345,8 +349,8 @@ mod tests {
         req
     }
 
-    fn test_get_request_with_sse() -> http::Request<&'static str> {
-        let mut req = http::Request::new("");
+    fn test_get_request_with_sse() -> Request<&'static str> {
+        let mut req = Request::new("");
         *req.method_mut() = http::Method::GET;
         *req.uri_mut() = "http://127.0.0.1:9000/hello"
             .parse()
@@ -375,8 +379,8 @@ mod tests {
         req
     }
 
-    fn test_get_request_with_query() -> http::Request<&'static str> {
-        let mut req = http::Request::new("");
+    fn test_get_request_with_query() -> Request<&'static str> {
+        let mut req = Request::new("");
         *req.method_mut() = http::Method::GET;
         *req.uri_mut() = "http://127.0.0.1:9000/hello?list-type=2&max-keys=3&prefix=CI/&start-after=ExampleGuide.pdf"
             .parse()
@@ -385,8 +389,8 @@ mod tests {
         req
     }
 
-    fn test_get_request_virtual_host() -> http::Request<&'static str> {
-        let mut req = http::Request::new("");
+    fn test_get_request_virtual_host() -> Request<&'static str> {
+        let mut req = Request::new("");
         *req.method_mut() = http::Method::GET;
         *req.uri_mut() = "http://hello.s3.test.example.com"
             .parse()
@@ -395,8 +399,8 @@ mod tests {
         req
     }
 
-    fn test_get_request_with_query_virtual_host() -> http::Request<&'static str> {
-        let mut req = http::Request::new("");
+    fn test_get_request_with_query_virtual_host() -> Request<&'static str> {
+        let mut req = Request::new("");
         *req.method_mut() = http::Method::GET;
         *req.uri_mut() = "http://hello.s3.test.example.com?list-type=2&max-keys=3&prefix=CI/&start-after=ExampleGuide.pdf"
             .parse()
@@ -405,9 +409,9 @@ mod tests {
         req
     }
 
-    fn test_put_request() -> http::Request<&'static str> {
+    fn test_put_request() -> Request<&'static str> {
         let content = "Hello,World!";
-        let mut req = http::Request::new(content);
+        let mut req = Request::new(content);
         *req.method_mut() = http::Method::PUT;
         *req.uri_mut() = "http://127.0.0.1:9000/hello"
             .parse()
@@ -421,9 +425,9 @@ mod tests {
         req
     }
 
-    fn test_put_request_with_body_digest() -> http::Request<&'static str> {
+    fn test_put_request_with_body_digest() -> Request<&'static str> {
         let content = "Hello,World!";
-        let mut req = http::Request::new(content);
+        let mut req = Request::new(content);
         *req.method_mut() = http::Method::PUT;
         *req.uri_mut() = "http://127.0.0.1:9000/hello"
             .parse()
@@ -443,9 +447,9 @@ mod tests {
         req
     }
 
-    fn test_put_request_virtual_host() -> http::Request<&'static str> {
+    fn test_put_request_virtual_host() -> Request<&'static str> {
         let content = "Hello,World!";
-        let mut req = http::Request::new(content);
+        let mut req = Request::new(content);
         *req.method_mut() = http::Method::PUT;
         *req.uri_mut() = "http://hello.s3.test.example.com"
             .parse()
@@ -459,22 +463,8 @@ mod tests {
         req
     }
 
-    macro_rules! test_cases {
-        ($($tt:tt)*) => {
-            #[test_case::test_case(test_get_request)]
-            #[test_case::test_case(test_get_request_with_sse)]
-            #[test_case::test_case(test_get_request_with_query)]
-            #[test_case::test_case(test_get_request_virtual_host)]
-            #[test_case::test_case(test_get_request_with_query_virtual_host)]
-            #[test_case::test_case(test_put_request)]
-            #[test_case::test_case(test_put_request_virtual_host)]
-            #[test_case::test_case(test_put_request_with_body_digest)]
-            $($tt)*
-        };
-    }
-
-    fn compare_request(name: &str, l: &http::Request<&str>, r: &http::Request<&str>) {
-        fn format_headers(req: &http::Request<&str>) -> Vec<String> {
+    fn compare_request(name: &str, l: &Request<&str>, r: &Request<&str>) {
+        fn format_headers(req: &Request<&str>) -> Vec<String> {
             let mut hs = req
                 .headers()
                 .iter()
@@ -496,7 +486,7 @@ mod tests {
             "{name} header mismatch"
         );
 
-        fn format_query(req: &http::Request<&str>) -> Vec<String> {
+        fn format_query(req: &Request<&str>) -> Vec<String> {
             let query = req.uri().query().unwrap_or_default();
             let mut query = form_urlencoded::parse(query.as_bytes())
                 .map(|(k, v)| format!("{}={}", &k, &v))
@@ -508,9 +498,28 @@ mod tests {
         assert_eq!(format_query(l), format_query(r), "{name} query mismatch");
     }
 
-    #[apply(test_cases)]
     #[tokio::test]
-    async fn test_calculate(req_fn: fn() -> http::Request<&'static str>) -> Result<()> {
+    async fn test() -> Result<()> {
+        for (name, req) in test_cases() {
+            calculate(req)
+                .await
+                .unwrap_or_else(|err| panic!("calculate {name} should pass: {err:?}"));
+            calculate_in_query(req)
+                .await
+                .unwrap_or_else(|err| panic!("calculate_in_query {name} should pass: {err:?}"));
+            test_calculate_with_token(req).await.unwrap_or_else(|err| {
+                panic!("test_calculate_with_token {name} should pass: {err:?}")
+            });
+            test_calculate_with_token_in_query(req)
+                .await
+                .unwrap_or_else(|err| {
+                    panic!("test_calculate_with_token_in_query {name} should pass: {err:?}")
+                });
+        }
+        Ok(())
+    }
+
+    async fn calculate(req_fn: fn() -> Request<&'static str>) -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let mut req = req_fn();
@@ -567,29 +576,31 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
         let loader = DefaultLoader::new(
-            Client::new(),
             Config {
                 access_key_id: Some("access_key_id".to_string()),
                 secret_access_key: Some("secret_access_key".to_string()),
                 ..Default::default()
-            },
+            }
+            .into(),
         );
-        let cred = loader.load().await?.unwrap();
+        let cred = loader.load(&ctx).await?.unwrap();
 
-        let signer = Signer::new("s3", "test").time(now);
-        signer.sign(&mut parts, &cred).expect("must apply success");
+        let builder = Builder::new("s3", "test").with_time(now);
+        builder
+            .build(&ctx, &mut parts, Some(&cred), None)
+            .await
+            .expect("must apply success");
 
-        let actual_req = http::request::Request::from_parts(parts, body);
+        let actual_req = Request::from_parts(parts, body);
 
         compare_request(&name, &expected_req, &actual_req);
 
         Ok(())
     }
 
-    #[apply(test_cases)]
-    #[tokio::test]
-    async fn test_calculate_in_query(req_fn: fn() -> http::Request<&'static str>) -> Result<()> {
+    async fn calculate_in_query(req_fn: fn() -> Request<&'static str>) -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let mut req = req_fn();
@@ -648,19 +659,27 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
         let loader = DefaultLoader::new(
-            Client::new(),
             Config {
                 access_key_id: Some("access_key_id".to_string()),
                 secret_access_key: Some("secret_access_key".to_string()),
                 ..Default::default()
-            },
+            }
+            .into(),
         );
-        let cred = loader.load().await?.unwrap();
+        let cred = loader.load(&ctx).await?.unwrap();
 
-        let signer = Signer::new("s3", "test").time(now);
+        let builder = Builder::new("s3", "test").with_time(now);
 
-        signer.sign_query(&mut parts, Duration::from_secs(3600), &cred)?;
+        builder
+            .build(
+                &ctx,
+                &mut parts,
+                Some(&cred),
+                Some(Duration::from_secs(3600)),
+            )
+            .await?;
         let actual_req = Request::from_parts(parts, body);
 
         compare_request(&name, &expected_req, &actual_req);
@@ -668,9 +687,7 @@ mod tests {
         Ok(())
     }
 
-    #[apply(test_cases)]
-    #[tokio::test]
-    async fn test_calculate_with_token(req_fn: fn() -> http::Request<&'static str>) -> Result<()> {
+    async fn test_calculate_with_token(req_fn: fn() -> Request<&'static str>) -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let mut req = req_fn();
@@ -727,20 +744,23 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
         let loader = DefaultLoader::new(
-            Client::new(),
             Config {
                 access_key_id: Some("access_key_id".to_string()),
                 secret_access_key: Some("secret_access_key".to_string()),
                 session_token: Some("security_token".to_string()),
                 ..Default::default()
-            },
+            }
+            .into(),
         );
-        let cred = loader.load().await?.unwrap();
+        let cred = loader.load(&ctx).await?.unwrap();
 
-        let signer = Signer::new("s3", "test").time(now);
-
-        signer.sign(&mut parts, &cred).expect("must apply success");
+        let builder = Builder::new("s3", "test").with_time(now);
+        builder
+            .build(&ctx, &mut parts, Some(&cred), None)
+            .await
+            .expect("must apply success");
         let actual_req = Request::from_parts(parts, body);
 
         compare_request(&name, &expected_req, &actual_req);
@@ -748,10 +768,8 @@ mod tests {
         Ok(())
     }
 
-    #[apply(test_cases)]
-    #[tokio::test]
     async fn test_calculate_with_token_in_query(
-        req_fn: fn() -> http::Request<&'static str>,
+        req_fn: fn() -> Request<&'static str>,
     ) -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
@@ -812,20 +830,27 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
         let loader = DefaultLoader::new(
-            Client::new(),
             Config {
                 access_key_id: Some("access_key_id".to_string()),
                 secret_access_key: Some("secret_access_key".to_string()),
                 session_token: Some("security_token".to_string()),
                 ..Default::default()
-            },
+            }
+            .into(),
         );
-        let cred = loader.load().await?.unwrap();
+        let cred = loader.load(&ctx).await?.unwrap();
 
-        let signer = Signer::new("s3", "test").time(now);
-        signer
-            .sign_query(&mut parts, Duration::from_secs(3600), &cred)
+        let builder = Builder::new("s3", "test").with_time(now);
+        builder
+            .build(
+                &ctx,
+                &mut parts,
+                Some(&cred),
+                Some(Duration::from_secs(3600)),
+            )
+            .await
             .expect("must apply success");
         let actual_req = Request::from_parts(parts, body);
 

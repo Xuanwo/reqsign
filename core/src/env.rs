@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 
 /// Permits parameterizing the home functions via the _from variants
-pub trait Env: Debug + 'static {
+pub trait Env: Debug + Send + Sync + 'static {
     /// Get an environment variable.
     ///
     /// - Returns `Some(v)` if the environment variable is found and is valid utf-8.

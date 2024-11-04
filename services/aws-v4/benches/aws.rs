@@ -9,11 +9,23 @@ use aws_sigv4::sign::v4::SigningParams;
 use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
+use once_cell::sync::Lazy;
+use reqsign_aws_v4::Builder as AwsV4Builder;
 use reqsign_aws_v4::Credential as AwsCredential;
-use reqsign_aws_v4::Signer as AwsV4Signer;
+use reqsign_core::{Build, Context};
+use reqsign_file_read_tokio::TokioFileRead;
+use reqsign_http_send_reqwest::ReqwestHttpSend;
 
 criterion_group!(benches, bench);
 criterion_main!(benches);
+
+static RUNTIME: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .expect("must success")
+});
 
 pub fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("aws_v4");
@@ -25,9 +37,10 @@ pub fn bench(c: &mut Criterion) {
             ..Default::default()
         };
 
-        let s = AwsV4Signer::new("s3", "test");
+        let s = AwsV4Builder::new("s3", "test");
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-        b.iter(|| {
+        b.to_async(&*RUNTIME).iter(|| async {
             let mut req = http::Request::new("");
             *req.method_mut() = http::Method::GET;
             *req.uri_mut() = "http://127.0.0.1:9000/hello"
@@ -35,7 +48,9 @@ pub fn bench(c: &mut Criterion) {
                 .expect("url must be valid");
 
             let (mut parts, _) = req.into_parts();
-            s.sign(&mut parts, &cred).expect("must success")
+            s.build(&ctx, &mut parts, Some(&cred), None)
+                .await
+                .expect("must success")
         })
     });
 
