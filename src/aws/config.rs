@@ -105,6 +105,11 @@ pub struct Config {
     /// - this field
     /// - env value: [`AWS_EC2_METADATA_DISABLED`]
     pub ec2_metadata_disabled: bool,
+    /// `endpoint_url` value will be loaded from:
+    ///
+    /// - this field
+    /// - env value: [`AWS_ENDPOINT_URL`]
+    pub endpoint_url: Option<String>,
 }
 
 impl Default for Config {
@@ -125,6 +130,7 @@ impl Default for Config {
             tags: None,
             web_identity_token_file: None,
             ec2_metadata_disabled: false,
+            endpoint_url: None,
         }
     }
 }
@@ -169,6 +175,9 @@ impl Config {
         }
         if let Some(v) = envs.get(AWS_EC2_METADATA_DISABLED) {
             self.ec2_metadata_disabled = v == "true";
+        }
+        if let Some(v) = envs.get(AWS_ENDPOINT_URL) {
+            self.endpoint_url = Some(v.to_string());
         }
         self
     }
@@ -282,6 +291,9 @@ impl Config {
         if let Some(v) = props.get("web_identity_token_file") {
             self.web_identity_token_file = Some(v.to_string())
         }
+        if let Some(v) = props.get("endpoint_url") {
+            self.endpoint_url = Some(v.to_string())
+        }
 
         Ok(())
     }
@@ -360,6 +372,7 @@ mod tests {
         writeln!(tmp_file, "aws_access_key_id = PROFILE1ACCESSKEYID")?;
         writeln!(tmp_file, "aws_secret_access_key = PROFILE1SECRETACCESSKEY")?;
         writeln!(tmp_file, "aws_session_token = PROFILE1SESSIONTOKEN")?;
+        writeln!(tmp_file, "endpoint_url = http://localhost:8080")?;
 
         temp_env::with_vars(
             [
@@ -384,6 +397,10 @@ mod tests {
                     Some("PROFILE1SESSIONTOKEN".to_owned())
                 );
             },
+        );
+        assert_eq!(
+            config.endpoint_url,
+            Some("http://localhost:8080".to_owned())
         );
 
         Ok(())
