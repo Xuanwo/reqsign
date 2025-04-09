@@ -23,8 +23,7 @@ use tokio::fs;
 
 async fn init_default_loader() -> Option<(Context, DefaultLoader, Builder)> {
     let _ = env_logger::builder().is_test(true).try_init();
-
-    dotenv::from_filename("../../../.env").ok();
+    let _ = dotenv::dotenv();
 
     if env::var("REQSIGN_AWS_V4_TEST").is_err() || env::var("REQSIGN_AWS_V4_TEST").unwrap() != "on"
     {
@@ -334,8 +333,7 @@ async fn test_list_bucket() -> Result<()> {
 #[tokio::test]
 async fn test_signer_with_web_loader() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
-
-    dotenv::from_filename("../../../.env").ok();
+    let _ = dotenv::dotenv();
 
     if env::var("REQSIGN_AWS_S3_TEST").is_err() || env::var("REQSIGN_AWS_S3_TEST").unwrap() != "on"
     {
@@ -412,8 +410,7 @@ async fn test_signer_with_web_loader() -> Result<()> {
 #[tokio::test]
 async fn test_signer_with_web_loader_assume_role() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
-
-    dotenv::from_filename("../../../.env").ok();
+    let _ = dotenv::dotenv();
 
     if env::var("REQSIGN_AWS_S3_TEST").is_err() || env::var("REQSIGN_AWS_S3_TEST").unwrap() != "on"
     {

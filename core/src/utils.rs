@@ -32,7 +32,7 @@ impl<'a> From<&'a Option<String>> for Redact<'a> {
     }
 }
 
-impl<'a> Debug for Redact<'a> {
+impl Debug for Redact<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let length = self.0.len();
         if length == 0 {
