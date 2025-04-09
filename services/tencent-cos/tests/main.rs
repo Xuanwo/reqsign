@@ -18,8 +18,7 @@ use reqwest::Client;
 
 fn init_signer() -> Option<(CredentialLoader, Signer)> {
     let _ = env_logger::builder().is_test(true).try_init();
-
-    dotenv::from_filename("../../../.env").ok();
+    let _ = dotenv::dotenv();
     if env::var("REQSIGN_TENCENT_COS_TEST").is_err()
         || env::var("REQSIGN_TENCENT_COS_TEST").unwrap() != "on"
     {
