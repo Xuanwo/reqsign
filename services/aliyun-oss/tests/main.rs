@@ -331,7 +331,7 @@ async fn test_list_bucket() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_list_bucket_with_invalid_token() -> Result<()> {
+async fn test_list_bucket_with_utf8() -> Result<()> {
     let signer = init_signer();
     if signer.is_none() {
         warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
@@ -344,9 +344,9 @@ async fn test_list_bucket_with_invalid_token() -> Result<()> {
     let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!(
-        "{}?list-type=2&delimiter=/&encoding-type=url&continuation-token={}",
+        "{}?list-type=2&delimiter=/&encoding-type=url&prefix={}",
         url,
-        utf8_percent_encode("hello.txt", NON_ALPHANUMERIC)
+        utf8_percent_encode("本 crate 具有超级牛力", NON_ALPHANUMERIC)
     ))?;
 
     let cred = loader
@@ -374,6 +374,6 @@ async fn test_list_bucket_with_invalid_token() -> Result<()> {
     let status = resp.status();
     debug!("got response: {:?}", resp);
     debug!("got response content: {}", resp.text().await?);
-    assert_eq!(StatusCode::BAD_REQUEST, status);
+    assert_eq!(StatusCode::OK, status);
     Ok(())
 }
