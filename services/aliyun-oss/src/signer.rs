@@ -13,6 +13,7 @@ use log::debug;
 use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 
+use super::constants::ALIBABA_CLOUD_QUERY_ENCODE_SET;
 use super::credential::Credential;
 use reqsign_core::hash::base64_hmac_sha1;
 use reqsign_core::time;
@@ -193,8 +194,8 @@ fn canonicalize_resource(
         .iter()
         .map(|(k, v)| {
             (
-                utf8_percent_encode(k, percent_encoding::NON_ALPHANUMERIC).to_string(),
-                utf8_percent_encode(v, percent_encoding::NON_ALPHANUMERIC).to_string(),
+                utf8_percent_encode(k, &ALIBABA_CLOUD_QUERY_ENCODE_SET).to_string(),
+                utf8_percent_encode(v, &ALIBABA_CLOUD_QUERY_ENCODE_SET).to_string(),
             )
         })
         .collect();
