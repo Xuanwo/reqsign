@@ -105,6 +105,11 @@ pub struct Config {
     /// - this field
     /// - env value: [`AWS_EC2_METADATA_DISABLED`]
     pub ec2_metadata_disabled: bool,
+    /// `container_credentials_disabled` value will be loaded from:
+    ///
+    /// - this field
+    /// - env value: [`AWS_CONTAINER_CREDENTIALS_DISABLED`]
+    pub container_credentials_disabled: bool,
     /// `endpoint_url` value will be loaded from:
     ///
     /// - this field
@@ -130,6 +135,7 @@ impl Default for Config {
             tags: None,
             web_identity_token_file: None,
             ec2_metadata_disabled: false,
+            container_credentials_disabled: false,
             endpoint_url: None,
         }
     }
@@ -175,6 +181,9 @@ impl Config {
         }
         if let Some(v) = envs.get(AWS_EC2_METADATA_DISABLED) {
             self.ec2_metadata_disabled = v == "true";
+        }
+        if let Some(v) = envs.get(AWS_CONTAINER_CREDENTIALS_DISABLED) {
+            self.container_credentials_disabled = v == "true";
         }
         if let Some(v) = envs.get(AWS_ENDPOINT_URL) {
             self.endpoint_url = Some(v.to_string());

@@ -15,6 +15,8 @@ use serde::Deserialize;
 
 use super::config::Config;
 use super::constants::X_AMZ_CONTENT_SHA_256;
+use super::constants::AWS_CONTAINER_CREDENTIALS_RELATIVE_URI;
+use super::constants::AWS_CONTAINER_CREDENTIALS_FULL_URI;
 use super::v4::Signer;
 use crate::time::now;
 use crate::time::parse_rfc3339;
@@ -75,6 +77,7 @@ pub struct DefaultLoader {
     config: Config,
     credential: Arc<Mutex<Option<Credential>>>,
     imds_v2_loader: Option<IMDSv2Loader>,
+    ecs_loader: Option<ECSLoader>,
 }
 
 impl DefaultLoader {
@@ -85,11 +88,17 @@ impl DefaultLoader {
         } else {
             Some(IMDSv2Loader::new(client.clone()))
         };
+        let ecs_loader = if config.container_credentials_disabled {
+            None
+        } else {
+            Some(ECSLoader::new(client.clone()))
+        };
         Self {
-            client,
+            client: client.clone(),
             config,
             credential: Arc::default(),
             imds_v2_loader,
+            ecs_loader,
         }
     }
 
@@ -99,14 +108,20 @@ impl DefaultLoader {
         self
     }
 
+    /// Disable load from container credentials.
+    pub fn with_disable_container_credentials(mut self) -> Self {
+        self.ecs_loader = None;
+        self
+    }
+
     /// Load credential.
     ///
     /// Resolution order:
     /// 1. Environment variables
     /// 2. Shared config (`~/.aws/config`, `~/.aws/credentials`)
     /// 3. Web Identity Tokens
-    /// 4. ECS (IAM Roles for Tasks) & General HTTP credentials:
-    /// 5. EC2 IMDSv2
+    /// 4. EC2 IMDSv2
+    /// 5. ECS (IAM Roles for Tasks)
     pub async fn load(&self) -> Result<Option<Credential>> {
         // Return cached credential if it has been loaded at least once.
         match self.credential.lock().expect("lock poisoned").clone() {
@@ -141,8 +156,19 @@ impl DefaultLoader {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.load_via_imds_v2().await.map_err(|err| {
-            debug!("load credential via imds_v2 failed: {err:?}");
+        // Try IMDSv2 but don't fail if it errors (e.g., in Fargate environment)
+        match self.load_via_imds_v2().await {
+            Ok(Some(cred)) => return Ok(Some(cred)),
+            Ok(None) => {
+                debug!("load credential via imds_v2 returned None");
+            }
+            Err(err) => {
+                debug!("load credential via imds_v2 failed: {err:?}");
+            }
+        }
+
+        if let Some(cred) = self.load_via_ecs().await.map_err(|err| {
+            debug!("load credential via ecs failed: {err:?}");
             err
         })? {
             return Ok(Some(cred));
@@ -164,6 +190,15 @@ impl DefaultLoader {
         } else {
             Ok(None)
         }
+    }
+
+    async fn load_via_ecs(&self) -> Result<Option<Credential>> {
+        let loader = match &self.ecs_loader {
+            Some(loader) => loader,
+            None => return Ok(None),
+        };
+
+        loader.load().await
     }
 
     async fn load_via_imds_v2(&self) -> Result<Option<Credential>> {
@@ -375,6 +410,84 @@ impl CredentialLoad for IMDSv2Loader {
     }
 }
 
+/// ECSLoader will load credential from ECS task metadata endpoint.
+pub struct ECSLoader {
+    client: Client,
+}
+
+impl ECSLoader {
+    /// Create a new ECSLoader.
+    pub fn new(client: Client) -> Self {
+        Self { client }
+    }
+
+    /// Load credential from ECS task metadata endpoint.
+    pub async fn load(&self) -> Result<Option<Credential>> {
+        use std::env;
+
+        // Check if we're in an ECS environment
+        let relative_uri = match env::var(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI) {
+            Ok(uri) => uri,
+            Err(_) => {
+                // Check for full URI as fallback
+                if let Ok(full_uri) = env::var(AWS_CONTAINER_CREDENTIALS_FULL_URI) {
+                    return self.load_from_full_uri(&full_uri).await;
+                }
+                return Ok(None);
+            }
+        };
+
+        self.load_from_relative_uri(&relative_uri).await
+    }
+
+    async fn load_from_relative_uri(&self, relative_uri: &str) -> Result<Option<Credential>> {
+        let url = format!("http://169.254.170.2{}", relative_uri);
+        self.load_from_url(&url).await
+    }
+
+    async fn load_from_full_uri(&self, full_uri: &str) -> Result<Option<Credential>> {
+        self.load_from_url(full_uri).await
+    }
+
+    async fn load_from_url(&self, url: &str) -> Result<Option<Credential>> {
+        let mut req = self.client.get(url);
+
+        // Set timeout to 1s to avoid hanging on non-s3 env.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            req = req.timeout(std::time::Duration::from_secs(1));
+        }
+
+        let resp = req.send().await?;
+        if resp.status() != http::StatusCode::OK {
+            let content = resp.text().await?;
+            return Err(anyhow!(
+                "request to ECS task metadata endpoint failed: {content}"
+            ));
+        }
+
+        let content = resp.text().await?;
+        let resp: EcsTaskCredentials = serde_json::from_str(&content)?;
+
+        let cred = Credential {
+            access_key_id: resp.access_key_id,
+            secret_access_key: resp.secret_access_key,
+            session_token: Some(resp.token),
+            expires_in: Some(parse_rfc3339(&resp.expiration)?),
+        };
+
+        Ok(Some(cred))
+    }
+}
+
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+impl CredentialLoad for ECSLoader {
+    async fn load_credential(&self, _: Client) -> Result<Option<Credential>> {
+        self.load().await
+    }
+}
+
 /// AssumeRoleLoader will load credential via assume role.
 pub struct AssumeRoleLoader {
     client: Client,
@@ -568,6 +681,19 @@ struct Ec2MetadataIamSecurityCredentials {
     code: String,
 }
 
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+struct EcsTaskCredentials {
+    #[serde(rename = "AccessKeyId")]
+    access_key_id: String,
+    #[serde(rename = "SecretAccessKey")]
+    secret_access_key: String,
+    #[serde(rename = "Token")]
+    token: String,
+    #[serde(rename = "Expiration")]
+    expiration: String,
+}
+
 #[cfg(test)]
 mod tests {
     use std::env;
@@ -600,7 +726,8 @@ mod tests {
         temp_env::with_vars_unset(vec![AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY], || {
             RUNTIME.block_on(async {
                 let l = DefaultLoader::new(reqwest::Client::new(), Config::default())
-                    .with_disable_ec2_metadata();
+                    .with_disable_ec2_metadata()
+                    .with_disable_container_credentials();
                 let x = l.load().await.expect("load must succeed");
                 assert!(x.is_none());
             })
@@ -875,7 +1002,8 @@ mod tests {
                     let client = reqwest::Client::new();
                     let default_loader =
                         DefaultLoader::new(client.clone(), Config::default().from_env())
-                            .with_disable_ec2_metadata();
+                            .with_disable_ec2_metadata()
+                            .with_disable_container_credentials();
 
                     let cfg = Config {
                         role_arn: Some(assume_role_arn.clone()),
