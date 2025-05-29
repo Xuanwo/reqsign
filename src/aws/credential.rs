@@ -14,9 +14,9 @@ use reqwest::Client;
 use serde::Deserialize;
 
 use super::config::Config;
-use super::constants::X_AMZ_CONTENT_SHA_256;
-use super::constants::AWS_CONTAINER_CREDENTIALS_RELATIVE_URI;
 use super::constants::AWS_CONTAINER_CREDENTIALS_FULL_URI;
+use super::constants::AWS_CONTAINER_CREDENTIALS_RELATIVE_URI;
+use super::constants::X_AMZ_CONTENT_SHA_256;
 use super::v4::Signer;
 use crate::time::now;
 use crate::time::parse_rfc3339;
