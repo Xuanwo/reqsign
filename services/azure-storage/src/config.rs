@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 use std::env;
 
+use anyhow::Result;
+
+use crate::{connection_string, Service};
+
 /// Config carries all the configuration for Azure Storage services.
 #[derive(Clone, Default)]
-#[cfg_attr(test, derive(Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct Config {
     /// `account_name` will be loaded from
     ///
@@ -86,6 +90,9 @@ const AZURE_PUBLIC_CLOUD: &str = "https://login.microsoftonline.com";
 
 impl Config {
     /// Load config from env.
+    ///
+    /// Note that some values looked at by this method are specific to Azure
+    /// Blob Storage.
     pub fn from_env(mut self) -> Self {
         let envs = env::vars().collect::<HashMap<_, _>>();
 
@@ -125,5 +132,26 @@ impl Config {
         }
 
         self
+    }
+
+    /// Parses an [Azure connection string][1] into a configuration object.
+    ///
+    /// The connection string doesn't have to specify all required parameters
+    /// because the user is still allowed to set them later directly on the object.
+    ///
+    /// The function takes a Service parameter because it determines the fields used
+    /// to parse the endpoint.
+    ///
+    /// An example of a connection string looks like:
+    ///
+    /// ```txt
+    /// AccountName=mystorageaccount;
+    /// AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;
+    /// BlobEndpoint=https://mystorageaccount.blob.core.windows.net
+    /// ```
+    ///
+    /// [1]: https://learn.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string
+    pub fn try_from_connection_string(conn_str: &str, service: &Service) -> Result<Self> {
+        connection_string::parse(conn_str, service)
     }
 }
