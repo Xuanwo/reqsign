@@ -33,19 +33,19 @@ pub trait ProvideCredential: Debug + Send + Sync + Unpin + 'static {
     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>>;
 }
 
-/// Build is the trait used by signer to build the signing request.
+/// SignRequest is the trait used by signer to build the signing request.
 #[async_trait::async_trait]
-pub trait Build: Debug + Send + Sync + Unpin + 'static {
-    /// Key used by this builder.
+pub trait SignRequest: Debug + Send + Sync + Unpin + 'static {
+    /// Credential used by this builder.
     ///
     /// Typically, it will be a credential.
-    type Key: Send + Sync + Unpin + 'static;
+    type Credential: Send + Sync + Unpin + 'static;
 
     /// Construct the signing request.
     ///
-    /// ## Key
+    /// ## Credential
     ///
-    /// The `key` parameter is the key required by the signer to sign the request.
+    /// The `credential` parameter is the credential required by the signer to sign the request.
     ///
     /// ## Expires In
     ///
@@ -54,11 +54,11 @@ pub trait Build: Debug + Send + Sync + Unpin + 'static {
     ///
     /// Implementation details determine how to handle the expiration logic. For instance,
     /// AWS uses a query string that includes an `Expires` parameter.
-    async fn build(
+    async fn sign_request(
         &self,
         ctx: &Context,
         req: &mut http::request::Parts,
-        key: Option<&Self::Key>,
+        credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
     ) -> anyhow::Result<()>;
 }

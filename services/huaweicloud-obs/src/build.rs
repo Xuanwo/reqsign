@@ -18,7 +18,7 @@ use reqsign_core::hash::base64_hmac_sha1;
 use reqsign_core::time::format_http_date;
 use reqsign_core::time::now;
 use reqsign_core::time::DateTime;
-use reqsign_core::{Build as BuildTrait, SigningMethod, SigningRequest};
+use reqsign_core::{SignRequest as SignRequestTrait, SigningMethod, SigningRequest};
 
 /// Builder that implement Huawei Cloud Object Storage Service Authorization.
 ///
@@ -52,17 +52,17 @@ impl Builder {
 }
 
 #[async_trait::async_trait]
-impl BuildTrait for Builder {
-    type Key = Credential;
+impl SignRequestTrait for Builder {
+    type Credential = Credential;
 
-    async fn build(
+    async fn sign_request(
         &self,
         _ctx: &reqsign_core::Context,
         parts: &mut http::request::Parts,
-        k: Option<&Self::Key>,
+        credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
     ) -> Result<()> {
-        let k = k.ok_or_else(|| anyhow::anyhow!("missing credential"))?;
+        let k = credential.ok_or_else(|| anyhow::anyhow!("missing credential"))?;
         let now = self.time.unwrap_or_else(now);
         let method = if expires_in.is_some() {
             SigningMethod::Query(expires_in.unwrap())
