@@ -1,15 +1,17 @@
 //! Tencent Cloud service signer
 //!
-//! Only Cos has been supported.
+//! Only COS has been supported.
 
-mod signer;
-pub use signer::Signer;
-
-mod credential;
-pub use credential::Credential;
-pub use credential::CredentialLoader;
+mod constants;
 
 mod config;
 pub use config::Config;
 
-mod constants;
+mod key;
+pub use key::Credential;
+
+mod build;
+pub use build::Builder;
+
+pub mod load;
+pub use load::{AssumeRoleWithWebIdentityLoader, ConfigLoader, DefaultLoader};

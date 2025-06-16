@@ -1,40 +1,27 @@
-//! Tencent COS Signer
-
+use crate::constants::TENCENT_URI_ENCODE_SET;
+use crate::Credential;
+use async_trait::async_trait;
+use http::header::{AUTHORIZATION, DATE};
+use http::request::Parts;
+use log::debug;
+use percent_encoding::{percent_decode_str, utf8_percent_encode};
+use reqsign_core::hash::{hex_hmac_sha1, hex_sha1};
+use reqsign_core::time::{format_http_date, now, DateTime};
+use reqsign_core::{Build, Context, SigningRequest};
 use std::time::Duration;
 
-use anyhow::Result;
-use http::header::AUTHORIZATION;
-use http::header::DATE;
-use http::HeaderValue;
-use log::debug;
-use percent_encoding::percent_decode_str;
-use percent_encoding::utf8_percent_encode;
-
-use super::constants::*;
-use super::credential::Credential;
-use reqsign_core::hash::hex_hmac_sha1;
-use reqsign_core::hash::hex_sha1;
-use reqsign_core::time;
-use reqsign_core::time::format_http_date;
-use reqsign_core::time::DateTime;
-use reqsign_core::SigningMethod;
-use reqsign_core::SigningRequest;
-
-/// Signer for Tencent COS.
-#[derive(Default)]
-pub struct Signer {
+/// Builder that implements Tencent COS signing.
+///
+/// - [Tencent COS Signature](https://cloud.tencent.com/document/product/436/7778)
+#[derive(Debug, Default)]
+pub struct Builder {
     time: Option<DateTime>,
 }
 
-impl Signer {
-    /// Load credential via credential load chain specified while building.
-    ///
-    /// # Note
-    ///
-    /// This function should never be exported to avoid credential leaking by
-    /// mistake.
+impl Builder {
+    /// Create a new builder for Tencent COS signer.
     pub fn new() -> Self {
-        Self::default()
+        Self { time: None }
     }
 
     /// Specify the signing time.
@@ -48,69 +35,64 @@ impl Signer {
         self.time = Some(time);
         self
     }
+}
 
-    fn build(
+#[async_trait]
+impl Build for Builder {
+    type Key = Credential;
+
+    async fn build(
         &self,
-        parts: &mut http::request::Parts,
-        method: SigningMethod,
-        cred: &Credential,
-    ) -> Result<SigningRequest> {
-        let now = self.time.unwrap_or_else(time::now);
-        let mut ctx = SigningRequest::build(parts)?;
+        _ctx: &Context,
+        req: &mut Parts,
+        key: Option<&Self::Key>,
+        expires_in: Option<Duration>,
+    ) -> anyhow::Result<()> {
+        let Some(cred) = key else {
+            return Ok(());
+        };
 
-        match method {
-            SigningMethod::Header => {
-                let signature = build_signature(&mut ctx, cred, now, Duration::from_secs(3600));
+        let now = self.time.unwrap_or_else(now);
+        let mut signing_req = SigningRequest::build(req)?;
 
-                ctx.headers.insert(DATE, format_http_date(now).parse()?);
-                ctx.headers.insert(AUTHORIZATION, {
-                    let mut value: HeaderValue = signature.parse()?;
+        if let Some(expires) = expires_in {
+            // Query signing
+            let signature = build_signature(&mut signing_req, cred, now, expires);
+
+            signing_req
+                .headers
+                .insert(DATE, format_http_date(now).parse()?);
+            signing_req.query_append(&signature);
+
+            if let Some(token) = &cred.security_token {
+                signing_req.query_push(
+                    "x-cos-security-token".to_string(),
+                    utf8_percent_encode(token, percent_encoding::NON_ALPHANUMERIC).to_string(),
+                );
+            }
+        } else {
+            // Header signing (default 3600s expiration)
+            let signature = build_signature(&mut signing_req, cred, now, Duration::from_secs(3600));
+
+            signing_req
+                .headers
+                .insert(DATE, format_http_date(now).parse()?);
+            signing_req.headers.insert(AUTHORIZATION, {
+                let mut value: http::HeaderValue = signature.parse()?;
+                value.set_sensitive(true);
+                value
+            });
+
+            if let Some(token) = &cred.security_token {
+                signing_req.headers.insert("x-cos-security-token", {
+                    let mut value: http::HeaderValue = token.parse()?;
                     value.set_sensitive(true);
                     value
                 });
-
-                if let Some(token) = &cred.security_token {
-                    ctx.headers.insert("x-cos-security-token", {
-                        let mut value: HeaderValue = token.parse()?;
-                        value.set_sensitive(true);
-
-                        value
-                    });
-                }
-            }
-            SigningMethod::Query(expire) => {
-                let signature = build_signature(&mut ctx, cred, now, expire);
-
-                ctx.headers.insert(DATE, format_http_date(now).parse()?);
-                ctx.query_append(&signature);
-
-                if let Some(token) = &cred.security_token {
-                    ctx.query_push(
-                        "x-cos-security-token".to_string(),
-                        utf8_percent_encode(token, percent_encoding::NON_ALPHANUMERIC).to_string(),
-                    );
-                }
             }
         }
 
-        Ok(ctx)
-    }
-
-    /// Signing request with header.
-    pub fn sign(&self, parts: &mut http::request::Parts, cred: &Credential) -> Result<()> {
-        let ctx = self.build(parts, SigningMethod::Header, cred)?;
-        ctx.apply(parts)
-    }
-
-    /// Signing request with query.
-    pub fn sign_query(
-        &self,
-        parts: &mut http::request::Parts,
-        expire: Duration,
-        cred: &Credential,
-    ) -> Result<()> {
-        let ctx = self.build(parts, SigningMethod::Query(expire), cred)?;
-        ctx.apply(parts)
+        signing_req.apply(req)
     }
 }
 
