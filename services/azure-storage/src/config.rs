@@ -1,127 +1,147 @@
-use std::collections::HashMap;
-use std::env;
-
 /// Config carries all the configuration for Azure Storage services.
-#[derive(Clone, Default)]
-#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, Default, Debug)]
 pub struct Config {
-    /// `account_name` will be loaded from
-    ///
-    /// - this field if it's `is_some`
+    /// Azure storage account name
     pub account_name: Option<String>,
-    /// `account_key` will be loaded from
-    ///
-    /// - this field if it's `is_some`
+    /// Azure storage account key
     pub account_key: Option<String>,
-    /// `sas_token` will be loaded from
-    ///
-    /// - this field if it's `is_some`
+    /// SAS (Shared Access Signature) token
     pub sas_token: Option<String>,
-    /// Specifies the object id associated with a user assigned managed service identity resource
-    ///
-    /// The values of client_id and msi_res_id are discarded
-    ///
-    /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
-    pub object_id: Option<String>,
-    /// Specifies the application id (client id) associated with a user assigned managed service identity resource
-    ///
-    /// The values of object_id and msi_res_id are discarded
-    /// - cnv value: [`AZURE_CLIENT_ID`]
-    ///
-    /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
-    pub client_id: Option<String>,
-    /// Specifies the ARM resource id of the user assigned managed service identity resource
-    ///
-    /// The values of object_id and client_id are discarded
-    ///
-    /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
-    pub msi_res_id: Option<String>,
-    /// Specifies the header that should be used to retrieve the access token.
-    ///
-    /// This header mitigates server-side request forgery (SSRF) attacks.
-    ///
-    /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
-    pub msi_secret: Option<String>,
-    /// Specifies the endpoint from which the identity should be retrieved.
-    ///
-    /// If not specified, the default endpoint of `http://169.254.169.254/metadata/identity/oauth2/token` will be used.
-    ///
-    /// This is part of use AAD(Azure Active Directory) authenticate on Azure VM
-    pub endpoint: Option<String>,
-    /// `federated_token_file` value will be loaded from:
-    ///
-    /// - this field if it's `is_some`
-    /// - env value: [`AZURE_FEDERATED_TOKEN_FILE`]
-    /// - profile config: `federated_token_file`
-    pub federated_token_file: Option<String>,
-    /// `tenant_id` value will be loaded from:
-    ///
-    /// - this field if it's `is_some`
-    /// - env value: [`AZURE_TENANT_ID`]
-    /// - profile config: `tenant_id`
+    /// Azure tenant ID for OAuth authentication
     pub tenant_id: Option<String>,
-    /// `authority_host` value will be loaded from:
-    ///
-    /// - this field if it's `is_some`
-    /// - env value: [`AZURE_AUTHORITY_HOST`]
-    /// - profile config: `authority_host`
-    pub authority_host: Option<String>,
-
-    /// `client_secret` value will be loaded from:
-    /// - this field if it's `is_some`
-    /// - profile config: `client_secret`
-    /// - env value: `AZURE_CLIENT_SECRET`
+    /// Azure client ID for OAuth authentication
+    pub client_id: Option<String>,
+    /// Azure client secret for OAuth authentication
     pub client_secret: Option<String>,
+    /// Path to federated token file for workload identity
+    pub federated_token_file: Option<String>,
+    /// Authority host URL for OAuth endpoints
+    pub authority_host: Option<String>,
+    /// Object ID for user-assigned managed identity
+    pub object_id: Option<String>,
+    /// MSI resource ID for user-assigned managed identity
+    pub msi_res_id: Option<String>,
+    /// MSI secret header for managed identity authentication
+    pub msi_secret: Option<String>,
+    /// Custom IMDS endpoint URL
+    pub endpoint: Option<String>,
 }
 
-pub const AZURE_FEDERATED_TOKEN_FILE: &str = "AZURE_FEDERATED_TOKEN_FILE";
-pub const AZURE_TENANT_ID: &str = "AZURE_TENANT_ID";
-pub const AZURE_CLIENT_ID: &str = "AZURE_CLIENT_ID";
-pub const AZURE_CLIENT_SECRET: &str = "AZURE_CLIENT_SECRET";
-pub const AZURE_AUTHORITY_HOST: &str = "AZURE_AUTHORITY_HOST";
-const AZBLOB_ENDPOINT: &str = "AZBLOB_ENDPOINT";
-const AZBLOB_ACCOUNT_KEY: &str = "AZBLOB_ACCOUNT_KEY";
-const AZBLOB_ACCOUNT_NAME: &str = "AZBLOB_ACCOUNT_NAME";
-const AZURE_PUBLIC_CLOUD: &str = "https://login.microsoftonline.com";
-
 impl Config {
-    /// Load config from env.
+    /// Create a new empty config.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the account name.
+    pub fn with_account_name(mut self, account_name: impl Into<String>) -> Self {
+        self.account_name = Some(account_name.into());
+        self
+    }
+
+    /// Set the account key.
+    pub fn with_account_key(mut self, account_key: impl Into<String>) -> Self {
+        self.account_key = Some(account_key.into());
+        self
+    }
+
+    /// Set the SAS token.
+    pub fn with_sas_token(mut self, sas_token: impl Into<String>) -> Self {
+        self.sas_token = Some(sas_token.into());
+        self
+    }
+
+    /// Set the tenant ID.
+    pub fn with_tenant_id(mut self, tenant_id: impl Into<String>) -> Self {
+        self.tenant_id = Some(tenant_id.into());
+        self
+    }
+
+    /// Set the client ID.
+    pub fn with_client_id(mut self, client_id: impl Into<String>) -> Self {
+        self.client_id = Some(client_id.into());
+        self
+    }
+
+    /// Set the client secret.
+    pub fn with_client_secret(mut self, client_secret: impl Into<String>) -> Self {
+        self.client_secret = Some(client_secret.into());
+        self
+    }
+
+    /// Set the federated token file path.
+    pub fn with_federated_token_file(mut self, federated_token_file: impl Into<String>) -> Self {
+        self.federated_token_file = Some(federated_token_file.into());
+        self
+    }
+
+    /// Set the authority host.
+    pub fn with_authority_host(mut self, authority_host: impl Into<String>) -> Self {
+        self.authority_host = Some(authority_host.into());
+        self
+    }
+
+    /// Set the object ID.
+    pub fn with_object_id(mut self, object_id: impl Into<String>) -> Self {
+        self.object_id = Some(object_id.into());
+        self
+    }
+
+    /// Set the MSI resource ID.
+    pub fn with_msi_res_id(mut self, msi_res_id: impl Into<String>) -> Self {
+        self.msi_res_id = Some(msi_res_id.into());
+        self
+    }
+
+    /// Set the MSI secret.
+    pub fn with_msi_secret(mut self, msi_secret: impl Into<String>) -> Self {
+        self.msi_secret = Some(msi_secret.into());
+        self
+    }
+
+    /// Set the IMDS endpoint.
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint = Some(endpoint.into());
+        self
+    }
+
+    /// Load config from environment variables for backward compatibility.
     pub fn from_env(mut self) -> Self {
-        let envs = env::vars().collect::<HashMap<_, _>>();
+        use std::env;
 
-        // federated_token can be loaded from both `AZURE_FEDERATED_TOKEN` and `AZURE_FEDERATED_TOKEN_FILE`.
-        if let Some(v) = envs.get(AZURE_FEDERATED_TOKEN_FILE) {
-            self.federated_token_file = Some(v.to_string());
+        // Load environment variables
+        if let Ok(v) = env::var("AZURE_FEDERATED_TOKEN_FILE") {
+            self.federated_token_file = Some(v);
         }
 
-        if let Some(v) = envs.get(AZURE_TENANT_ID) {
-            self.tenant_id = Some(v.to_string());
+        if let Ok(v) = env::var("AZURE_TENANT_ID") {
+            self.tenant_id = Some(v);
         }
 
-        if let Some(v) = envs.get(AZURE_CLIENT_ID) {
-            self.client_id = Some(v.to_string());
+        if let Ok(v) = env::var("AZURE_CLIENT_ID") {
+            self.client_id = Some(v);
         }
 
-        if let Some(v) = envs.get(AZBLOB_ENDPOINT) {
-            self.endpoint = Some(v.to_string());
+        if let Ok(v) = env::var("AZBLOB_ENDPOINT") {
+            self.endpoint = Some(v);
         }
 
-        if let Some(v) = envs.get(AZBLOB_ACCOUNT_KEY) {
-            self.account_key = Some(v.to_string());
+        if let Ok(v) = env::var("AZBLOB_ACCOUNT_KEY") {
+            self.account_key = Some(v);
         }
 
-        if let Some(v) = envs.get(AZBLOB_ACCOUNT_NAME) {
-            self.account_name = Some(v.to_string());
+        if let Ok(v) = env::var("AZBLOB_ACCOUNT_NAME") {
+            self.account_name = Some(v);
         }
 
-        if let Some(v) = envs.get(AZURE_AUTHORITY_HOST) {
-            self.authority_host = Some(v.to_string());
+        if let Ok(v) = env::var("AZURE_AUTHORITY_HOST") {
+            self.authority_host = Some(v);
         } else {
-            self.authority_host = Some(AZURE_PUBLIC_CLOUD.to_string());
+            self.authority_host = Some("https://login.microsoftonline.com".to_string());
         }
 
-        if let Some(v) = envs.get(AZURE_CLIENT_SECRET) {
-            self.client_secret = Some(v.to_string());
+        if let Ok(v) = env::var("AZURE_CLIENT_SECRET") {
+            self.client_secret = Some(v);
         }
 
         self
