@@ -26,13 +26,15 @@ async fn main() -> Result<()> {
         .from_env();
 
     // Check if we have real credentials
-    let has_real_creds = ctx.env_var("AZURE_STORAGE_ACCOUNT_NAME").is_some() ||
-                         ctx.env_var("AZURE_STORAGE_ACCOUNT_KEY").is_some();
-    
+    let has_real_creds = ctx.env_var("AZURE_STORAGE_ACCOUNT_NAME").is_some()
+        || ctx.env_var("AZURE_STORAGE_ACCOUNT_KEY").is_some();
+
     let demo_mode = !has_real_creds;
     if demo_mode {
         println!("No Azure credentials found, using demo mode");
-        println!("To use real credentials, set AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_ACCOUNT_KEY");
+        println!(
+            "To use real credentials, set AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_ACCOUNT_KEY"
+        );
         println!();
     }
 
@@ -60,7 +62,10 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("List containers request signed successfully!");
-            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!(
+                "Authorization header: {:?}",
+                parts.headers.get("authorization")
+            );
             println!("x-ms-date header: {:?}", parts.headers.get("x-ms-date"));
 
             if !demo_mode {
@@ -190,7 +195,9 @@ async fn main() -> Result<()> {
         }
         Err(e) => {
             if demo_mode {
-                println!("SAS token signing failed in demo mode (expected without real credentials)");
+                println!(
+                    "SAS token signing failed in demo mode (expected without real credentials)"
+                );
             } else {
                 eprintln!("Failed to sign with SAS token: {}", e);
             }

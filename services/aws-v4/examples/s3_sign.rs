@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
     // For demo purposes, set demo credentials if none exist
     let mut config = Config::default();
     config = config.from_env(&ctx);
-    
+
     // If no credentials are found, use demo credentials
     if config.access_key_id.is_none() {
         println!("No AWS credentials found, using demo credentials for example");
@@ -54,7 +54,10 @@ async fn main() -> Result<()> {
 
             // In demo mode, don't actually send the request
             println!("Demo mode: Not sending actual request to AWS");
-            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!(
+                "Authorization header: {:?}",
+                parts.headers.get("authorization")
+            );
             println!("X-Amz-Date header: {:?}", parts.headers.get("x-amz-date"));
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),

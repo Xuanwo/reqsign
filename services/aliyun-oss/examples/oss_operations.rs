@@ -22,17 +22,17 @@ async fn main() -> Result<()> {
     // 2. Aliyun CLI config file (~/.aliyun/config.json)
     // 3. ECS RAM role (if running on Aliyun ECS)
     let mut config = Config::default().from_env(&ctx);
-    
+
     // Check if we have real credentials
-    let has_real_creds = ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_ID").is_some() ||
-                         ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").is_some();
-    
+    let has_real_creds = ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_ID").is_some()
+        || ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").is_some();
+
     let demo_mode = !has_real_creds;
     if demo_mode {
         println!("No Aliyun credentials found, using demo mode");
         println!("To use real credentials, set ALIBABA_CLOUD_ACCESS_KEY_ID and ALIBABA_CLOUD_ACCESS_KEY_SECRET");
         println!();
-        
+
         // Use demo credentials
         config.access_key_id = Some("LTAI4GDemoAccessKeyId".to_string());
         config.access_key_secret = Some("DemoAccessKeySecretForExample".to_string());
@@ -61,7 +61,10 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("List objects request signed successfully!");
-            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!(
+                "Authorization header: {:?}",
+                parts.headers.get("authorization")
+            );
             println!("Date header: {:?}", parts.headers.get("date"));
 
             if !demo_mode {
