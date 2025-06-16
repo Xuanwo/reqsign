@@ -2,15 +2,17 @@
 
 mod constants;
 
-mod credential;
-pub(crate) use credential::external_account;
-pub use credential::Credential;
-pub use credential::CredentialLoader;
+mod config;
+pub use config::Config;
 
-mod token;
-pub use token::Token;
-pub use token::TokenLoad;
-pub use token::TokenLoader;
+mod key;
+pub use key::{Credential, ServiceAccount, Token};
 
-mod signer;
-pub use signer::Signer;
+mod build;
+pub use build::Builder;
+
+mod load;
+pub use load::{
+    ConfigLoader, DefaultLoader, ExternalAccountLoader, ImpersonatedServiceAccountLoader,
+    ServiceAccountLoader, VmMetadataLoader,
+};
