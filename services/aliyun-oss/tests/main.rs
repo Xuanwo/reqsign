@@ -17,8 +17,7 @@ use reqwest::Client;
 
 async fn init_signer() -> Option<(Context, Signer<reqsign_aliyun_oss::Credential>)> {
     let _ = env_logger::builder().is_test(true).try_init();
-
-    dotenv::from_filename("../../../.env").ok();
+    let _ = dotenv::dotenv();
 
     if env::var("REQSIGN_ALIYUN_OSS_TEST").is_err()
         || env::var("REQSIGN_ALIYUN_OSS_TEST").unwrap() != "on"
