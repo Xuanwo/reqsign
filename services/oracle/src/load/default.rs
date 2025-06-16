@@ -41,9 +41,9 @@ impl Load for DefaultLoader {
 }
 
 impl DefaultLoader {
-    async fn load_from_env(&self, _ctx: &Context) -> anyhow::Result<Option<Credential>> {
+    async fn load_from_env(&self, ctx: &Context) -> anyhow::Result<Option<Credential>> {
         // First check if we have config from environment
-        let env_config = Config::from_env();
+        let env_config = Config::from_env(ctx);
 
         match (
             &env_config.tenancy,

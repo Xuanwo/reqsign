@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-use std::env;
-
 use super::constants::*;
+use reqsign_core::Context;
 
 /// Config carries all the configuration for Huawei Cloud OBS services.
 #[derive(Clone, Debug, Default)]
@@ -48,17 +46,15 @@ impl Config {
     }
 
     /// Load config from env.
-    pub fn from_env(mut self) -> Self {
-        let envs = env::vars().collect::<HashMap<_, _>>();
-
-        if let Some(v) = envs.get(HUAWEI_CLOUD_ACCESS_KEY_ID) {
-            self.access_key_id.get_or_insert(v.clone());
+    pub fn from_env(mut self, ctx: &Context) -> Self {
+        if let Some(v) = ctx.env_var(HUAWEI_CLOUD_ACCESS_KEY_ID) {
+            self.access_key_id.get_or_insert(v);
         }
-        if let Some(v) = envs.get(HUAWEI_CLOUD_SECRET_ACCESS_KEY) {
-            self.secret_access_key.get_or_insert(v.clone());
+        if let Some(v) = ctx.env_var(HUAWEI_CLOUD_SECRET_ACCESS_KEY) {
+            self.secret_access_key.get_or_insert(v);
         }
-        if let Some(v) = envs.get(HUAWEI_CLOUD_SECURITY_TOKEN) {
-            self.security_token.get_or_insert(v.clone());
+        if let Some(v) = ctx.env_var(HUAWEI_CLOUD_SECURITY_TOKEN) {
+            self.security_token.get_or_insert(v);
         }
 
         self

@@ -1,6 +1,6 @@
 use crate::constants::*;
 use reqsign_core::utils::Redact;
-use std::env;
+use reqsign_core::Context;
 use std::fmt::{Debug, Formatter};
 
 /// Config for Tencent COS services.
@@ -41,32 +41,32 @@ impl Debug for Config {
 
 impl Config {
     /// Load config from environment variables.
-    pub fn from_env() -> Self {
+    pub fn from_env(ctx: &Context) -> Self {
         Self {
-            region: env::var(TENCENTCLOUD_REGION)
-                .or_else(|_| env::var(TKE_REGION))
-                .ok(),
-            secret_id: env::var(TENCENTCLOUD_SECRET_ID)
-                .or_else(|_| env::var(TKE_SECRET_ID))
-                .ok(),
-            secret_key: env::var(TENCENTCLOUD_SECRET_KEY)
-                .or_else(|_| env::var(TKE_SECRET_KEY))
-                .ok(),
-            security_token: env::var(TENCENTCLOUD_TOKEN)
-                .or_else(|_| env::var(TENCENTCLOUD_SECURITY_TOKEN))
-                .ok(),
-            role_arn: env::var(TENCENTCLOUD_ROLE_ARN)
-                .or_else(|_| env::var(TKE_ROLE_ARN))
-                .ok(),
-            role_session_name: env::var(TENCENTCLOUD_ROLE_SESSSION_NAME)
-                .or_else(|_| env::var(TKE_ROLE_SESSSION_NAME))
-                .ok(),
-            provider_id: env::var(TENCENTCLOUD_PROVIDER_ID)
-                .or_else(|_| env::var(TKE_PROVIDER_ID))
-                .ok(),
-            web_identity_token_file: env::var(TENCENTCLOUD_WEB_IDENTITY_TOKEN_FILE)
-                .or_else(|_| env::var(TKE_IDENTITY_TOKEN_FILE))
-                .ok(),
+            region: ctx
+                .env_var(TENCENTCLOUD_REGION)
+                .or_else(|| ctx.env_var(TKE_REGION)),
+            secret_id: ctx
+                .env_var(TENCENTCLOUD_SECRET_ID)
+                .or_else(|| ctx.env_var(TKE_SECRET_ID)),
+            secret_key: ctx
+                .env_var(TENCENTCLOUD_SECRET_KEY)
+                .or_else(|| ctx.env_var(TKE_SECRET_KEY)),
+            security_token: ctx
+                .env_var(TENCENTCLOUD_TOKEN)
+                .or_else(|| ctx.env_var(TENCENTCLOUD_SECURITY_TOKEN)),
+            role_arn: ctx
+                .env_var(TENCENTCLOUD_ROLE_ARN)
+                .or_else(|| ctx.env_var(TKE_ROLE_ARN)),
+            role_session_name: ctx
+                .env_var(TENCENTCLOUD_ROLE_SESSSION_NAME)
+                .or_else(|| ctx.env_var(TKE_ROLE_SESSSION_NAME)),
+            provider_id: ctx
+                .env_var(TENCENTCLOUD_PROVIDER_ID)
+                .or_else(|| ctx.env_var(TKE_PROVIDER_ID)),
+            web_identity_token_file: ctx
+                .env_var(TENCENTCLOUD_WEB_IDENTITY_TOKEN_FILE)
+                .or_else(|| ctx.env_var(TKE_IDENTITY_TOKEN_FILE)),
         }
     }
 }
