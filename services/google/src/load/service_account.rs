@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::key::{ServiceAccount, Token};
+use crate::credential::{ServiceAccount, Token};
 
 /// Claims is used to build JWT for Google Cloud.
 #[derive(Debug, Serialize)]

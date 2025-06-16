@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::key::{ImpersonatedServiceAccount, Token};
+use crate::credential::{ImpersonatedServiceAccount, Token};
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
 const MAX_LIFETIME: Duration = Duration::from_secs(3600);

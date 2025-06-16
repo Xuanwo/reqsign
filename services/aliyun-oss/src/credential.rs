@@ -1,35 +1,37 @@
 use reqsign_core::time::{now, DateTime};
 use reqsign_core::utils::Redact;
-use reqsign_core::Key;
+use reqsign_core::SigningCredential;
 use std::fmt::{Debug, Formatter};
 
-/// Credential for Tencent COS.
+/// Credential that holds the access_key and secret_key.
 #[derive(Default, Clone)]
 pub struct Credential {
-    /// Secret ID
-    pub secret_id: String,
-    /// Secret Key
-    pub secret_key: String,
-    /// Security token for temporary credentials
+    /// Access key id for aliyun services.
+    pub access_key_id: String,
+    /// Access key secret for aliyun services.
+    pub access_key_secret: String,
+    /// Security token for aliyun services.
     pub security_token: Option<String>,
-    /// Expiration time for this credential
+    /// Expiration time for this credential.
     pub expires_in: Option<DateTime>,
 }
 
 impl Debug for Credential {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Credential")
-            .field("secret_id", &Redact::from(&self.secret_id))
-            .field("secret_key", &Redact::from(&self.secret_key))
+            .field("access_key_id", &Redact::from(&self.access_key_id))
+            .field("access_key_secret", &Redact::from(&self.access_key_secret))
             .field("security_token", &Redact::from(&self.security_token))
             .field("expires_in", &self.expires_in)
             .finish()
     }
 }
 
-impl Key for Credential {
+impl SigningCredential for Credential {
     fn is_valid(&self) -> bool {
-        if self.secret_id.is_empty() || self.secret_key.is_empty() {
+        if (self.access_key_id.is_empty() || self.access_key_secret.is_empty())
+            && self.security_token.is_none()
+        {
             return false;
         }
         // Take 120s as buffer to avoid edge cases.

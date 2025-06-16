@@ -5,7 +5,7 @@ use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
-use crate::key::RawCredential;
+use crate::credential::RawCredential;
 
 /// ConfigLoader loads credentials from the configuration.
 #[derive(Debug, Clone)]

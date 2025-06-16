@@ -13,7 +13,7 @@ use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 
 use super::constants::*;
-use super::key::Credential;
+use super::credential::Credential;
 use reqsign_core::hash::base64_hmac_sha1;
 use reqsign_core::time::format_http_date;
 use reqsign_core::time::now;

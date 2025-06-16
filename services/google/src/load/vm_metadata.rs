@@ -5,7 +5,7 @@ use serde::Deserialize;
 use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::key::Token;
+use crate::credential::Token;
 
 /// VM metadata token response.
 #[derive(Deserialize)]

@@ -4,7 +4,7 @@ use log::debug;
 use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::key::Credential;
+use crate::credential::Credential;
 
 use super::{
     ConfigLoader, ExternalAccountLoader, ImpersonatedServiceAccountLoader, ServiceAccountLoader,

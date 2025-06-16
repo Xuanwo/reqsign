@@ -1,4 +1,4 @@
-use reqsign_core::Key;
+use reqsign_core::SigningCredential;
 
 /// Credential for obs.
 #[derive(Clone, Debug)]
@@ -26,7 +26,7 @@ impl Credential {
     }
 }
 
-impl Key for Credential {
+impl SigningCredential for Credential {
     fn is_valid(&self) -> bool {
         true
     }

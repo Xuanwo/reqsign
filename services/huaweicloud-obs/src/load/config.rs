@@ -2,7 +2,7 @@ use anyhow::Result;
 use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::key::Credential;
+use crate::credential::Credential;
 
 /// ConfigLoader will load credential from config.
 #[derive(Debug, Clone)]
