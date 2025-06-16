@@ -1,13 +1,20 @@
-//! Azure Storage service signer
+//! Azure Storage signing implementation for reqsign.
 //!
-//! This crate provides signing capabilities for Azure Storage services including:
-//! - Shared Key authentication
-//! - SAS (Shared Access Signature) token authentication
-//! - Bearer token authentication (OAuth)
+//! This crate provides comprehensive signing support for Azure Storage services
+//! including Blob Storage, File Storage, Queue Storage, and Table Storage.
 //!
-//! # Example
+//! ## Overview
 //!
-//! ```rust,no_run
+//! Azure Storage supports multiple authentication methods, and this crate
+//! implements all major ones:
+//!
+//! - **Shared Key**: Using storage account access keys
+//! - **SAS Token**: Pre-generated Shared Access Signature tokens
+//! - **Bearer Token**: OAuth2/Azure AD authentication
+//!
+//! ## Quick Start
+//!
+//! ```no_run
 //! use anyhow::Result;
 //! use reqsign_azure_storage::{Config, DefaultLoader, Builder};
 //! use reqsign_core::{Context, Signer};
@@ -17,33 +24,127 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
-//!     // Create context with proper FileRead and HttpSend implementations
-//!     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+//!     // Create context
+//!     let ctx = Context::new(
+//!         TokioFileRead::default(),
+//!         ReqwestHttpSend::default()
+//!     );
 //!
-//!     // Create a loader that tries multiple credential sources
-//!     let loader = DefaultLoader::new().from_env(&ctx);
+//!     // Configure Azure Storage credentials
+//!     let config = Config::default()
+//!         .account_name("mystorageaccount")
+//!         .from_env();
 //!
-//!     // Create a builder for Azure Storage
+//!     // Create credential loader
+//!     let loader = DefaultLoader::new(config);
+//!
+//!     // Create request builder
 //!     let builder = Builder::new();
 //!
 //!     // Create the signer
-//!     let signer = Signer::new(ctx.clone(), loader, builder);
+//!     let signer = Signer::new(ctx, loader, builder);
 //!
-//!     // Build and sign your request
-//!     let mut req = http::Request::get("https://account.blob.core.windows.net/container/blob")
-//!         .body(reqwest::Body::default())?;
+//!     // Sign requests
+//!     let mut req = http::Request::get("https://mystorageaccount.blob.core.windows.net/container/blob")
+//!         .body(())
+//!         .unwrap()
+//!         .into_parts()
+//!         .0;
 //!
-//!     let (mut parts, body) = req.into_parts();
-//!     signer.sign(&mut parts, None).await?;
-//!     let req = http::Request::from_parts(parts, body);
-//!
-//!     // Send the signed request
-//!     let resp = Client::new().execute(req.try_into()?).await?;
-//!     println!("Response: {}", resp.status());
-//!
+//!     signer.sign(&mut req, None).await?;
 //!     Ok(())
 //! }
 //! ```
+//!
+//! ## Credential Sources
+//!
+//! ### Environment Variables
+//!
+//! ```bash
+//! # For Shared Key authentication
+//! export AZURE_STORAGE_ACCOUNT_NAME=mystorageaccount
+//! export AZURE_STORAGE_ACCOUNT_KEY=base64key
+//!
+//! # For SAS Token authentication
+//! export AZURE_STORAGE_SAS_TOKEN=sv=2021-06-08&ss=b&srt=sco...
+//!
+//! # For Azure AD authentication
+//! export AZURE_CLIENT_ID=client-id
+//! export AZURE_CLIENT_SECRET=client-secret
+//! export AZURE_TENANT_ID=tenant-id
+//! ```
+//!
+//! ### Managed Identity
+//!
+//! When running on Azure services (VMs, App Service, AKS), the crate
+//! automatically uses managed identity:
+//!
+//! ```no_run
+//! use reqsign_azure_storage::{Config, DefaultLoader};
+//!
+//! let config = Config::default()
+//!     .account_name("mystorageaccount");
+//!
+//! let loader = DefaultLoader::new(config);
+//! // Automatically tries managed identity
+//! ```
+//!
+//! ## Storage Services
+//!
+//! ### Blob Storage
+//!
+//! ```no_run
+//! # use http::Request;
+//! // List containers
+//! let req = Request::get("https://account.blob.core.windows.net/?comp=list")
+//!     .body(())
+//!     .unwrap();
+//!
+//! // Get blob
+//! let req = Request::get("https://account.blob.core.windows.net/container/blob.txt")
+//!     .body(())
+//!     .unwrap();
+//! ```
+//!
+//! ### File Storage
+//!
+//! ```no_run
+//! # use http::Request;
+//! // List shares
+//! let req = Request::get("https://account.file.core.windows.net/?comp=list")
+//!     .body(())
+//!     .unwrap();
+//! ```
+//!
+//! ## Advanced Features
+//!
+//! ### Account SAS Generation
+//!
+//! Generate SAS tokens for delegated access:
+//!
+//! ```ignore
+//! // Account SAS is not yet exposed in the public API
+//! // This is planned for future releases
+//! ```
+//!
+//! ### Custom Configuration
+//!
+//! ```no_run
+//! use reqsign_azure_storage::Config;
+//!
+//! let config = Config::default()
+//!     .account_name("mystorageaccount")
+//!     .account_key("base64key")
+//!     .sas_token("sv=2021-06-08...")
+//!     .client_id("azure-ad-client-id")
+//!     .authority_host("https://login.microsoftonline.com");
+//! ```
+//!
+//! ## Examples
+//!
+//! Check out the examples directory for more detailed usage:
+//! - [Blob storage operations](examples/blob_storage.rs)
+//! - [SAS token generation](examples/sas_token.rs)
 
 mod account_sas;
 mod constants;
