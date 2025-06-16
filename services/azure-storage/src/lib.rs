@@ -11,12 +11,14 @@
 //! use anyhow::Result;
 //! use reqsign_azure_storage::{Config, DefaultLoader, Builder};
 //! use reqsign_core::{Context, Signer};
+//! use reqsign_file_read_tokio::TokioFileRead;
+//! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //! use reqwest::Client;
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
 //!     // Create context with proper FileRead and HttpSend implementations
-//!     let ctx = Context::new(file_reader, http_sender);
+//!     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 //!
 //!     // Create a loader that tries multiple credential sources
 //!     let loader = DefaultLoader::new().from_env(&ctx);
@@ -25,13 +27,15 @@
 //!     let builder = Builder::new();
 //!
 //!     // Create the signer
-//!     let signer = Signer::new(loader, builder);
+//!     let signer = Signer::new(ctx.clone(), loader, builder);
 //!
 //!     // Build and sign your request
 //!     let mut req = http::Request::get("https://account.blob.core.windows.net/container/blob")
 //!         .body(reqwest::Body::default())?;
 //!
-//!     signer.sign(&ctx, &mut req).await?;
+//!     let (mut parts, body) = req.into_parts();
+//!     signer.sign(&mut parts, None).await?;
+//!     let req = http::Request::from_parts(parts, body);
 //!
 //!     // Send the signed request
 //!     let resp = Client::new().execute(req.try_into()?).await?;
