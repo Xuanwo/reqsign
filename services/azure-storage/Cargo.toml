@@ -11,6 +11,8 @@ repository.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
 chrono.workspace = true
 form_urlencoded.workspace = true
 http.workspace = true
@@ -23,6 +25,7 @@ serde_json.workspace = true
 
 
 [dev-dependencies]
+async-trait.workspace = true
 dotenv.workspace = true
 env_logger.workspace = true
 reqwest = { workspace = true, features = ["rustls-tls"] }
