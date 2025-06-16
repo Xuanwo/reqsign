@@ -9,7 +9,7 @@ use http::{
 };
 use log::debug;
 use reqsign_core::time::{format_http_date, now};
-use reqsign_core::{Build, Context, SigningRequest};
+use reqsign_core::{Context, SignRequest, SigningRequest};
 use rsa::pkcs1v15::SigningKey;
 use rsa::sha2::Sha256;
 use rsa::signature::{SignatureEncoding, Signer};
@@ -37,17 +37,17 @@ impl Default for Builder {
 }
 
 #[async_trait]
-impl Build for Builder {
-    type Key = Credential;
+impl SignRequest for Builder {
+    type Credential = Credential;
 
-    async fn build(
+    async fn sign_request(
         &self,
         ctx: &Context,
         req: &mut Parts,
-        key: Option<&Self::Key>,
+        credential: Option<&Self::Credential>,
         _expires_in: Option<Duration>,
     ) -> Result<()> {
-        let Some(cred) = key else {
+        let Some(cred) = credential else {
             return Ok(());
         };
 

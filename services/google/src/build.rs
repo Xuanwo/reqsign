@@ -10,7 +10,8 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use reqsign_core::{
-    hash::hex_sha256, time::*, Build as BuildTrait, Context, SigningMethod, SigningRequest,
+    hash::hex_sha256, time::*, Context, SignRequest as SignRequestTrait, SigningMethod,
+    SigningRequest,
 };
 
 use crate::constants::{GOOG_QUERY_ENCODE_SET, GOOG_URI_ENCODE_SET};
@@ -127,19 +128,19 @@ impl Builder {
 }
 
 #[async_trait::async_trait]
-impl BuildTrait for Builder {
-    type Key = Credential;
+impl SignRequestTrait for Builder {
+    type Credential = Credential;
 
-    async fn build(
+    async fn sign_request(
         &self,
         ctx: &Context,
         req: &mut http::request::Parts,
-        key: Option<&Self::Key>,
+        credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
     ) -> Result<()> {
-        let key = key.ok_or_else(|| anyhow::anyhow!("missing credential"))?;
+        let cred = credential.ok_or_else(|| anyhow::anyhow!("missing credential"))?;
 
-        let signing_req = match (key, expires_in) {
+        let signing_req = match (cred, expires_in) {
             (Credential::Token(token), None) => {
                 // Use token authentication
                 self.build_token_auth(req, token)?

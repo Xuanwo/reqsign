@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 use reqsign_core::hash::base64_hmac_sha1;
 use reqsign_core::time::{format_http_date, now, DateTime};
-use reqsign_core::{Build, Context};
+use reqsign_core::{Context, SignRequest};
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::time::Duration;
@@ -48,17 +48,17 @@ impl Builder {
 }
 
 #[async_trait]
-impl Build for Builder {
-    type Key = Credential;
+impl SignRequest for Builder {
+    type Credential = Credential;
 
-    async fn build(
+    async fn sign_request(
         &self,
         _ctx: &Context,
         req: &mut http::request::Parts,
-        key: Option<&Self::Key>,
+        credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
     ) -> Result<()> {
-        let Some(cred) = key else {
+        let Some(cred) = credential else {
             return Ok(());
         };
 

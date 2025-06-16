@@ -1,4 +1,4 @@
-use crate::{Build, Context, Key, ProvideCredential};
+use crate::{Context, Key, ProvideCredential, SignRequest};
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -8,7 +8,7 @@ use std::time::Duration;
 pub struct Signer<K: Key> {
     ctx: Context,
     loader: Arc<dyn ProvideCredential<Credential = K>>,
-    builder: Arc<dyn Build<Key = K>>,
+    builder: Arc<dyn SignRequest<Credential = K>>,
     key: Arc<Mutex<Option<K>>>,
 }
 
@@ -17,7 +17,7 @@ impl<K: Key> Signer<K> {
     pub fn new(
         ctx: Context,
         loader: impl ProvideCredential<Credential = K>,
-        builder: impl Build<Key = K>,
+        builder: impl SignRequest<Credential = K>,
     ) -> Self {
         Self {
             ctx,
@@ -44,7 +44,7 @@ impl<K: Key> Signer<K> {
         };
 
         self.builder
-            .build(&self.ctx, req, key.as_ref(), expires_in)
+            .sign_request(&self.ctx, req, key.as_ref(), expires_in)
             .await
     }
 }
