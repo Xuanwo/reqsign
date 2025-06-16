@@ -73,8 +73,7 @@ impl DefaultLoader {
         let config_file = self
             .config
             .config_file
-            .as_ref()
-            .map(|s| s.as_str())
+            .as_deref()
             .unwrap_or(ORACLE_CONFIG_PATH);
 
         // Expand home directory if needed
@@ -95,8 +94,7 @@ impl DefaultLoader {
         let profile = self
             .config
             .profile
-            .as_ref()
-            .map(|s| s.as_str())
+            .as_deref()
             .unwrap_or(ORACLE_DEFAULT_PROFILE);
 
         // Parse INI content
