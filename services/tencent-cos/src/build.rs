@@ -7,7 +7,7 @@ use log::debug;
 use percent_encoding::{percent_decode_str, utf8_percent_encode};
 use reqsign_core::hash::{hex_hmac_sha1, hex_sha1};
 use reqsign_core::time::{format_http_date, now, DateTime};
-use reqsign_core::{SignRequest, Context, SigningRequest};
+use reqsign_core::{Context, SignRequest, SigningRequest};
 use std::time::Duration;
 
 /// Builder that implements Tencent COS signing.

@@ -9,7 +9,7 @@ use http::{
 };
 use log::debug;
 use reqsign_core::time::{format_http_date, now};
-use reqsign_core::{SignRequest, Context, SigningRequest};
+use reqsign_core::{Context, SignRequest, SigningRequest};
 use rsa::pkcs1v15::SigningKey;
 use rsa::sha2::Sha256;
 use rsa::signature::{SignatureEncoding, Signer};

@@ -10,7 +10,8 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use reqsign_core::{
-    hash::hex_sha256, time::*, SignRequest as SignRequestTrait, Context, SigningMethod, SigningRequest,
+    hash::hex_sha256, time::*, Context, SignRequest as SignRequestTrait, SigningMethod,
+    SigningRequest,
 };
 
 use crate::constants::{GOOG_QUERY_ENCODE_SET, GOOG_URI_ENCODE_SET};

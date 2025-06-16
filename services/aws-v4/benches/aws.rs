@@ -12,7 +12,7 @@ use criterion::Criterion;
 use once_cell::sync::Lazy;
 use reqsign_aws_v4::Builder as AwsV4Builder;
 use reqsign_aws_v4::Credential as AwsCredential;
-use reqsign_core::{SignRequest, Context};
+use reqsign_core::{Context, SignRequest};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 

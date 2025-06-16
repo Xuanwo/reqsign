@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use percent_encoding::utf8_percent_encode;
 use reqsign_core::hash::base64_hmac_sha1;
 use reqsign_core::time::{format_http_date, now, DateTime};
-use reqsign_core::{SignRequest, Context};
+use reqsign_core::{Context, SignRequest};
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::time::Duration;

@@ -13,7 +13,7 @@ use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
 use reqsign_aws_v4::{AssumeRoleLoader, Config};
 use reqsign_aws_v4::{Builder, DefaultLoader};
-use reqsign_core::{SignRequest, Context, ProvideCredential, Signer, StaticEnv};
+use reqsign_core::{Context, ProvideCredential, SignRequest, Signer, StaticEnv};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;

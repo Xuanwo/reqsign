@@ -7,7 +7,7 @@ use log::debug;
 use percent_encoding::percent_encode;
 use reqsign_core::hash::{base64_decode, base64_hmac_sha256};
 use reqsign_core::time::{format_http_date, now, DateTime};
-use reqsign_core::{SignRequest, Context, SigningMethod, SigningRequest};
+use reqsign_core::{Context, SignRequest, SigningMethod, SigningRequest};
 use std::fmt::Write;
 use std::time::Duration;
 
