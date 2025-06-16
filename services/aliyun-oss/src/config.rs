@@ -1,11 +1,8 @@
-use std::collections::HashMap;
-use std::env;
-
 use super::constants::*;
+use reqsign_core::Context;
 
 /// Config carries all the configuration for Aliyun services.
-#[derive(Clone)]
-#[cfg_attr(test, derive(Debug))]
+#[derive(Clone, Debug)]
 pub struct Config {
     /// `access_key_id` will be loaded from
     ///
@@ -64,29 +61,27 @@ impl Default for Config {
 
 impl Config {
     /// Load config from env.
-    pub fn from_env(mut self) -> Self {
-        let envs = env::vars().collect::<HashMap<_, _>>();
-
-        if let Some(v) = envs.get(ALIBABA_CLOUD_ACCESS_KEY_ID) {
-            self.access_key_id.get_or_insert(v.clone());
+    pub fn from_env(mut self, ctx: &Context) -> Self {
+        if let Some(v) = ctx.env_var(ALIBABA_CLOUD_ACCESS_KEY_ID) {
+            self.access_key_id.get_or_insert(v);
         }
-        if let Some(v) = envs.get(ALIBABA_CLOUD_ACCESS_KEY_SECRET) {
-            self.access_key_secret.get_or_insert(v.clone());
+        if let Some(v) = ctx.env_var(ALIBABA_CLOUD_ACCESS_KEY_SECRET) {
+            self.access_key_secret.get_or_insert(v);
         }
-        if let Some(v) = envs.get(ALIBABA_CLOUD_SECURITY_TOKEN) {
-            self.security_token.get_or_insert(v.clone());
+        if let Some(v) = ctx.env_var(ALIBABA_CLOUD_SECURITY_TOKEN) {
+            self.security_token.get_or_insert(v);
         }
-        if let Some(v) = envs.get(ALIBABA_CLOUD_ROLE_ARN) {
-            self.role_arn.get_or_insert(v.clone());
+        if let Some(v) = ctx.env_var(ALIBABA_CLOUD_ROLE_ARN) {
+            self.role_arn.get_or_insert(v);
         }
-        if let Some(v) = envs.get(ALIBABA_CLOUD_OIDC_PROVIDER_ARN) {
-            self.oidc_provider_arn.get_or_insert(v.clone());
+        if let Some(v) = ctx.env_var(ALIBABA_CLOUD_OIDC_PROVIDER_ARN) {
+            self.oidc_provider_arn.get_or_insert(v);
         }
-        if let Some(v) = envs.get(ALIBABA_CLOUD_OIDC_TOKEN_FILE) {
-            self.oidc_token_file.get_or_insert(v.clone());
+        if let Some(v) = ctx.env_var(ALIBABA_CLOUD_OIDC_TOKEN_FILE) {
+            self.oidc_token_file.get_or_insert(v);
         }
-        if let Some(v) = envs.get(ALIBABA_CLOUD_STS_ENDPOINT) {
-            self.sts_endpoint.get_or_insert(v.clone());
+        if let Some(v) = ctx.env_var(ALIBABA_CLOUD_STS_ENDPOINT) {
+            self.sts_endpoint.get_or_insert(v);
         }
 
         self
