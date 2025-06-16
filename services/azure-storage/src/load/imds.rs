@@ -1,6 +1,6 @@
 use crate::Credential;
 use async_trait::async_trait;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 
 /// Load credential from Azure Instance Metadata Service (IMDS).
 ///
@@ -55,10 +55,10 @@ impl ImdsLoader {
 }
 
 #[async_trait]
-impl Load for ImdsLoader {
-    type Key = Credential;
+impl ProvideCredential for ImdsLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         let token = get_access_token("https://storage.azure.com/", self, ctx).await?;
 
         let expires_on = if token.expires_on.is_empty() {

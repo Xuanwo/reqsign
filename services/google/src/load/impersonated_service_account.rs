@@ -5,7 +5,7 @@ use http::header::CONTENT_TYPE;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 
-use reqsign_core::{time::now, Context, Load};
+use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::key::{ImpersonatedServiceAccount, Token};
@@ -180,10 +180,10 @@ impl ImpersonatedServiceAccountLoader {
 }
 
 #[async_trait::async_trait]
-impl Load for ImpersonatedServiceAccountLoader {
-    type Key = Token;
+impl ProvideCredential for ImpersonatedServiceAccountLoader {
+    type Credential = Token;
 
-    async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // First get bearer token using OAuth2 refresh
         let bearer_token = self.generate_bearer_auth_token(ctx).await?;
 

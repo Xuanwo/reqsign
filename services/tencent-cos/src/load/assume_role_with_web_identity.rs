@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use http::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE};
 use log::debug;
 use reqsign_core::time::{now, parse_rfc3339};
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 use serde::{Deserialize, Serialize};
 
 /// Loader that loads credential via AssumeRoleWithWebIdentity.
@@ -21,10 +21,10 @@ impl AssumeRoleWithWebIdentityLoader {
 }
 
 #[async_trait]
-impl Load for AssumeRoleWithWebIdentityLoader {
-    type Key = Credential;
+impl ProvideCredential for AssumeRoleWithWebIdentityLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         let (region, token_file, role_arn, provider_id) = match (
             &self.config.region,
             &self.config.web_identity_token_file,

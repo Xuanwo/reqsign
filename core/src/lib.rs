@@ -18,7 +18,7 @@ pub use env::Env;
 pub use env::StaticEnv;
 
 mod api;
-pub use api::{Build, Key, Load};
+pub use api::{Build, Key, ProvideCredential};
 mod request;
 pub use request::{SigningMethod, SigningRequest};
 mod signer;

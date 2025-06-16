@@ -5,7 +5,7 @@ use http::header::{ACCEPT, CONTENT_TYPE};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 
-use reqsign_core::{time::now, Context, Load};
+use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::key::{
@@ -212,10 +212,10 @@ impl ExternalAccountLoader {
 }
 
 #[async_trait::async_trait]
-impl Load for ExternalAccountLoader {
-    type Key = Token;
+impl ProvideCredential for ExternalAccountLoader {
+    type Credential = Token;
 
-    async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Load OIDC token from source
         let oidc_token = self.load_oidc_token(ctx).await?;
 

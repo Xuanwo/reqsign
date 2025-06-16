@@ -1,6 +1,6 @@
 use crate::Credential;
 use async_trait::async_trait;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 
 /// Load credential from Azure Client Secret.
 ///
@@ -49,10 +49,10 @@ impl ClientSecretLoader {
 }
 
 #[async_trait]
-impl Load for ClientSecretLoader {
-    type Key = Credential;
+impl ProvideCredential for ClientSecretLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         // Check if all required parameters are available
         let tenant_id = match &self.tenant_id {
             Some(id) if !id.is_empty() => id,

@@ -1,6 +1,6 @@
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 use std::sync::Arc;
 
 /// ConfigLoader loads credential from static config.
@@ -17,10 +17,10 @@ impl ConfigLoader {
 }
 
 #[async_trait]
-impl Load for ConfigLoader {
-    type Key = Credential;
+impl ProvideCredential for ConfigLoader {
+    type Credential = Credential;
 
-    async fn load(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         if let (Some(access_key_id), Some(access_key_secret)) =
             (&self.config.access_key_id, &self.config.access_key_secret)
         {
@@ -60,7 +60,7 @@ mod tests {
         };
 
         let loader = ConfigLoader::new(Arc::new(config));
-        let credential = loader.load(&ctx).await.unwrap().unwrap();
+        let credential = loader.provide_credential(&ctx).await.unwrap().unwrap();
 
         assert_eq!(credential.access_key_id, "test_access_key");
         assert_eq!(credential.access_key_secret, "test_secret_key");
@@ -77,7 +77,7 @@ mod tests {
 
         let config = Config::default();
         let loader = ConfigLoader::new(Arc::new(config));
-        let credential = loader.load(&ctx).await.unwrap();
+        let credential = loader.provide_credential(&ctx).await.unwrap();
 
         assert!(credential.is_none());
     }

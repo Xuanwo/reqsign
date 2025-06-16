@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
     let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::from(""))?;
     let (mut parts, body) = req.into_parts();
     // Signing request with Signer, and convert it back to reqwest::Request
-    let credential = loader.load().await?.unwrap();
+    let credential = loader.provide_credential().await?.unwrap();
     signer.sign(&mut parts, &credential)?;
     let req = http::Request::from_parts(parts, body).try_into()?;
     // Sending already signed request.

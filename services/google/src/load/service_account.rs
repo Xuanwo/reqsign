@@ -4,7 +4,7 @@ use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 
-use reqsign_core::{time::now, Context, Load};
+use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::key::{ServiceAccount, Token};
@@ -59,10 +59,10 @@ impl ServiceAccountLoader {
 }
 
 #[async_trait::async_trait]
-impl Load for ServiceAccountLoader {
-    type Key = Token;
+impl ProvideCredential for ServiceAccountLoader {
+    type Credential = Token;
 
-    async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         let scope = self
             .config
             .scope
