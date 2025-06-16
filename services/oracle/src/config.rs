@@ -2,7 +2,7 @@ use crate::constants::*;
 use anyhow::Result;
 use ini::Ini;
 use reqsign_core::utils::Redact;
-use std::env;
+use reqsign_core::Context;
 use std::fmt::{Debug, Formatter};
 
 /// Config for Oracle Cloud Infrastructure services.
@@ -40,21 +40,22 @@ impl Debug for Config {
 
 impl Config {
     /// Load config from environment variables.
-    pub fn from_env() -> Self {
+    pub fn from_env(ctx: &Context) -> Self {
         Self {
-            user: env::var(ORACLE_USER).ok(),
-            tenancy: env::var(ORACLE_TENANCY).ok(),
-            region: env::var(ORACLE_REGION).ok(),
-            key_file: env::var(ORACLE_KEY_FILE).ok(),
-            fingerprint: env::var(ORACLE_FINGERPRINT).ok(),
-            config_file: env::var(ORACLE_CONFIG_FILE).ok(),
-            profile: env::var(ORACLE_PROFILE).ok(),
+            user: ctx.env_var(ORACLE_USER),
+            tenancy: ctx.env_var(ORACLE_TENANCY),
+            region: ctx.env_var(ORACLE_REGION),
+            key_file: ctx.env_var(ORACLE_KEY_FILE),
+            fingerprint: ctx.env_var(ORACLE_FINGERPRINT),
+            config_file: ctx.env_var(ORACLE_CONFIG_FILE),
+            profile: ctx.env_var(ORACLE_PROFILE),
         }
     }
 
     /// Load config from Oracle config file.
-    pub fn from_config_file(path: &str, profile: &str) -> Result<Self> {
-        let ini = Ini::read_from(&mut std::fs::File::open(path)?)?;
+    pub async fn from_config_file(ctx: &Context, path: &str, profile: &str) -> Result<Self> {
+        let content = ctx.file_read_as_string(path).await?;
+        let ini = Ini::read_from(&mut content.as_bytes())?;
         let section = ini
             .section(Some(profile))
             .ok_or_else(|| anyhow::anyhow!("Profile {} not found in config file", profile))?;

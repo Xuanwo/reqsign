@@ -49,9 +49,9 @@ mod tests {
             ],
             || {
                 tokio::runtime::Runtime::new().unwrap().block_on(async {
-                    let config = Config::default().from_env();
-                    let loader = ConfigLoader::new(config);
                     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+                    let config = Config::default().from_env(&ctx);
+                    let loader = ConfigLoader::new(config);
 
                     let x = loader.load(&ctx).await.expect("load must succeed");
                     let x = x.expect("must load succeed");
