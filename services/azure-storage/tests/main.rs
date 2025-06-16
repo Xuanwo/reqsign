@@ -10,44 +10,9 @@ use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
 use reqsign_azure_storage::{Builder, Credential, DefaultLoader};
 use reqsign_core::{Context, Signer};
+use reqsign_file_read_tokio::TokioFileRead;
+use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
-
-// Mock implementations for testing
-#[derive(Debug)]
-struct MockFileRead;
-
-#[async_trait::async_trait]
-impl reqsign_core::FileRead for MockFileRead {
-    async fn file_read(&self, _path: &str) -> anyhow::Result<Vec<u8>> {
-        Ok(Vec::new())
-    }
-}
-
-#[derive(Debug)]
-struct MockHttpSend;
-
-#[async_trait::async_trait]
-impl reqsign_core::HttpSend for MockHttpSend {
-    async fn http_send(
-        &self,
-        req: http::Request<bytes::Bytes>,
-    ) -> anyhow::Result<http::Response<bytes::Bytes>> {
-        // For IMDS and OAuth requests, we need to actually make HTTP calls
-        let client = reqwest::Client::new();
-        let resp = client.execute(req.try_into()?).await?;
-
-        let status = resp.status();
-        let headers = resp.headers().clone();
-        let body = resp.bytes().await?;
-
-        let mut response = http::Response::builder().status(status);
-        for (key, value) in headers.iter() {
-            response = response.header(key, value);
-        }
-
-        Ok(response.body(body)?)
-    }
-}
 
 fn init_signer() -> Option<(Context, Signer<Credential>)> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -59,7 +24,7 @@ fn init_signer() -> Option<(Context, Signer<Credential>)> {
         return None;
     }
 
-    let ctx = Context::new(MockFileRead, MockHttpSend);
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
     let loader = DefaultLoader::new().with_account_key(
         env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
@@ -286,7 +251,7 @@ async fn test_head_blob_with_imds() -> Result<()> {
         return Ok(());
     }
 
-    let ctx = Context::new(MockFileRead, MockHttpSend);
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
     let loader = DefaultLoader::new().with_imds();
     let builder = Builder::new();
@@ -332,7 +297,7 @@ async fn test_can_list_container_blobs_with_imds() -> Result<()> {
         return Ok(());
     }
 
-    let ctx = Context::new(MockFileRead, MockHttpSend);
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
     let loader = DefaultLoader::new().with_imds();
     let builder = Builder::new();
@@ -393,7 +358,7 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
         return Ok(());
     }
 
-    let ctx = Context::new(MockFileRead, MockHttpSend);
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
     let loader = DefaultLoader::new().from_env(&ctx);
     let builder = Builder::new();
@@ -446,7 +411,7 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
         return Ok(());
     }
 
-    let ctx = Context::new(MockFileRead, MockHttpSend);
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
     let loader = DefaultLoader::new().from_env(&ctx);
     let builder = Builder::new();

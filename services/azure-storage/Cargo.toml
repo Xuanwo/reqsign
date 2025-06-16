@@ -28,5 +28,7 @@ serde_json.workspace = true
 async-trait.workspace = true
 dotenv.workspace = true
 env_logger.workspace = true
+reqsign-file-read-tokio = { path = "../../context/file-read-tokio" }
+reqsign-http-send-reqwest = { path = "../../context/http-send-reqwest" }
 reqwest = { workspace = true, features = ["rustls-tls"] }
 tokio = { workspace = true, features = ["full"] }
