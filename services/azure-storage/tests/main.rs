@@ -177,7 +177,9 @@ async fn test_can_head_blob_with_sas() -> Result<()> {
         .body(reqwest::Body::default())?;
 
     let (mut parts, body) = req.into_parts();
-    signer.sign(&mut parts, Some(Duration::from_secs(60))).await?;
+    signer
+        .sign(&mut parts, Some(Duration::from_secs(60)))
+        .await?;
     req = Request::from_parts(parts, body);
 
     println!("signed request: {:?}", req);
@@ -221,7 +223,9 @@ async fn test_can_list_container_blobs() -> Result<()> {
             .body(reqwest::Body::default())?;
 
         let (mut parts, body) = req.into_parts();
-        signer.sign(&mut parts, Some(Duration::from_secs(60))).await?;
+        signer
+            .sign(&mut parts, Some(Duration::from_secs(60)))
+            .await?;
         req = Request::from_parts(parts, body);
 
         let client = Client::new();
