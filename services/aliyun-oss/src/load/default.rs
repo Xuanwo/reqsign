@@ -38,7 +38,11 @@ impl ProvideCredential for DefaultLoader {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.assume_role_with_oidc_loader.provide_credential(ctx).await? {
+        if let Some(cred) = self
+            .assume_role_with_oidc_loader
+            .provide_credential(ctx)
+            .await?
+        {
             return Ok(Some(cred));
         }
 

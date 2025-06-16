@@ -46,7 +46,11 @@ impl ProvideCredential for DefaultLoader {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.assume_role_with_web_identity_loader.provide_credential(ctx).await? {
+        if let Some(cred) = self
+            .assume_role_with_web_identity_loader
+            .provide_credential(ctx)
+            .await?
+        {
             return Ok(Some(cred));
         }
 
@@ -233,7 +237,11 @@ mod tests {
                 .await
                 .into(),
         );
-        let x = l.provide_credential(&ctx).await.expect("load must success").unwrap();
+        let x = l
+            .provide_credential(&ctx)
+            .await
+            .expect("load must success")
+            .unwrap();
         assert_eq!("shared_access_key_id", x.access_key_id);
         assert_eq!("shared_secret_access_key", x.secret_access_key);
     }

@@ -53,7 +53,10 @@ mod tests {
                     let config = Config::default().from_env(&ctx);
                     let loader = ConfigLoader::new(config);
 
-                    let x = loader.provide_credential(&ctx).await.expect("load must succeed");
+                    let x = loader
+                        .provide_credential(&ctx)
+                        .await
+                        .expect("load must succeed");
                     let x = x.expect("must load succeed");
                     assert_eq!("access_key_id", x.access_key_id);
                     assert_eq!("secret_access_key", x.secret_access_key);

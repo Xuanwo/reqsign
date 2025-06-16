@@ -209,7 +209,11 @@ impl ProvideCredential for DefaultLoader {
         }
 
         // Try workload identity loader
-        if let Some(cred) = self.workload_identity_loader.provide_credential(ctx).await? {
+        if let Some(cred) = self
+            .workload_identity_loader
+            .provide_credential(ctx)
+            .await?
+        {
             if cred.is_valid() {
                 return Ok(Some(cred));
             }

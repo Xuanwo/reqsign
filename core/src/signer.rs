@@ -14,7 +14,11 @@ pub struct Signer<K: Key> {
 
 impl<K: Key> Signer<K> {
     /// Create a new signer.
-    pub fn new(ctx: Context, loader: impl ProvideCredential<Credential = K>, builder: impl Build<Key = K>) -> Self {
+    pub fn new(
+        ctx: Context,
+        loader: impl ProvideCredential<Credential = K>,
+        builder: impl Build<Key = K>,
+    ) -> Self {
         Self {
             ctx,
 

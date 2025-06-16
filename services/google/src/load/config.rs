@@ -143,7 +143,10 @@ mod tests {
         ));
 
         let loader = ConfigLoader::new(config);
-        let cred = loader.provide_credential(&ctx).await.expect("load must succeed");
+        let cred = loader
+            .provide_credential(&ctx)
+            .await
+            .expect("load must succeed");
         assert!(cred.is_some());
 
         let cred = cred.unwrap();
@@ -168,7 +171,10 @@ mod tests {
         let config = Config::new();
 
         let loader = ConfigLoader::new(config);
-        let cred = loader.provide_credential(&ctx).await.expect("load must succeed");
+        let cred = loader
+            .provide_credential(&ctx)
+            .await
+            .expect("load must succeed");
         assert!(cred.is_some());
     }
 
@@ -183,7 +189,10 @@ mod tests {
         ));
 
         let loader = ConfigLoader::new(config);
-        let cred = loader.provide_credential(&ctx).await.expect("load must succeed");
+        let cred = loader
+            .provide_credential(&ctx)
+            .await
+            .expect("load must succeed");
         assert!(cred.is_some());
 
         let cred = cred.unwrap();
@@ -206,7 +215,10 @@ mod tests {
         ));
 
         let loader = ConfigLoader::new(config);
-        let cred = loader.provide_credential(&ctx).await.expect("load must succeed");
+        let cred = loader
+            .provide_credential(&ctx)
+            .await
+            .expect("load must succeed");
         assert!(cred.is_some());
 
         let cred = cred.unwrap();
