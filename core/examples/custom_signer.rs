@@ -32,8 +32,13 @@ impl ProvideCredential for MyCredentialLoader {
         let api_key = ctx.env_var("MY_API_KEY").unwrap_or_default();
         let api_secret = ctx.env_var("MY_API_SECRET").unwrap_or_default();
 
+        // For demo purposes, use dummy credentials if none are provided
         if api_key.is_empty() || api_secret.is_empty() {
-            return Ok(None);
+            println!("No credentials found in environment, using demo credentials");
+            return Ok(Some(MyCredential {
+                api_key: "demo-api-key".to_string(),
+                api_secret: "demo-api-secret".to_string(),
+            }));
         }
 
         Ok(Some(MyCredential {

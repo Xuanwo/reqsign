@@ -26,16 +26,15 @@
 //!     );
 //!
 //!     // Configure Aliyun OSS credentials
-//!     let config = Config::default()
-//!         .access_key_id("your-access-key-id")
-//!         .access_key_secret("your-access-key-secret")
-//!         .region("oss-cn-beijing");
+//!     let mut config = Config::default();
+//!     config.access_key_id = Some("your-access-key-id".to_string());
+//!     config.access_key_secret = Some("your-access-key-secret".to_string());
 //!
 //!     // Create credential loader
-//!     let loader = DefaultLoader::new(config);
+//!     let loader = DefaultLoader::new(config.into());
 //!
 //!     // Create request builder
-//!     let builder = Builder::new();
+//!     let builder = Builder::new("bucket");
 //!
 //!     // Create the signer
 //!     let signer = Signer::new(ctx, loader, builder);
@@ -117,12 +116,12 @@
 //! ```no_run
 //! use reqsign_aliyun_oss::{Config, AssumeRoleWithOidcLoader};
 //!
-//! let config = Config::default()
-//!     .role_arn("acs:ram::123456789012:role/MyRole")
-//!     .oidc_provider_arn("acs:ram::123456789012:oidc-provider/MyProvider")
-//!     .oidc_token_file_path("/var/run/secrets/token");
+//! let mut config = Config::default();
+//! config.role_arn = Some("acs:ram::123456789012:role/MyRole".to_string());
+//! config.oidc_provider_arn = Some("acs:ram::123456789012:oidc-provider/MyProvider".to_string());
+//! config.oidc_token_file = Some("/var/run/secrets/token".to_string());
 //!
-//! let loader = AssumeRoleWithOidcLoader::new(config);
+//! let loader = AssumeRoleWithOidcLoader::new(config.into());
 //! ```
 //!
 //! ### Custom Endpoints

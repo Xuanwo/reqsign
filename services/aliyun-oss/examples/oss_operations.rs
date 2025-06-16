@@ -21,7 +21,22 @@ async fn main() -> Result<()> {
     // 1. Environment variables (ALIBABA_CLOUD_ACCESS_KEY_ID, ALIBABA_CLOUD_ACCESS_KEY_SECRET)
     // 2. Aliyun CLI config file (~/.aliyun/config.json)
     // 3. ECS RAM role (if running on Aliyun ECS)
-    let config = Config::default().from_env(&ctx);
+    let mut config = Config::default().from_env(&ctx);
+    
+    // Check if we have real credentials
+    let has_real_creds = ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_ID").is_some() ||
+                         ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").is_some();
+    
+    let demo_mode = !has_real_creds;
+    if demo_mode {
+        println!("No Aliyun credentials found, using demo mode");
+        println!("To use real credentials, set ALIBABA_CLOUD_ACCESS_KEY_ID and ALIBABA_CLOUD_ACCESS_KEY_SECRET");
+        println!();
+        
+        // Use demo credentials
+        config.access_key_id = Some("LTAI4GDemoAccessKeyId".to_string());
+        config.access_key_secret = Some("DemoAccessKeySecretForExample".to_string());
+    }
 
     // Create credential loader
     let loader = DefaultLoader::new(std::sync::Arc::new(config));
@@ -46,19 +61,27 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("List objects request signed successfully!");
+            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!("Date header: {:?}", parts.headers.get("date"));
 
-            // Execute the request
-            let req = http::Request::from_parts(parts, body).try_into()?;
-            match client.execute(req).await {
-                Ok(resp) => {
-                    println!("Response status: {}", resp.status());
-                    if resp.status().is_success() {
-                        let text = resp.text().await?;
-                        println!("Objects XML response preview:");
-                        println!("{}", &text[..500.min(text.len())]);
+            if !demo_mode {
+                // Execute the request only if we have real credentials
+                let req = http::Request::from_parts(parts, body).try_into()?;
+                match client.execute(req).await {
+                    Ok(resp) => {
+                        println!("Response status: {}", resp.status());
+                        if resp.status().is_success() {
+                            let text = resp.text().await?;
+                            println!("Objects XML response preview:");
+                            println!("{}", &text[..500.min(text.len())]);
+                        }
                     }
+                    Err(e) => eprintln!("Request failed: {}", e),
                 }
-                Err(e) => eprintln!("Request failed: {}", e),
+            } else {
+                println!("Demo mode: Skipping actual API call");
+                // Consume body to avoid unused variable warning
+                let _ = body;
             }
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
@@ -86,6 +109,9 @@ async fn main() -> Result<()> {
                 parts.headers.get("authorization")
             );
             println!("Date header: {:?}", parts.headers.get("date"));
+            if demo_mode {
+                println!("Demo mode: Not making actual API call");
+            }
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
     }
@@ -111,6 +137,9 @@ async fn main() -> Result<()> {
         Ok(_) => {
             println!("Upload object request signed successfully!");
             println!("The request is ready to upload '{}' to OSS", upload_key);
+            if demo_mode {
+                println!("Demo mode: Not actually uploading the file");
+            }
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
     }
@@ -132,6 +161,9 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("Delete object request signed successfully!");
+            if demo_mode {
+                println!("Demo mode: Not actually deleting the file");
+            }
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
     }
@@ -152,6 +184,9 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("List objects with prefix request signed successfully!");
+            if demo_mode {
+                println!("Demo mode: Not making actual API call");
+            }
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
     }
@@ -173,6 +208,9 @@ async fn main() -> Result<()> {
         Ok(_) => {
             println!("Internal endpoint request signed successfully!");
             println!("Use this when running within Aliyun VPC for better performance");
+            if demo_mode {
+                println!("Demo mode: Not making actual API call");
+            }
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
     }

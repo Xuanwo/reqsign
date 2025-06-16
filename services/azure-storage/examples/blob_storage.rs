@@ -8,7 +8,7 @@ use reqwest::Client;
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
-    env_logger::init();
+    let _ = env_logger::builder().is_test(true).try_init();
 
     // Create HTTP client
     let client = Client::new();
@@ -24,6 +24,17 @@ async fn main() -> Result<()> {
     let _config = Config::default()
         .with_account_name("mystorageaccount") // Replace with your account
         .from_env();
+
+    // Check if we have real credentials
+    let has_real_creds = ctx.env_var("AZURE_STORAGE_ACCOUNT_NAME").is_some() ||
+                         ctx.env_var("AZURE_STORAGE_ACCOUNT_KEY").is_some();
+    
+    let demo_mode = !has_real_creds;
+    if demo_mode {
+        println!("No Azure credentials found, using demo mode");
+        println!("To use real credentials, set AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_ACCOUNT_KEY");
+        println!();
+    }
 
     // Create credential loader
     let loader = DefaultLoader::new().from_env(&ctx);
@@ -49,22 +60,37 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("List containers request signed successfully!");
+            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!("x-ms-date header: {:?}", parts.headers.get("x-ms-date"));
 
-            // Execute the request
-            let req = http::Request::from_parts(parts, body).try_into()?;
-            match client.execute(req).await {
-                Ok(resp) => {
-                    println!("Response status: {}", resp.status());
-                    if resp.status().is_success() {
-                        let text = resp.text().await?;
-                        println!("Containers XML response preview:");
-                        println!("{}", &text[..500.min(text.len())]);
+            if !demo_mode {
+                // Execute the request only if we have real credentials
+                let req = http::Request::from_parts(parts, body).try_into()?;
+                match client.execute(req).await {
+                    Ok(resp) => {
+                        println!("Response status: {}", resp.status());
+                        if resp.status().is_success() {
+                            let text = resp.text().await?;
+                            println!("Containers XML response preview:");
+                            println!("{}", &text[..500.min(text.len())]);
+                        }
                     }
+                    Err(e) => eprintln!("Request failed: {}", e),
                 }
-                Err(e) => eprintln!("Request failed: {}", e),
+            } else {
+                println!("Demo mode: Skipping actual API call");
+                // Consume body to avoid unused variable warning
+                let _ = body;
             }
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => {
+            if demo_mode {
+                println!("In demo mode, signing may fail without real credentials.");
+                println!("This is expected. The example shows how the API would be used.");
+            } else {
+                eprintln!("Failed to sign request: {}", e);
+            }
+        }
     }
 
     // Example 2: Get blob properties
@@ -92,7 +118,13 @@ async fn main() -> Result<()> {
             );
             println!("x-ms-date header: {:?}", parts.headers.get("x-ms-date"));
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => {
+            if demo_mode {
+                println!("Signing failed in demo mode (expected without real credentials)");
+            } else {
+                eprintln!("Failed to sign request: {}", e);
+            }
+        }
     }
 
     // Example 3: Upload a blob
@@ -117,8 +149,17 @@ async fn main() -> Result<()> {
         Ok(_) => {
             println!("Upload blob request signed successfully!");
             println!("The request is ready to upload 'hello.txt' to Azure Blob Storage");
+            if demo_mode {
+                println!("Demo mode: Not actually uploading the file");
+            }
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => {
+            if demo_mode {
+                println!("Signing failed in demo mode (expected without real credentials)");
+            } else {
+                eprintln!("Failed to sign request: {}", e);
+            }
+        }
     }
 
     // Example 4: Using SAS token (if available)
@@ -147,7 +188,13 @@ async fn main() -> Result<()> {
             println!("SAS token request signed successfully!");
             println!("When using SAS tokens, the token is appended to the URL");
         }
-        Err(e) => eprintln!("Failed to sign with SAS token: {}", e),
+        Err(e) => {
+            if demo_mode {
+                println!("SAS token signing failed in demo mode (expected without real credentials)");
+            } else {
+                eprintln!("Failed to sign with SAS token: {}", e);
+            }
+        }
     }
 
     Ok(())

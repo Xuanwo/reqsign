@@ -30,13 +30,8 @@
 //!         ReqwestHttpSend::default()
 //!     );
 //!
-//!     // Configure Azure Storage credentials
-//!     let config = Config::default()
-//!         .account_name("mystorageaccount")
-//!         .from_env();
-//!
-//!     // Create credential loader
-//!     let loader = DefaultLoader::new(config);
+//!     // Create credential loader (will try multiple methods)
+//!     let loader = DefaultLoader::new();
 //!
 //!     // Create request builder
 //!     let builder = Builder::new();
@@ -82,11 +77,8 @@
 //! ```no_run
 //! use reqsign_azure_storage::{Config, DefaultLoader};
 //!
-//! let config = Config::default()
-//!     .account_name("mystorageaccount");
-//!
-//! let loader = DefaultLoader::new(config);
-//! // Automatically tries managed identity
+//! // Create loader that will try managed identity
+//! let loader = DefaultLoader::new();
 //! ```
 //!
 //! ## Storage Services
@@ -133,11 +125,11 @@
 //! use reqsign_azure_storage::Config;
 //!
 //! let config = Config::default()
-//!     .account_name("mystorageaccount")
-//!     .account_key("base64key")
-//!     .sas_token("sv=2021-06-08...")
-//!     .client_id("azure-ad-client-id")
-//!     .authority_host("https://login.microsoftonline.com");
+//!     .with_account_name("mystorageaccount")
+//!     .with_account_key("base64key")
+//!     .with_sas_token("sv=2021-06-08...")
+//!     .with_client_id("azure-ad-client-id")
+//!     .with_authority_host("https://login.microsoftonline.com");
 //! ```
 //!
 //! ## Examples

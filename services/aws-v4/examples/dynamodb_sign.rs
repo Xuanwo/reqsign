@@ -9,7 +9,7 @@ use serde_json::json;
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
-    env_logger::init();
+    let _ = env_logger::builder().is_test(true).try_init();
 
     // Create HTTP client
     let client = Client::new();
@@ -21,6 +21,13 @@ async fn main() -> Result<()> {
     let mut config = Config::default();
     config = config.from_env(&ctx);
     config.region = Some("us-east-1".to_string());
+    
+    // If no credentials are found, use demo credentials
+    if config.access_key_id.is_none() {
+        println!("No AWS credentials found, using demo credentials for example");
+        config.access_key_id = Some("AKIAIOSFODNN7EXAMPLE".to_string());
+        config.secret_access_key = Some("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
+    }
 
     // Create credential loader
     let loader = DefaultLoader::new(std::sync::Arc::new(config));
@@ -47,27 +54,16 @@ async fn main() -> Result<()> {
         .body(reqwest::Body::from(body_bytes))
         .unwrap();
 
-    let (mut parts, body) = req.into_parts();
+    let (mut parts, _body) = req.into_parts();
 
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("ListTables request signed successfully!");
 
-            // Execute the request
-            let req = http::Request::from_parts(parts, body).try_into()?;
-            match client.execute(req).await {
-                Ok(resp) => {
-                    println!("Response status: {}", resp.status());
-                    if resp.status().is_success() {
-                        let json: serde_json::Value = resp.json().await?;
-                        println!("Tables: {}", serde_json::to_string_pretty(&json)?);
-                    } else {
-                        let text = resp.text().await?;
-                        eprintln!("Error response: {}", text);
-                    }
-                }
-                Err(e) => eprintln!("Request failed: {}", e),
-            }
+            // In demo mode, don't actually send the request
+            println!("Demo mode: Not sending actual request to AWS");
+            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!("X-Amz-Date header: {:?}", parts.headers.get("x-amz-date"));
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
     }

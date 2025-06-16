@@ -8,7 +8,7 @@ use reqwest::Client;
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging for debugging
-    env_logger::init();
+    let _ = env_logger::builder().is_test(true).try_init();
 
     // Create HTTP client
     let client = Client::new();
@@ -17,11 +17,17 @@ async fn main() -> Result<()> {
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
 
     // Configure AWS credential loading
-    // This will try multiple sources in order:
-    // 1. Environment variables
-    // 2. ~/.aws/credentials file
-    // 3. IAM instance roles
-    let config = Config::default().from_env(&ctx);
+    // For demo purposes, set demo credentials if none exist
+    let mut config = Config::default();
+    config = config.from_env(&ctx);
+    
+    // If no credentials are found, use demo credentials
+    if config.access_key_id.is_none() {
+        println!("No AWS credentials found, using demo credentials for example");
+        config.access_key_id = Some("AKIAIOSFODNN7EXAMPLE".to_string());
+        config.secret_access_key = Some("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
+        config.region = Some("us-east-1".to_string());
+    }
 
     // Create credential loader
     let loader = DefaultLoader::new(std::sync::Arc::new(config));
@@ -39,28 +45,17 @@ async fn main() -> Result<()> {
         .body(reqwest::Body::from(""))
         .unwrap();
 
-    let (mut parts, body) = req.into_parts();
+    let (mut parts, _body) = req.into_parts();
 
     // Sign the request
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("Request signed successfully!");
 
-            // Convert back to reqwest request and execute
-            let req = http::Request::from_parts(parts, body).try_into()?;
-            match client.execute(req).await {
-                Ok(resp) => {
-                    println!("Response status: {}", resp.status());
-                    if resp.status().is_success() {
-                        let text = resp.text().await?;
-                        println!(
-                            "First 500 chars of response:\n{}",
-                            &text[..500.min(text.len())]
-                        );
-                    }
-                }
-                Err(e) => eprintln!("Request failed: {}", e),
-            }
+            // In demo mode, don't actually send the request
+            println!("Demo mode: Not sending actual request to AWS");
+            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!("X-Amz-Date header: {:?}", parts.headers.get("x-amz-date"));
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
     }

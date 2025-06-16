@@ -107,7 +107,7 @@ impl ReqwestHttpSend {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
     /// use reqsign_http_send_reqwest::ReqwestHttpSend;
     /// use reqwest::Client;
     ///

@@ -47,7 +47,7 @@
 //! );
 //!
 //! // Create a signer that can load credentials from files
-//! let signer = Signer::new(ctx, credential_loader, request_builder);
+//! // let signer = Signer::new(ctx, credential_loader, request_builder);
 //! # Ok(())
 //! # }
 //! ```

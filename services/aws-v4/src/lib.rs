@@ -27,12 +27,10 @@
 //!     );
 //!
 //!     // Configure AWS credential loading
-//!     let config = Config::default()
-//!         .from_env()
-//!         .from_profile();
+//!     let config = Config::default();
 //!
 //!     // Create credential loader
-//!     let loader = DefaultLoader::new(config);
+//!     let loader = DefaultLoader::new(config.into());
 //!
 //!     // Create request builder for S3
 //!     let builder = Builder::new("s3", "us-east-1");
@@ -79,18 +77,14 @@
 //! ```no_run
 //! use reqsign_aws_v4::Config;
 //!
-//! let config = Config::default()
-//!     // Set specific credentials
-//!     .access_key_id("AKIAIOSFODNN7EXAMPLE")
-//!     .secret_access_key("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
-//!     // Or use a specific profile
-//!     .profile("production")
-//!     // Or assume a role
-//!     .role_arn("arn:aws:iam::123456789012:role/MyRole")
-//!     // Load from environment
-//!     .from_env()
-//!     // Load from credential file
-//!     .from_profile();
+//! let mut config = Config::default();
+//! // Set specific credentials
+//! config.access_key_id = Some("AKIAIOSFODNN7EXAMPLE".to_string());
+//! config.secret_access_key = Some("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
+//! // Or use a specific profile
+//! config.profile = "production".to_string();
+//! // Or assume a role
+//! config.role_arn = Some("arn:aws:iam::123456789012:role/MyRole".to_string());
 //! ```
 //!
 //! ## Examples

@@ -14,14 +14,14 @@
 //! ## Example
 //!
 //! ```no_run
-//! use reqsign_core::{Context, Signer, ProvideCredential, SignRequest, SigningCredential, SigningRequest};
+//! use reqsign_core::{Context, Signer, ProvideCredential, SignRequest, SigningCredential};
 //! use async_trait::async_trait;
 //! use anyhow::Result;
-//! use http::header::Parts;
+//! use http::request::Parts;
 //! use std::time::Duration;
 //!
 //! // Define your credential type
-//! #[derive(Clone)]
+//! #[derive(Clone, Debug)]
 //! struct MyCredential {
 //!     key: String,
 //!     secret: String,
@@ -34,6 +34,7 @@
 //! }
 //!
 //! // Implement credential loader
+//! #[derive(Debug)]
 //! struct MyLoader;
 //!
 //! #[async_trait]
@@ -49,6 +50,7 @@
 //! }
 //!
 //! // Implement request builder
+//! #[derive(Debug)]
 //! struct MyBuilder;
 //!
 //! #[async_trait]
@@ -58,18 +60,42 @@
 //!     async fn sign_request(
 //!         &self,
 //!         _ctx: &Context,
-//!         _req: &mut Parts,
+//!         req: &mut Parts,
+//!         _cred: Option<&Self::Credential>,
 //!         _expires_in: Option<Duration>,
-//!         _cred: &Self::Credential,
-//!     ) -> Result<SigningRequest> {
-//!         // Build your signing request here
-//!         todo!()
+//!     ) -> Result<()> {
+//!         // Add example header
+//!         req.headers.insert("x-custom-auth", "signed".parse()?);
+//!         Ok(())
 //!     }
 //! }
 //!
 //! # async fn example() -> Result<()> {
+//! # use reqsign_core::{FileRead, HttpSend};
+//! # use async_trait::async_trait;
+//! # use bytes::Bytes;
+//! #
+//! # // Mock implementations for the example
+//! # #[derive(Debug, Clone)]
+//! # struct MockFileRead;
+//! # #[async_trait]
+//! # impl FileRead for MockFileRead {
+//! #     async fn file_read(&self, _path: &str) -> Result<Vec<u8>> {
+//! #         Ok(vec![])
+//! #     }
+//! # }
+//! #
+//! # #[derive(Debug, Clone)]
+//! # struct MockHttpSend;
+//! # #[async_trait]
+//! # impl HttpSend for MockHttpSend {
+//! #     async fn http_send(&self, _req: http::Request<Bytes>) -> Result<http::Response<Bytes>> {
+//! #         Ok(http::Response::builder().status(200).body(Bytes::new())?)
+//! #     }
+//! # }
+//! #
 //! // Create a context with your implementations
-//! let ctx = Context::default();
+//! let ctx = Context::new(MockFileRead, MockHttpSend);
 //!
 //! // Create a signer
 //! let signer = Signer::new(ctx, MyLoader, MyBuilder);
