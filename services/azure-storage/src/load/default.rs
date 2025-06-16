@@ -251,8 +251,16 @@ mod tests {
         let loader = DefaultLoader::new().from_env(&ctx);
 
         let cred = loader.load(&ctx).await.unwrap().unwrap();
-        assert_eq!(cred.account_name, "test_account");
-        assert_eq!(cred.account_key, "dGVzdF9rZXk=");
+        match cred {
+            crate::Credential::SharedKey {
+                account_name,
+                account_key,
+            } => {
+                assert_eq!(account_name, "test_account");
+                assert_eq!(account_key, "dGVzdF9rZXk=");
+            }
+            _ => panic!("Expected SharedKey credential"),
+        }
     }
 
     #[tokio::test]
@@ -270,10 +278,12 @@ mod tests {
         let loader = DefaultLoader::new().from_env(&ctx);
 
         let cred = loader.load(&ctx).await.unwrap().unwrap();
-        assert_eq!(
-            cred.sas_token.as_ref().unwrap(),
-            "sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx"
-        );
+        match cred {
+            crate::Credential::SasToken { token } => {
+                assert_eq!(token, "sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx");
+            }
+            _ => panic!("Expected SasToken credential"),
+        }
     }
 
     // Mock implementations for testing
