@@ -2,7 +2,7 @@ use crate::constants::{ORACLE_CONFIG_PATH, ORACLE_DEFAULT_PROFILE};
 use crate::{Config, Credential};
 use async_trait::async_trait;
 use log::debug;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 
 /// Default loader for Oracle Cloud Infrastructure.
 ///
@@ -22,10 +22,10 @@ impl DefaultLoader {
 }
 
 #[async_trait]
-impl Load for DefaultLoader {
-    type Key = Credential;
+impl ProvideCredential for DefaultLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         // Try to load from environment variables first
         if let Ok(Some(cred)) = self.load_from_env(ctx).await {
             return Ok(Some(cred));

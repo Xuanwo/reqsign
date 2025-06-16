@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use quick_xml::de;
 use reqsign_core::time::parse_rfc3339;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -23,10 +23,10 @@ impl AssumeRoleWithWebIdentityLoader {
 }
 
 #[async_trait]
-impl Load for AssumeRoleWithWebIdentityLoader {
-    type Key = Credential;
+impl ProvideCredential for AssumeRoleWithWebIdentityLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         let (token_file, role_arn) =
             match (&self.config.web_identity_token_file, &self.config.role_arn) {
                 (Some(token_file), Some(role_arn)) => (token_file, role_arn),

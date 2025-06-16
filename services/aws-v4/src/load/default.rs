@@ -2,7 +2,7 @@ use crate::load::config::ConfigLoader;
 use crate::load::{AssumeRoleWithWebIdentityLoader, IMDSv2Loader};
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 use std::sync::Arc;
 
 /// DefaultLoader is a loader that will try to load credential via default chains.
@@ -38,19 +38,19 @@ impl DefaultLoader {
 }
 
 #[async_trait]
-impl Load for DefaultLoader {
-    type Key = Credential;
+impl ProvideCredential for DefaultLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
-        if let Some(cred) = self.config_loader.load(ctx).await? {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+        if let Some(cred) = self.config_loader.provide_credential(ctx).await? {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.assume_role_with_web_identity_loader.load(ctx).await? {
+        if let Some(cred) = self.assume_role_with_web_identity_loader.provide_credential(ctx).await? {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.imds_v2_loader.load(ctx).await? {
+        if let Some(cred) = self.imds_v2_loader.provide_credential(ctx).await? {
             return Ok(Some(cred));
         }
 
@@ -86,7 +86,7 @@ mod tests {
         };
 
         let l = DefaultLoader::new(Arc::new(cfg));
-        let x = l.load(&ctx).await.expect("load must succeed");
+        let x = l.provide_credential(&ctx).await.expect("load must succeed");
         assert!(x.is_none());
     }
 
@@ -107,7 +107,7 @@ mod tests {
         });
 
         let l = DefaultLoader::new(Arc::new(Config::default().from_env(&ctx)));
-        let x = l.load(&ctx).await.expect("load must succeed");
+        let x = l.provide_credential(&ctx).await.expect("load must succeed");
 
         let x = x.expect("must load succeed");
         assert_eq!("access_key_id", x.access_key_id);
@@ -150,7 +150,7 @@ mod tests {
                 .await
                 .into(),
         );
-        let x = l.load(&ctx).await.unwrap().unwrap();
+        let x = l.provide_credential(&ctx).await.unwrap().unwrap();
         assert_eq!("config_access_key_id", x.access_key_id);
         assert_eq!("config_secret_access_key", x.secret_access_key);
     }
@@ -191,7 +191,7 @@ mod tests {
                 .await
                 .into(),
         );
-        let x = l.load(&ctx).await.unwrap().unwrap();
+        let x = l.provide_credential(&ctx).await.unwrap().unwrap();
         assert_eq!("shared_access_key_id", x.access_key_id);
         assert_eq!("shared_secret_access_key", x.secret_access_key);
     }
@@ -233,7 +233,7 @@ mod tests {
                 .await
                 .into(),
         );
-        let x = l.load(&ctx).await.expect("load must success").unwrap();
+        let x = l.provide_credential(&ctx).await.expect("load must success").unwrap();
         assert_eq!("shared_access_key_id", x.access_key_id);
         assert_eq!("shared_secret_access_key", x.secret_access_key);
     }

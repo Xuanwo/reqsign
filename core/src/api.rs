@@ -18,19 +18,19 @@ impl<T: Key> Key for Option<T> {
     }
 }
 
-/// Load is the trait used by signer to load the key from the environment.
+/// ProvideCredential is the trait used by signer to load the key from the environment.
 ///
 /// Service may require different key to sign the request, for example, AWS require
 /// access key and secret key, while Google Cloud Storage require token.
 #[async_trait::async_trait]
-pub trait Load: Debug + Send + Sync + Unpin + 'static {
-    /// Key returned by this loader.
+pub trait ProvideCredential: Debug + Send + Sync + Unpin + 'static {
+    /// Credential returned by this loader.
     ///
     /// Typically, it will be a credential.
-    type Key: Send + Sync + Unpin + 'static;
+    type Credential: Send + Sync + Unpin + 'static;
 
     /// Load signing key from current env.
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>>;
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>>;
 }
 
 /// Build is the trait used by signer to build the signing request.

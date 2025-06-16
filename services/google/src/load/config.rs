@@ -1,7 +1,7 @@
 use anyhow::Result;
 use log::debug;
 
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
@@ -79,10 +79,10 @@ impl ConfigLoader {
 }
 
 #[async_trait::async_trait]
-impl Load for ConfigLoader {
-    type Key = RawCredential;
+impl ProvideCredential for ConfigLoader {
+    type Credential = RawCredential;
 
-    async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Try content first
         if let Some(content) = &self.config.credential_content {
             if let Ok(Some(cred)) = self.load_from_content(content).await {
@@ -143,7 +143,7 @@ mod tests {
         ));
 
         let loader = ConfigLoader::new(config);
-        let cred = loader.load(&ctx).await.expect("load must succeed");
+        let cred = loader.provide_credential(&ctx).await.expect("load must succeed");
         assert!(cred.is_some());
 
         let cred = cred.unwrap();
@@ -168,7 +168,7 @@ mod tests {
         let config = Config::new();
 
         let loader = ConfigLoader::new(config);
-        let cred = loader.load(&ctx).await.expect("load must succeed");
+        let cred = loader.provide_credential(&ctx).await.expect("load must succeed");
         assert!(cred.is_some());
     }
 
@@ -183,7 +183,7 @@ mod tests {
         ));
 
         let loader = ConfigLoader::new(config);
-        let cred = loader.load(&ctx).await.expect("load must succeed");
+        let cred = loader.provide_credential(&ctx).await.expect("load must succeed");
         assert!(cred.is_some());
 
         let cred = cred.unwrap();
@@ -206,7 +206,7 @@ mod tests {
         ));
 
         let loader = ConfigLoader::new(config);
-        let cred = loader.load(&ctx).await.expect("load must succeed");
+        let cred = loader.provide_credential(&ctx).await.expect("load must succeed");
         assert!(cred.is_some());
 
         let cred = cred.unwrap();

@@ -1,4 +1,4 @@
-use crate::{Build, Context, Key, Load};
+use crate::{Build, Context, Key, ProvideCredential};
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -7,14 +7,14 @@ use std::time::Duration;
 #[derive(Clone, Debug)]
 pub struct Signer<K: Key> {
     ctx: Context,
-    loader: Arc<dyn Load<Key = K>>,
+    loader: Arc<dyn ProvideCredential<Credential = K>>,
     builder: Arc<dyn Build<Key = K>>,
     key: Arc<Mutex<Option<K>>>,
 }
 
 impl<K: Key> Signer<K> {
     /// Create a new signer.
-    pub fn new(ctx: Context, loader: impl Load<Key = K>, builder: impl Build<Key = K>) -> Self {
+    pub fn new(ctx: Context, loader: impl ProvideCredential<Credential = K>, builder: impl Build<Key = K>) -> Self {
         Self {
             ctx,
 
@@ -34,7 +34,7 @@ impl<K: Key> Signer<K> {
         let key = if key.is_valid() {
             key
         } else {
-            let ctx = self.loader.load(&self.ctx).await?;
+            let ctx = self.loader.provide_credential(&self.ctx).await?;
             *self.key.lock().expect("lock poisoned") = ctx.clone();
             ctx
         };

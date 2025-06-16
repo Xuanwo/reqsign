@@ -1,6 +1,6 @@
 use crate::Credential;
 use async_trait::async_trait;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 
 /// Load credential from configuration.
 #[derive(Debug, Default)]
@@ -36,10 +36,10 @@ impl ConfigLoader {
 }
 
 #[async_trait]
-impl Load for ConfigLoader {
-    type Key = Credential;
+impl ProvideCredential for ConfigLoader {
+    type Credential = Credential;
 
-    async fn load(&self, _: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, _: &Context) -> anyhow::Result<Option<Self::Credential>> {
         // Check SAS token first
         if let Some(sas_token) = &self.sas_token {
             if !sas_token.is_empty() {

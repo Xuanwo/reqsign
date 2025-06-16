@@ -1,6 +1,6 @@
 use anyhow::Result;
 use log::debug;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::key::Credential;
@@ -20,16 +20,16 @@ impl DefaultLoader {
 }
 
 #[async_trait::async_trait]
-impl Load for DefaultLoader {
-    type Key = Credential;
+impl ProvideCredential for DefaultLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Load config from environment
         let config = self.config.clone().from_env(ctx);
         let config_loader = ConfigLoader::new(config);
 
         // Try to load from config
-        if let Ok(Some(cred)) = config_loader.load(ctx).await {
+        if let Ok(Some(cred)) = config_loader.provide_credential(ctx).await {
             debug!("huaweicloud obs credential loaded from config");
             return Ok(Some(cred));
         }

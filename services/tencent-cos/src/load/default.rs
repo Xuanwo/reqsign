@@ -1,7 +1,7 @@
 use crate::{Config, Credential};
 use async_trait::async_trait;
 use log::debug;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 
 /// Default loader for Tencent COS.
 ///
@@ -25,14 +25,14 @@ impl DefaultLoader {
 }
 
 #[async_trait]
-impl Load for DefaultLoader {
-    type Key = Credential;
+impl ProvideCredential for DefaultLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         // Try static config first
         if let Ok(Some(cred)) = self
             .config_loader
-            .load(ctx)
+            .provide_credential(ctx)
             .await
             .map_err(|err| debug!("load credential via config failed: {err:?}"))
         {
@@ -40,7 +40,7 @@ impl Load for DefaultLoader {
         }
 
         // Try AssumeRoleWithWebIdentity
-        if let Ok(Some(cred)) = self.assume_role_loader.load(ctx).await.map_err(|err| {
+        if let Ok(Some(cred)) = self.assume_role_loader.provide_credential(ctx).await.map_err(|err| {
             debug!("load credential via assume_role_with_web_identity failed: {err:?}")
         }) {
             return Ok(Some(cred));

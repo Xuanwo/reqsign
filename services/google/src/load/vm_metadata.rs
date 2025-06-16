@@ -2,7 +2,7 @@ use anyhow::Result;
 use log::debug;
 use serde::Deserialize;
 
-use reqsign_core::{time::now, Context, Load};
+use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::key::Token;
@@ -28,10 +28,10 @@ impl VmMetadataLoader {
 }
 
 #[async_trait::async_trait]
-impl Load for VmMetadataLoader {
-    type Key = Token;
+impl ProvideCredential for VmMetadataLoader {
+    type Credential = Token;
 
-    async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         let scope = self
             .config
             .scope

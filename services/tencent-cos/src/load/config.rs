@@ -1,7 +1,7 @@
 use crate::{Config, Credential};
 use async_trait::async_trait;
 use log::debug;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 
 /// Static configuration based loader.
 #[derive(Debug)]
@@ -17,10 +17,10 @@ impl ConfigLoader {
 }
 
 #[async_trait]
-impl Load for ConfigLoader {
-    type Key = Credential;
+impl ProvideCredential for ConfigLoader {
+    type Credential = Credential;
 
-    async fn load(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         match (&self.config.secret_id, &self.config.secret_key) {
             (Some(secret_id), Some(secret_key)) => {
                 debug!("loading credential from config");

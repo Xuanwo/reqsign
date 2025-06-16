@@ -1,7 +1,7 @@
 use crate::load::{ClientSecretLoader, ConfigLoader, ImdsLoader, WorkloadIdentityLoader};
 use crate::Credential;
 use async_trait::async_trait;
-use reqsign_core::{Context, Key, Load};
+use reqsign_core::{Context, Key, ProvideCredential};
 
 /// Default loader that tries multiple credential sources in order.
 ///
@@ -190,33 +190,33 @@ impl DefaultLoader {
 }
 
 #[async_trait]
-impl Load for DefaultLoader {
-    type Key = Credential;
+impl ProvideCredential for DefaultLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         // Try configuration loader first (account key, SAS token)
-        if let Some(cred) = self.config_loader.load(ctx).await? {
+        if let Some(cred) = self.config_loader.provide_credential(ctx).await? {
             if cred.is_valid() {
                 return Ok(Some(cred));
             }
         }
 
         // Try client secret loader
-        if let Some(cred) = self.client_secret_loader.load(ctx).await? {
+        if let Some(cred) = self.client_secret_loader.provide_credential(ctx).await? {
             if cred.is_valid() {
                 return Ok(Some(cred));
             }
         }
 
         // Try workload identity loader
-        if let Some(cred) = self.workload_identity_loader.load(ctx).await? {
+        if let Some(cred) = self.workload_identity_loader.provide_credential(ctx).await? {
             if cred.is_valid() {
                 return Ok(Some(cred));
             }
         }
 
         // Try IMDS loader (managed identity)
-        if let Some(cred) = self.imds_loader.load(ctx).await? {
+        if let Some(cred) = self.imds_loader.provide_credential(ctx).await? {
             if cred.is_valid() {
                 return Ok(Some(cred));
             }
@@ -250,7 +250,7 @@ mod tests {
 
         let loader = DefaultLoader::new().from_env(&ctx);
 
-        let cred = loader.load(&ctx).await.unwrap().unwrap();
+        let cred = loader.provide_credential(&ctx).await.unwrap().unwrap();
         match cred {
             crate::Credential::SharedKey {
                 account_name,
@@ -277,7 +277,7 @@ mod tests {
 
         let loader = DefaultLoader::new().from_env(&ctx);
 
-        let cred = loader.load(&ctx).await.unwrap().unwrap();
+        let cred = loader.provide_credential(&ctx).await.unwrap().unwrap();
         match cred {
             crate::Credential::SasToken { token } => {
                 assert_eq!(token, "sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx");

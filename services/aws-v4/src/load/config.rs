@@ -1,6 +1,6 @@
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 use std::sync::Arc;
 
 /// TODO: we should support refresh from config file.
@@ -17,10 +17,10 @@ impl ConfigLoader {
 }
 
 #[async_trait]
-impl Load for ConfigLoader {
-    type Key = Credential;
+impl ProvideCredential for ConfigLoader {
+    type Credential = Credential;
 
-    async fn load(&self, _: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, _: &Context) -> anyhow::Result<Option<Self::Credential>> {
         let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.secret_access_key)
         else {
             return Ok(None);

@@ -2,7 +2,7 @@ use crate::{Config, Credential};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use reqsign_core::time::{format_rfc3339, now, parse_rfc3339};
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 use serde::Deserialize;
 use std::sync::Arc;
 
@@ -27,10 +27,10 @@ impl AssumeRoleWithOidcLoader {
 }
 
 #[async_trait]
-impl Load for AssumeRoleWithOidcLoader {
-    type Key = Credential;
+impl ProvideCredential for AssumeRoleWithOidcLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         let (token_file, role_arn, provider_arn) = match (
             &self.config.oidc_token_file,
             &self.config.role_arn,
@@ -162,7 +162,7 @@ mod tests {
 
         let config = Config::default();
         let loader = AssumeRoleWithOidcLoader::new(Arc::new(config));
-        let credential = loader.load(&ctx).await.unwrap();
+        let credential = loader.provide_credential(&ctx).await.unwrap();
 
         assert!(credential.is_none());
     }

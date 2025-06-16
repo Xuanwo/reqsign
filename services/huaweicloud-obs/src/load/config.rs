@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::key::Credential;
@@ -18,10 +18,10 @@ impl ConfigLoader {
 }
 
 #[async_trait::async_trait]
-impl Load for ConfigLoader {
-    type Key = Credential;
+impl ProvideCredential for ConfigLoader {
+    type Credential = Credential;
 
-    async fn load(&self, _: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, _: &Context) -> Result<Option<Self::Credential>> {
         if let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.secret_access_key) {
             let cred = Credential::new(ak.clone(), sk.clone(), self.config.security_token.clone());
             return Ok(Some(cred));
@@ -53,7 +53,7 @@ mod tests {
                     let config = Config::default().from_env(&ctx);
                     let loader = ConfigLoader::new(config);
 
-                    let x = loader.load(&ctx).await.expect("load must succeed");
+                    let x = loader.provide_credential(&ctx).await.expect("load must succeed");
                     let x = x.expect("must load succeed");
                     assert_eq!("access_key_id", x.access_key_id);
                     assert_eq!("secret_access_key", x.secret_access_key);

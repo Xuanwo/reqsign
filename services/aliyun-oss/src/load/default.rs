@@ -1,7 +1,7 @@
 use crate::load::{AssumeRoleWithOidcLoader, ConfigLoader};
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 use std::sync::Arc;
 
 /// DefaultLoader is a loader that will try to load credential via default chains.
@@ -30,15 +30,15 @@ impl DefaultLoader {
 }
 
 #[async_trait]
-impl Load for DefaultLoader {
-    type Key = Credential;
+impl ProvideCredential for DefaultLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
-        if let Some(cred) = self.config_loader.load(ctx).await? {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+        if let Some(cred) = self.config_loader.provide_credential(ctx).await? {
             return Ok(Some(cred));
         }
 
-        if let Some(cred) = self.assume_role_with_oidc_loader.load(ctx).await? {
+        if let Some(cred) = self.assume_role_with_oidc_loader.provide_credential(ctx).await? {
             return Ok(Some(cred));
         }
 
@@ -65,7 +65,7 @@ mod tests {
 
         let config = Config::default();
         let loader = DefaultLoader::new(Arc::new(config));
-        let credential = loader.load(&ctx).await.unwrap();
+        let credential = loader.provide_credential(&ctx).await.unwrap();
 
         assert!(credential.is_none());
     }
@@ -89,7 +89,7 @@ mod tests {
 
         let config = Config::default().from_env(&ctx);
         let loader = DefaultLoader::new(Arc::new(config));
-        let credential = loader.load(&ctx).await.unwrap().unwrap();
+        let credential = loader.provide_credential(&ctx).await.unwrap().unwrap();
 
         assert_eq!("access_key_id", credential.access_key_id);
         assert_eq!("secret_access_key", credential.access_key_secret);

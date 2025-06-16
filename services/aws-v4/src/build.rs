@@ -313,7 +313,7 @@ mod tests {
     use aws_sigv4::sign::v4;
     use http::header;
     use http::Request;
-    use reqsign_core::Load;
+    use reqsign_core::ProvideCredential;
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
 
@@ -585,7 +585,7 @@ mod tests {
             }
             .into(),
         );
-        let cred = loader.load(&ctx).await?.unwrap();
+        let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = Builder::new("s3", "test").with_time(now);
         builder
@@ -668,7 +668,7 @@ mod tests {
             }
             .into(),
         );
-        let cred = loader.load(&ctx).await?.unwrap();
+        let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = Builder::new("s3", "test").with_time(now);
 
@@ -754,7 +754,7 @@ mod tests {
             }
             .into(),
         );
-        let cred = loader.load(&ctx).await?.unwrap();
+        let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = Builder::new("s3", "test").with_time(now);
         builder
@@ -840,7 +840,7 @@ mod tests {
             }
             .into(),
         );
-        let cred = loader.load(&ctx).await?.unwrap();
+        let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = Builder::new("s3", "test").with_time(now);
         builder
