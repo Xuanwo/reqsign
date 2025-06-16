@@ -1,21 +1,21 @@
 use std::env;
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
 use http::header::CONTENT_LENGTH;
 use http::Request;
 use http::StatusCode;
-use log::debug;
-use log::warn;
-use percent_encoding::utf8_percent_encode;
-use percent_encoding::NON_ALPHANUMERIC;
-use reqsign_aliyun_oss::Config;
-use reqsign_aliyun_oss::Loader;
-use reqsign_aliyun_oss::Signer;
+use log::{debug, warn};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use reqsign_aliyun_oss::{Builder, Config, DefaultLoader};
+use reqsign_core::{Context, Signer};
+use reqsign_file_read_tokio::TokioFileRead;
+use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
 
-fn init_signer() -> Option<(Loader, Signer)> {
+async fn init_signer() -> Option<(Context, Signer<reqsign_aliyun_oss::Credential>)> {
     let _ = env_logger::builder().is_test(true).try_init();
     let _ = dotenv::dotenv();
 
@@ -24,6 +24,8 @@ fn init_signer() -> Option<(Loader, Signer)> {
     {
         return None;
     }
+
+    let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
     let config = Config {
         access_key_id: Some(
@@ -37,23 +39,24 @@ fn init_signer() -> Option<(Loader, Signer)> {
         ..Default::default()
     };
 
-    let loader = Loader::new(Client::new(), config);
+    let bucket =
+        env::var("REQSIGN_ALIYUN_OSS_BUCKET").expect("env REQSIGN_ALIYUN_OSS_BUCKET must set");
 
-    let signer = Signer::new(
-        &env::var("REQSIGN_ALIYUN_OSS_BUCKET").expect("env REQSIGN_ALIYUN_OSS_BUCKET must set"),
-    );
+    let loader = DefaultLoader::new(Arc::new(config));
+    let builder = Builder::new(&bucket);
+    let signer = Signer::new(context.clone(), loader, builder);
 
-    Some((loader, signer))
+    Some((context, signer))
 }
 
 #[tokio::test]
 async fn test_get_object() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_context, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
@@ -61,16 +64,11 @@ async fn test_get_object() -> Result<()> {
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
-    let cred = loader
-        .load()
-        .await
-        .expect("load request must success")
-        .unwrap();
-
     let req = {
         let (mut parts, body) = req.into_parts();
         signer
-            .sign(&mut parts, &cred)
+            .sign(&mut parts, None)
+            .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
     };
@@ -92,12 +90,12 @@ async fn test_get_object() -> Result<()> {
 
 #[tokio::test]
 async fn test_delete_objects() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_context, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
@@ -116,16 +114,11 @@ async fn test_delete_objects() -> Result<()> {
     req.headers_mut()
         .insert("CONTENT-MD5", "WOctCY1SS662e7ziElh4cw==".parse().unwrap());
 
-    let cred = loader
-        .load()
-        .await
-        .expect("load request must success")
-        .unwrap();
-
     let req = {
         let (mut parts, body) = req.into_parts();
         signer
-            .sign(&mut parts, &cred)
+            .sign(&mut parts, None)
+            .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
     };
@@ -147,12 +140,12 @@ async fn test_delete_objects() -> Result<()> {
 
 #[tokio::test]
 async fn test_get_object_with_query_sign() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_context, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
@@ -160,16 +153,11 @@ async fn test_get_object_with_query_sign() -> Result<()> {
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
-    let cred = loader
-        .load()
-        .await
-        .expect("load request must success")
-        .unwrap();
-
     let req = {
         let (mut parts, body) = req.into_parts();
         signer
-            .sign_query(&mut parts, Duration::from_secs(3600), &cred)
+            .sign(&mut parts, Some(Duration::from_secs(3600)))
+            .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
     };
@@ -191,12 +179,12 @@ async fn test_get_object_with_query_sign() -> Result<()> {
 
 #[tokio::test]
 async fn test_head_object_with_special_characters() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_context, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
@@ -208,16 +196,11 @@ async fn test_head_object_with_special_characters() -> Result<()> {
         utf8_percent_encode("not-exist-!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
     ))?;
 
-    let cred = loader
-        .load()
-        .await
-        .expect("load request must success")
-        .unwrap();
-
     let req = {
         let (mut parts, body) = req.into_parts();
         signer
-            .sign(&mut parts, &cred)
+            .sign(&mut parts, None)
+            .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
     };
@@ -237,12 +220,12 @@ async fn test_head_object_with_special_characters() -> Result<()> {
 
 #[tokio::test]
 async fn test_put_object_with_special_characters() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_context, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
@@ -256,16 +239,11 @@ async fn test_put_object_with_special_characters() -> Result<()> {
     req.headers_mut()
         .insert(CONTENT_LENGTH, 0.to_string().parse()?);
 
-    let cred = loader
-        .load()
-        .await
-        .expect("load request must success")
-        .unwrap();
-
     let req = {
         let (mut parts, body) = req.into_parts();
         signer
-            .sign(&mut parts, &cred)
+            .sign(&mut parts, None)
+            .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
     };
@@ -287,12 +265,12 @@ async fn test_put_object_with_special_characters() -> Result<()> {
 
 #[tokio::test]
 async fn test_list_bucket() -> Result<()> {
-    let signer = init_signer();
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_context, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
@@ -301,16 +279,11 @@ async fn test_list_bucket() -> Result<()> {
     *req.uri_mut() =
         http::Uri::from_str(&format!("{url}?list-type=2&delimiter=/&encoding-type=url"))?;
 
-    let cred = loader
-        .load()
-        .await
-        .expect("load request must success")
-        .unwrap();
-
     let req = {
         let (mut parts, body) = req.into_parts();
         signer
-            .sign(&mut parts, &cred)
+            .sign(&mut parts, None)
+            .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
     };
@@ -331,34 +304,29 @@ async fn test_list_bucket() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_list_bucket_with_utf8() -> Result<()> {
-    let signer = init_signer();
+async fn test_list_bucket_with_invalid_token() -> Result<()> {
+    let signer = init_signer().await;
     if signer.is_none() {
         warn!("REQSIGN_ALIYUN_OSS_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_context, signer) = signer.unwrap();
 
     let url = &env::var("REQSIGN_ALIYUN_OSS_URL").expect("env REQSIGN_ALIYUN_OSS_URL must set");
 
     let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!(
-        "{}?list-type=2&delimiter=/&encoding-type=url&prefix={}",
+        "{}?list-type=2&delimiter=/&encoding-type=url&continuation-token={}",
         url,
-        utf8_percent_encode("本 crate 具有超级牛力", NON_ALPHANUMERIC)
+        utf8_percent_encode("hello.txt", NON_ALPHANUMERIC)
     ))?;
-
-    let cred = loader
-        .load()
-        .await
-        .expect("load request must success")
-        .unwrap();
 
     let req = {
         let (mut parts, body) = req.into_parts();
         signer
-            .sign(&mut parts, &cred)
+            .sign(&mut parts, None)
+            .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
     };
@@ -374,6 +342,6 @@ async fn test_list_bucket_with_utf8() -> Result<()> {
     let status = resp.status();
     debug!("got response: {:?}", resp);
     debug!("got response content: {}", resp.text().await?);
-    assert_eq!(StatusCode::OK, status);
+    assert_eq!(StatusCode::BAD_REQUEST, status);
     Ok(())
 }

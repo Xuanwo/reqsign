@@ -1,15 +1,15 @@
-//! Aliyun service signer
-//!
-//! Only OSS has been supported.
+//! Aliyun OSS service signer
 
-mod signer;
-pub use signer::Signer;
+mod constants;
 
 mod config;
 pub use config::Config;
 
-mod credential;
-pub use credential::Credential;
-pub use credential::Loader;
+mod key;
+pub use key::Credential;
 
-mod constants;
+mod build;
+pub use build::Builder;
+
+mod load;
+pub use load::*;
