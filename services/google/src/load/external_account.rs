@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::key::{
+use crate::credential::{
     CredentialSource, ExternalAccount, FileSourcedCredential, Token, UrlSourcedCredential,
 };
 

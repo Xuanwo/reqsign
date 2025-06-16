@@ -1,6 +1,6 @@
 use reqsign_core::time::{now, DateTime};
 use reqsign_core::utils::Redact;
-use reqsign_core::Key;
+use reqsign_core::SigningCredential;
 use std::fmt::{Debug, Formatter};
 
 /// Credential enum for different Azure Storage authentication methods.
@@ -51,7 +51,7 @@ impl Debug for Credential {
     }
 }
 
-impl Key for Credential {
+impl SigningCredential for Credential {
     fn is_valid(&self) -> bool {
         match self {
             Credential::SharedKey {

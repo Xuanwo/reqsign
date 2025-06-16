@@ -3,7 +3,7 @@ use log::debug;
 use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::key::Credential;
+use crate::credential::Credential;
 use crate::load::ConfigLoader;
 
 /// DefaultLoader will try to load credential from different sources.

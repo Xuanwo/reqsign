@@ -5,8 +5,8 @@ mod constants;
 mod config;
 pub use config::Config;
 
-mod key;
-pub use key::{Credential, ServiceAccount, Token};
+mod credential;
+pub use credential::{Credential, ServiceAccount, Token};
 
 mod build;
 pub use build::Builder;

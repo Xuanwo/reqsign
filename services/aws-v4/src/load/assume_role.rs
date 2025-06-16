@@ -1,5 +1,5 @@
 use crate::constants::X_AMZ_CONTENT_SHA_256;
-use crate::key::Credential;
+use crate::credential::Credential;
 use crate::load::utils::sts_endpoint;
 use crate::{Config, EMPTY_STRING_SHA256};
 use anyhow::anyhow;

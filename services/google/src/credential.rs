@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use reqsign_core::hash::base64_decode;
-use reqsign_core::{time::now, time::DateTime, Key as KeyTrait};
+use reqsign_core::{time::now, time::DateTime, SigningCredential as KeyTrait};
 use std::fmt::{self, Debug};
 
 /// ServiceAccount holds the client email and private key for service account authentication.

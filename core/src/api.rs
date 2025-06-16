@@ -2,13 +2,13 @@ use crate::Context;
 use std::fmt::Debug;
 use std::time::Duration;
 
-/// Key is the trait used by signer as the signing key.
-pub trait Key: Clone + Debug + Send + Sync + Unpin + 'static {
-    /// Check if the key is valid.
+/// SigningCredential is the trait used by signer as the signing credential.
+pub trait SigningCredential: Clone + Debug + Send + Sync + Unpin + 'static {
+    /// Check if the signing credential is valid.
     fn is_valid(&self) -> bool;
 }
 
-impl<T: Key> Key for Option<T> {
+impl<T: SigningCredential> SigningCredential for Option<T> {
     fn is_valid(&self) -> bool {
         let Some(ctx) = self else {
             return false;
@@ -29,7 +29,7 @@ pub trait ProvideCredential: Debug + Send + Sync + Unpin + 'static {
     /// Typically, it will be a credential.
     type Credential: Send + Sync + Unpin + 'static;
 
-    /// Load signing key from current env.
+    /// Load signing credential from current env.
     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>>;
 }
 

@@ -15,7 +15,7 @@ use reqsign_core::{
 };
 
 use crate::constants::{GOOG_QUERY_ENCODE_SET, GOOG_URI_ENCODE_SET};
-use crate::key::{Credential, ServiceAccount, Token};
+use crate::credential::{Credential, ServiceAccount, Token};
 
 /// Builder for Google service requests.
 #[derive(Debug)]

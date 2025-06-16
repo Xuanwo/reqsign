@@ -1,7 +1,7 @@
 use crate::load::{ClientSecretLoader, ConfigLoader, ImdsLoader, WorkloadIdentityLoader};
 use crate::Credential;
 use async_trait::async_trait;
-use reqsign_core::{Context, Key, ProvideCredential};
+use reqsign_core::{Context, SigningCredential, ProvideCredential};
 
 /// Default loader that tries multiple credential sources in order.
 ///
