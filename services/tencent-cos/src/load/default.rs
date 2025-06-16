@@ -40,14 +40,9 @@ impl Load for DefaultLoader {
         }
 
         // Try AssumeRoleWithWebIdentity
-        if let Ok(Some(cred)) = self
-            .assume_role_loader
-            .load(ctx)
-            .await
-            .map_err(|err| {
-                debug!("load credential via assume_role_with_web_identity failed: {err:?}")
-            })
-        {
+        if let Ok(Some(cred)) = self.assume_role_loader.load(ctx).await.map_err(|err| {
+            debug!("load credential via assume_role_with_web_identity failed: {err:?}")
+        }) {
             return Ok(Some(cred));
         }
 

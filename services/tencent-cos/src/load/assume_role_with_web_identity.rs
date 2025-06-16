@@ -89,7 +89,7 @@ impl Load for AssumeRoleWithWebIdentityLoader {
         let resp = ctx.http_send(req).await?;
         let status = resp.status();
         let body = resp.into_body();
-        
+
         if status != http::StatusCode::OK {
             return Err(anyhow!(
                 "request to Tencent Cloud STS Services failed: {}",
