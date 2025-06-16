@@ -68,56 +68,61 @@ impl Build for Builder {
         let mut ctx = SigningRequest::build(req)?;
 
         // Handle different credential types
-        if let Some(sas_token) = &key.sas_token {
-            // SAS token authentication
-            ctx.query_append(sas_token);
-        } else if let Some(bearer_token) = &key.bearer_token {
-            // Bearer token authentication
-            match method {
-                SigningMethod::Query(_) => {
-                    return Err(anyhow::anyhow!("BearerToken can't be used in query string"));
-                }
-                SigningMethod::Header => {
-                    ctx.headers
-                        .insert(X_MS_DATE, format_http_date(now()).parse()?);
-                    ctx.headers.insert(header::AUTHORIZATION, {
-                        let mut value: HeaderValue = format!("Bearer {}", bearer_token).parse()?;
-                        value.set_sensitive(true);
-                        value
-                    });
+        match key {
+            Credential::SasToken { token } => {
+                // SAS token authentication
+                ctx.query_append(token);
+            }
+            Credential::BearerToken { token, .. } => {
+                // Bearer token authentication
+                match method {
+                    SigningMethod::Query(_) => {
+                        return Err(anyhow::anyhow!("BearerToken can't be used in query string"));
+                    }
+                    SigningMethod::Header => {
+                        ctx.headers
+                            .insert(X_MS_DATE, format_http_date(now()).parse()?);
+                        ctx.headers.insert(header::AUTHORIZATION, {
+                            let mut value: HeaderValue = format!("Bearer {}", token).parse()?;
+                            value.set_sensitive(true);
+                            value
+                        });
+                    }
                 }
             }
-        } else if !key.account_name.is_empty() && !key.account_key.is_empty() {
-            // Shared key authentication
-            match method {
-                SigningMethod::Query(d) => {
-                    // try sign request use account_sas token
-                    let signer = crate::account_sas::AccountSharedAccessSignature::new(
-                        key.account_name.clone(),
-                        key.account_key.clone(),
-                        now() + chrono::TimeDelta::from_std(d)?,
-                    );
-                    let signer_token = signer.token()?;
-                    signer_token.iter().for_each(|(k, v)| {
-                        ctx.query_push(k, v);
-                    });
-                }
-                SigningMethod::Header => {
-                    let now_time = self.time.unwrap_or_else(now);
-                    let string_to_sign = string_to_sign(&mut ctx, &key.account_name, now_time)?;
-                    let decode_content = base64_decode(&key.account_key)?;
-                    let signature = base64_hmac_sha256(&decode_content, string_to_sign.as_bytes());
+            Credential::SharedKey {
+                account_name,
+                account_key,
+            } => {
+                // Shared key authentication
+                match method {
+                    SigningMethod::Query(d) => {
+                        // try sign request use account_sas token
+                        let signer = crate::account_sas::AccountSharedAccessSignature::new(
+                            account_name.clone(),
+                            account_key.clone(),
+                            now() + chrono::TimeDelta::from_std(d)?,
+                        );
+                        let signer_token = signer.token()?;
+                        signer_token.iter().for_each(|(k, v)| {
+                            ctx.query_push(k, v);
+                        });
+                    }
+                    SigningMethod::Header => {
+                        let now_time = self.time.unwrap_or_else(now);
+                        let string_to_sign = string_to_sign(&mut ctx, account_name, now_time)?;
+                        let decode_content = base64_decode(account_key)?;
+                        let signature = base64_hmac_sha256(&decode_content, string_to_sign.as_bytes());
 
-                    ctx.headers.insert(header::AUTHORIZATION, {
-                        let mut value: HeaderValue =
-                            format!("SharedKey {}:{}", key.account_name, signature).parse()?;
-                        value.set_sensitive(true);
-                        value
-                    });
+                        ctx.headers.insert(header::AUTHORIZATION, {
+                            let mut value: HeaderValue =
+                                format!("SharedKey {}:{}", account_name, signature).parse()?;
+                            value.set_sensitive(true);
+                            value
+                        });
+                    }
                 }
             }
-        } else {
-            return Err(anyhow::anyhow!("no valid credential found"));
         }
 
         // Apply percent encoding for query parameters
@@ -257,13 +262,15 @@ mod tests {
     use super::*;
     use http::Request;
     use reqsign_core::Context;
+    use reqsign_file_read_tokio::TokioFileRead;
+    use reqsign_http_send_reqwest::ReqwestHttpSend;
     use std::time::Duration;
 
     #[tokio::test]
     async fn test_sas_token() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(MockFileRead, MockHttpSend);
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
         let cred = Credential::with_sas_token("sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D");
 
         let builder = Builder::new();
@@ -285,7 +292,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bearer_token() {
-        let ctx = Context::new(MockFileRead, MockHttpSend);
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
         let cred = Credential::with_bearer_token(
             "token",
             Some(now() + chrono::TimeDelta::try_hours(1).unwrap()),
@@ -321,29 +328,5 @@ mod tests {
             .build(&ctx, &mut parts, Some(&cred), Some(Duration::from_secs(1)))
             .await
             .is_err());
-    }
-
-    // Mock implementations for testing
-    #[derive(Debug)]
-    struct MockFileRead;
-
-    #[async_trait]
-    impl reqsign_core::FileRead for MockFileRead {
-        async fn file_read(&self, _path: &str) -> anyhow::Result<Vec<u8>> {
-            Ok(Vec::new())
-        }
-    }
-
-    #[derive(Debug)]
-    struct MockHttpSend;
-
-    #[async_trait]
-    impl reqsign_core::HttpSend for MockHttpSend {
-        async fn http_send(
-            &self,
-            _req: http::Request<bytes::Bytes>,
-        ) -> anyhow::Result<http::Response<bytes::Bytes>> {
-            Ok(http::Response::new(bytes::Bytes::new()))
-        }
     }
 }
