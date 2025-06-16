@@ -67,7 +67,9 @@ impl ExternalAccountLoader {
 
     async fn load_oidc_token(&self, ctx: &Context) -> Result<String> {
         match &self.external_account.credential_source {
-            CredentialSource::FileSourced(source) => self.load_file_sourced_token(ctx, source).await,
+            CredentialSource::FileSourced(source) => {
+                self.load_file_sourced_token(ctx, source).await
+            }
             CredentialSource::UrlSourced(source) => self.load_url_sourced_token(ctx, source).await,
         }
     }
@@ -88,30 +90,30 @@ impl ExternalAccountLoader {
         source: &UrlSourcedCredential,
     ) -> Result<String> {
         debug!("loading OIDC token from URL: {}", source.url);
-        
+
         let mut req = http::Request::get(&source.url);
-        
+
         // Add custom headers if any
         if let Some(headers) = &source.headers {
             for (key, value) in headers {
                 req = req.header(key, value);
             }
         }
-        
+
         let resp = ctx.http_send(req.body(Vec::<u8>::new().into())?).await?;
-        
+
         if resp.status() != http::StatusCode::OK {
             error!("exchange token got unexpected response: {:?}", resp);
             let body = String::from_utf8_lossy(resp.body());
             bail!("exchange OIDC token failed: {}", body);
         }
-        
+
         source.format.parse(resp.body())
     }
 
     async fn exchange_sts_token(&self, ctx: &Context, oidc_token: &str) -> Result<Token> {
         debug!("exchanging OIDC token for STS access token");
-        
+
         let request = StsTokenRequest {
             grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
             requested_token_type: "urn:ietf:params:oauth:token-type:access_token",
@@ -129,7 +131,7 @@ impl ExternalAccountLoader {
             .header(ACCEPT, "application/json")
             .header(CONTENT_TYPE, "application/json")
             .body(body.into())?;
-        
+
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {
@@ -139,7 +141,7 @@ impl ExternalAccountLoader {
         }
 
         let token_resp: StsTokenResponse = serde_json::from_slice(resp.body())?;
-        
+
         let expires_at = token_resp.expires_in.map(|expires_in| {
             now() + chrono::TimeDelta::try_seconds(expires_in as i64).expect("in bounds")
         });
@@ -161,11 +163,9 @@ impl ExternalAccountLoader {
 
         debug!("impersonating service account");
 
-        let scope = self
-            .config
-            .scope
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("scope is required for service account impersonation"))?;
+        let scope = self.config.scope.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("scope is required for service account impersonation")
+        })?;
 
         let lifetime = self
             .external_account
@@ -188,7 +188,7 @@ impl ExternalAccountLoader {
             .header(CONTENT_TYPE, "application/json")
             .header("Authorization", format!("Bearer {}", access_token))
             .body(body.into())?;
-        
+
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {
@@ -198,7 +198,7 @@ impl ExternalAccountLoader {
         }
 
         let token_resp: ImpersonatedTokenResponse = serde_json::from_slice(resp.body())?;
-        
+
         // Parse expire time from RFC3339 format
         let expires_at = chrono::DateTime::parse_from_rfc3339(&token_resp.expire_time)
             .ok()

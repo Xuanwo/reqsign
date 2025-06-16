@@ -1,7 +1,7 @@
-use reqsign_core::{time::now, time::DateTime, Key as KeyTrait};
-use reqsign_core::hash::base64_decode;
-use std::fmt::{self, Debug};
 use anyhow::anyhow;
+use reqsign_core::hash::base64_decode;
+use reqsign_core::{time::now, time::DateTime, Key as KeyTrait};
+use std::fmt::{self, Debug};
 
 /// ServiceAccount holds the client email and private key for service account authentication.
 #[derive(Clone, serde::Deserialize)]

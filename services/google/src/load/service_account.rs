@@ -88,7 +88,7 @@ impl Load for ServiceAccountLoader {
             .uri("https://oauth2.googleapis.com/token")
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(body.into_bytes().into())?;
-        
+
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {

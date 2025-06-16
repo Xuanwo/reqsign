@@ -7,8 +7,8 @@ use log::debug;
 use log::warn;
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
-use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqsign_google::{Builder, Config, Credential, DefaultLoader};
+use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
 
 async fn init_signer() -> Option<(Context, Signer<Credential>)> {
@@ -20,8 +20,8 @@ async fn init_signer() -> Option<(Context, Signer<Credential>)> {
         return None;
     }
 
-    let credential_content = env::var("REQSIGN_GOOGLE_CREDENTIAL")
-        .expect("env REQSIGN_GOOGLE_CREDENTIAL must be set");
+    let credential_content =
+        env::var("REQSIGN_GOOGLE_CREDENTIAL").expect("env REQSIGN_GOOGLE_CREDENTIAL must be set");
     let scope = env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE")
         .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE must be set");
 
@@ -47,8 +47,8 @@ async fn init_signer_for_signed_url() -> Option<(Context, Signer<Credential>)> {
         return None;
     }
 
-    let credential_content = env::var("REQSIGN_GOOGLE_CREDENTIAL")
-        .expect("env REQSIGN_GOOGLE_CREDENTIAL must be set");
+    let credential_content =
+        env::var("REQSIGN_GOOGLE_CREDENTIAL").expect("env REQSIGN_GOOGLE_CREDENTIAL must be set");
 
     // Don't set scope for signed URL generation
     let config = Config::new()

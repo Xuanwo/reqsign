@@ -1,13 +1,13 @@
-use std::time::Duration;
 use anyhow::Result;
 use http::header;
 use log::debug;
 use percent_encoding::{percent_decode_str, utf8_percent_encode};
+use rand::thread_rng;
 use rsa::pkcs1v15::SigningKey;
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::signature::RandomizedSigner;
-use rand::thread_rng;
 use std::borrow::Cow;
+use std::time::Duration;
 
 use reqsign_core::{
     hash::hex_sha256, time::*, Build as BuildTrait, Context, SigningMethod, SigningRequest,
@@ -55,8 +55,7 @@ impl Builder {
         let mut req = SigningRequest::build(parts)?;
 
         req.headers.insert(header::AUTHORIZATION, {
-            let mut value: http::HeaderValue =
-                format!("Bearer {}", &token.access_token).parse()?;
+            let mut value: http::HeaderValue = format!("Bearer {}", &token.access_token).parse()?;
             value.set_sensitive(true);
             value
         });
@@ -76,7 +75,7 @@ impl Builder {
 
         // Canonicalize headers
         canonicalize_header(&mut req)?;
-        
+
         // Canonicalize query
         canonicalize_query(
             &mut req,

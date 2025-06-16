@@ -54,10 +54,7 @@ impl ConfigLoader {
         self.load_from_path(ctx, &path).await
     }
 
-    async fn load_from_well_known_location(
-        &self,
-        ctx: &Context,
-    ) -> Result<Option<RawCredential>> {
+    async fn load_from_well_known_location(&self, ctx: &Context) -> Result<Option<RawCredential>> {
         if self.config.disable_well_known_location {
             return Ok(None);
         }
@@ -148,7 +145,7 @@ mod tests {
         let loader = ConfigLoader::new(config);
         let cred = loader.load(&ctx).await.expect("load must succeed");
         assert!(cred.is_some());
-        
+
         let cred = cred.unwrap();
         assert!(cred.service_account.is_some());
         let sa = cred.service_account.unwrap();
@@ -188,7 +185,7 @@ mod tests {
         let loader = ConfigLoader::new(config);
         let cred = loader.load(&ctx).await.expect("load must succeed");
         assert!(cred.is_some());
-        
+
         let cred = cred.unwrap();
         assert!(cred.external_account.is_some());
         let ea = cred.external_account.unwrap();
@@ -211,7 +208,7 @@ mod tests {
         let loader = ConfigLoader::new(config);
         let cred = loader.load(&ctx).await.expect("load must succeed");
         assert!(cred.is_some());
-        
+
         let cred = cred.unwrap();
         assert!(cred.impersonated_service_account.is_some());
         let isa = cred.impersonated_service_account.unwrap();

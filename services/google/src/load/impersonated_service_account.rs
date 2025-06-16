@@ -94,7 +94,7 @@ impl ImpersonatedServiceAccountLoader {
             .uri("https://oauth2.googleapis.com/token")
             .header(CONTENT_TYPE, "application/json")
             .body(body.into())?;
-        
+
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {
@@ -121,18 +121,13 @@ impl ImpersonatedServiceAccountLoader {
         })
     }
 
-    async fn generate_access_token(
-        &self,
-        ctx: &Context,
-        bearer_token: &Token,
-    ) -> Result<Token> {
+    async fn generate_access_token(&self, ctx: &Context, bearer_token: &Token) -> Result<Token> {
         debug!("generating access token for impersonated service account");
 
-        let scope = self
-            .config
-            .scope
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("scope is required for impersonated service account"))?;
+        let scope =
+            self.config.scope.as_ref().ok_or_else(|| {
+                anyhow::anyhow!("scope is required for impersonated service account")
+            })?;
 
         let request = ImpersonationRequest {
             lifetime: format!("{}s", MAX_LIFETIME.as_secs()),
@@ -144,11 +139,18 @@ impl ImpersonatedServiceAccountLoader {
 
         let req = http::Request::builder()
             .method(http::Method::POST)
-            .uri(&self.impersonated_service_account.service_account_impersonation_url)
+            .uri(
+                &self
+                    .impersonated_service_account
+                    .service_account_impersonation_url,
+            )
             .header(CONTENT_TYPE, "application/json")
-            .header("Authorization", format!("Bearer {}", bearer_token.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", bearer_token.access_token),
+            )
             .body(body.into())?;
-        
+
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {

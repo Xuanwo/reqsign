@@ -41,7 +41,10 @@ impl Load for VmMetadataLoader {
         // Use "default" service account if not specified
         let service_account = "default";
 
-        debug!("loading token from VM metadata service for account: {}", service_account);
+        debug!(
+            "loading token from VM metadata service for account: {}",
+            service_account
+        );
 
         let url = format!(
             "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/{}/token?scopes={}",
@@ -53,7 +56,7 @@ impl Load for VmMetadataLoader {
             .uri(&url)
             .header("Metadata-Flavor", "Google")
             .body(Vec::<u8>::new().into())?;
-        
+
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {

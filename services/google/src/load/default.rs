@@ -37,7 +37,7 @@ impl Load for DefaultLoader {
             // Try service account first - exchange for token if scope is provided
             if let Some(sa) = raw_cred.service_account {
                 debug!("loaded service account credential");
-                
+
                 // If we have a scope, exchange for token
                 if self.config.scope.is_some() {
                     debug!("exchanging service account for token");
