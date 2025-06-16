@@ -15,10 +15,10 @@ async-trait.workspace = true
 base64.workspace = true
 chrono.workspace = true
 http.workspace = true
-rust-ini.workspace = true
 log.workspace = true
 reqsign-core.workspace = true
 rsa.workspace = true
+rust-ini.workspace = true
 serde.workspace = true
 
 
