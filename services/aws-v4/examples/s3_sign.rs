@@ -14,10 +14,7 @@ async fn main() -> Result<()> {
     let client = Client::new();
 
     // Create context with Tokio file reader and reqwest HTTP client
-    let ctx = Context::new(
-        TokioFileRead,
-        ReqwestHttpSend::new(client.clone()),
-    );
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
 
     // Configure AWS credential loading
     // This will try multiple sources in order:
@@ -43,12 +40,12 @@ async fn main() -> Result<()> {
         .unwrap();
 
     let (mut parts, body) = req.into_parts();
-    
+
     // Sign the request
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("Request signed successfully!");
-            
+
             // Convert back to reqwest request and execute
             let req = http::Request::from_parts(parts, body).try_into()?;
             match client.execute(req).await {
@@ -56,7 +53,10 @@ async fn main() -> Result<()> {
                     println!("Response status: {}", resp.status());
                     if resp.status().is_success() {
                         let text = resp.text().await?;
-                        println!("First 500 chars of response:\n{}", &text[..500.min(text.len())]);
+                        println!(
+                            "First 500 chars of response:\n{}",
+                            &text[..500.min(text.len())]
+                        );
                     }
                 }
                 Err(e) => eprintln!("Request failed: {}", e),
@@ -70,18 +70,21 @@ async fn main() -> Result<()> {
     let bucket = "my-test-bucket";
     let key = "test-file.txt";
     let url = format!("https://{}.s3.amazonaws.com/{}", bucket, key);
-    
+
     let req = http::Request::get(&url)
         .header("x-amz-content-sha256", reqsign_aws_v4::EMPTY_STRING_SHA256)
         .body(reqwest::Body::from(""))
         .unwrap();
 
     let (mut parts, _body) = req.into_parts();
-    
+
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("GET request to {} signed successfully!", url);
-            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!(
+                "Authorization header: {:?}",
+                parts.headers.get("authorization")
+            );
             println!("X-Amz-Date header: {:?}", parts.headers.get("x-amz-date"));
         }
         Err(e) => eprintln!("Failed to sign GET request: {}", e),
@@ -95,7 +98,7 @@ async fn main() -> Result<()> {
         .unwrap();
 
     let (mut parts, _body) = req.into_parts();
-    
+
     match signer
         .sign(&mut parts, Some(std::time::Duration::from_secs(3600)))
         .await

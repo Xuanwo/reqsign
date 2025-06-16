@@ -14,10 +14,7 @@ async fn main() -> Result<()> {
     let client = Client::new();
 
     // Create context
-    let ctx = Context::new(
-        TokioFileRead,
-        ReqwestHttpSend::new(client.clone()),
-    );
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
 
     // Configure Aliyun OSS credentials
     // This will try multiple sources:
@@ -49,7 +46,7 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("List objects request signed successfully!");
-            
+
             // Execute the request
             let req = http::Request::from_parts(parts, body).try_into()?;
             match client.execute(req).await {
@@ -70,7 +67,10 @@ async fn main() -> Result<()> {
     // Example 2: Get object metadata
     println!("\nExample 2: Get object metadata");
     let object_key = "test-file.txt";
-    let url = format!("https://{}.oss-cn-beijing.aliyuncs.com/{}", bucket, object_key);
+    let url = format!(
+        "https://{}.oss-cn-beijing.aliyuncs.com/{}",
+        bucket, object_key
+    );
 
     let req = http::Request::head(&url)
         .body(reqwest::Body::from(""))
@@ -81,7 +81,10 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("Get object metadata request signed successfully!");
-            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!(
+                "Authorization header: {:?}",
+                parts.headers.get("authorization")
+            );
             println!("Date header: {:?}", parts.headers.get("date"));
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
@@ -91,7 +94,10 @@ async fn main() -> Result<()> {
     println!("\nExample 3: Upload an object");
     let upload_content = b"Hello from reqsign to Aliyun OSS!";
     let upload_key = "hello-oss.txt";
-    let url = format!("https://{}.oss-cn-beijing.aliyuncs.com/{}", bucket, upload_key);
+    let url = format!(
+        "https://{}.oss-cn-beijing.aliyuncs.com/{}",
+        bucket, upload_key
+    );
 
     let req = http::Request::put(&url)
         .header("Content-Type", "text/plain")
@@ -112,7 +118,10 @@ async fn main() -> Result<()> {
     // Example 4: Delete an object
     println!("\nExample 4: Delete an object");
     let delete_key = "old-file.txt";
-    let url = format!("https://{}.oss-cn-beijing.aliyuncs.com/{}", bucket, delete_key);
+    let url = format!(
+        "https://{}.oss-cn-beijing.aliyuncs.com/{}",
+        bucket, delete_key
+    );
 
     let req = http::Request::delete(&url)
         .body(reqwest::Body::from(""))

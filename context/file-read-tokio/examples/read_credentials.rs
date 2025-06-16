@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
     match ctx.file_read(&path).await {
         Ok(content) => {
             println!("Successfully read {} bytes from {}", content.len(), path);
-            
+
             // Try to parse as UTF-8 and show a preview
             if let Ok(text) = String::from_utf8(content.clone()) {
                 let preview: String = text.lines().take(5).collect::<Vec<_>>().join("\n");

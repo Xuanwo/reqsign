@@ -70,7 +70,7 @@
 //! # async fn example() -> Result<()> {
 //! // Create a context with your implementations
 //! let ctx = Context::default();
-//! 
+//!
 //! // Create a signer
 //! let signer = Signer::new(ctx, MyLoader, MyBuilder);
 //!

@@ -1,9 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use http::request::Parts;
-use reqsign_core::{
-    Context, ProvideCredential, SignRequest, Signer, SigningCredential,
-};
+use reqsign_core::{Context, ProvideCredential, SignRequest, Signer, SigningCredential};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use std::time::Duration;
@@ -65,16 +63,12 @@ impl SignRequest for MyRequestBuilder {
         let cred = credential.ok_or_else(|| anyhow::anyhow!("No credential provided"))?;
 
         // Add required headers
-        req.headers.insert(
-            "x-api-key",
-            cred.api_key.parse().unwrap(),
-        );
-        
+        req.headers
+            .insert("x-api-key", cred.api_key.parse().unwrap());
+
         // In a real implementation, you would calculate a signature here
-        req.headers.insert(
-            "x-api-signature",
-            "calculated-signature".parse().unwrap(),
-        );
+        req.headers
+            .insert("x-api-signature", "calculated-signature".parse().unwrap());
 
         Ok(())
     }

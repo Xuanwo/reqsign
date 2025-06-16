@@ -14,10 +14,7 @@ async fn main() -> Result<()> {
     let client = Client::new();
 
     // Create context
-    let ctx = Context::new(
-        TokioFileRead,
-        ReqwestHttpSend::new(client.clone()),
-    );
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
 
     // Configure Azure Storage credentials
     // This will try multiple sources:
@@ -52,7 +49,7 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("List containers request signed successfully!");
-            
+
             // Execute the request
             let req = http::Request::from_parts(parts, body).try_into()?;
             match client.execute(req).await {
@@ -89,7 +86,10 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("Get blob properties request signed successfully!");
-            println!("Authorization header: {:?}", parts.headers.get("authorization"));
+            println!(
+                "Authorization header: {:?}",
+                parts.headers.get("authorization")
+            );
             println!("x-ms-date header: {:?}", parts.headers.get("x-ms-date"));
         }
         Err(e) => eprintln!("Failed to sign request: {}", e),
