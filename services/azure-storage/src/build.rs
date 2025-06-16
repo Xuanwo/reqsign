@@ -112,7 +112,8 @@ impl Build for Builder {
                         let now_time = self.time.unwrap_or_else(now);
                         let string_to_sign = string_to_sign(&mut ctx, account_name, now_time)?;
                         let decode_content = base64_decode(account_key)?;
-                        let signature = base64_hmac_sha256(&decode_content, string_to_sign.as_bytes());
+                        let signature =
+                            base64_hmac_sha256(&decode_content, string_to_sign.as_bytes());
 
                         ctx.headers.insert(header::AUTHORIZATION, {
                             let mut value: HeaderValue =
