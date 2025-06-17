@@ -1,7 +1,9 @@
-use reqsign_core::SigningCredential;
+use std::fmt::{Debug, Formatter};
+
+use reqsign_core::{utils::Redact, SigningCredential};
 
 /// Credential for obs.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Credential {
     /// Access key id for obs
     pub access_key_id: String,
@@ -23,6 +25,16 @@ impl Credential {
             secret_access_key,
             security_token,
         }
+    }
+}
+
+impl Debug for Credential {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Credential")
+            .field("access_key_id", &Redact::from(&self.access_key_id))
+            .field("secret_access_key", &Redact::from(&self.secret_access_key))
+            .field("security_token", &self.security_token.as_ref().map(Redact::from))
+            .finish()
     }
 }
 

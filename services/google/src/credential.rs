@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use reqsign_core::hash::base64_decode;
-use reqsign_core::{time::now, time::DateTime, SigningCredential as KeyTrait};
+use reqsign_core::{time::now, time::DateTime, utils::Redact, SigningCredential as KeyTrait};
 use std::fmt::{self, Debug};
 
 /// ServiceAccount holds the client email and private key for service account authentication.
@@ -17,7 +17,7 @@ impl Debug for ServiceAccount {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ServiceAccount")
             .field("client_email", &self.client_email)
-            .field("private_key", &"<redacted>")
+            .field("private_key", &Redact::from(&self.private_key))
             .finish()
     }
 }
@@ -51,8 +51,8 @@ impl Debug for SourceCredentials {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SourceCredentials")
             .field("client_id", &self.client_id)
-            .field("client_secret", &"<redacted>")
-            .field("refresh_token", &"<redacted>")
+            .field("client_secret", &Redact::from(&self.client_secret))
+            .field("refresh_token", &Redact::from(&self.refresh_token))
             .finish()
     }
 }
@@ -160,7 +160,7 @@ pub struct Token {
 impl Debug for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Token")
-            .field("access_token", &"<redacted>")
+            .field("access_token", &Redact::from(&self.access_token))
             .field("expires_at", &self.expires_at)
             .finish()
     }

@@ -1,7 +1,9 @@
-use reqsign_core::Context;
+use std::fmt::{Debug, Formatter};
+
+use reqsign_core::{Context, utils::Redact};
 
 /// Config carries all the configuration for Google services.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Config {
     /// Credential file path.
     pub credential_path: Option<String>,
@@ -102,5 +104,19 @@ impl Config {
         }
 
         cfg
+    }
+}
+
+impl Debug for Config {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("credential_path", &self.credential_path)
+            .field("credential_content", &self.credential_content.as_ref().map(Redact::from))
+            .field("disable_env", &self.disable_env)
+            .field("disable_well_known_location", &self.disable_well_known_location)
+            .field("service", &self.service)
+            .field("region", &self.region)
+            .field("scope", &self.scope)
+            .finish()
     }
 }

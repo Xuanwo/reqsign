@@ -16,6 +16,7 @@ use serde::Serialize;
 use super::credential::Credential;
 use reqsign_core::time::now;
 use reqsign_core::time::DateTime;
+use reqsign_core::utils::Redact;
 
 /// Token is the authentication methods used by google services.
 ///
@@ -57,7 +58,7 @@ impl Token {
 impl Debug for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Token")
-            .field("access_token", &"<redacted>")
+            .field("access_token", &Redact::from(&self.access_token))
             .field("scope", &self.scope)
             .field("token_type", &self.token_type)
             .field("expires_in", &self.expires_in)
