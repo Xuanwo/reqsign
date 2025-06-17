@@ -1,5 +1,4 @@
 use std::env;
-use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -9,12 +8,13 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign_azure_storage::Config;
-use reqsign_azure_storage::Loader;
-use reqsign_azure_storage::Signer;
+use reqsign_azure_storage::{Builder, Credential, DefaultLoader};
+use reqsign_core::{Context, Signer};
+use reqsign_file_read_tokio::TokioFileRead;
+use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
 
-fn init_signer() -> Option<(Loader, Signer)> {
+fn init_signer() -> Option<(Context, Signer<Credential>)> {
     let _ = env_logger::builder().is_test(true).try_init();
     let _ = dotenv::dotenv();
 
@@ -24,21 +24,19 @@ fn init_signer() -> Option<(Loader, Signer)> {
         return None;
     }
 
-    let config = Config {
-        account_name: Some(
-            env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
-                .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),
-        ),
-        account_key: Some(
-            env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY")
-                .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_KEY must set"),
-        ),
-        ..Default::default()
-    };
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    let loader = Loader::new(config);
+    let loader = DefaultLoader::new().with_account_key(
+        env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
+            .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),
+        env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY")
+            .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_KEY must set"),
+    );
 
-    Some((loader, Signer::new()))
+    let builder = Builder::new();
+    let signer = Signer::new(ctx.clone(), loader, builder);
+
+    Some((ctx, signer))
 }
 
 #[tokio::test]
@@ -48,30 +46,20 @@ async fn test_head_blob() -> Result<()> {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_ctx, signer) = signer.unwrap();
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let mut builder = http::Request::builder();
-    builder = builder.method(http::Method::HEAD);
-    builder = builder.header("x-ms-version", "2023-01-03");
-    builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
-    let req = builder.body("")?;
+    let mut req = http::Request::builder()
+        .method(http::Method::HEAD)
+        .header("x-ms-version", "2023-01-03")
+        .uri(format!("{}/{}", url, "not_exist_file"))
+        .body(reqwest::Body::default())?;
 
-    let cred = loader
-        .load()
-        .await
-        .expect("load credential must success")
-        .unwrap();
-
-    let req = {
-        let (mut parts, body) = req.into_parts();
-        signer
-            .sign(&mut parts, &cred)
-            .expect("sign request must success");
-        Request::from_parts(parts, body)
-    };
+    let (mut parts, body) = req.into_parts();
+    signer.sign(&mut parts, None).await?;
+    req = Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 
@@ -93,34 +81,24 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_ctx, signer) = signer.unwrap();
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let mut req = http::Request::new("");
-    *req.method_mut() = http::Method::HEAD;
-    req.headers_mut()
-        .insert("x-ms-version", "2023-01-03".parse().unwrap());
-    *req.uri_mut() = http::Uri::from_str(&format!(
-        "{}/{}",
-        url,
-        utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
-    ))?;
+    let mut req = http::Request::builder()
+        .method(http::Method::HEAD)
+        .header("x-ms-version", "2023-01-03")
+        .uri(format!(
+            "{}/{}",
+            url,
+            utf8_percent_encode("!@#$%^&*()_+-=;:'><,/?.txt", NON_ALPHANUMERIC)
+        ))
+        .body(reqwest::Body::default())?;
 
-    let cred = loader
-        .load()
-        .await
-        .expect("load credential must success")
-        .unwrap();
-
-    let req = {
-        let (mut parts, body) = req.into_parts();
-        signer
-            .sign(&mut parts, &cred)
-            .expect("sign request must success");
-        Request::from_parts(parts, body)
-    };
+    let (mut parts, body) = req.into_parts();
+    signer.sign(&mut parts, None).await?;
+    req = Request::from_parts(parts, body);
 
     debug!("signed request: {:?}", req);
 
@@ -142,7 +120,7 @@ async fn test_list_container_blobs() -> Result<()> {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_ctx, signer) = signer.unwrap();
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
@@ -155,25 +133,15 @@ async fn test_list_container_blobs() -> Result<()> {
         // With encoded prefix
         "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
     ] {
-        let mut builder = http::Request::builder();
-        builder = builder.method(http::Method::GET);
-        builder = builder.uri(format!("{url}?{query}"));
-        builder = builder.header("x-ms-version", "2023-01-03");
-        let req = builder.body("")?;
+        let mut req = http::Request::builder()
+            .method(http::Method::GET)
+            .uri(format!("{url}?{query}"))
+            .header("x-ms-version", "2023-01-03")
+            .body(reqwest::Body::default())?;
 
-        let cred = loader
-            .load()
-            .await
-            .expect("load credential must success")
-            .unwrap();
-
-        let req = {
-            let (mut parts, body) = req.into_parts();
-            signer
-                .sign(&mut parts, &cred)
-                .expect("sign request must success");
-            Request::from_parts(parts, body)
-        };
+        let (mut parts, body) = req.into_parts();
+        signer.sign(&mut parts, None).await?;
+        req = Request::from_parts(parts, body);
 
         debug!("signed request: {:?}", req);
 
@@ -197,30 +165,22 @@ async fn test_can_head_blob_with_sas() -> Result<()> {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_ctx, signer) = signer.unwrap();
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let mut builder = http::Request::builder();
-    builder = builder.method(http::Method::HEAD);
-    builder = builder.header("x-ms-version", "2023-01-03");
-    builder = builder.uri(format!("{}/{}", url, "not_exist_file"));
-    let req = builder.body("")?;
+    let mut req = http::Request::builder()
+        .method(http::Method::HEAD)
+        .header("x-ms-version", "2023-01-03")
+        .uri(format!("{}/{}", url, "not_exist_file"))
+        .body(reqwest::Body::default())?;
 
-    let cred = loader
-        .load()
-        .await
-        .expect("load credential must success")
-        .unwrap();
-
-    let req = {
-        let (mut parts, body) = req.into_parts();
-        signer
-            .sign_query(&mut parts, Duration::from_secs(60), &cred)
-            .expect("sign request must success");
-        Request::from_parts(parts, body)
-    };
+    let (mut parts, body) = req.into_parts();
+    signer
+        .sign(&mut parts, Some(Duration::from_secs(60)))
+        .await?;
+    req = Request::from_parts(parts, body);
 
     println!("signed request: {:?}", req);
 
@@ -243,7 +203,7 @@ async fn test_can_list_container_blobs() -> Result<()> {
         warn!("REQSIGN_AZURE_STORAGE_ON_TEST is not set, skipped");
         return Ok(());
     }
-    let (loader, signer) = signer.unwrap();
+    let (_ctx, signer) = signer.unwrap();
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
@@ -256,23 +216,17 @@ async fn test_can_list_container_blobs() -> Result<()> {
         // With encoded prefix
         "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
     ] {
-        let mut builder = http::Request::builder();
-        builder = builder.method(http::Method::GET);
-        builder = builder.header("x-ms-version", "2023-01-03");
-        builder = builder.uri(format!("{url}?{query}"));
-        let req = builder.body("")?;
-
-        let cred = loader
-            .load()
-            .await
-            .expect("load credential must success")
-            .unwrap();
+        let mut req = http::Request::builder()
+            .method(http::Method::GET)
+            .header("x-ms-version", "2023-01-03")
+            .uri(format!("{url}?{query}"))
+            .body(reqwest::Body::default())?;
 
         let (mut parts, body) = req.into_parts();
         signer
-            .sign_query(&mut parts, Duration::from_secs(60), &cred)
-            .expect("sign request must success");
-        let req = Request::from_parts(parts, body);
+            .sign(&mut parts, Some(Duration::from_secs(60)))
+            .await?;
+        req = Request::from_parts(parts, body);
 
         let client = Client::new();
         let resp = client
@@ -289,7 +243,7 @@ async fn test_can_list_container_blobs() -> Result<()> {
 
 /// This test must run on azure vm with imds enabled,
 #[tokio::test]
-async fn test_head_blob_with_ldms() -> Result<()> {
+async fn test_head_blob_with_imds() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
     let _ = dotenv::dotenv();
 
@@ -301,30 +255,24 @@ async fn test_head_blob_with_ldms() -> Result<()> {
         return Ok(());
     }
 
-    let config = Config {
-        ..Default::default()
-    };
-    let loader = Loader::new(config);
-    let cred = loader
-        .load()
-        .await
-        .expect("load credential must success")
-        .unwrap();
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+
+    let loader = DefaultLoader::new().with_imds();
+    let builder = Builder::new();
+    let signer = Signer::new(ctx.clone(), loader, builder);
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let req = http::Request::builder()
+    let mut req = http::Request::builder()
         .method(http::Method::HEAD)
         .header("x-ms-version", "2023-01-03")
         .uri(format!("{}/{}", url, "not_exist_file"))
-        .body("")?;
+        .body(reqwest::Body::default())?;
 
     let (mut parts, body) = req.into_parts();
-    Signer::new()
-        .sign(&mut parts, &cred)
-        .expect("sign request must success");
-    let req = Request::from_parts(parts, body);
+    signer.sign(&mut parts, None).await?;
+    req = Request::from_parts(parts, body);
 
     println!("signed request: {:?}", req);
 
@@ -341,7 +289,7 @@ async fn test_head_blob_with_ldms() -> Result<()> {
 
 /// This test must run on azure vm with imds enabled
 #[tokio::test]
-async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
+async fn test_can_list_container_blobs_with_imds() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
     let _ = dotenv::dotenv();
 
@@ -353,15 +301,11 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
         return Ok(());
     }
 
-    let config = Config {
-        ..Default::default()
-    };
-    let loader = Loader::new(config);
-    let cred = loader
-        .load()
-        .await
-        .expect("load credential must success")
-        .unwrap();
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+
+    let loader = DefaultLoader::new().with_imds();
+    let builder = Builder::new();
+    let signer = Signer::new(ctx.clone(), loader, builder);
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
@@ -374,17 +318,15 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
         // With encoded prefix
         "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
     ] {
-        let mut builder = http::Request::builder();
-        builder = builder.method(http::Method::GET);
-        builder = builder.header("x-ms-version", "2023-01-03");
-        builder = builder.uri(format!("{url}?{query}"));
-        let req = builder.body("")?;
+        let mut req = http::Request::builder()
+            .method(http::Method::GET)
+            .header("x-ms-version", "2023-01-03")
+            .uri(format!("{url}?{query}"))
+            .body(reqwest::Body::default())?;
 
         let (mut parts, body) = req.into_parts();
-        Signer::new()
-            .sign(&mut parts, &cred)
-            .expect("sign request must success");
-        let req = Request::from_parts(parts, body);
+        signer.sign(&mut parts, None).await?;
+        req = Request::from_parts(parts, body);
 
         let client = Client::new();
         let resp = client
@@ -399,7 +341,7 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
     Ok(())
 }
 
-/// This test must run on azure vm with imds enabled,
+/// This test must run on azure vm with client secret configured
 #[tokio::test]
 async fn test_head_blob_with_client_secret() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -420,36 +362,24 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
         return Ok(());
     }
 
-    let config = Config::default().from_env();
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    assert!(config.client_secret.is_some());
-    assert!(config.tenant_id.is_some());
-    assert!(config.client_id.is_some());
-    assert!(config.authority_host.is_some());
-    assert!(config.account_key.is_none());
-
-    let loader = Loader::new(config);
-
-    let cred = loader
-        .load()
-        .await
-        .expect("load credential must success")
-        .unwrap();
+    let loader = DefaultLoader::new().from_env(&ctx);
+    let builder = Builder::new();
+    let signer = Signer::new(ctx.clone(), loader, builder);
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
 
-    let req = http::Request::builder()
+    let mut req = http::Request::builder()
         .method(http::Method::HEAD)
         .header("x-ms-version", "2023-01-03")
         .uri(format!("{}/{}", url, "not_exist_file"))
-        .body("")?;
+        .body(reqwest::Body::default())?;
 
     let (mut parts, body) = req.into_parts();
-    Signer::new()
-        .sign(&mut parts, &cred)
-        .expect("sign request must success");
-    let req = Request::from_parts(parts, body);
+    signer.sign(&mut parts, None).await?;
+    req = Request::from_parts(parts, body);
 
     println!("signed request: {:?}", req);
 
@@ -464,7 +394,7 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
     Ok(())
 }
 
-/// This test must run on azure vm with imds enabled
+/// This test must run with client secret configured
 #[tokio::test]
 async fn test_can_list_container_blobs_client_secret() -> Result<()> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -485,24 +415,15 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
         return Ok(());
     }
 
-    let config = Config::default().from_env();
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    assert!(config.client_secret.is_some());
-    assert!(config.tenant_id.is_some());
-    assert!(config.client_id.is_some());
-    assert!(config.authority_host.is_some());
-    assert!(config.account_key.is_none());
-
-    let loader = Loader::new(config);
-
-    let cred = loader
-        .load()
-        .await
-        .expect("load credential must success")
-        .unwrap();
+    let loader = DefaultLoader::new().from_env(&ctx);
+    let builder = Builder::new();
+    let signer = Signer::new(ctx.clone(), loader, builder);
 
     let url =
         &env::var("REQSIGN_AZURE_STORAGE_URL").expect("env REQSIGN_AZURE_STORAGE_URL must set");
+
     for query in [
         // Without prefix
         "restype=container&comp=list",
@@ -511,26 +432,27 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
         // With encoded prefix
         "restype=container&comp=list&prefix=test%2Fpath%2Fto%2Fdir",
     ] {
-        let mut builder = http::Request::builder();
-        builder = builder.method(http::Method::GET);
-        builder = builder.header("x-ms-version", "2023-01-03");
-        builder = builder.uri(format!("{url}?{query}"));
-        let req = builder.body("")?;
+        let mut req = http::Request::builder()
+            .method(http::Method::GET)
+            .header("x-ms-version", "2023-01-03")
+            .uri(format!("{url}?{query}"))
+            .body(reqwest::Body::default())?;
 
         let (mut parts, body) = req.into_parts();
-        Signer::new()
-            .sign(&mut parts, &cred)
-            .expect("sign request must success");
-        let req = Request::from_parts(parts, body);
+        signer.sign(&mut parts, None).await?;
+        req = Request::from_parts(parts, body);
 
         let client = Client::new();
         let resp = client
             .execute(req.try_into()?)
             .await
             .expect("request must success");
+
         let stat = resp.status();
         debug!("got response: {:?}", resp);
-        debug!("{}", resp.text().await?);
+        if stat != StatusCode::OK {
+            debug!("{}", resp.text().await?);
+        }
 
         assert_eq!(StatusCode::OK, stat);
     }

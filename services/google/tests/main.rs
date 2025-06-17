@@ -5,12 +5,13 @@ use anyhow::Result;
 use http::StatusCode;
 use log::debug;
 use log::warn;
-use reqsign_google::CredentialLoader;
-use reqsign_google::Signer;
-use reqsign_google::TokenLoader;
+use reqsign_core::{Context, Signer};
+use reqsign_file_read_tokio::TokioFileRead;
+use reqsign_google::{Builder, Config, Credential, DefaultLoader};
+use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
 
-async fn init_signer() -> Option<(CredentialLoader, TokenLoader, Signer)> {
+async fn init_signer() -> Option<(Context, Signer<Credential>)> {
     let _ = env_logger::builder().is_test(true).try_init();
     let _ = dotenv::dotenv();
 
@@ -19,30 +20,55 @@ async fn init_signer() -> Option<(CredentialLoader, TokenLoader, Signer)> {
         return None;
     }
 
-    let cred_loader = CredentialLoader::default().with_content(
-        &env::var("REQSIGN_GOOGLE_CREDENTIAL").expect("env REQSIGN_GOOGLE_CREDENTIAL must set"),
-    );
+    let credential_content =
+        env::var("REQSIGN_GOOGLE_CREDENTIAL").expect("env REQSIGN_GOOGLE_CREDENTIAL must be set");
+    let scope = env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE")
+        .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE must be set");
 
-    let token_loader = TokenLoader::new(
-        &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE")
-            .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE must set"),
-        Client::new(),
-    )
-    .with_credentials(cred_loader.load().unwrap().unwrap());
+    let config = Config::new()
+        .with_credential_content(credential_content)
+        .with_scope(scope)
+        .with_service("storage");
 
-    let signer = Signer::new("storage");
+    let loader = DefaultLoader::new(config);
+    let builder = Builder::new("storage");
 
-    Some((cred_loader, token_loader, signer))
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let signer = Signer::new(ctx.clone(), loader, builder);
+    Some((ctx, signer))
+}
+
+async fn init_signer_for_signed_url() -> Option<(Context, Signer<Credential>)> {
+    let _ = env_logger::builder().is_test(true).try_init();
+    let _ = dotenv::dotenv();
+
+    if env::var("REQSIGN_GOOGLE_TEST").is_err() || env::var("REQSIGN_GOOGLE_TEST").unwrap() != "on"
+    {
+        return None;
+    }
+
+    let credential_content =
+        env::var("REQSIGN_GOOGLE_CREDENTIAL").expect("env REQSIGN_GOOGLE_CREDENTIAL must be set");
+
+    // Don't set scope for signed URL generation
+    let config = Config::new()
+        .with_credential_content(credential_content)
+        .with_service("storage");
+
+    let loader = DefaultLoader::new(config);
+    let builder = Builder::new("storage");
+
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let signer = Signer::new(ctx.clone(), loader, builder);
+    Some((ctx, signer))
 }
 
 #[tokio::test]
 async fn test_get_object() -> Result<()> {
-    let signer = init_signer().await;
-    if signer.is_none() {
+    let Some((_ctx, signer)) = init_signer().await else {
         warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
         return Ok(());
-    }
-    let (_, token_loader, signer) = signer.unwrap();
+    };
 
     let url = &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_URL")
         .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_URL must set");
@@ -52,11 +78,10 @@ async fn test_get_object() -> Result<()> {
     builder = builder.uri(format!("{}/o/{}", url, "not_exist_file"));
     let req = builder.body("")?;
 
-    let token = token_loader.load().await?.unwrap();
-
     let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut parts, &token)
+        .sign(&mut parts, None)
+        .await
         .expect("sign request must success");
     let req = http::Request::from_parts(parts, body);
 
@@ -75,12 +100,10 @@ async fn test_get_object() -> Result<()> {
 
 #[tokio::test]
 async fn test_list_objects() -> Result<()> {
-    let signer = init_signer().await;
-    if signer.is_none() {
+    let Some((_ctx, signer)) = init_signer().await else {
         warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
         return Ok(());
-    }
-    let (_, token_loader, signer) = signer.unwrap();
+    };
 
     let url = &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_URL")
         .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_URL must set");
@@ -90,10 +113,10 @@ async fn test_list_objects() -> Result<()> {
     builder = builder.uri(format!("{url}/o"));
     let req = builder.body("")?;
 
-    let token = token_loader.load().await?.unwrap();
     let (mut parts, body) = req.into_parts();
     signer
-        .sign(&mut parts, &token)
+        .sign(&mut parts, None)
+        .await
         .expect("sign request must success");
     let req = http::Request::from_parts(parts, body);
 
@@ -112,12 +135,10 @@ async fn test_list_objects() -> Result<()> {
 
 #[tokio::test]
 async fn test_get_object_with_query() -> Result<()> {
-    let signer = init_signer().await;
-    if signer.is_none() {
+    let Some((_ctx, signer)) = init_signer_for_signed_url().await else {
         warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
         return Ok(());
-    }
-    let (cred_loader, _, signer) = signer.unwrap();
+    };
 
     let url = &env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_URL")
         .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_URL must set");
@@ -131,11 +152,10 @@ async fn test_get_object_with_query() -> Result<()> {
     ));
     let req = builder.body("")?;
 
-    let cred = cred_loader.load()?.unwrap();
-
     let (mut parts, body) = req.into_parts();
     signer
-        .sign_query(&mut parts, Duration::from_secs(3600), &cred)
+        .sign(&mut parts, Some(Duration::from_secs(3600)))
+        .await
         .expect("sign request must success");
     let req = http::Request::from_parts(parts, body);
 

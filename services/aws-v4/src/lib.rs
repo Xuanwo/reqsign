@@ -1,11 +1,104 @@
-//! AWS service signer
+//! AWS SigV4 signing implementation for reqsign.
+//!
+//! This crate provides AWS Signature Version 4 (SigV4) signing capabilities
+//! for authenticating requests to AWS services like S3, DynamoDB, Lambda, and more.
+//!
+//! ## Overview
+//!
+//! AWS SigV4 is the authentication protocol used by most AWS services. This crate
+//! implements the complete signing algorithm along with credential loading from
+//! various sources including environment variables, credential files, IAM roles,
+//! and more.
+//!
+//! ## Quick Start
+//!
+//! ```no_run
+//! use reqsign_aws_v4::{Builder, Config, DefaultLoader};
+//! use reqsign_core::{Context, Signer};
+//! use reqsign_file_read_tokio::TokioFileRead;
+//! use reqsign_http_send_reqwest::ReqwestHttpSend;
+//!
+//! #[tokio::main]
+//! async fn main() -> anyhow::Result<()> {
+//!     // Create context
+//!     let ctx = Context::new(
+//!         TokioFileRead::default(),
+//!         ReqwestHttpSend::default(),
+//!     );
+//!
+//!     // Configure AWS credential loading
+//!     let config = Config::default();
+//!
+//!     // Create credential loader
+//!     let loader = DefaultLoader::new(config.into());
+//!
+//!     // Create request builder for S3
+//!     let builder = Builder::new("s3", "us-east-1");
+//!
+//!     // Create the signer
+//!     let signer = Signer::new(ctx, loader, builder);
+//!
+//!     // Sign requests
+//!     let mut req = http::Request::get("https://s3.amazonaws.com/mybucket/mykey")
+//!         .body(())
+//!         .unwrap()
+//!         .into_parts()
+//!         .0;
+//!
+//!     signer.sign(&mut req, None).await?;
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Credential Sources
+//!
+//! The crate supports loading credentials from multiple sources:
+//!
+//! 1. **Environment Variables**: `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+//! 2. **Credential File**: `~/.aws/credentials`
+//! 3. **IAM Roles**: For EC2 instances and ECS tasks
+//! 4. **AssumeRole**: Via STS AssumeRole operations
+//! 5. **WebIdentity**: For Kubernetes service accounts
+//! 6. **SSO**: AWS SSO credentials
+//!
+//! ## Supported Services
+//!
+//! This implementation works with any AWS service that uses SigV4:
+//!
+//! - Amazon S3
+//! - Amazon DynamoDB
+//! - AWS Lambda
+//! - Amazon SQS
+//! - Amazon SNS
+//! - And many more...
+//!
+//! ## Advanced Configuration
+//!
+//! ```no_run
+//! use reqsign_aws_v4::Config;
+//!
+//! let mut config = Config::default();
+//! // Set specific credentials
+//! config.access_key_id = Some("AKIAIOSFODNN7EXAMPLE".to_string());
+//! config.secret_access_key = Some("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
+//! // Or use a specific profile
+//! config.profile = "production".to_string();
+//! // Or assume a role
+//! config.role_arn = Some("arn:aws:iam::123456789012:role/MyRole".to_string());
+//! ```
+//!
+//! ## Examples
+//!
+//! Check out the examples directory for more detailed usage:
+//! - [S3 signing example](examples/s3_sign.rs)
+//! - [DynamoDB signing example](examples/dynamodb_sign.rs)
 
 mod constants;
 
 mod config;
 pub use config::Config;
-mod key;
-pub use key::Credential;
+mod credential;
+pub use credential::Credential;
 mod build;
 pub use build::Builder;
 mod load;

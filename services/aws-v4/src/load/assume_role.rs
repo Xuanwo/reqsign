@@ -1,5 +1,5 @@
 use crate::constants::X_AMZ_CONTENT_SHA_256;
-use crate::key::Credential;
+use crate::credential::Credential;
 use crate::load::utils::sts_endpoint;
 use crate::{Config, EMPTY_STRING_SHA256};
 use anyhow::anyhow;
@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use quick_xml::de;
 use reqsign_core::time::parse_rfc3339;
-use reqsign_core::{Context, Load, Signer};
+use reqsign_core::{Context, ProvideCredential, Signer};
 use serde::Deserialize;
 use std::fmt::Write;
 use std::sync::Arc;
@@ -28,10 +28,10 @@ impl AssumeRoleLoader {
 }
 
 #[async_trait]
-impl Load for AssumeRoleLoader {
-    type Key = Credential;
+impl ProvideCredential for AssumeRoleLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         let role_arn =self.config.role_arn.clone().ok_or_else(|| {
             anyhow!("assume role loader requires role_arn, but not found, please check your configuration")
         })?;

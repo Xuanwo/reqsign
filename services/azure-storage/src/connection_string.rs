@@ -122,15 +122,17 @@ fn collect_endpoint(
 }
 
 fn collect_credentials(key_values: &HashMap<String, String>) -> Option<Credential> {
-    if let Some(sas_token) = key_values.get("SharedAccessSignature") {
-        Some(Credential::SharedAccessSignature(sas_token.clone()))
+    if let Some(token) = key_values.get("SharedAccessSignature") {
+        Some(Credential::SasToken {
+            token: token.clone(),
+        })
     } else if let (Some(account_name), Some(account_key)) =
         (key_values.get("AccountName"), key_values.get("AccountKey"))
     {
-        Some(Credential::SharedKey(
-            account_name.clone(),
-            account_key.clone(),
-        ))
+        Some(Credential::SharedKey {
+            account_name: account_name.clone(),
+            account_key: account_key.clone(),
+        })
     } else {
         // We default to no authentication. This is not an error because e.g.
         // Azure Active Directory configuration is typically not passed via
@@ -142,14 +144,20 @@ fn collect_credentials(key_values: &HashMap<String, String>) -> Option<Credentia
 
 fn set_credentials(config: &mut Config, creds: Credential) {
     match creds {
-        Credential::SharedAccessSignature(sas_token) => {
-            config.sas_token = Some(sas_token);
+        Credential::SasToken { token } => {
+            config.sas_token = Some(token);
         }
-        Credential::SharedKey(account_name, account_key) => {
+        Credential::SharedKey {
+            account_name,
+            account_key,
+        } => {
             config.account_name = Some(account_name);
             config.account_key = Some(account_key);
         }
-        Credential::BearerToken(_, _) => {
+        Credential::BearerToken {
+            token: _,
+            expires_in: _,
+        } => {
             // Bearer tokens shouldn't be passed via connection strings.
         }
     }

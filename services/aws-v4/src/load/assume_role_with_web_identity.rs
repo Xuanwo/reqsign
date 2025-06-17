@@ -5,8 +5,9 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use quick_xml::de;
 use reqsign_core::time::parse_rfc3339;
-use reqsign_core::{Context, Load};
+use reqsign_core::{utils::Redact, Context, ProvideCredential};
 use serde::Deserialize;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 /// AssumeRoleLoader will load credential via assume role.
@@ -23,10 +24,10 @@ impl AssumeRoleWithWebIdentityLoader {
 }
 
 #[async_trait]
-impl Load for AssumeRoleWithWebIdentityLoader {
-    type Key = Credential;
+impl ProvideCredential for AssumeRoleWithWebIdentityLoader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> anyhow::Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         let (token_file, role_arn) =
             match (&self.config.web_identity_token_file, &self.config.role_arn) {
                 (Some(token_file), Some(role_arn)) => (token_file, role_arn),
@@ -82,13 +83,24 @@ struct AssumeRoleWithWebIdentityResult {
     credentials: AssumeRoleWithWebIdentityCredentials,
 }
 
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Deserialize)]
 #[serde(default, rename_all = "PascalCase")]
 struct AssumeRoleWithWebIdentityCredentials {
     access_key_id: String,
     secret_access_key: String,
     session_token: String,
     expiration: String,
+}
+
+impl Debug for AssumeRoleWithWebIdentityCredentials {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AssumeRoleWithWebIdentityCredentials")
+            .field("access_key_id", &Redact::from(&self.access_key_id))
+            .field("secret_access_key", &Redact::from(&self.secret_access_key))
+            .field("session_token", &Redact::from(&self.session_token))
+            .field("expiration", &self.expiration)
+            .finish()
+    }
 }
 
 #[cfg(test)]

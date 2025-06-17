@@ -1,26 +1,30 @@
-use crate::{Build, Context, Key, Load};
+use crate::{Context, ProvideCredential, SignRequest, SigningCredential};
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// Signer is the main struct used to sign the request.
 #[derive(Clone, Debug)]
-pub struct Signer<K: Key> {
+pub struct Signer<K: SigningCredential> {
     ctx: Context,
-    loader: Arc<dyn Load<Key = K>>,
-    builder: Arc<dyn Build<Key = K>>,
-    key: Arc<Mutex<Option<K>>>,
+    loader: Arc<dyn ProvideCredential<Credential = K>>,
+    builder: Arc<dyn SignRequest<Credential = K>>,
+    credential: Arc<Mutex<Option<K>>>,
 }
 
-impl<K: Key> Signer<K> {
+impl<K: SigningCredential> Signer<K> {
     /// Create a new signer.
-    pub fn new(ctx: Context, loader: impl Load<Key = K>, builder: impl Build<Key = K>) -> Self {
+    pub fn new(
+        ctx: Context,
+        loader: impl ProvideCredential<Credential = K>,
+        builder: impl SignRequest<Credential = K>,
+    ) -> Self {
         Self {
             ctx,
 
             loader: Arc::new(loader),
             builder: Arc::new(builder),
-            key: Arc::new(Mutex::new(None)),
+            credential: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -30,17 +34,17 @@ impl<K: Key> Signer<K> {
         req: &mut http::request::Parts,
         expires_in: Option<Duration>,
     ) -> Result<()> {
-        let key = self.key.lock().expect("lock poisoned").clone();
-        let key = if key.is_valid() {
-            key
+        let credential = self.credential.lock().expect("lock poisoned").clone();
+        let credential = if credential.is_valid() {
+            credential
         } else {
-            let ctx = self.loader.load(&self.ctx).await?;
-            *self.key.lock().expect("lock poisoned") = ctx.clone();
+            let ctx = self.loader.provide_credential(&self.ctx).await?;
+            *self.credential.lock().expect("lock poisoned") = ctx.clone();
             ctx
         };
 
         self.builder
-            .build(&self.ctx, req, key.as_ref(), expires_in)
+            .sign_request(&self.ctx, req, credential.as_ref(), expires_in)
             .await
     }
 }

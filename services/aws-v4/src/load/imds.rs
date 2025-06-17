@@ -5,7 +5,7 @@ use bytes::Bytes;
 use http::header::CONTENT_LENGTH;
 use http::Method;
 use reqsign_core::time::{now, parse_rfc3339, DateTime};
-use reqsign_core::{Context, Load};
+use reqsign_core::{Context, ProvideCredential};
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 
@@ -63,10 +63,10 @@ impl IMDSv2Loader {
 }
 
 #[async_trait]
-impl Load for IMDSv2Loader {
-    type Key = Credential;
+impl ProvideCredential for IMDSv2Loader {
+    type Credential = Credential;
 
-    async fn load(&self, ctx: &Context) -> Result<Option<Self::Key>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // If ec2_metadata_disabled is set, return None.
         if self.config.ec2_metadata_disabled {
             return Ok(None);

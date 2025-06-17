@@ -1,49 +1,106 @@
-use reqsign_core::time::DateTime;
+use reqsign_core::time::{now, DateTime};
+use reqsign_core::utils::Redact;
+use reqsign_core::SigningCredential;
+use std::fmt::{Debug, Formatter};
 
-/// Credential that holds the access_key and secret_key.
+/// Credential enum for different Azure Storage authentication methods.
 #[derive(Clone)]
-#[cfg_attr(test, derive(Debug))]
 pub enum Credential {
-    /// Credential via account key
-    ///
-    /// Refer to <https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key>
-    SharedKey(String, String),
-    /// Credential via SAS token
-    ///
-    /// Refer to <https://learn.microsoft.com/en-us/rest/api/storageservices/create-account-sas>
-    SharedAccessSignature(String),
-    /// Create an Bearer Token based credential
-    ///
-    /// Azure Storage accepts OAuth 2.0 access tokens from the Azure AD tenant
-    /// associated with the subscription that contains the storage account.
-    ///
-    /// ref: <https://docs.microsoft.com/rest/api/storageservices/authorize-with-azure-active-directory>
-    BearerToken(String, DateTime),
+    /// Shared Key authentication with account name and key
+    SharedKey {
+        /// Azure storage account name.
+        account_name: String,
+        /// Azure storage account key.
+        account_key: String,
+    },
+    /// SAS (Shared Access Signature) token authentication
+    SasToken {
+        /// SAS token.
+        token: String,
+    },
+    /// Bearer token for OAuth authentication
+    BearerToken {
+        /// Bearer token.
+        token: String,
+        /// Expiration time for this credential.
+        expires_in: Option<DateTime>,
+    },
+}
+
+impl Debug for Credential {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Credential::SharedKey {
+                account_name,
+                account_key,
+            } => f
+                .debug_struct("Credential::SharedKey")
+                .field("account_name", &Redact::from(account_name))
+                .field("account_key", &Redact::from(account_key))
+                .finish(),
+            Credential::SasToken { token } => f
+                .debug_struct("Credential::SasToken")
+                .field("token", &Redact::from(token))
+                .finish(),
+            Credential::BearerToken { token, expires_in } => f
+                .debug_struct("Credential::BearerToken")
+                .field("token", &Redact::from(token))
+                .field("expires_in", expires_in)
+                .finish(),
+        }
+    }
+}
+
+impl SigningCredential for Credential {
+    fn is_valid(&self) -> bool {
+        match self {
+            Credential::SharedKey {
+                account_name,
+                account_key,
+            } => !account_name.is_empty() && !account_key.is_empty(),
+            Credential::SasToken { token } => !token.is_empty(),
+            Credential::BearerToken { token, expires_in } => {
+                if token.is_empty() {
+                    return false;
+                }
+                // Check expiration for bearer tokens (take 20s as buffer to avoid edge cases)
+                if let Some(expires) = expires_in {
+                    *expires > now() + chrono::TimeDelta::try_seconds(20).expect("in bounds")
+                } else {
+                    true
+                }
+            }
+        }
+    }
 }
 
 impl Credential {
-    /// is current cred is valid?
-    pub fn is_valid(&self) -> bool {
-        if self.is_empty() {
-            return false;
+    /// Create a new credential with shared key authentication.
+    pub fn with_shared_key(
+        account_name: impl Into<String>,
+        account_key: impl Into<String>,
+    ) -> Self {
+        Self::SharedKey {
+            account_name: account_name.into(),
+            account_key: account_key.into(),
         }
-        if let Credential::BearerToken(_, expires_on) = self {
-            let buffer = chrono::TimeDelta::try_seconds(20).expect("in bounds");
-            if expires_on < &(chrono::Utc::now() + buffer) {
-                return false;
-            }
-        };
-
-        true
     }
 
-    fn is_empty(&self) -> bool {
-        match self {
-            Credential::SharedKey(account_name, account_key) => {
-                account_name.is_empty() || account_key.is_empty()
-            }
-            Credential::SharedAccessSignature(sas_token) => sas_token.is_empty(),
-            Credential::BearerToken(bearer_token, _) => bearer_token.is_empty(),
+    /// Create a new credential with SAS token authentication.
+    pub fn with_sas_token(sas_token: impl Into<String>) -> Self {
+        Self::SasToken {
+            token: sas_token.into(),
+        }
+    }
+
+    /// Create a new credential with bearer token authentication.
+    pub fn with_bearer_token(
+        bearer_token: impl Into<String>,
+        expires_in: Option<DateTime>,
+    ) -> Self {
+        Self::BearerToken {
+            token: bearer_token.into(),
+            expires_in,
         }
     }
 }

@@ -9,7 +9,7 @@ use log::debug;
 use percent_encoding::{percent_decode_str, utf8_percent_encode};
 use reqsign_core::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use reqsign_core::time::{format_date, format_iso8601, now, DateTime};
-use reqsign_core::{Build, Context, SigningRequest};
+use reqsign_core::{Context, SignRequest, SigningRequest};
 use std::fmt::Write;
 use std::time::Duration;
 
@@ -49,20 +49,20 @@ impl Builder {
 }
 
 #[async_trait]
-impl Build for Builder {
-    type Key = Credential;
+impl SignRequest for Builder {
+    type Credential = Credential;
 
-    async fn build(
+    async fn sign_request(
         &self,
         _: &Context,
         req: &mut Parts,
-        key: Option<&Self::Key>,
+        credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
     ) -> anyhow::Result<()> {
         let now = self.time.unwrap_or_else(now);
         let mut signed_req = SigningRequest::build(req)?;
 
-        let Some(cred) = key else {
+        let Some(cred) = credential else {
             return Ok(());
         };
 
@@ -313,7 +313,7 @@ mod tests {
     use aws_sigv4::sign::v4;
     use http::header;
     use http::Request;
-    use reqsign_core::Load;
+    use reqsign_core::ProvideCredential;
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
 
@@ -585,11 +585,11 @@ mod tests {
             }
             .into(),
         );
-        let cred = loader.load(&ctx).await?.unwrap();
+        let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = Builder::new("s3", "test").with_time(now);
         builder
-            .build(&ctx, &mut parts, Some(&cred), None)
+            .sign_request(&ctx, &mut parts, Some(&cred), None)
             .await
             .expect("must apply success");
 
@@ -668,12 +668,12 @@ mod tests {
             }
             .into(),
         );
-        let cred = loader.load(&ctx).await?.unwrap();
+        let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = Builder::new("s3", "test").with_time(now);
 
         builder
-            .build(
+            .sign_request(
                 &ctx,
                 &mut parts,
                 Some(&cred),
@@ -754,11 +754,11 @@ mod tests {
             }
             .into(),
         );
-        let cred = loader.load(&ctx).await?.unwrap();
+        let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = Builder::new("s3", "test").with_time(now);
         builder
-            .build(&ctx, &mut parts, Some(&cred), None)
+            .sign_request(&ctx, &mut parts, Some(&cred), None)
             .await
             .expect("must apply success");
         let actual_req = Request::from_parts(parts, body);
@@ -840,11 +840,11 @@ mod tests {
             }
             .into(),
         );
-        let cred = loader.load(&ctx).await?.unwrap();
+        let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = Builder::new("s3", "test").with_time(now);
         builder
-            .build(
+            .sign_request(
                 &ctx,
                 &mut parts,
                 Some(&cred),

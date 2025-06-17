@@ -25,8 +25,13 @@ sha1.workspace = true
 sha2.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.59.0", features = [
-    "Win32_Foundation",
-    "Win32_UI_Shell",
-    "Win32_System_Com",
+windows-sys = { version = "0.60.2", features = [
+  "Win32_Foundation",
+  "Win32_UI_Shell",
+  "Win32_System_Com",
 ] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+reqsign-file-read-tokio = { path = "../context/file-read-tokio" }
+reqsign-http-send-reqwest = { path = "../context/http-send-reqwest" }

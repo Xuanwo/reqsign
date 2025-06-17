@@ -13,7 +13,7 @@ use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
 use reqsign_aws_v4::{AssumeRoleLoader, Config};
 use reqsign_aws_v4::{Builder, DefaultLoader};
-use reqsign_core::{Build, Context, Load, Signer, StaticEnv};
+use reqsign_core::{Context, ProvideCredential, SignRequest, Signer, StaticEnv};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
@@ -74,7 +74,7 @@ async fn test_head_object() -> Result<()> {
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
     let cred = loader
-        .load(&ctx)
+        .provide_credential(&ctx)
         .await
         .expect("load request must success")
         .unwrap();
@@ -82,7 +82,7 @@ async fn test_head_object() -> Result<()> {
     let req = {
         let (mut parts, body) = req.into_parts();
         builder
-            .build(&ctx, &mut parts, Some(&cred), None)
+            .sign_request(&ctx, &mut parts, Some(&cred), None)
             .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
@@ -121,7 +121,7 @@ async fn test_put_object_with_query() -> Result<()> {
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "put_object_test"))?;
 
     let cred = loader
-        .load(&ctx)
+        .provide_credential(&ctx)
         .await
         .expect("load request must success")
         .unwrap();
@@ -129,7 +129,7 @@ async fn test_put_object_with_query() -> Result<()> {
     let req = {
         let (mut parts, body) = req.into_parts();
         builder
-            .build(&ctx, &mut parts, Some(&cred), None)
+            .sign_request(&ctx, &mut parts, Some(&cred), None)
             .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
@@ -166,7 +166,7 @@ async fn test_get_object_with_query() -> Result<()> {
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", url, "not_exist_file"))?;
 
     let cred = loader
-        .load(&ctx)
+        .provide_credential(&ctx)
         .await
         .expect("load request must success")
         .unwrap();
@@ -174,7 +174,7 @@ async fn test_get_object_with_query() -> Result<()> {
     let req = {
         let (mut parts, body) = req.into_parts();
         builder
-            .build(
+            .sign_request(
                 &ctx,
                 &mut parts,
                 Some(&cred),
@@ -216,7 +216,7 @@ async fn test_head_object_with_special_characters() -> Result<()> {
     ))?;
 
     let cred = loader
-        .load(&ctx)
+        .provide_credential(&ctx)
         .await
         .expect("load request must success")
         .unwrap();
@@ -224,7 +224,7 @@ async fn test_head_object_with_special_characters() -> Result<()> {
     let req = {
         let (mut parts, body) = req.into_parts();
         builder
-            .build(&ctx, &mut parts, Some(&cred), None)
+            .sign_request(&ctx, &mut parts, Some(&cred), None)
             .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
@@ -261,7 +261,7 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
     ))?;
 
     let cred = loader
-        .load(&ctx)
+        .provide_credential(&ctx)
         .await
         .expect("load request must success")
         .unwrap();
@@ -269,7 +269,7 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
     let req = {
         let (mut parts, body) = req.into_parts();
         builder
-            .build(&ctx, &mut parts, Some(&cred), None)
+            .sign_request(&ctx, &mut parts, Some(&cred), None)
             .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
@@ -303,7 +303,7 @@ async fn test_list_bucket() -> Result<()> {
         http::Uri::from_str(&format!("{url}?list-type=2&delimiter=/&encoding-type=url"))?;
 
     let cred = loader
-        .load(&ctx)
+        .provide_credential(&ctx)
         .await
         .expect("load request must success")
         .unwrap();
@@ -311,7 +311,7 @@ async fn test_list_bucket() -> Result<()> {
     let req = {
         let (mut parts, body) = req.into_parts();
         builder
-            .build(&ctx, &mut parts, Some(&cred), None)
+            .sign_request(&ctx, &mut parts, Some(&cred), None)
             .await
             .expect("sign request must success");
         Request::from_parts(parts, body)
@@ -382,14 +382,14 @@ async fn test_signer_with_web_loader() -> Result<()> {
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
 
     let cred = loader
-        .load(&context)
+        .provide_credential(&context)
         .await
         .expect("credential must be valid")
         .unwrap();
 
     let (mut req, body) = req.into_parts();
     builder
-        .build(&context, &mut req, Some(&cred), None)
+        .sign_request(&context, &mut req, Some(&cred), None)
         .await
         .expect("sign must success");
     let req = Request::from_parts(req, body);
@@ -482,14 +482,14 @@ async fn test_signer_with_web_loader_assume_role() -> Result<()> {
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
     let cred = loader
-        .load(&context)
+        .provide_credential(&context)
         .await
         .expect("credential must be valid")
         .unwrap();
 
     let (mut parts, body) = req.into_parts();
     builder
-        .build(&context, &mut parts, Some(&cred), None)
+        .sign_request(&context, &mut parts, Some(&cred), None)
         .await
         .expect("sign must success");
     let req = Request::from_parts(parts, body);

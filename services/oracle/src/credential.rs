@@ -1,90 +1,52 @@
-use std::sync::Arc;
-use std::sync::Mutex;
+use reqsign_core::time::{now, DateTime};
+use reqsign_core::utils::Redact;
+use reqsign_core::SigningCredential;
+use std::fmt::{Debug, Formatter};
 
-use anyhow::Result;
-use log::debug;
-
-use super::config::Config;
-use super::constants::ORACLE_CONFIG_PATH;
-use reqsign_core::time::now;
-use reqsign_core::time::DateTime;
-
-/// Credential that holds the API private key.
-/// private_key_path is optional, because some other credential will be added later
+/// Credential that holds the API private key information.
 #[derive(Default, Clone)]
-#[cfg_attr(test, derive(Debug))]
 pub struct Credential {
     /// TenantID for Oracle Cloud Infrastructure.
     pub tenancy: String,
     /// UserID for Oracle Cloud Infrastructure.
     pub user: String,
-    /// API Private Key for credential.
-    pub key_file: Option<String>,
+    /// API Private Key file path for credential.
+    pub key_file: String,
     /// Fingerprint of the API Key.
-    pub fingerprint: Option<String>,
-    /// expires in for credential.
+    pub fingerprint: String,
+    /// Expiration time for this credential.
     pub expires_in: Option<DateTime>,
 }
 
-impl Credential {
-    /// is current cred is valid?
-    pub fn is_valid(&self) -> bool {
-        self.key_file.is_some()
-            && self.fingerprint.is_some()
-            && self.expires_in.unwrap_or_default() > now()
+impl Debug for Credential {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Credential")
+            .field("tenancy", &self.tenancy)
+            .field("user", &self.user)
+            .field("key_file", &Redact::from(&self.key_file))
+            .field("fingerprint", &self.fingerprint)
+            .field("expires_in", &self.expires_in)
+            .finish()
     }
 }
 
-/// Loader will load credential from different methods.
-#[derive(Default)]
-#[cfg_attr(test, derive(Debug))]
-pub struct Loader {
-    credential: Arc<Mutex<Option<Credential>>>,
-}
-
-impl Loader {
-    /// Load credential.
-    pub async fn load(&self) -> Result<Option<Credential>> {
-        // Return cached credential if it's valid.
-        match self.credential.lock().expect("lock poisoned").clone() {
-            Some(cred) if cred.is_valid() => return Ok(Some(cred)),
-            _ => (),
-        }
-
-        let cred = if let Some(cred) = self.load_inner().await? {
-            cred
-        } else {
-            return Ok(None);
-        };
-
-        let mut lock = self.credential.lock().expect("lock poisoned");
-        *lock = Some(cred.clone());
-
-        Ok(Some(cred))
-    }
-
-    async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Ok(Some(cred)) = self
-            .load_via_config()
-            .map_err(|err| debug!("load credential via static failed: {err:?}"))
+impl SigningCredential for Credential {
+    fn is_valid(&self) -> bool {
+        if self.tenancy.is_empty()
+            || self.user.is_empty()
+            || self.key_file.is_empty()
+            || self.fingerprint.is_empty()
         {
-            return Ok(Some(cred));
+            return false;
+        }
+        // Take 120s as buffer to avoid edge cases.
+        if let Some(valid) = self
+            .expires_in
+            .map(|v| v > now() + chrono::TimeDelta::try_minutes(2).expect("in bounds"))
+        {
+            return valid;
         }
 
-        Ok(None)
-    }
-
-    fn load_via_config(&self) -> Result<Option<Credential>> {
-        let config = Config::from_config(ORACLE_CONFIG_PATH)?;
-
-        Ok(Some(Credential {
-            tenancy: config.tenancy,
-            user: config.user,
-            key_file: config.key_file,
-            fingerprint: config.fingerprint,
-            // Set expires_in to 10 minutes to enforce re-read
-            // from file.
-            expires_in: Some(now() + chrono::TimeDelta::try_minutes(10).expect("in bounds")),
-        }))
+        true
     }
 }

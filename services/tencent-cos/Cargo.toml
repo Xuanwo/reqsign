@@ -12,12 +12,12 @@ repository.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
 chrono.workspace = true
 http.workspace = true
 log.workspace = true
 percent-encoding.workspace = true
 reqsign-core.workspace = true
-reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
@@ -26,6 +26,9 @@ serde_json.workspace = true
 dotenv.workspace = true
 env_logger.workspace = true
 once_cell.workspace = true
+reqsign-core.workspace = true
+reqsign-file-read-tokio = { path = "../../context/file-read-tokio" }
+reqsign-http-send-reqwest = { path = "../../context/http-send-reqwest" }
 reqwest = { workspace = true, features = ["rustls-tls"] }
 temp-env.workspace = true
 tokio = { workspace = true, features = ["full"] }
