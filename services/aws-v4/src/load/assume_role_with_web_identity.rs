@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use quick_xml::de;
 use reqsign_core::time::parse_rfc3339;
-use reqsign_core::{Context, ProvideCredential, utils::Redact};
+use reqsign_core::{utils::Redact, Context, ProvideCredential};
 use serde::Deserialize;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;

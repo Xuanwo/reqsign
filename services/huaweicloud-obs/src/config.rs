@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 
 use super::constants::*;
-use reqsign_core::{Context, utils::Redact};
+use reqsign_core::{utils::Redact, Context};
 
 /// Config carries all the configuration for Huawei Cloud OBS services.
 #[derive(Clone, Default)]
@@ -66,9 +66,18 @@ impl Config {
 impl Debug for Config {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Config")
-            .field("access_key_id", &self.access_key_id.as_ref().map(Redact::from))
-            .field("secret_access_key", &self.secret_access_key.as_ref().map(Redact::from))
-            .field("security_token", &self.security_token.as_ref().map(Redact::from))
+            .field(
+                "access_key_id",
+                &self.access_key_id.as_ref().map(Redact::from),
+            )
+            .field(
+                "secret_access_key",
+                &self.secret_access_key.as_ref().map(Redact::from),
+            )
+            .field(
+                "security_token",
+                &self.security_token.as_ref().map(Redact::from),
+            )
             .finish()
     }
 }

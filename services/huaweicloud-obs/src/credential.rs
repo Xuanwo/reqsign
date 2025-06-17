@@ -33,7 +33,10 @@ impl Debug for Credential {
         f.debug_struct("Credential")
             .field("access_key_id", &Redact::from(&self.access_key_id))
             .field("secret_access_key", &Redact::from(&self.secret_access_key))
-            .field("security_token", &self.security_token.as_ref().map(Redact::from))
+            .field(
+                "security_token",
+                &self.security_token.as_ref().map(Redact::from),
+            )
             .finish()
     }
 }
