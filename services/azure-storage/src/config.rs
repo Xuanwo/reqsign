@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{connection_string, Service};
+use crate::{connection_string, Credential, Service};
 
 /// Config carries all the configuration for Azure Storage services.
 #[derive(Clone, Default, Debug)]
@@ -174,5 +174,23 @@ impl Config {
     /// [1]: https://learn.microsoft.com/en-us/azure/storage/common/storage-configure-connection-string
     pub fn try_from_connection_string(conn_str: &str, service: &Service) -> Result<Self> {
         connection_string::parse(conn_str, service)
+    }
+}
+
+impl Config {
+    pub(crate) fn with_credential(self, credential: Credential) -> Self {
+        match credential {
+            Credential::SasToken { token } => self.with_sas_token(token),
+            Credential::SharedKey {
+                account_name,
+                account_key,
+            } => self
+                .with_account_name(account_name)
+                .with_account_key(account_key),
+            Credential::BearerToken {
+                token: _,
+                expires_in: _,
+            } => self, // Bearer tokens are ignored.
+        }
     }
 }

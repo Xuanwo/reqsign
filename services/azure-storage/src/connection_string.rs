@@ -29,7 +29,7 @@ pub(crate) fn parse(conn_str: &str, storage: &Service) -> Result<Config> {
     };
 
     if let Some(creds) = collect_credentials(&key_values) {
-        set_credentials(&mut config, creds);
+        config = config.with_credential(creds);
     };
 
     Ok(config)
@@ -123,43 +123,17 @@ fn collect_endpoint(
 
 fn collect_credentials(key_values: &HashMap<String, String>) -> Option<Credential> {
     if let Some(token) = key_values.get("SharedAccessSignature") {
-        Some(Credential::SasToken {
-            token: token.clone(),
-        })
+        Some(Credential::with_sas_token(token))
     } else if let (Some(account_name), Some(account_key)) =
         (key_values.get("AccountName"), key_values.get("AccountKey"))
     {
-        Some(Credential::SharedKey {
-            account_name: account_name.clone(),
-            account_key: account_key.clone(),
-        })
+        Some(Credential::with_shared_key(account_name, account_key))
     } else {
         // We default to no authentication. This is not an error because e.g.
         // Azure Active Directory configuration is typically not passed via
         // connection strings.
         // Users may also set credentials manually on the configuration.
         None
-    }
-}
-
-fn set_credentials(config: &mut Config, creds: Credential) {
-    match creds {
-        Credential::SasToken { token } => {
-            config.sas_token = Some(token);
-        }
-        Credential::SharedKey {
-            account_name,
-            account_key,
-        } => {
-            config.account_name = Some(account_name);
-            config.account_key = Some(account_key);
-        }
-        Credential::BearerToken {
-            token: _,
-            expires_in: _,
-        } => {
-            // Bearer tokens shouldn't be passed via connection strings.
-        }
     }
 }
 
