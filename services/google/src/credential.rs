@@ -184,7 +184,7 @@ impl KeyTrait for Token {
 }
 
 /// Credential represents Google credentials that may contain both service account and token.
-/// 
+///
 /// This unified credential type allows for flexible authentication strategies:
 /// - Service account only: Used for signed URL generation
 /// - Token only: Used for Bearer authentication  

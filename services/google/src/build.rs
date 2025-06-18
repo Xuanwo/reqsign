@@ -96,7 +96,7 @@ impl Builder {
     }
 
     /// Exchange a service account for an access token.
-    /// 
+    ///
     /// This method is used internally when a token is needed but only a service account
     /// is available. It creates a JWT and exchanges it for an OAuth2 access token.
     async fn exchange_token(&self, ctx: &Context, sa: &ServiceAccount) -> Result<Token> {
@@ -258,7 +258,9 @@ impl SignRequestTrait for Builder {
                         let new_token = self.exchange_token(ctx, sa).await?;
                         self.build_token_auth(req, &new_token)?
                     } else {
-                        return Err(anyhow::anyhow!("token expired and no service account available"));
+                        return Err(anyhow::anyhow!(
+                            "token expired and no service account available"
+                        ));
                     }
                 } else if let Some(sa) = &cred.service_account {
                     // No token but have SA, exchange for token

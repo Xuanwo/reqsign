@@ -8,7 +8,7 @@ use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::credential::{Credential, RawCredential};
 
 /// ConfigLoader loads service account credentials from configuration.
-/// 
+///
 /// This loader only returns service account credentials. Other credential types
 /// (external account, impersonated service account) should be loaded by DefaultLoader.
 #[derive(Debug, Clone)]
@@ -104,10 +104,7 @@ impl ProvideCredential for ConfigLoader {
 
         // Convert RawCredential to Credential
         // ConfigLoader only returns service account credentials
-        Ok(raw_cred.and_then(|raw| {
-            raw.service_account
-                .map(Credential::with_service_account)
-        }))
+        Ok(raw_cred.and_then(|raw| raw.service_account.map(Credential::with_service_account)))
     }
 }
 

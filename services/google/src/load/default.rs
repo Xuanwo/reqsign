@@ -4,8 +4,8 @@ use log::debug;
 use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::credential::{Credential, RawCredential};
 use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
+use crate::credential::{Credential, RawCredential};
 
 use super::{
     ConfigLoader, ExternalAccountLoader, ImpersonatedServiceAccountLoader, VmMetadataLoader,
