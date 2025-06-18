@@ -16,7 +16,7 @@
 //!
 //! ```no_run
 //! use anyhow::Result;
-//! use reqsign_azure_storage::{Config, DefaultCredentialProvider, Builder};
+//! use reqsign_azure_storage::{Config, DefaultCredentialProvider, RequestSigner};
 //! use reqsign_core::{Context, Signer};
 //! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
