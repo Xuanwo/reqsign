@@ -13,6 +13,6 @@ pub use build::Builder;
 
 mod load;
 pub use load::{
-    ConfigLoader, DefaultLoader, ExternalAccountLoader, ImpersonatedServiceAccountLoader,
-    VmMetadataLoader,
+    AuthorizedUserLoader, ConfigLoader, DefaultLoader, ExternalAccountLoader,
+    ImpersonatedServiceAccountLoader, VmMetadataLoader,
 };

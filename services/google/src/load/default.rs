@@ -5,10 +5,11 @@ use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
-use crate::credential::{Credential, RawCredential};
+use crate::credential::{Credential, CredentialFile};
 
 use super::{
-    ConfigLoader, ExternalAccountLoader, ImpersonatedServiceAccountLoader, VmMetadataLoader,
+    AuthorizedUserLoader, ExternalAccountLoader, ImpersonatedServiceAccountLoader,
+    VmMetadataLoader,
 };
 
 /// DefaultLoader tries to load credentials from multiple sources in order.
@@ -23,10 +24,10 @@ impl DefaultLoader {
         Self { config }
     }
 
-    async fn load_raw_credential(&self, ctx: &Context) -> Result<Option<RawCredential>> {
+    async fn load_credential_file(&self, ctx: &Context) -> Result<Option<CredentialFile>> {
         // Try explicit content
         if let Some(content) = &self.config.credential_content {
-            if let Ok(cred) = RawCredential::from_base64(content) {
+            if let Ok(cred) = CredentialFile::from_base64(content) {
                 return Ok(Some(cred));
             }
         }
@@ -34,7 +35,7 @@ impl DefaultLoader {
         // Try explicit path
         if let Some(path) = &self.config.credential_path {
             if let Ok(content) = ctx.file_read(path).await {
-                if let Ok(cred) = RawCredential::from_slice(&content) {
+                if let Ok(cred) = CredentialFile::from_slice(&content) {
                     return Ok(Some(cred));
                 }
             }
@@ -44,7 +45,7 @@ impl DefaultLoader {
         if !self.config.disable_env {
             if let Some(path) = ctx.env_var(GOOGLE_APPLICATION_CREDENTIALS) {
                 if let Ok(content) = ctx.file_read(&path).await {
-                    if let Ok(cred) = RawCredential::from_slice(&content) {
+                    if let Ok(cred) = CredentialFile::from_slice(&content) {
                         return Ok(Some(cred));
                     }
                 }
@@ -65,7 +66,7 @@ impl DefaultLoader {
 
             let path = format!("{config_dir}/gcloud/application_default_credentials.json");
             if let Ok(content) = ctx.file_read(&path).await {
-                if let Ok(cred) = RawCredential::from_slice(&content) {
+                if let Ok(cred) = CredentialFile::from_slice(&content) {
                     return Ok(Some(cred));
                 }
             }
@@ -80,32 +81,33 @@ impl ProvideCredential for DefaultLoader {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        // First try to load credentials from config
-        let config_loader = ConfigLoader::new(self.config.clone());
-        if let Some(cred) = config_loader.provide_credential(ctx).await? {
-            // ConfigLoader returns Credential with service account
-            debug!("loaded service account credential from config");
-            return Ok(Some(cred));
-        }
-
-        // Try to load raw credentials for other types
-        let raw_cred = self.load_raw_credential(ctx).await?;
-        if let Some(raw_cred) = raw_cred {
-            // Try external account
-            if let Some(ea) = raw_cred.external_account {
-                debug!("loaded external account credential, exchanging for token");
-                let loader = ExternalAccountLoader::new(self.config.clone(), ea);
-                if let Some(cred) = loader.provide_credential(ctx).await? {
-                    return Ok(Some(cred));
+        // Try to load credential file
+        if let Some(cred_file) = self.load_credential_file(ctx).await? {
+            match cred_file {
+                CredentialFile::ServiceAccount(sa) => {
+                    debug!("loaded service account credential");
+                    return Ok(Some(Credential::with_service_account(sa)));
                 }
-            }
-
-            // Try impersonated service account
-            if let Some(isa) = raw_cred.impersonated_service_account {
-                debug!("loaded impersonated service account credential, exchanging for token");
-                let loader = ImpersonatedServiceAccountLoader::new(self.config.clone(), isa);
-                if let Some(cred) = loader.provide_credential(ctx).await? {
-                    return Ok(Some(cred));
+                CredentialFile::ExternalAccount(ea) => {
+                    debug!("loaded external account credential, exchanging for token");
+                    let loader = ExternalAccountLoader::new(self.config.clone(), ea);
+                    if let Some(cred) = loader.provide_credential(ctx).await? {
+                        return Ok(Some(cred));
+                    }
+                }
+                CredentialFile::ImpersonatedServiceAccount(isa) => {
+                    debug!("loaded impersonated service account credential, exchanging for token");
+                    let loader = ImpersonatedServiceAccountLoader::new(self.config.clone(), isa);
+                    if let Some(cred) = loader.provide_credential(ctx).await? {
+                        return Ok(Some(cred));
+                    }
+                }
+                CredentialFile::AuthorizedUser(au) => {
+                    debug!("loaded authorized user credential, exchanging for token");
+                    let loader = AuthorizedUserLoader::new(self.config.clone(), au);
+                    if let Some(cred) = loader.provide_credential(ctx).await? {
+                        return Ok(Some(cred));
+                    }
                 }
             }
         }

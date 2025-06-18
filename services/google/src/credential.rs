@@ -237,54 +237,40 @@ impl KeyTrait for Credential {
     }
 }
 
-/// CredentialType indicates the type of credential in a file.
+/// AuthorizedUser holds OAuth2 user credentials.
 #[derive(Clone, serde::Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
-#[allow(clippy::enum_variant_names)]
-pub enum CredentialType {
+pub struct AuthorizedUser {
+    /// The client ID.
+    pub client_id: String,
+    /// The client secret.
+    pub client_secret: String,
+    /// The refresh token.
+    pub refresh_token: String,
+}
+
+/// CredentialFile represents the different types of Google credential files.
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CredentialFile {
+    /// Service account with private key.
+    ServiceAccount(ServiceAccount),
+    /// External account for workload identity federation.
+    ExternalAccount(ExternalAccount),
     /// Impersonated service account.
-    ImpersonatedServiceAccount,
-    /// External account.
-    ExternalAccount,
-    /// Service account.
-    ServiceAccount,
+    ImpersonatedServiceAccount(ImpersonatedServiceAccount),
+    /// Authorized user credentials.
+    AuthorizedUser(AuthorizedUser),
 }
 
-/// RawCredential represents the raw credential file that can be one of multiple types.
-#[derive(Clone, Debug)]
-pub struct RawCredential {
-    /// Service account, if present.
-    pub service_account: Option<ServiceAccount>,
-    /// Impersonated service account, if present.
-    pub impersonated_service_account: Option<ImpersonatedServiceAccount>,
-    /// External account, if present.
-    pub external_account: Option<ExternalAccount>,
-}
-
-impl RawCredential {
-    /// Parse raw credential from bytes.
+impl CredentialFile {
+    /// Parse credential file from bytes.
     pub fn from_slice(v: &[u8]) -> anyhow::Result<Self> {
-        let service_account = serde_json::from_slice(v).ok();
-        let impersonated_service_account = serde_json::from_slice(v).ok();
-        let external_account = serde_json::from_slice(v).ok();
-
-        let cred = RawCredential {
-            service_account,
-            impersonated_service_account,
-            external_account,
-        };
-
-        if cred.service_account.is_none()
-            && cred.impersonated_service_account.is_none()
-            && cred.external_account.is_none()
-        {
-            return Err(anyhow!("Couldn't deserialize credential file"));
-        }
-
-        Ok(cred)
+        serde_json::from_slice(v)
+            .map_err(|e| anyhow!("failed to parse credential file: {}", e))
     }
 
-    /// Parse raw credential from base64-encoded content.
+    /// Parse credential file from base64-encoded content.
     pub fn from_base64(content: &str) -> anyhow::Result<Self> {
         let decoded = base64_decode(content)?;
         Self::from_slice(&decoded)
@@ -346,6 +332,54 @@ mod tests {
         // Empty access token
         token.access_token = String::new();
         assert!(!token.is_valid());
+    }
+
+    #[test]
+    fn test_credential_file_deserialize() {
+        // Test service account
+        let sa_json = r#"{
+            "type": "service_account",
+            "private_key": "test_key",
+            "client_email": "test@example.com"
+        }"#;
+        let cred = CredentialFile::from_slice(sa_json.as_bytes()).unwrap();
+        match cred {
+            CredentialFile::ServiceAccount(sa) => {
+                assert_eq!(sa.client_email, "test@example.com");
+            }
+            _ => panic!("Expected ServiceAccount"),
+        }
+
+        // Test external account
+        let ea_json = r#"{
+            "type": "external_account",
+            "audience": "test_audience",
+            "subject_token_type": "test_type",
+            "token_url": "https://example.com/token",
+            "credential_source": {
+                "file": "/path/to/file",
+                "format": {
+                    "type": "text"
+                }
+            }
+        }"#;
+        let cred = CredentialFile::from_slice(ea_json.as_bytes()).unwrap();
+        assert!(matches!(cred, CredentialFile::ExternalAccount(_)));
+
+        // Test authorized user
+        let au_json = r#"{
+            "type": "authorized_user",
+            "client_id": "test_id",
+            "client_secret": "test_secret",
+            "refresh_token": "test_token"
+        }"#;
+        let cred = CredentialFile::from_slice(au_json.as_bytes()).unwrap();
+        match cred {
+            CredentialFile::AuthorizedUser(au) => {
+                assert_eq!(au.client_id, "test_id");
+            }
+            _ => panic!("Expected AuthorizedUser"),
+        }
     }
 
     #[test]
