@@ -12,7 +12,7 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use reqsign_core::{
-    hash::hex_sha256, time::*, Context, SignRequest as SignRequestTrait, SigningCredential,
+    hash::hex_sha256, time::*, Context, SignRequest, SigningCredential,
     SigningMethod, SigningRequest,
 };
 
@@ -225,7 +225,7 @@ impl RequestSigner {
 }
 
 #[async_trait::async_trait]
-impl SignRequestTrait for RequestSigner {
+impl SignRequest for RequestSigner {
     type Credential = Credential;
 
     async fn sign_request(
