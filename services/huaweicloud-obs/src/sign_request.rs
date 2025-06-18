@@ -18,7 +18,7 @@ use reqsign_core::hash::base64_hmac_sha1;
 use reqsign_core::time::format_http_date;
 use reqsign_core::time::now;
 use reqsign_core::time::DateTime;
-use reqsign_core::{SignRequest as SignRequestTrait, SigningMethod, SigningRequest};
+use reqsign_core::{SignRequest, SigningMethod, SigningRequest};
 
 /// RequestSigner that implement Huawei Cloud Object Storage Service Authorization.
 ///
@@ -52,7 +52,7 @@ impl RequestSigner {
 }
 
 #[async_trait::async_trait]
-impl SignRequestTrait for RequestSigner {
+impl SignRequest for RequestSigner {
     type Credential = Credential;
 
     async fn sign_request(
