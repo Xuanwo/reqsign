@@ -5,7 +5,7 @@ use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
-use crate::credential::{Credential, RawCredential};
+use crate::credential::{Credential, CredentialFile};
 
 /// ConfigLoader loads service account credentials from configuration.
 ///
@@ -22,13 +22,13 @@ impl ConfigLoader {
         Self { config }
     }
 
-    async fn load_from_path(&self, ctx: &Context, path: &str) -> Result<Option<RawCredential>> {
+    async fn load_from_path(&self, ctx: &Context, path: &str) -> Result<Option<CredentialFile>> {
         let content = ctx.file_read(path).await.map_err(|err| {
             debug!("load credential from path {path} failed: {err:?}");
             err
         })?;
 
-        let cred = RawCredential::from_slice(&content).map_err(|err| {
+        let cred = CredentialFile::from_slice(&content).map_err(|err| {
             debug!("parse credential from path {path} failed: {err:?}");
             err
         })?;
@@ -36,8 +36,8 @@ impl ConfigLoader {
         Ok(Some(cred))
     }
 
-    async fn load_from_content(&self, content: &str) -> Result<Option<RawCredential>> {
-        let cred = RawCredential::from_base64(content).map_err(|err| {
+    async fn load_from_content(&self, content: &str) -> Result<Option<CredentialFile>> {
+        let cred = CredentialFile::from_base64(content).map_err(|err| {
             debug!("parse credential from content failed: {err:?}");
             err
         })?;
@@ -45,7 +45,7 @@ impl ConfigLoader {
         Ok(Some(cred))
     }
 
-    async fn load_from_env(&self, ctx: &Context) -> Result<Option<RawCredential>> {
+    async fn load_from_env(&self, ctx: &Context) -> Result<Option<CredentialFile>> {
         if self.config.disable_env {
             return Ok(None);
         }
@@ -57,7 +57,7 @@ impl ConfigLoader {
         self.load_from_path(ctx, &path).await
     }
 
-    async fn load_from_well_known_location(&self, ctx: &Context) -> Result<Option<RawCredential>> {
+    async fn load_from_well_known_location(&self, ctx: &Context) -> Result<Option<CredentialFile>> {
         if self.config.disable_well_known_location {
             return Ok(None);
         }
@@ -86,7 +86,7 @@ impl ProvideCredential for ConfigLoader {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        let raw_cred = if let Some(content) = &self.config.credential_content {
+        let cred_file = if let Some(content) = &self.config.credential_content {
             // Try content first
             self.load_from_content(content).await?
         } else if let Some(path) = &self.config.credential_path {
@@ -102,9 +102,12 @@ impl ProvideCredential for ConfigLoader {
             None
         };
 
-        // Convert RawCredential to Credential
+        // Convert CredentialFile to Credential
         // ConfigLoader only returns service account credentials
-        Ok(raw_cred.and_then(|raw| raw.service_account.map(Credential::with_service_account)))
+        Ok(cred_file.and_then(|file| match file {
+            CredentialFile::ServiceAccount(sa) => Some(Credential::with_service_account(sa)),
+            _ => None, // Other types are not supported by ConfigLoader
+        }))
     }
 }
 

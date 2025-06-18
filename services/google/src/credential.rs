@@ -28,17 +28,17 @@ impl Debug for ServiceAccount {
 pub struct ImpersonatedServiceAccount {
     /// The URL to obtain the access token for the impersonated service account.
     pub service_account_impersonation_url: String,
-    /// The underlying source credential.
-    pub source_credentials: SourceCredentials,
+    /// The underlying OAuth2 credentials.
+    pub source_credentials: OAuth2Credentials,
     /// Optional delegates for the impersonation.
     #[serde(default)]
     pub delegates: Vec<String>,
 }
 
-/// SourceCredentials holds the OAuth2 credentials.
+/// OAuth2 user credentials (for authorized users and impersonation sources).
 #[derive(Clone, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub struct SourceCredentials {
+pub struct OAuth2Credentials {
     /// The client ID.
     pub client_id: String,
     /// The client secret.
@@ -47,9 +47,9 @@ pub struct SourceCredentials {
     pub refresh_token: String,
 }
 
-impl Debug for SourceCredentials {
+impl Debug for OAuth2Credentials {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SourceCredentials")
+        f.debug_struct("OAuth2Credentials")
             .field("client_id", &self.client_id)
             .field("client_secret", &Redact::from(&self.client_secret))
             .field("refresh_token", &Redact::from(&self.refresh_token))
@@ -57,7 +57,7 @@ impl Debug for SourceCredentials {
     }
 }
 
-/// ExternalAccount holds the configuration for external account authentication.
+/// External account for workload identity federation.
 #[derive(Clone, serde::Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub struct ExternalAccount {
@@ -68,83 +68,88 @@ pub struct ExternalAccount {
     /// The token URL to exchange tokens.
     pub token_url: String,
     /// The credential source.
-    pub credential_source: CredentialSource,
+    pub credential_source: external_account::Source,
     /// Optional service account impersonation URL.
     pub service_account_impersonation_url: Option<String>,
     /// Optional service account impersonation options.
-    pub service_account_impersonation: Option<ServiceAccountImpersonation>,
+    pub service_account_impersonation: Option<external_account::ImpersonationOptions>,
 }
 
-/// Service account impersonation options.
-#[derive(Clone, serde::Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub struct ServiceAccountImpersonation {
-    /// The lifetime in seconds to be used when exchanging the STS token.
-    pub token_lifetime_seconds: Option<usize>,
-}
+/// External account specific types.
+pub mod external_account {
+    use serde::Deserialize;
 
-/// CredentialSource defines where to obtain the external account credentials.
-#[derive(Clone, serde::Deserialize, Debug)]
-#[serde(untagged)]
-pub enum CredentialSource {
-    /// URL-based credential source.
+    /// Where to obtain the external account credentials from.
+    #[derive(Clone, Deserialize, Debug)]
+    #[serde(untagged)]
+    pub enum Source {
+        /// URL-based credential source.
+        #[serde(rename_all = "snake_case")]
+        Url(UrlSource),
+        /// File-based credential source.
+        #[serde(rename_all = "snake_case")]
+        File(FileSource),
+    }
+
+    /// Configuration for fetching credentials from a URL.
+    #[derive(Clone, Deserialize, Debug)]
     #[serde(rename_all = "snake_case")]
-    UrlSourced(UrlSourcedCredential),
-    /// File-based credential source.
+    pub struct UrlSource {
+        /// The URL to fetch credentials from.
+        pub url: String,
+        /// The format of the response.
+        pub format: Format,
+        /// Optional headers to include in the request.
+        pub headers: Option<std::collections::HashMap<String, String>>,
+    }
+
+    /// Configuration for reading credentials from a file.
+    #[derive(Clone, Deserialize, Debug)]
     #[serde(rename_all = "snake_case")]
-    FileSourced(FileSourcedCredential),
-}
+    pub struct FileSource {
+        /// The file path to read credentials from.
+        pub file: String,
+        /// The format of the file.
+        pub format: Format,
+    }
 
-/// URL-based credential source configuration.
-#[derive(Clone, serde::Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub struct UrlSourcedCredential {
-    /// The URL to fetch credentials from.
-    pub url: String,
-    /// The format of the response.
-    pub format: FormatType,
-    /// Optional headers to include in the request.
-    pub headers: Option<std::collections::HashMap<String, String>>,
-}
+    /// Format for parsing credentials.
+    #[derive(Clone, Deserialize, Debug)]
+    #[serde(tag = "type", rename_all = "snake_case")]
+    pub enum Format {
+        /// JSON format.
+        Json {
+            /// The JSON path to extract the subject token.
+            subject_token_field_name: String,
+        },
+        /// Plain text format.
+        Text,
+    }
 
-/// File-based credential source configuration.
-#[derive(Clone, serde::Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-pub struct FileSourcedCredential {
-    /// The file path to read credentials from.
-    pub file: String,
-    /// The format of the file.
-    pub format: FormatType,
-}
-
-/// Format type for credential sources.
-#[derive(Clone, serde::Deserialize, Debug)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum FormatType {
-    /// JSON format.
-    Json {
-        /// The JSON path to extract the subject token.
-        subject_token_field_name: String,
-    },
-    /// Text format.
-    Text,
-}
-
-impl FormatType {
-    /// Parse a slice of bytes as the expected format.
-    pub fn parse(&self, slice: &[u8]) -> anyhow::Result<String> {
-        match &self {
-            Self::Text => Ok(String::from_utf8(slice.to_vec())?),
-            Self::Json {
-                subject_token_field_name,
-            } => {
-                let value: serde_json::Value = serde_json::from_slice(slice)?;
-                match value.get(subject_token_field_name) {
-                    Some(serde_json::Value::String(access_token)) => Ok(access_token.clone()),
-                    _ => anyhow::bail!("JSON missing token field {subject_token_field_name}"),
+    impl Format {
+        /// Parse a slice of bytes as the expected format.
+        pub fn parse(&self, slice: &[u8]) -> anyhow::Result<String> {
+            match &self {
+                Self::Text => Ok(String::from_utf8(slice.to_vec())?),
+                Self::Json {
+                    subject_token_field_name,
+                } => {
+                    let value: serde_json::Value = serde_json::from_slice(slice)?;
+                    match value.get(subject_token_field_name) {
+                        Some(serde_json::Value::String(access_token)) => Ok(access_token.clone()),
+                        _ => anyhow::bail!("JSON missing token field {subject_token_field_name}"),
+                    }
                 }
             }
         }
+    }
+
+    /// Service account impersonation options.
+    #[derive(Clone, Deserialize, Debug)]
+    #[serde(rename_all = "snake_case")]
+    pub struct ImpersonationOptions {
+        /// The lifetime in seconds for the impersonated token.
+        pub token_lifetime_seconds: Option<usize>,
     }
 }
 
@@ -237,54 +242,27 @@ impl KeyTrait for Credential {
     }
 }
 
-/// CredentialType indicates the type of credential in a file.
-#[derive(Clone, serde::Deserialize, Debug)]
-#[serde(rename_all = "snake_case")]
-#[allow(clippy::enum_variant_names)]
-pub enum CredentialType {
+/// CredentialFile represents the different types of Google credential files.
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CredentialFile {
+    /// Service account with private key.
+    ServiceAccount(ServiceAccount),
+    /// External account for workload identity federation.
+    ExternalAccount(ExternalAccount),
     /// Impersonated service account.
-    ImpersonatedServiceAccount,
-    /// External account.
-    ExternalAccount,
-    /// Service account.
-    ServiceAccount,
+    ImpersonatedServiceAccount(ImpersonatedServiceAccount),
+    /// OAuth2 authorized user credentials.
+    AuthorizedUser(OAuth2Credentials),
 }
 
-/// RawCredential represents the raw credential file that can be one of multiple types.
-#[derive(Clone, Debug)]
-pub struct RawCredential {
-    /// Service account, if present.
-    pub service_account: Option<ServiceAccount>,
-    /// Impersonated service account, if present.
-    pub impersonated_service_account: Option<ImpersonatedServiceAccount>,
-    /// External account, if present.
-    pub external_account: Option<ExternalAccount>,
-}
-
-impl RawCredential {
-    /// Parse raw credential from bytes.
+impl CredentialFile {
+    /// Parse credential file from bytes.
     pub fn from_slice(v: &[u8]) -> anyhow::Result<Self> {
-        let service_account = serde_json::from_slice(v).ok();
-        let impersonated_service_account = serde_json::from_slice(v).ok();
-        let external_account = serde_json::from_slice(v).ok();
-
-        let cred = RawCredential {
-            service_account,
-            impersonated_service_account,
-            external_account,
-        };
-
-        if cred.service_account.is_none()
-            && cred.impersonated_service_account.is_none()
-            && cred.external_account.is_none()
-        {
-            return Err(anyhow!("Couldn't deserialize credential file"));
-        }
-
-        Ok(cred)
+        serde_json::from_slice(v).map_err(|e| anyhow!("failed to parse credential file: {}", e))
     }
 
-    /// Parse raw credential from base64-encoded content.
+    /// Parse credential file from base64-encoded content.
     pub fn from_base64(content: &str) -> anyhow::Result<Self> {
         let decoded = base64_decode(content)?;
         Self::from_slice(&decoded)
@@ -296,16 +274,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_format_type_parse_text() {
-        let format = FormatType::Text;
+    fn test_external_account_format_parse_text() {
+        let format = external_account::Format::Text;
         let data = b"test-token";
         let result = format.parse(data).unwrap();
         assert_eq!("test-token", result);
     }
 
     #[test]
-    fn test_format_type_parse_json() {
-        let format = FormatType::Json {
+    fn test_external_account_format_parse_json() {
+        let format = external_account::Format::Json {
             subject_token_field_name: "access_token".to_string(),
         };
         let data = br#"{"access_token": "test-token", "expires_in": 3600}"#;
@@ -314,8 +292,8 @@ mod tests {
     }
 
     #[test]
-    fn test_format_type_parse_json_missing_field() {
-        let format = FormatType::Json {
+    fn test_external_account_format_parse_json_missing_field() {
+        let format = external_account::Format::Json {
             subject_token_field_name: "access_token".to_string(),
         };
         let data = br#"{"wrong_field": "test-token"}"#;
@@ -346,6 +324,56 @@ mod tests {
         // Empty access token
         token.access_token = String::new();
         assert!(!token.is_valid());
+    }
+
+    #[test]
+    fn test_credential_file_deserialize() {
+        // Test service account
+        let sa_json = r#"{
+            "type": "service_account",
+            "private_key": "test_key",
+            "client_email": "test@example.com"
+        }"#;
+        let cred = CredentialFile::from_slice(sa_json.as_bytes()).unwrap();
+        match cred {
+            CredentialFile::ServiceAccount(sa) => {
+                assert_eq!(sa.client_email, "test@example.com");
+            }
+            _ => panic!("Expected ServiceAccount"),
+        }
+
+        // Test external account
+        let ea_json = r#"{
+            "type": "external_account",
+            "audience": "test_audience",
+            "subject_token_type": "test_type",
+            "token_url": "https://example.com/token",
+            "credential_source": {
+                "file": "/path/to/file",
+                "format": {
+                    "type": "text"
+                }
+            }
+        }"#;
+        let cred = CredentialFile::from_slice(ea_json.as_bytes()).unwrap();
+        assert!(matches!(cred, CredentialFile::ExternalAccount(_)));
+
+        // Test authorized user
+        let au_json = r#"{
+            "type": "authorized_user",
+            "client_id": "test_id",
+            "client_secret": "test_secret",
+            "refresh_token": "test_token"
+        }"#;
+        let cred = CredentialFile::from_slice(au_json.as_bytes()).unwrap();
+        match cred {
+            CredentialFile::AuthorizedUser(oauth2) => {
+                assert_eq!(oauth2.client_id, "test_id");
+                assert_eq!(oauth2.client_secret, "test_secret");
+                assert_eq!(oauth2.refresh_token, "test_token");
+            }
+            _ => panic!("Expected AuthorizedUser"),
+        }
     }
 
     #[test]

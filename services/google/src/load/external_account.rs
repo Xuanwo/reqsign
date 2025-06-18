@@ -8,10 +8,7 @@ use serde::{Deserialize, Serialize};
 use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::credential::{
-    Credential, CredentialSource, ExternalAccount, FileSourcedCredential, Token,
-    UrlSourcedCredential,
-};
+use crate::credential::{external_account, Credential, ExternalAccount, Token};
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
 const MAX_LIFETIME: Duration = Duration::from_secs(3600);
@@ -68,17 +65,17 @@ impl ExternalAccountLoader {
 
     async fn load_oidc_token(&self, ctx: &Context) -> Result<String> {
         match &self.external_account.credential_source {
-            CredentialSource::FileSourced(source) => {
+            external_account::Source::File(source) => {
                 self.load_file_sourced_token(ctx, source).await
             }
-            CredentialSource::UrlSourced(source) => self.load_url_sourced_token(ctx, source).await,
+            external_account::Source::Url(source) => self.load_url_sourced_token(ctx, source).await,
         }
     }
 
     async fn load_file_sourced_token(
         &self,
         ctx: &Context,
-        source: &FileSourcedCredential,
+        source: &external_account::FileSource,
     ) -> Result<String> {
         debug!("loading OIDC token from file: {}", source.file);
         let content = ctx.file_read(&source.file).await?;
@@ -88,7 +85,7 @@ impl ExternalAccountLoader {
     async fn load_url_sourced_token(
         &self,
         ctx: &Context,
-        source: &UrlSourcedCredential,
+        source: &external_account::UrlSource,
     ) -> Result<String> {
         debug!("loading OIDC token from URL: {}", source.url);
 

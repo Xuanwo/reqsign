@@ -12,3 +12,6 @@ pub use impersonated_service_account::ImpersonatedServiceAccountLoader;
 
 mod vm_metadata;
 pub use vm_metadata::VmMetadataLoader;
+
+mod authorized_user;
+pub use authorized_user::AuthorizedUserLoader;
