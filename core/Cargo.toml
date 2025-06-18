@@ -32,6 +32,6 @@ windows-sys = { version = "0.60.2", features = [
 ] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 reqsign-file-read-tokio = { path = "../context/file-read-tokio" }
 reqsign-http-send-reqwest = { path = "../context/http-send-reqwest" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
