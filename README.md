@@ -16,26 +16,38 @@ Most API is simple. But they could be complicated when they are hidden from comp
 
 ```rust
 use anyhow::Result;
-use reqsign::AwsConfig;
-use reqsign::AwsLoader;
-use reqsign::AwsV4Signer;
+use reqsign_aws_v4::{Config, DefaultCredentialProvider, RequestSigner, EMPTY_STRING_SHA256};
+use reqsign_core::{Context, Signer};
+use reqsign_file_read_tokio::TokioFileRead;
+use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Signer can load region and credentials from environment by default.
+    // Create HTTP client and context
     let client = Client::new();
-    let config = AwsConfig::default().from_profile().from_env();
-    let loader = AwsLoader::new(client.clone(), config);
-    let signer = AwsV4Signer::new("s3", "us-east-1");
-    // Construct http::Request, and convert it into parts and body
-    let req = http::Request::get("https://s3.amazonaws.com/testbucket").body(reqwest::Body::from(""))?;
+    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
+    
+    // Configure AWS credentials (loads from env by default)
+    let config = Config::default().from_env(&ctx);
+    let loader = DefaultCredentialProvider::new(Arc::new(config));
+    
+    // Create request signer for S3
+    let builder = RequestSigner::new("s3", "us-east-1");
+    let signer = Signer::new(ctx, loader, builder);
+    
+    // Construct and sign the request
+    let req = http::Request::get("https://s3.amazonaws.com/testbucket")
+        .header("x-amz-content-sha256", EMPTY_STRING_SHA256)
+        .body(reqwest::Body::from(""))?;
     let (mut parts, body) = req.into_parts();
-    // Signing request with Signer, and convert it back to reqwest::Request
-    let credential = loader.provide_credential().await?.unwrap();
-    signer.sign(&mut parts, &credential)?;
+    
+    // Sign the request
+    signer.sign(&mut parts, None).await?;
     let req = http::Request::from_parts(parts, body).try_into()?;
-    // Sending already signed request.
+    
+    // Send the signed request
     let resp = client.execute(req).await?;
     println!("resp got status: {}", resp.status());
     Ok(())
@@ -47,11 +59,13 @@ async fn main() -> Result<()> {
 - Pure rust with minimal dependencies.
 - Test again official SDK and services.
 - Supported services
-  - Aliyun OSS: `reqsign::AliyunOssSigner`
-  - AWS services (SigV4): `reqsign::AwsV4Signer`
-  - Azure Storage services: `reqsign::AzureStorageSigner`
-  - Google services: `reqsign::GoogleSigner`
-  - Huawei Cloud OBS: `reqsign::HuaweicloudObsSigner`
+  - Aliyun OSS: `reqsign-aliyun-oss`
+  - AWS services (SigV4): `reqsign-aws-v4`
+  - Azure Storage services: `reqsign-azure-storage`
+  - Google services: `reqsign-google`
+  - Huawei Cloud OBS: `reqsign-huaweicloud-obs`
+  - Oracle Cloud: `reqsign-oracle`
+  - Tencent COS: `reqsign-tencent-cos`
 
 ## Contributing
 
