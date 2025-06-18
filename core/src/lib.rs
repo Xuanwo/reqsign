@@ -108,7 +108,7 @@
 //!     .unwrap()
 //!     .into_parts()
 //!     .0;
-//!     
+//!
 //! signer.sign(&mut parts, None).await?;
 //! # Ok(())
 //! # }
@@ -142,13 +142,10 @@ pub mod utils;
 
 mod context;
 pub use context::Context;
-mod fs;
-pub use fs::FileRead;
-mod http;
-pub use http::HttpSend;
-mod env;
-pub use env::Env;
-pub use env::StaticEnv;
+pub use context::Env;
+pub use context::FileRead;
+pub use context::HttpSend;
+pub use context::StaticEnv;
 
 mod api;
 pub use api::{ProvideCredential, SignRequest, SigningCredential};
