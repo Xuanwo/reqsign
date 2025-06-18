@@ -8,11 +8,12 @@ pub use config::Config;
 mod credential;
 pub use credential::{Credential, ServiceAccount, Token};
 
-mod build;
-pub use build::Builder;
+mod sign_request;
+pub use sign_request::RequestSigner;
 
-mod load;
-pub use load::{
-    AuthorizedUserLoader, ConfigLoader, DefaultLoader, ExternalAccountLoader,
-    ImpersonatedServiceAccountLoader, VmMetadataLoader,
+mod provide_credential;
+pub use provide_credential::{
+    AuthorizedUserCredentialProvider, ConfigCredentialProvider, DefaultCredentialProvider,
+    ExternalAccountCredentialProvider, ImpersonatedServiceAccountCredentialProvider,
+    VmMetadataCredentialProvider,
 };

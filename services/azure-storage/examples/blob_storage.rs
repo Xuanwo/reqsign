@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqsign_azure_storage::{Builder, Config, DefaultLoader};
+use reqsign_azure_storage::{Config, DefaultCredentialProvider, RequestSigner};
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -39,10 +39,10 @@ async fn main() -> Result<()> {
     }
 
     // Create credential loader
-    let loader = DefaultLoader::new().from_env(&ctx);
+    let loader = DefaultCredentialProvider::new().from_env(&ctx);
 
     // Create request builder
-    let builder = Builder::new();
+    let builder = RequestSigner::new();
 
     // Create the signer
     let signer = Signer::new(ctx.clone(), loader, builder);
@@ -173,8 +173,8 @@ async fn main() -> Result<()> {
         .with_account_name(account_name)
         .with_sas_token("sv=2021-12-02&ss=b&srt=sco&sp=rwdlacx&se=2024-12-31T23:59:59Z&..."); // Your SAS token
 
-    let sas_loader = DefaultLoader::new().from_env(&ctx);
-    let sas_signer = Signer::new(ctx.clone(), sas_loader, Builder::new());
+    let sas_loader = DefaultCredentialProvider::new().from_env(&ctx);
+    let sas_signer = Signer::new(ctx.clone(), sas_loader, RequestSigner::new());
 
     let url_with_sas = format!(
         "https://{}.blob.core.windows.net/{}?comp=list&restype=container",

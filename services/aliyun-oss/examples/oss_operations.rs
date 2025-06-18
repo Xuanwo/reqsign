@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqsign_aliyun_oss::{Builder, Config, DefaultLoader};
+use reqsign_aliyun_oss::{Config, DefaultCredentialProvider, RequestSigner};
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -39,11 +39,11 @@ async fn main() -> Result<()> {
     }
 
     // Create credential loader
-    let loader = DefaultLoader::new(std::sync::Arc::new(config));
+    let loader = DefaultCredentialProvider::new(std::sync::Arc::new(config));
 
     // Create request builder
     let bucket = "my-bucket"; // Replace with your bucket name
-    let builder = Builder::new(bucket);
+    let builder = RequestSigner::new(bucket);
 
     // Create the signer
     let signer = Signer::new(ctx, loader, builder);

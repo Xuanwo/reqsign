@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqsign_aws_v4::{Builder, Config, DefaultLoader};
+use reqsign_aws_v4::{Config, DefaultCredentialProvider, RequestSigner};
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -30,10 +30,10 @@ async fn main() -> Result<()> {
     }
 
     // Create credential loader
-    let loader = DefaultLoader::new(std::sync::Arc::new(config));
+    let loader = DefaultCredentialProvider::new(std::sync::Arc::new(config));
 
     // Create request builder for S3 in us-east-1
-    let builder = Builder::new("s3", "us-east-1");
+    let builder = RequestSigner::new("s3", "us-east-1");
 
     // Create the signer
     let signer = Signer::new(ctx, loader, builder);

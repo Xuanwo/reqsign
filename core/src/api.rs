@@ -18,9 +18,9 @@ impl<T: SigningCredential> SigningCredential for Option<T> {
     }
 }
 
-/// ProvideCredential is the trait used by signer to load the key from the environment.
+/// ProvideCredential is the trait used by signer to load the credential from the environment.
 ///`
-/// Service may require different key to sign the request, for example, AWS require
+/// Service may require different credential to sign the request, for example, AWS require
 /// access key and secret key, while Google Cloud Storage require token.
 #[async_trait::async_trait]
 pub trait ProvideCredential: Debug + Send + Sync + Unpin + 'static {

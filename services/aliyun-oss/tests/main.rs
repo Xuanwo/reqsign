@@ -9,7 +9,7 @@ use http::Request;
 use http::StatusCode;
 use log::{debug, warn};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use reqsign_aliyun_oss::{Builder, Config, DefaultLoader};
+use reqsign_aliyun_oss::{Config, DefaultCredentialProvider, RequestSigner};
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -42,8 +42,8 @@ async fn init_signer() -> Option<(Context, Signer<reqsign_aliyun_oss::Credential
     let bucket =
         env::var("REQSIGN_ALIYUN_OSS_BUCKET").expect("env REQSIGN_ALIYUN_OSS_BUCKET must set");
 
-    let loader = DefaultLoader::new(Arc::new(config));
-    let builder = Builder::new(&bucket);
+    let loader = DefaultCredentialProvider::new(Arc::new(config));
+    let builder = RequestSigner::new(&bucket);
     let signer = Signer::new(context.clone(), loader, builder);
 
     Some((context, signer))

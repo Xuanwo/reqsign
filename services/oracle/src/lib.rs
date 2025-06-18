@@ -9,8 +9,8 @@ pub use config::Config;
 mod credential;
 pub use credential::Credential;
 
-mod build;
-pub use build::Builder;
+mod sign_request;
+pub use sign_request::RequestSigner;
 
-pub mod load;
-pub use load::{ConfigLoader, DefaultLoader};
+pub mod provide_credential;
+pub use provide_credential::{ConfigCredentialProvider, DefaultCredentialProvider};

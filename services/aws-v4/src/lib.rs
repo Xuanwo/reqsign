@@ -13,7 +13,7 @@
 //! ## Quick Start
 //!
 //! ```no_run
-//! use reqsign_aws_v4::{Builder, Config, DefaultLoader};
+//! use reqsign_aws_v4::{RequestSigner, Config, DefaultCredentialProvider};
 //! use reqsign_core::{Context, Signer};
 //! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -30,10 +30,10 @@
 //!     let config = Config::default();
 //!
 //!     // Create credential loader
-//!     let loader = DefaultLoader::new(config.into());
+//!     let loader = DefaultCredentialProvider::new(config.into());
 //!
 //!     // Create request builder for S3
-//!     let builder = Builder::new("s3", "us-east-1");
+//!     let builder = RequestSigner::new("s3", "us-east-1");
 //!
 //!     // Create the signer
 //!     let signer = Signer::new(ctx, loader, builder);
@@ -99,10 +99,10 @@ mod config;
 pub use config::Config;
 mod credential;
 pub use credential::Credential;
-mod build;
-pub use build::Builder;
-mod load;
-pub use load::*;
+mod sign_request;
+pub use sign_request::RequestSigner;
+mod provide_credential;
+pub use provide_credential::*;
 
 pub const EMPTY_STRING_SHA256: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";

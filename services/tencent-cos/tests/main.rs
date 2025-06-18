@@ -13,7 +13,7 @@ use percent_encoding::NON_ALPHANUMERIC;
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
-use reqsign_tencent_cos::{Builder, Config, Credential, DefaultLoader};
+use reqsign_tencent_cos::{Config, Credential, DefaultCredentialProvider, RequestSigner};
 
 async fn init_signer() -> Option<Signer<Credential>> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -35,9 +35,9 @@ async fn init_signer() -> Option<Signer<Credential>> {
         ),
         ..Default::default()
     };
-    let loader = DefaultLoader::new(config);
+    let loader = DefaultCredentialProvider::new(config);
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
-    let signer = Signer::new(ctx, loader, Builder::new());
+    let signer = Signer::new(ctx, loader, RequestSigner::new());
 
     Some(signer)
 }

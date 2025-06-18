@@ -10,8 +10,8 @@ use criterion::criterion_group;
 use criterion::criterion_main;
 use criterion::Criterion;
 use once_cell::sync::Lazy;
-use reqsign_aws_v4::Builder as AwsV4Builder;
 use reqsign_aws_v4::Credential as AwsCredential;
+use reqsign_aws_v4::RequestSigner as AwsV4RequestSigner;
 use reqsign_core::{Context, SignRequest};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -37,7 +37,7 @@ pub fn bench(c: &mut Criterion) {
             ..Default::default()
         };
 
-        let s = AwsV4Builder::new("s3", "test");
+        let s = AwsV4RequestSigner::new("s3", "test");
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
         b.to_async(&*RUNTIME).iter(|| async {

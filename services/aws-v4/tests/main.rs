@@ -11,8 +11,8 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign_aws_v4::{AssumeRoleLoader, Config};
-use reqsign_aws_v4::{Builder, DefaultLoader};
+use reqsign_aws_v4::{AssumeRoleCredentialProvider, Config};
+use reqsign_aws_v4::{DefaultCredentialProvider, RequestSigner};
 use reqsign_core::{Context, ProvideCredential, SignRequest, Signer, StaticEnv};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -21,7 +21,7 @@ use sha2::Digest;
 use sha2::Sha256;
 use tokio::fs;
 
-async fn init_default_loader() -> Option<(Context, DefaultLoader, Builder)> {
+async fn init_default_loader() -> Option<(Context, DefaultCredentialProvider, RequestSigner)> {
     let _ = env_logger::builder().is_test(true).try_init();
     let _ = dotenv::dotenv();
 
@@ -50,9 +50,9 @@ async fn init_default_loader() -> Option<(Context, DefaultLoader, Builder)> {
 
     let region = config.region.as_deref().unwrap().to_string();
 
-    let loader = DefaultLoader::new(config.into());
+    let loader = DefaultCredentialProvider::new(config.into());
 
-    let builder = Builder::new(
+    let builder = RequestSigner::new(
         &env::var("REQSIGN_AWS_V4_SERVICE").expect("env REQSIGN_AWS_V4_SERVICE must set"),
         &region,
     );
@@ -372,9 +372,9 @@ async fn test_signer_with_web_loader() -> Result<()> {
     });
 
     let config = Config::default().from_env(&context);
-    let loader = DefaultLoader::new(config.into());
+    let loader = DefaultCredentialProvider::new(config.into());
 
-    let builder = Builder::new("s3", &region);
+    let builder = RequestSigner::new("s3", &region);
 
     let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
     let mut req = Request::new("");
@@ -460,11 +460,11 @@ async fn test_signer_with_web_loader_assume_role() -> Result<()> {
     };
     let cfg: Arc<Config> = cfg.from_env(&context).into();
 
-    let default_loader = DefaultLoader::new(cfg.clone());
+    let default_loader = DefaultCredentialProvider::new(cfg.clone());
     let sts_signer = Signer::new(
         context.clone(),
         default_loader,
-        Builder::new("sts", &region),
+        RequestSigner::new("sts", &region),
     );
 
     let cfg = Config {
@@ -473,10 +473,10 @@ async fn test_signer_with_web_loader_assume_role() -> Result<()> {
         sts_regional_endpoints: "regional".to_string(),
         ..Default::default()
     };
-    let loader =
-        AssumeRoleLoader::new(cfg.into(), sts_signer).expect("AssumeRoleLoader must be valid");
+    let loader = AssumeRoleCredentialProvider::new(cfg.into(), sts_signer)
+        .expect("AssumeRoleCredentialProvider must be valid");
 
-    let builder = Builder::new("s3", &region);
+    let builder = RequestSigner::new("s3", &region);
     let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
     let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;

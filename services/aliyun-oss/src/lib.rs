@@ -12,7 +12,7 @@
 //! ## Quick Start
 //!
 //! ```no_run
-//! use reqsign_aliyun_oss::{Builder, Config, DefaultLoader};
+//! use reqsign_aliyun_oss::{RequestSigner, Config, DefaultCredentialProvider};
 //! use reqsign_core::{Context, Signer};
 //! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -31,10 +31,10 @@
 //!     config.access_key_secret = Some("your-access-key-secret".to_string());
 //!
 //!     // Create credential loader
-//!     let loader = DefaultLoader::new(config.into());
+//!     let loader = DefaultCredentialProvider::new(config.into());
 //!
 //!     // Create request builder
-//!     let builder = Builder::new("bucket");
+//!     let builder = RequestSigner::new("bucket");
 //!
 //!     // Create the signer
 //!     let signer = Signer::new(ctx, loader, builder);
@@ -114,14 +114,14 @@
 //! ### STS AssumeRole
 //!
 //! ```no_run
-//! use reqsign_aliyun_oss::{Config, AssumeRoleWithOidcLoader};
+//! use reqsign_aliyun_oss::{Config, AssumeRoleWithOidcCredentialProvider};
 //!
 //! let mut config = Config::default();
 //! config.role_arn = Some("acs:ram::123456789012:role/MyRole".to_string());
 //! config.oidc_provider_arn = Some("acs:ram::123456789012:oidc-provider/MyProvider".to_string());
 //! config.oidc_token_file = Some("/var/run/secrets/token".to_string());
 //!
-//! let loader = AssumeRoleWithOidcLoader::new(config.into());
+//! let loader = AssumeRoleWithOidcCredentialProvider::new(config.into());
 //! ```
 //!
 //! ### Custom Endpoints
@@ -153,8 +153,8 @@ pub use config::Config;
 mod credential;
 pub use credential::Credential;
 
-mod build;
-pub use build::Builder;
+mod sign_request;
+pub use sign_request::RequestSigner;
 
-mod load;
-pub use load::*;
+mod provide_credential;
+pub use provide_credential::*;
