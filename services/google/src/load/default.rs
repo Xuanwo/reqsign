@@ -8,8 +8,7 @@ use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
 use crate::credential::{Credential, CredentialFile};
 
 use super::{
-    AuthorizedUserLoader, ExternalAccountLoader, ImpersonatedServiceAccountLoader,
-    VmMetadataLoader,
+    AuthorizedUserLoader, ExternalAccountLoader, ImpersonatedServiceAccountLoader, VmMetadataLoader,
 };
 
 /// DefaultLoader tries to load credentials from multiple sources in order.

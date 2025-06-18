@@ -68,9 +68,7 @@ impl ExternalAccountLoader {
             external_account::Source::File(source) => {
                 self.load_file_sourced_token(ctx, source).await
             }
-            external_account::Source::Url(source) => {
-                self.load_url_sourced_token(ctx, source).await
-            }
+            external_account::Source::Url(source) => self.load_url_sourced_token(ctx, source).await,
         }
     }
 

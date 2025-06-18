@@ -78,7 +78,7 @@ pub struct ExternalAccount {
 /// External account specific types.
 pub mod external_account {
     use serde::Deserialize;
-    
+
     /// Where to obtain the external account credentials from.
     #[derive(Clone, Deserialize, Debug)]
     #[serde(untagged)]
@@ -90,7 +90,7 @@ pub mod external_account {
         #[serde(rename_all = "snake_case")]
         File(FileSource),
     }
-    
+
     /// Configuration for fetching credentials from a URL.
     #[derive(Clone, Deserialize, Debug)]
     #[serde(rename_all = "snake_case")]
@@ -102,7 +102,7 @@ pub mod external_account {
         /// Optional headers to include in the request.
         pub headers: Option<std::collections::HashMap<String, String>>,
     }
-    
+
     /// Configuration for reading credentials from a file.
     #[derive(Clone, Deserialize, Debug)]
     #[serde(rename_all = "snake_case")]
@@ -112,7 +112,7 @@ pub mod external_account {
         /// The format of the file.
         pub format: Format,
     }
-    
+
     /// Format for parsing credentials.
     #[derive(Clone, Deserialize, Debug)]
     #[serde(tag = "type", rename_all = "snake_case")]
@@ -125,7 +125,7 @@ pub mod external_account {
         /// Plain text format.
         Text,
     }
-    
+
     impl Format {
         /// Parse a slice of bytes as the expected format.
         pub fn parse(&self, slice: &[u8]) -> anyhow::Result<String> {
@@ -143,7 +143,7 @@ pub mod external_account {
             }
         }
     }
-    
+
     /// Service account impersonation options.
     #[derive(Clone, Deserialize, Debug)]
     #[serde(rename_all = "snake_case")]
@@ -259,8 +259,7 @@ pub enum CredentialFile {
 impl CredentialFile {
     /// Parse credential file from bytes.
     pub fn from_slice(v: &[u8]) -> anyhow::Result<Self> {
-        serde_json::from_slice(v)
-            .map_err(|e| anyhow!("failed to parse credential file: {}", e))
+        serde_json::from_slice(v).map_err(|e| anyhow!("failed to parse credential file: {}", e))
     }
 
     /// Parse credential file from base64-encoded content.
