@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::credential::{AuthorizedUser, Credential, Token};
+use crate::credential::{Credential, OAuth2Credentials, Token};
 
 /// OAuth2 refresh token request.
 #[derive(Serialize)]
@@ -28,13 +28,13 @@ struct RefreshTokenResponse {
 /// AuthorizedUserLoader exchanges OAuth2 user credentials for access tokens.
 #[derive(Debug, Clone)]
 pub struct AuthorizedUserLoader {
-    authorized_user: AuthorizedUser,
+    oauth2_credentials: OAuth2Credentials,
 }
 
 impl AuthorizedUserLoader {
     /// Create a new AuthorizedUserLoader.
-    pub fn new(_config: Config, authorized_user: AuthorizedUser) -> Self {
-        Self { authorized_user }
+    pub fn new(_config: Config, oauth2_credentials: OAuth2Credentials) -> Self {
+        Self { oauth2_credentials }
     }
 }
 
@@ -47,9 +47,9 @@ impl ProvideCredential for AuthorizedUserLoader {
 
         let req_body = RefreshTokenRequest {
             grant_type: "refresh_token",
-            refresh_token: self.authorized_user.refresh_token.clone(),
-            client_id: self.authorized_user.client_id.clone(),
-            client_secret: self.authorized_user.client_secret.clone(),
+            refresh_token: self.oauth2_credentials.refresh_token.clone(),
+            client_id: self.oauth2_credentials.client_id.clone(),
+            client_secret: self.oauth2_credentials.client_secret.clone(),
         };
 
         let body = serde_json::to_vec(&req_body)?;
