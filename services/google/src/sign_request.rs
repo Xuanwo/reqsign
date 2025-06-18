@@ -12,8 +12,8 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use reqsign_core::{
-    hash::hex_sha256, time::*, Context, SignRequest, SigningCredential,
-    SigningMethod, SigningRequest,
+    hash::hex_sha256, time::*, Context, SignRequest, SigningCredential, SigningMethod,
+    SigningRequest,
 };
 
 use crate::config::Config;
