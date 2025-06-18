@@ -16,7 +16,7 @@
 //!
 //! ```no_run
 //! use anyhow::Result;
-//! use reqsign_azure_storage::{Config, DefaultLoader, Builder};
+//! use reqsign_azure_storage::{Config, DefaultCredentialProvider, Builder};
 //! use reqsign_core::{Context, Signer};
 //! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -31,10 +31,10 @@
 //!     );
 //!
 //!     // Create credential loader (will try multiple methods)
-//!     let loader = DefaultLoader::new();
+//!     let loader = DefaultCredentialProvider::new();
 //!
 //!     // Create request builder
-//!     let builder = Builder::new();
+//!     let builder = RequestSigner::new();
 //!
 //!     // Create the signer
 //!     let signer = Signer::new(ctx, loader, builder);
@@ -75,10 +75,10 @@
 //! automatically uses managed identity:
 //!
 //! ```no_run
-//! use reqsign_azure_storage::{Config, DefaultLoader};
+//! use reqsign_azure_storage::{Config, DefaultCredentialProvider};
 //!
 //! // Create loader that will try managed identity
-//! let loader = DefaultLoader::new();
+//! let loader = DefaultCredentialProvider::new();
 //! ```
 //!
 //! ## Storage Services
@@ -147,8 +147,8 @@ pub use config::Config;
 mod credential;
 pub use credential::Credential;
 
-mod build;
-pub use build::Builder;
+mod sign_request;
+pub use sign_request::RequestSigner;
 
-mod load;
-pub use load::*;
+mod provide_credential;
+pub use provide_credential::*;
