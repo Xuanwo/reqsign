@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::credential::{ImpersonatedServiceAccount, Token};
+use crate::credential::{Credential, ImpersonatedServiceAccount, Token};
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
 const MAX_LIFETIME: Duration = Duration::from_secs(3600);
@@ -181,7 +181,7 @@ impl ImpersonatedServiceAccountLoader {
 
 #[async_trait::async_trait]
 impl ProvideCredential for ImpersonatedServiceAccountLoader {
-    type Credential = Token;
+    type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // First get bearer token using OAuth2 refresh
@@ -190,6 +190,6 @@ impl ProvideCredential for ImpersonatedServiceAccountLoader {
         // Then exchange for impersonated access token
         let access_token = self.generate_access_token(ctx, &bearer_token).await?;
 
-        Ok(Some(access_token))
+        Ok(Some(Credential::with_token(access_token)))
     }
 }

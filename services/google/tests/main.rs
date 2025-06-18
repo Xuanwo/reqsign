@@ -30,8 +30,8 @@ async fn init_signer() -> Option<(Context, Signer<Credential>)> {
         .with_scope(scope)
         .with_service("storage");
 
-    let loader = DefaultLoader::new(config);
-    let builder = Builder::new("storage");
+    let loader = DefaultLoader::new(config.clone());
+    let builder = Builder::with_config("storage", config);
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
     let signer = Signer::new(ctx.clone(), loader, builder);
@@ -55,8 +55,8 @@ async fn init_signer_for_signed_url() -> Option<(Context, Signer<Credential>)> {
         .with_credential_content(credential_content)
         .with_service("storage");
 
-    let loader = DefaultLoader::new(config);
-    let builder = Builder::new("storage");
+    let loader = DefaultLoader::new(config.clone());
+    let builder = Builder::with_config("storage", config);
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
     let signer = Signer::new(ctx.clone(), loader, builder);
