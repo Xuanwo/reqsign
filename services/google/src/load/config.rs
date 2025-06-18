@@ -5,9 +5,12 @@ use reqsign_core::{Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
-use crate::credential::RawCredential;
+use crate::credential::{Credential, RawCredential};
 
-/// ConfigLoader loads credentials from the configuration.
+/// ConfigLoader loads service account credentials from configuration.
+/// 
+/// This loader only returns service account credentials. Other credential types
+/// (external account, impersonated service account) should be loaded by DefaultLoader.
 #[derive(Debug, Clone)]
 pub struct ConfigLoader {
     config: Config,
@@ -80,34 +83,31 @@ impl ConfigLoader {
 
 #[async_trait::async_trait]
 impl ProvideCredential for ConfigLoader {
-    type Credential = RawCredential;
+    type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        // Try content first
-        if let Some(content) = &self.config.credential_content {
-            if let Ok(Some(cred)) = self.load_from_content(content).await {
-                return Ok(Some(cred));
-            }
-        }
+        let raw_cred = if let Some(content) = &self.config.credential_content {
+            // Try content first
+            self.load_from_content(content).await?
+        } else if let Some(path) = &self.config.credential_path {
+            // Try explicit path
+            self.load_from_path(ctx, path).await?
+        } else if let Ok(Some(cred)) = self.load_from_env(ctx).await {
+            // Try environment variable
+            Some(cred)
+        } else if let Ok(Some(cred)) = self.load_from_well_known_location(ctx).await {
+            // Try well-known location
+            Some(cred)
+        } else {
+            None
+        };
 
-        // Try explicit path
-        if let Some(path) = &self.config.credential_path {
-            if let Ok(Some(cred)) = self.load_from_path(ctx, path).await {
-                return Ok(Some(cred));
-            }
-        }
-
-        // Try environment variable
-        if let Ok(Some(cred)) = self.load_from_env(ctx).await {
-            return Ok(Some(cred));
-        }
-
-        // Try well-known location
-        if let Ok(Some(cred)) = self.load_from_well_known_location(ctx).await {
-            return Ok(Some(cred));
-        }
-
-        Ok(None)
+        // Convert RawCredential to Credential
+        // ConfigLoader only returns service account credentials
+        Ok(raw_cred.and_then(|raw| {
+            raw.service_account
+                .map(Credential::with_service_account)
+        }))
     }
 }
 
@@ -150,8 +150,8 @@ mod tests {
         assert!(cred.is_some());
 
         let cred = cred.unwrap();
-        assert!(cred.service_account.is_some());
-        let sa = cred.service_account.unwrap();
+        assert!(cred.has_service_account());
+        let sa = cred.service_account.as_ref().unwrap();
         assert_eq!("test-234@test.iam.gserviceaccount.com", &sa.client_email);
     }
 
@@ -193,15 +193,8 @@ mod tests {
             .provide_credential(&ctx)
             .await
             .expect("load must succeed");
-        assert!(cred.is_some());
-
-        let cred = cred.unwrap();
-        assert!(cred.external_account.is_some());
-        let ea = cred.external_account.unwrap();
-        assert_eq!(
-            "//iam.googleapis.com/projects/000000000000/locations/global/workloadIdentityPools/reqsign/providers/reqsign-provider",
-            &ea.audience
-        );
+        // ConfigLoader only returns service accounts, so external account should return None
+        assert!(cred.is_none());
     }
 
     #[tokio::test]
@@ -219,14 +212,7 @@ mod tests {
             .provide_credential(&ctx)
             .await
             .expect("load must succeed");
-        assert!(cred.is_some());
-
-        let cred = cred.unwrap();
-        assert!(cred.impersonated_service_account.is_some());
-        let isa = cred.impersonated_service_account.unwrap();
-        assert_eq!(
-            "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/example-01-iam@example-01.iam.gserviceaccount.com:generateAccessToken",
-            &isa.service_account_impersonation_url
-        );
+        // ConfigLoader only returns service accounts, so impersonated service account should return None
+        assert!(cred.is_none());
     }
 }

@@ -1,27 +1,63 @@
 use anyhow::Result;
 use http::header;
+use jsonwebtoken::{Algorithm, EncodingKey, Header as JwtHeader};
 use log::debug;
 use percent_encoding::{percent_decode_str, utf8_percent_encode};
 use rand::thread_rng;
 use rsa::pkcs1v15::SigningKey;
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::signature::RandomizedSigner;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::time::Duration;
 
 use reqsign_core::{
-    hash::hex_sha256, time::*, Context, SignRequest as SignRequestTrait, SigningMethod,
-    SigningRequest,
+    hash::hex_sha256, time::*, Context, SignRequest as SignRequestTrait, SigningCredential,
+    SigningMethod, SigningRequest,
 };
 
+use crate::config::Config;
 use crate::constants::{GOOG_QUERY_ENCODE_SET, GOOG_URI_ENCODE_SET};
 use crate::credential::{Credential, ServiceAccount, Token};
+
+/// Claims is used to build JWT for Google Cloud.
+#[derive(Debug, Serialize)]
+struct Claims {
+    iss: String,
+    scope: String,
+    aud: String,
+    exp: u64,
+    iat: u64,
+}
+
+impl Claims {
+    fn new(client_email: &str, scope: &str) -> Self {
+        let current = now().timestamp() as u64;
+
+        Claims {
+            iss: client_email.to_string(),
+            scope: scope.to_string(),
+            aud: "https://oauth2.googleapis.com/token".to_string(),
+            exp: current + 3600,
+            iat: current,
+        }
+    }
+}
+
+/// OAuth2 token response.
+#[derive(Deserialize)]
+struct TokenResponse {
+    access_token: String,
+    #[serde(default)]
+    expires_in: Option<u64>,
+}
 
 /// Builder for Google service requests.
 #[derive(Debug)]
 pub struct Builder {
     service: String,
     region: String,
+    config: Config,
 }
 
 impl Default for Builder {
@@ -29,6 +65,7 @@ impl Default for Builder {
         Self {
             service: String::new(),
             region: "auto".to_string(),
+            config: Config::default(),
         }
     }
 }
@@ -39,6 +76,16 @@ impl Builder {
         Self {
             service: service.into(),
             region: "auto".to_string(),
+            config: Config::default(),
+        }
+    }
+
+    /// Create a new builder with the specified service and config.
+    pub fn with_config(service: impl Into<String>, config: Config) -> Self {
+        Self {
+            service: service.into(),
+            region: "auto".to_string(),
+            config,
         }
     }
 
@@ -46,6 +93,56 @@ impl Builder {
     pub fn with_region(mut self, region: impl Into<String>) -> Self {
         self.region = region.into();
         self
+    }
+
+    /// Exchange a service account for an access token.
+    /// 
+    /// This method is used internally when a token is needed but only a service account
+    /// is available. It creates a JWT and exchanges it for an OAuth2 access token.
+    async fn exchange_token(&self, ctx: &Context, sa: &ServiceAccount) -> Result<Token> {
+        let scope = self
+            .config
+            .scope
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("scope is required for token exchange"))?;
+
+        debug!("exchanging service account for token with scope: {}", scope);
+
+        // Create JWT
+        let jwt = jsonwebtoken::encode(
+            &JwtHeader::new(Algorithm::RS256),
+            &Claims::new(&sa.client_email, scope),
+            &EncodingKey::from_rsa_pem(sa.private_key.as_bytes())?,
+        )?;
+
+        // Exchange JWT for access token
+        let body = format!(
+            "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={}",
+            jwt
+        );
+        let req = http::Request::builder()
+            .method(http::Method::POST)
+            .uri("https://oauth2.googleapis.com/token")
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(body.into_bytes().into())?;
+
+        let resp = ctx.http_send(req).await?;
+
+        if resp.status() != http::StatusCode::OK {
+            let body = String::from_utf8_lossy(resp.body());
+            anyhow::bail!("exchange token failed: {}", body);
+        }
+
+        let token_resp: TokenResponse = serde_json::from_slice(resp.body())?;
+
+        let expires_at = token_resp.expires_in.map(|expires_in| {
+            now() + chrono::TimeDelta::try_seconds(expires_in as i64).expect("in bounds")
+        });
+
+        Ok(Token {
+            access_token: token_resp.access_token,
+            expires_at,
+        })
     }
 
     fn build_token_auth(
@@ -140,24 +237,37 @@ impl SignRequestTrait for Builder {
     ) -> Result<()> {
         let cred = credential.ok_or_else(|| anyhow::anyhow!("missing credential"))?;
 
-        let signing_req = match (cred, expires_in) {
-            (Credential::Token(token), None) => {
-                // Use token authentication
-                self.build_token_auth(req, token)?
-            }
-            (Credential::ServiceAccount(sa), Some(expires)) => {
-                // Use signed query for service account with expiration
+        let signing_req = match expires_in {
+            // Query signing - must use ServiceAccount
+            Some(expires) => {
+                let sa = cred
+                    .service_account
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("service account required for query signing"))?;
                 self.build_signed_query(ctx, req, sa, expires)?
             }
-            (Credential::ServiceAccount(_), None) => {
-                return Err(anyhow::anyhow!(
-                    "service account requires expires_in for signing"
-                ));
-            }
-            (Credential::Token(_), Some(_)) => {
-                return Err(anyhow::anyhow!(
-                    "token authentication does not support expires_in"
-                ));
+            // Header authentication - prefer valid token, otherwise exchange from SA
+            None => {
+                // Check if we have a valid token
+                if let Some(token) = &cred.token {
+                    if token.is_valid() {
+                        self.build_token_auth(req, token)?
+                    } else if let Some(sa) = &cred.service_account {
+                        // Token expired but we have SA, exchange for new token
+                        debug!("token expired, exchanging service account for new token");
+                        let new_token = self.exchange_token(ctx, sa).await?;
+                        self.build_token_auth(req, &new_token)?
+                    } else {
+                        return Err(anyhow::anyhow!("token expired and no service account available"));
+                    }
+                } else if let Some(sa) = &cred.service_account {
+                    // No token but have SA, exchange for token
+                    debug!("no token available, exchanging service account for token");
+                    let token = self.exchange_token(ctx, sa).await?;
+                    self.build_token_auth(req, &token)?
+                } else {
+                    return Err(anyhow::anyhow!("no valid credential available"));
+                }
             }
         };
 

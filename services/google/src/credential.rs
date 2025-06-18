@@ -183,21 +183,57 @@ impl KeyTrait for Token {
     }
 }
 
-/// Credential represents different types of Google credentials.
-#[derive(Clone, Debug)]
-pub enum Credential {
-    /// Service account with private key.
-    ServiceAccount(ServiceAccount),
-    /// OAuth2 access token.
-    Token(Token),
+/// Credential represents Google credentials that may contain both service account and token.
+/// 
+/// This unified credential type allows for flexible authentication strategies:
+/// - Service account only: Used for signed URL generation
+/// - Token only: Used for Bearer authentication  
+/// - Both: Allows automatic token refresh when token expires
+#[derive(Clone, Debug, Default)]
+pub struct Credential {
+    /// Service account information, if available.
+    pub service_account: Option<ServiceAccount>,
+    /// OAuth2 access token, if available.
+    pub token: Option<Token>,
+}
+
+impl Credential {
+    /// Create a credential with only a service account.
+    pub fn with_service_account(service_account: ServiceAccount) -> Self {
+        Self {
+            service_account: Some(service_account),
+            token: None,
+        }
+    }
+
+    /// Create a credential with only a token.
+    pub fn with_token(token: Token) -> Self {
+        Self {
+            service_account: None,
+            token: Some(token),
+        }
+    }
+
+    /// Check if the credential has a service account.
+    pub fn has_service_account(&self) -> bool {
+        self.service_account.is_some()
+    }
+
+    /// Check if the credential has a token.
+    pub fn has_token(&self) -> bool {
+        self.token.is_some()
+    }
+
+    /// Check if the credential has a valid token.
+    pub fn has_valid_token(&self) -> bool {
+        self.token.as_ref().is_some_and(|t| t.is_valid())
+    }
 }
 
 impl KeyTrait for Credential {
     fn is_valid(&self) -> bool {
-        match self {
-            Credential::ServiceAccount(_) => true, // Service accounts don't expire
-            Credential::Token(token) => token.is_valid(),
-        }
+        // A credential is valid if it has a service account or a valid token
+        self.service_account.is_some() || self.has_valid_token()
     }
 }
 
@@ -314,25 +350,56 @@ mod tests {
 
     #[test]
     fn test_credential_is_valid() {
-        // Service account is always valid
-        let cred = Credential::ServiceAccount(ServiceAccount {
+        // Service account only
+        let cred = Credential::with_service_account(ServiceAccount {
             client_email: "test@example.com".to_string(),
             private_key: "key".to_string(),
         });
         assert!(cred.is_valid());
+        assert!(cred.has_service_account());
+        assert!(!cred.has_token());
 
-        // Valid token
-        let cred = Credential::Token(Token {
+        // Valid token only
+        let cred = Credential::with_token(Token {
             access_token: "test".to_string(),
             expires_at: Some(now() + chrono::TimeDelta::try_hours(1).unwrap()),
         });
         assert!(cred.is_valid());
+        assert!(!cred.has_service_account());
+        assert!(cred.has_token());
+        assert!(cred.has_valid_token());
 
-        // Invalid token
-        let cred = Credential::Token(Token {
+        // Invalid token only
+        let cred = Credential::with_token(Token {
             access_token: String::new(),
             expires_at: None,
         });
         assert!(!cred.is_valid());
+        assert!(!cred.has_valid_token());
+
+        // Both service account and valid token
+        let mut cred = Credential::with_service_account(ServiceAccount {
+            client_email: "test@example.com".to_string(),
+            private_key: "key".to_string(),
+        });
+        cred.token = Some(Token {
+            access_token: "test".to_string(),
+            expires_at: Some(now() + chrono::TimeDelta::try_hours(1).unwrap()),
+        });
+        assert!(cred.is_valid());
+        assert!(cred.has_service_account());
+        assert!(cred.has_valid_token());
+
+        // Service account with expired token
+        let mut cred = Credential::with_service_account(ServiceAccount {
+            client_email: "test@example.com".to_string(),
+            private_key: "key".to_string(),
+        });
+        cred.token = Some(Token {
+            access_token: "test".to_string(),
+            expires_at: Some(now() - chrono::TimeDelta::try_hours(1).unwrap()),
+        });
+        assert!(cred.is_valid()); // Still valid because of service account
+        assert!(!cred.has_valid_token());
     }
 }

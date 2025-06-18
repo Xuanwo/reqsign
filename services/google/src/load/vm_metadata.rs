@@ -5,7 +5,7 @@ use serde::Deserialize;
 use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
-use crate::credential::Token;
+use crate::credential::{Credential, Token};
 
 /// VM metadata token response.
 #[derive(Deserialize)]
@@ -29,7 +29,7 @@ impl VmMetadataLoader {
 
 #[async_trait::async_trait]
 impl ProvideCredential for VmMetadataLoader {
-    type Credential = Token;
+    type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         let scope = self
@@ -70,9 +70,11 @@ impl ProvideCredential for VmMetadataLoader {
         let expires_at = now()
             + chrono::TimeDelta::try_seconds(token_resp.expires_in as i64).expect("in bounds");
 
-        Ok(Some(Token {
+        let token = Token {
             access_token: token_resp.access_token,
             expires_at: Some(expires_at),
-        }))
+        };
+
+        Ok(Some(Credential::with_token(token)))
     }
 }

@@ -4,9 +4,6 @@ pub use config::ConfigLoader;
 mod default;
 pub use default::DefaultLoader;
 
-mod service_account;
-pub use service_account::ServiceAccountLoader;
-
 mod external_account;
 pub use external_account::ExternalAccountLoader;
 

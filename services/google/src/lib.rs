@@ -14,5 +14,5 @@ pub use build::Builder;
 mod load;
 pub use load::{
     ConfigLoader, DefaultLoader, ExternalAccountLoader, ImpersonatedServiceAccountLoader,
-    ServiceAccountLoader, VmMetadataLoader,
+    VmMetadataLoader,
 };

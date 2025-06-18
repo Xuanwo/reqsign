@@ -9,7 +9,7 @@ use reqsign_core::{time::now, Context, ProvideCredential};
 
 use crate::config::Config;
 use crate::credential::{
-    CredentialSource, ExternalAccount, FileSourcedCredential, Token, UrlSourcedCredential,
+    Credential, CredentialSource, ExternalAccount, FileSourcedCredential, Token, UrlSourcedCredential,
 };
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
@@ -213,7 +213,7 @@ impl ExternalAccountLoader {
 
 #[async_trait::async_trait]
 impl ProvideCredential for ExternalAccountLoader {
-    type Credential = Token;
+    type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Load OIDC token from source
@@ -223,13 +223,15 @@ impl ProvideCredential for ExternalAccountLoader {
         let sts_token = self.exchange_sts_token(ctx, &oidc_token).await?;
 
         // Try to impersonate service account if configured
-        if let Some(token) = self
+        let final_token = if let Some(token) = self
             .impersonate_service_account(ctx, &sts_token.access_token)
             .await?
         {
-            Ok(Some(token))
+            token
         } else {
-            Ok(Some(sts_token))
-        }
+            sts_token
+        };
+
+        Ok(Some(Credential::with_token(final_token)))
     }
 }
