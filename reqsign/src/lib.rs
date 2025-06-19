@@ -3,9 +3,9 @@
 
 pub use reqsign_core::*;
 
-#[cfg(feature = "default-context")]
+#[cfg(all(feature = "default-context", not(target_arch = "wasm32")))]
 mod context;
-#[cfg(feature = "default-context")]
+#[cfg(all(feature = "default-context", not(target_arch = "wasm32")))]
 pub use context::DefaultContext;
 
 #[cfg(feature = "aliyun")]

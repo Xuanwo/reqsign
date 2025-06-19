@@ -31,23 +31,20 @@ reqsign-http-send-reqwest = { version = "0.1", path = "../context/http-send-reqw
 anyhow = { version = "1.0", optional = true }
 async-trait = { version = "0.1", optional = true }
 bytes = { version = "1", optional = true }
-home = { version = "0.5", optional = true }
 http = { version = "1", optional = true }
-reqwest = { version = "0.12", optional = true, default-features = false }
-tokio = { version = "1", optional = true, features = ["fs"] }
+reqwest = { version = "0.12", optional = true, default-features = false, features = ["json"] }
+tokio = { version = "1", optional = true, features = [] }
 
 [features]
 default = ["default-context"]
 default-context = [
-  "dep:reqsign-file-read-tokio",
-  "dep:reqsign-http-send-reqwest",
   "dep:anyhow",
   "dep:async-trait",
   "dep:bytes",
-  "dep:home",
   "dep:http",
   "dep:reqwest",
   "dep:tokio",
+  "dep:home",
 ]
 
 # Service features
@@ -64,6 +61,9 @@ full = ["aliyun", "aws", "azure", "google", "huaweicloud", "oracle", "tencent"]
 
 # Advanced features for custom context implementations
 custom-context = []
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+home = { version = "0.5", optional = true }
 
 [dev-dependencies]
 env_logger = "0.11"

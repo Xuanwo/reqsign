@@ -4,8 +4,10 @@ use bytes::Bytes;
 use reqsign_core::{Env, FileRead, HttpSend};
 use reqwest::Client;
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
 use std::env;
 use std::path::PathBuf;
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::fs;
 
 #[derive(Debug, Default, Clone)]
@@ -25,10 +27,19 @@ impl DefaultContext {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
 impl FileRead for DefaultContext {
     async fn file_read(&self, path: &str) -> Result<Vec<u8>> {
         Ok(fs::read(path).await?)
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[async_trait]
+impl FileRead for DefaultContext {
+    async fn file_read(&self, _path: &str) -> Result<Vec<u8>> {
+        Err(anyhow::anyhow!("File reading is not supported on WASM"))
     }
 }
 
@@ -66,14 +77,36 @@ impl HttpSend for DefaultContext {
 
 impl Env for DefaultContext {
     fn var(&self, key: &str) -> Option<String> {
-        env::var(key).ok()
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            env::var(key).ok()
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            _ = key;
+            None
+        }
     }
 
     fn vars(&self) -> HashMap<String, String> {
-        env::vars().collect()
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            env::vars().collect()
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            HashMap::new()
+        }
     }
 
     fn home_dir(&self) -> Option<PathBuf> {
-        home::home_dir()
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            home::home_dir()
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            None
+        }
     }
 }

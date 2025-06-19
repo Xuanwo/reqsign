@@ -99,3 +99,18 @@ reqsign = { version = "0.17", default-features = false, features = ["aws", "cust
 ```
 
 Then implement the `Context`, `FileRead`, `HttpSend`, and `Env` traits for your custom context type.
+
+## WASM Support
+
+This crate supports WebAssembly (WASM) targets. However, the `default-context` feature is not available on WASM due to platform limitations. When targeting WASM, you should:
+
+1. Disable default features
+2. Use the existing context implementations from `reqsign-file-read-tokio` and `reqsign-http-send-reqwest` crates
+3. Or implement your own WASM-compatible context
+
+Example for WASM:
+```toml
+[dependencies]
+reqsign = { version = "0.17", default-features = false, features = ["aws"] }
+reqsign-http-send-reqwest = "0.1"
+```
