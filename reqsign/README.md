@@ -34,30 +34,42 @@ reqsign = { version = "0.17", default-features = false, features = ["aws", "defa
 
 ## Example
 
-```rust
+```rust,ignore
 use anyhow::Result;
-use reqsign::{AwsDefaultLoader, AwsV4Signer, DefaultContext};
-use reqwest::Request;
+use reqsign::aws::{Config, DefaultCredentialProvider, RequestSigner};
+use reqsign::{Context, DefaultContext, Signer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Create a default context
-    let ctx = DefaultContext::new();
+    // Create a default context implementation
+    let ctx_impl = DefaultContext::new();
+    
+    // Create a Context from the implementation
+    let ctx = Context::new(ctx_impl.clone(), ctx_impl.clone()).with_env(ctx_impl.clone());
+    
+    // Configure AWS credential loading
+    let config = Config::default();
+    let loader = DefaultCredentialProvider::new(config.into());
+    
+    // Create signer for S3
+    let builder = RequestSigner::new("s3", "us-east-1");
+    let signer = Signer::new(ctx.clone(), loader, builder);
     
     // Build and sign a request
-    let req = Request::new(
-        http::Method::GET,
-        "https://s3.amazonaws.com/my-bucket/my-object".parse()?,
-    );
+    let mut req = http::Request::builder()
+        .method(http::Method::GET)
+        .uri("https://s3.amazonaws.com/my-bucket/my-object")
+        .body(())
+        .unwrap()
+        .into_parts()
+        .0;
     
-    // Load credentials and create signer  
-    let loader = AwsDefaultLoader::new(ctx.clone());
-    let signer = AwsV4Signer::new("s3", "us-east-1");
-    let (req, cred) = signer.sign(req, &ctx, loader).await?.into_parts();
+    signer.sign(&mut req, None).await?;
     
     // Execute the signed request
-    let resp = ctx.http_send(req).await?;
-    println!("Response: {:?}", resp.status());
+    let signed_req = http::Request::from_parts(req, bytes::Bytes::new());
+    let resp = ctx.http_send(signed_req).await?;
+    println!("Response status: {}", resp.status());
     
     Ok(())
 }
