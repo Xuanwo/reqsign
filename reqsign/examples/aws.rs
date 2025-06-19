@@ -8,7 +8,7 @@ async fn main() -> Result<()> {
 
     // Create a default context implementation
     let ctx_impl = DefaultContext::new();
-    
+
     // Create a Context from the implementation
     let ctx = Context::new(ctx_impl.clone(), ctx_impl.clone()).with_env(ctx_impl.clone());
 

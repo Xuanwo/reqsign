@@ -40,27 +40,26 @@ impl HttpSend for DefaultContext {
         let uri = req.uri().to_string();
         let headers = req.headers().clone();
         let body = req.into_body();
-        
+
         let mut reqwest_req = self.client.request(method, uri);
         reqwest_req = reqwest_req.headers(headers);
         reqwest_req = reqwest_req.body(body);
-        
+
         let reqwest_resp = reqwest_req.send().await?;
-        
+
         // Convert reqwest::Response to http::Response
         let status = reqwest_resp.status();
         let headers = reqwest_resp.headers().clone();
         let body = reqwest_resp.bytes().await?;
-        
-        let mut http_resp = http::Response::builder()
-            .status(status);
-        
+
+        let mut http_resp = http::Response::builder().status(status);
+
         for (k, v) in headers {
             if let Some(name) = k {
                 http_resp = http_resp.header(name, v);
             }
         }
-        
+
         Ok(http_resp.body(body)?)
     }
 }
@@ -78,4 +77,3 @@ impl Env for DefaultContext {
         home::home_dir()
     }
 }
-
