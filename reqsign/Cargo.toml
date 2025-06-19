@@ -6,9 +6,9 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+categories = ["authentication", "web-programming::http-client"]
 description = "Signing HTTP requests for AWS, Azure, Google, Huawei, Aliyun, Tencent and Oracle services"
 keywords = ["http", "requests", "signing", "aws", "azure"]
-categories = ["authentication", "web-programming::http-client"]
 
 [dependencies]
 # Core functionality (always included)
@@ -38,7 +38,17 @@ tokio = { version = "1", optional = true, features = ["fs"] }
 
 [features]
 default = ["default-context"]
-default-context = ["dep:reqsign-file-read-tokio", "dep:reqsign-http-send-reqwest", "dep:anyhow", "dep:async-trait", "dep:bytes", "dep:home", "dep:http", "dep:reqwest", "dep:tokio"]
+default-context = [
+  "dep:reqsign-file-read-tokio",
+  "dep:reqsign-http-send-reqwest",
+  "dep:anyhow",
+  "dep:async-trait",
+  "dep:bytes",
+  "dep:home",
+  "dep:http",
+  "dep:reqwest",
+  "dep:tokio",
+]
 
 # Service features
 aliyun = ["dep:reqsign-aliyun-oss"]
