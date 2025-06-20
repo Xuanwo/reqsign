@@ -148,7 +148,7 @@ pub use context::HttpSend;
 pub use context::StaticEnv;
 
 mod api;
-pub use api::{ProvideCredential, SignRequest, SigningCredential};
+pub use api::{ProvideCredential, ProvideCredentialChain, SignRequest, SigningCredential};
 mod request;
 pub use request::{SigningMethod, SigningRequest};
 mod signer;

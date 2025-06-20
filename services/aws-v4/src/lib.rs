@@ -74,6 +74,8 @@
 //!
 //! ## Advanced Configuration
 //!
+//! ### Using Config
+//!
 //! ```no_run
 //! use reqsign_aws_v4::Config;
 //!
@@ -85,6 +87,25 @@
 //! config.profile = "production".to_string();
 //! // Or assume a role
 //! config.role_arn = Some("arn:aws:iam::123456789012:role/MyRole".to_string());
+//! ```
+//!
+//! ### Custom Credential Provider Chain
+//!
+//! You can create a custom credential provider chain to control the order and sources
+//! of credential loading:
+//!
+//! ```no_run
+//! use reqsign_aws_v4::{ProvideCredentialChain, ConfigCredentialProvider, IMDSv2CredentialProvider};
+//! use std::sync::Arc;
+//!
+//! # async fn example() {
+//! let config = Arc::new(reqsign_aws_v4::Config::default());
+//!
+//! // Create a custom chain with specific order
+//! let chain = ProvideCredentialChain::new()
+//!     .push(ConfigCredentialProvider::new(config.clone()))
+//!     .push(IMDSv2CredentialProvider::new(config));
+//! # }
 //! ```
 //!
 //! ## Examples
@@ -103,6 +124,9 @@ mod sign_request;
 pub use sign_request::RequestSigner;
 mod provide_credential;
 pub use provide_credential::*;
+
+// Re-export ProvideCredentialChain from core for convenience
+pub use reqsign_core::ProvideCredentialChain;
 
 pub const EMPTY_STRING_SHA256: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";

@@ -62,3 +62,136 @@ pub trait SignRequest: Debug + Send + Sync + Unpin + 'static {
         expires_in: Option<Duration>,
     ) -> anyhow::Result<()>;
 }
+
+/// A chain of credential providers that will be tried in order.
+///
+/// This is a generic implementation that can be used by any service to chain multiple
+/// credential providers together. The chain will try each provider in order until one
+/// returns credentials or all providers have been exhausted.
+///
+/// # Example
+///
+/// ```no_run
+/// use reqsign_core::{ProvideCredentialChain, Context, ProvideCredential};
+/// use async_trait::async_trait;
+///
+/// #[derive(Debug)]
+/// struct MyCredential {
+///     token: String,
+/// }
+///
+/// #[derive(Debug)]
+/// struct EnvironmentProvider;
+///
+/// #[async_trait]
+/// impl ProvideCredential for EnvironmentProvider {
+///     type Credential = MyCredential;
+///     
+///     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+///         // Implementation
+///         Ok(None)
+///     }
+/// }
+///
+/// # async fn example(ctx: Context) {
+/// let chain = ProvideCredentialChain::new()
+///     .push(EnvironmentProvider);
+///     
+/// let credentials = chain.provide_credential(&ctx).await;
+/// # }
+/// ```
+pub struct ProvideCredentialChain<C> {
+    providers: Vec<Box<dyn ProvideCredential<Credential = C>>>,
+}
+
+impl<C> ProvideCredentialChain<C>
+where
+    C: Send + Sync + Unpin + 'static,
+{
+    /// Create a new empty credential provider chain.
+    pub fn new() -> Self {
+        Self {
+            providers: Vec::new(),
+        }
+    }
+
+    /// Add a credential provider to the chain.
+    pub fn push(mut self, provider: impl ProvideCredential<Credential = C> + 'static) -> Self {
+        self.providers.push(Box::new(provider));
+        self
+    }
+
+    /// Create a credential provider chain from a vector of providers.
+    pub fn from_vec(providers: Vec<Box<dyn ProvideCredential<Credential = C>>>) -> Self {
+        Self { providers }
+    }
+
+    /// Get the number of providers in the chain.
+    pub fn len(&self) -> usize {
+        self.providers.len()
+    }
+
+    /// Check if the chain is empty.
+    pub fn is_empty(&self) -> bool {
+        self.providers.is_empty()
+    }
+}
+
+impl<C> Default for ProvideCredentialChain<C>
+where
+    C: Send + Sync + Unpin + 'static,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<C> Debug for ProvideCredentialChain<C>
+where
+    C: Send + Sync + Unpin + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProvideCredentialChain")
+            .field("providers_count", &self.providers.len())
+            .finish()
+    }
+}
+
+#[async_trait::async_trait]
+impl<C> ProvideCredential for ProvideCredentialChain<C>
+where
+    C: Send + Sync + Unpin + 'static,
+{
+    type Credential = C;
+
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+        for provider in &self.providers {
+            log::debug!("Trying credential provider: {:?}", provider);
+
+            match provider.provide_credential(ctx).await {
+                Ok(Some(cred)) => {
+                    log::debug!(
+                        "Successfully loaded credential from provider: {:?}",
+                        provider
+                    );
+                    return Ok(Some(cred));
+                }
+                Ok(None) => {
+                    log::debug!("No credential found in provider: {:?}", provider);
+                    continue;
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Error loading credential from provider {:?}: {:?}",
+                        provider,
+                        e
+                    );
+                    // Continue to next provider on error
+                    continue;
+                }
+            }
+        }
+
+        Ok(None)
+    }
+}

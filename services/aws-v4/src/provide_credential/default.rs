@@ -4,7 +4,7 @@ use crate::provide_credential::{
 };
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
 use std::sync::Arc;
 
 /// DefaultCredentialProvider is a loader that will try to load credential via default chains.
@@ -18,24 +18,20 @@ use std::sync::Arc;
 /// 5. EC2 IMDSv2
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
-    config_loader: ConfigCredentialProvider,
-    assume_role_with_web_identity_loader: AssumeRoleWithWebIdentityCredentialProvider,
-    imds_v2_loader: IMDSv2CredentialProvider,
+    chain: ProvideCredentialChain<Credential>,
 }
 
 impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
     pub fn new(config: Arc<Config>) -> Self {
-        let config_loader = ConfigCredentialProvider::new(config.clone());
-        let assume_role_with_web_identity_loader =
-            AssumeRoleWithWebIdentityCredentialProvider::new(config.clone());
-        let imds_v2_loader = IMDSv2CredentialProvider::new(config.clone());
+        let chain = ProvideCredentialChain::new()
+            .push(ConfigCredentialProvider::new(config.clone()))
+            .push(AssumeRoleWithWebIdentityCredentialProvider::new(
+                config.clone(),
+            ))
+            .push(IMDSv2CredentialProvider::new(config));
 
-        Self {
-            config_loader,
-            assume_role_with_web_identity_loader,
-            imds_v2_loader,
-        }
+        Self { chain }
     }
 }
 
@@ -44,23 +40,7 @@ impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
-        if let Some(cred) = self.config_loader.provide_credential(ctx).await? {
-            return Ok(Some(cred));
-        }
-
-        if let Some(cred) = self
-            .assume_role_with_web_identity_loader
-            .provide_credential(ctx)
-            .await?
-        {
-            return Ok(Some(cred));
-        }
-
-        if let Some(cred) = self.imds_v2_loader.provide_credential(ctx).await? {
-            return Ok(Some(cred));
-        }
-
-        Ok(None)
+        self.chain.provide_credential(ctx).await
     }
 }
 
