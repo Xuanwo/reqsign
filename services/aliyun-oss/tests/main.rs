@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Result;
+use reqsign_core::Result;
 use http::header::CONTENT_LENGTH;
 use http::Request;
 use http::StatusCode;
@@ -77,13 +77,13 @@ async fn test_get_object() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
-        .expect("request must succeed");
+        .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
     let status = resp.status();
     debug!("got response: {:?}", resp);
-    debug!("got response content: {}", resp.text().await?);
+    debug!("got response content: {}", resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to get response text").with_source(anyhow::Error::new(e)))?);
     assert_eq!(StatusCode::NOT_FOUND, status);
     Ok(())
 }
@@ -127,13 +127,13 @@ async fn test_delete_objects() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
-        .expect("request must succeed");
+        .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
     let status = resp.status();
     debug!("got response: {:?}", resp);
-    debug!("got response content: {}", resp.text().await?);
+    debug!("got response content: {}", resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to get response text").with_source(anyhow::Error::new(e)))?);
     assert_eq!(StatusCode::OK, status);
     Ok(())
 }
@@ -166,13 +166,13 @@ async fn test_get_object_with_query_sign() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
-        .expect("request must succeed");
+        .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
     let status = resp.status();
     debug!("got response: {:?}", resp);
-    debug!("got response content: {}", resp.text().await?);
+    debug!("got response content: {}", resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to get response text").with_source(anyhow::Error::new(e)))?);
     assert_eq!(StatusCode::NOT_FOUND, status);
     Ok(())
 }
@@ -209,9 +209,9 @@ async fn test_head_object_with_special_characters() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
-        .expect("request must success");
+        .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -252,13 +252,13 @@ async fn test_put_object_with_special_characters() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
-        .expect("request must success");
+        .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
     let status = resp.status();
     debug!("got response: {:?}", resp);
-    debug!("got response content: {:?}", resp.text().await?);
+    debug!("got response content: {:?}", resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to get response text").with_source(anyhow::Error::new(e)))?);
     assert_eq!(StatusCode::OK, status);
     Ok(())
 }
@@ -292,13 +292,13 @@ async fn test_list_bucket() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
-        .expect("request must success");
+        .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
     let status = resp.status();
     debug!("got response: {:?}", resp);
-    debug!("got response content: {}", resp.text().await?);
+    debug!("got response content: {}", resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to get response text").with_source(anyhow::Error::new(e)))?);
     assert_eq!(StatusCode::OK, status);
     Ok(())
 }
@@ -335,13 +335,13 @@ async fn test_list_bucket_with_invalid_token() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
-        .expect("request must success");
+        .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
     let status = resp.status();
     debug!("got response: {:?}", resp);
-    debug!("got response content: {}", resp.text().await?);
+    debug!("got response content: {}", resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to get response text").with_source(anyhow::Error::new(e)))?);
     assert_eq!(StatusCode::BAD_REQUEST, status);
     Ok(())
 }

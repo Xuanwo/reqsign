@@ -47,7 +47,7 @@ impl SignRequest for RequestSigner {
         req: &mut Parts,
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
-    ) -> anyhow::Result<()> {
+    ) -> reqsign_core::Result<()> {
         let Some(cred) = credential else {
             return Ok(());
         };

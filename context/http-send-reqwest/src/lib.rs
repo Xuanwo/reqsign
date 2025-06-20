@@ -87,7 +87,7 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use http_body_util::BodyExt;
-use reqsign_core::HttpSend;
+use reqsign_core::{Error, HttpSend, Result};
 use reqwest::{Client, Request};
 
 /// Reqwest-based implementation of the `HttpSend` trait.
@@ -125,12 +125,27 @@ impl ReqwestHttpSend {
 
 #[async_trait]
 impl HttpSend for ReqwestHttpSend {
-    async fn http_send(&self, req: http::Request<Bytes>) -> anyhow::Result<http::Response<Bytes>> {
-        let req = Request::try_from(req)?;
-        let resp: http::Response<_> = self.client.execute(req).await?.into();
+    async fn http_send(&self, req: http::Request<Bytes>) -> Result<http::Response<Bytes>> {
+        let req = Request::try_from(req).map_err(|e| {
+            Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e))
+        })?;
+        let resp: http::Response<_> = self
+            .client
+            .execute(req)
+            .await
+            .map_err(|e| {
+                Error::unexpected("failed to send HTTP request").with_source(anyhow::Error::new(e))
+            })?
+            .into();
 
         let (parts, body) = resp.into_parts();
-        let bs = BodyExt::collect(body).await.map(|buf| buf.to_bytes())?;
+        let bs = BodyExt::collect(body)
+            .await
+            .map(|buf| buf.to_bytes())
+            .map_err(|e| {
+                Error::unexpected("failed to collect response body")
+                    .with_source(anyhow::Error::new(e))
+            })?;
         Ok(http::Response::from_parts(parts, bs))
     }
 }

@@ -58,13 +58,14 @@ impl ImdsCredentialProvider {
 impl ProvideCredential for ImdsCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         let token = get_access_token("https://storage.azure.com/", self, ctx).await?;
 
         let expires_on = if token.expires_on.is_empty() {
             reqsign_core::time::now() + chrono::TimeDelta::try_minutes(10).expect("in bounds")
         } else {
-            reqsign_core::time::parse_rfc3339(&token.expires_on)?
+            reqsign_core::time::parse_rfc3339(&token.expires_on)
+                .map_err(|e| reqsign_core::Error::unexpected("failed to parse expires_on time").with_source(e))?
         };
 
         Ok(Some(Credential::with_bearer_token(
@@ -84,7 +85,7 @@ async fn get_access_token(
     resource: &str,
     loader: &ImdsCredentialProvider,
     ctx: &Context,
-) -> anyhow::Result<AccessTokenResponse> {
+) -> reqsign_core::Result<AccessTokenResponse> {
     let endpoint = loader
         .endpoint
         .as_deref()
@@ -111,20 +112,20 @@ async fn get_access_token(
         req = req.header("X-IDENTITY-HEADER", msi_secret);
     }
 
-    let req = req.body(bytes::Bytes::new())?;
+    let req = req.body(bytes::Bytes::new())
+        .map_err(|e| reqsign_core::Error::unexpected("failed to build IMDS request").with_source(e))?;
 
     let resp = ctx.http_send(req).await?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let body = String::from_utf8_lossy(resp.body());
-        return Err(anyhow::anyhow!(
-            "IMDS request failed with status {}: {}",
-            status,
-            body
+        return Err(reqsign_core::Error::unexpected(
+            format!("IMDS request failed with status {}: {}", status, body)
         ));
     }
 
-    let token: AccessTokenResponse = serde_json::from_slice(resp.body())?;
+    let token: AccessTokenResponse = serde_json::from_slice(resp.body())
+        .map_err(|e| reqsign_core::Error::unexpected("failed to parse IMDS response").with_source(e))?;
     Ok(token)
 }

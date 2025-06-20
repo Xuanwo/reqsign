@@ -30,7 +30,7 @@ impl DefaultCredentialProvider {
 impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         self.chain.provide_credential(ctx).await
     }
 }
@@ -51,7 +51,7 @@ impl EnvCredentialProvider {
 impl ProvideCredential for EnvCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         // Get environment config
         let env_config = Config::from_env(ctx);
         let config = self.config.as_ref();
@@ -99,7 +99,7 @@ impl ConfigFileCredentialProvider {
 impl ProvideCredential for ConfigFileCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         // Determine config file path
         let config_file = self
             .config
@@ -110,7 +110,7 @@ impl ProvideCredential for ConfigFileCredentialProvider {
         // Expand home directory if needed
         let expanded_path = ctx
             .expand_home_dir(config_file)
-            .ok_or_else(|| anyhow::anyhow!("Failed to expand home directory"))?;
+            .ok_or_else(|| reqsign_core::Error::unexpected("Failed to expand home directory"))?;
 
         // Try to read the file - if it doesn't exist, return None
         let content = match ctx.file_read_as_string(&expanded_path).await {
@@ -129,7 +129,8 @@ impl ProvideCredential for ConfigFileCredentialProvider {
             .unwrap_or(ORACLE_DEFAULT_PROFILE);
 
         // Parse INI content
-        let ini = ini::Ini::read_from(&mut content.as_bytes())?;
+        let ini = ini::Ini::read_from(&mut content.as_bytes())
+            .map_err(|e| reqsign_core::Error::config_invalid(format!("Failed to parse config file: {}", e)))?;
         let section = match ini.section(Some(profile)) {
             Some(section) => section,
             None => {
@@ -151,7 +152,7 @@ impl ProvideCredential for ConfigFileCredentialProvider {
                 // Expand key file path if it starts with ~
                 let expanded_key_file = if key_file.starts_with('~') {
                     ctx.expand_home_dir(key_file)
-                        .ok_or_else(|| anyhow::anyhow!("Failed to expand home directory"))?
+                        .ok_or_else(|| reqsign_core::Error::unexpected("Failed to expand home directory"))?
                 } else {
                     key_file.to_string()
                 };

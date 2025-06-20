@@ -31,7 +31,7 @@ where
 {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         info!("Attempting to load credentials from: {}", self.name);
 
         match self.inner.provide_credential(ctx).await {
@@ -55,7 +55,7 @@ where
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> reqsign_core::Result<()> {
     env_logger::init();
 
     // Create context

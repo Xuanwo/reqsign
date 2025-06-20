@@ -19,7 +19,7 @@
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //!
 //! #[tokio::main]
-//! async fn main() -> anyhow::Result<()> {
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create context
 //!     let ctx = Context::new(
 //!         TokioFileRead::default(),
@@ -104,7 +104,7 @@
 //! impl ProvideCredential for MyCredentialProvider {
 //!     type Credential = Credential;
 //!     
-//!     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+//!     async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
 //!         // Your custom credential loading logic
 //!         Ok(None)
 //!     }

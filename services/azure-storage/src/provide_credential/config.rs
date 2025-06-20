@@ -39,7 +39,7 @@ impl ConfigCredentialProvider {
 impl ProvideCredential for ConfigCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         // Check SAS token first
         if let Some(sas_token) = &self.sas_token {
             if !sas_token.is_empty() {

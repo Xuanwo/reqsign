@@ -1,5 +1,5 @@
 use crate::constants::*;
-use anyhow::Result;
+use reqsign_core::Result;
 use ini::Ini;
 use reqsign_core::utils::Redact;
 use reqsign_core::Context;
@@ -55,10 +55,11 @@ impl Config {
     /// Load config from Oracle config file.
     pub async fn from_config_file(ctx: &Context, path: &str, profile: &str) -> Result<Self> {
         let content = ctx.file_read_as_string(path).await?;
-        let ini = Ini::read_from(&mut content.as_bytes())?;
+        let ini = Ini::read_from(&mut content.as_bytes())
+            .map_err(|e| reqsign_core::Error::config_invalid(format!("Failed to parse config file: {}", e)))?;
         let section = ini
             .section(Some(profile))
-            .ok_or_else(|| anyhow::anyhow!("Profile {} not found in config file", profile))?;
+            .ok_or_else(|| reqsign_core::Error::config_invalid(format!("Profile {} not found in config file", profile)))?;
 
         Ok(Self {
             user: section.get("user").map(|s| s.to_string()),

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use log::debug;
 
 use reqsign_core::{Context, ProvideCredential};
@@ -22,7 +21,7 @@ impl ConfigCredentialProvider {
         Self { config }
     }
 
-    async fn load_from_path(&self, ctx: &Context, path: &str) -> Result<Option<CredentialFile>> {
+    async fn load_from_path(&self, ctx: &Context, path: &str) -> reqsign_core::Result<Option<CredentialFile>> {
         let content = ctx.file_read(path).await.map_err(|err| {
             debug!("load credential from path {path} failed: {err:?}");
             err
@@ -36,7 +35,7 @@ impl ConfigCredentialProvider {
         Ok(Some(cred))
     }
 
-    async fn load_from_content(&self, content: &str) -> Result<Option<CredentialFile>> {
+    async fn load_from_content(&self, content: &str) -> reqsign_core::Result<Option<CredentialFile>> {
         let cred = CredentialFile::from_base64(content).map_err(|err| {
             debug!("parse credential from content failed: {err:?}");
             err
@@ -45,7 +44,7 @@ impl ConfigCredentialProvider {
         Ok(Some(cred))
     }
 
-    async fn load_from_env(&self, ctx: &Context) -> Result<Option<CredentialFile>> {
+    async fn load_from_env(&self, ctx: &Context) -> reqsign_core::Result<Option<CredentialFile>> {
         if self.config.disable_env {
             return Ok(None);
         }
@@ -57,7 +56,7 @@ impl ConfigCredentialProvider {
         self.load_from_path(ctx, &path).await
     }
 
-    async fn load_from_well_known_location(&self, ctx: &Context) -> Result<Option<CredentialFile>> {
+    async fn load_from_well_known_location(&self, ctx: &Context) -> reqsign_core::Result<Option<CredentialFile>> {
         if self.config.disable_well_known_location {
             return Ok(None);
         }
@@ -85,7 +84,7 @@ impl ConfigCredentialProvider {
 impl ProvideCredential for ConfigCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         let cred_file = if let Some(content) = &self.config.credential_content {
             // Try content first
             self.load_from_content(content).await?

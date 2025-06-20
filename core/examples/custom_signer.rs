@@ -1,4 +1,4 @@
-use anyhow::Result;
+use reqsign_core::Result;
 use async_trait::async_trait;
 use http::request::Parts;
 use reqsign_core::{Context, ProvideCredential, SignRequest, Signer, SigningCredential};

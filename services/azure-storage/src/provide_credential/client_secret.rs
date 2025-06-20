@@ -52,7 +52,7 @@ impl ClientSecretCredentialProvider {
 impl ProvideCredential for ClientSecretCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         // Check if all required parameters are available
         let tenant_id = match &self.tenant_id {
             Some(id) if !id.is_empty() => id,
@@ -106,7 +106,7 @@ async fn get_client_secret_token(
     client_secret: &str,
     authority_host: &str,
     ctx: &Context,
-) -> anyhow::Result<Option<ClientSecretTokenResponse>> {
+) -> reqsign_core::Result<Option<ClientSecretTokenResponse>> {
     let url = format!(
         "{}/{}/oauth2/v2.0/token",
         authority_host.trim_end_matches('/'),
@@ -124,20 +124,20 @@ async fn get_client_secret_token(
         .method(http::Method::POST)
         .uri(&url)
         .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(bytes::Bytes::from(body))?;
+        .body(bytes::Bytes::from(body))
+        .map_err(|e| reqsign_core::Error::unexpected("failed to build client secret request").with_source(e))?;
 
     let resp = ctx.http_send(req).await?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let body = String::from_utf8_lossy(resp.body());
-        return Err(anyhow::anyhow!(
-            "Client secret request failed with status {}: {}",
-            status,
-            body
+        return Err(reqsign_core::Error::unexpected(
+            format!("Client secret request failed with status {}: {}", status, body)
         ));
     }
 
-    let token: ClientSecretTokenResponse = serde_json::from_slice(resp.body())?;
+    let token: ClientSecretTokenResponse = serde_json::from_slice(resp.body())
+        .map_err(|e| reqsign_core::Error::unexpected("failed to parse client secret response").with_source(e))?;
     Ok(Some(token))
 }

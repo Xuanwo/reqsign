@@ -58,7 +58,7 @@ impl SignRequest for RequestSigner {
         req: &mut Parts,
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
-    ) -> anyhow::Result<()> {
+    ) -> reqsign_core::Result<()> {
         let now = self.time.unwrap_or_else(now);
         let mut signed_req = SigningRequest::build(req)?;
 
@@ -98,10 +98,18 @@ impl SignRequest for RequestSigner {
         // <hashed_canonical_request>
         let string_to_sign = {
             let mut f = String::new();
-            writeln!(f, "AWS4-HMAC-SHA256")?;
-            writeln!(f, "{}", format_iso8601(now))?;
-            writeln!(f, "{}", &scope)?;
-            write!(f, "{}", &encoded_req)?;
+            writeln!(f, "AWS4-HMAC-SHA256").map_err(|e| {
+                reqsign_core::Error::unexpected(format!("failed to write algorithm: {}", e))
+            })?;
+            writeln!(f, "{}", format_iso8601(now)).map_err(|e| {
+                reqsign_core::Error::unexpected(format!("failed to write timestamp: {}", e))
+            })?;
+            writeln!(f, "{}", &scope).map_err(|e| {
+                reqsign_core::Error::unexpected(format!("failed to write scope: {}", e))
+            })?;
+            write!(f, "{}", &encoded_req).map_err(|e| {
+                reqsign_core::Error::unexpected(format!("failed to write encoded request: {}", e))
+            })?;
             f
         };
         debug!("calculated string to sign: {string_to_sign}");
@@ -119,7 +127,13 @@ impl SignRequest for RequestSigner {
                 scope,
                 signed_req.header_name_to_vec_sorted().join(";"),
                 signature
-            ))?;
+            ))
+            .map_err(|e| {
+                reqsign_core::Error::unexpected(format!(
+                    "failed to create authorization header: {}",
+                    e
+                ))
+            })?;
             authorization.set_sensitive(true);
 
             signed_req
@@ -132,19 +146,23 @@ impl SignRequest for RequestSigner {
     }
 }
 
-fn canonical_request_string(ctx: &mut SigningRequest) -> anyhow::Result<String> {
+fn canonical_request_string(ctx: &mut SigningRequest) -> reqsign_core::Result<String> {
     // 256 is specially chosen to avoid reallocation for most requests.
     let mut f = String::with_capacity(256);
 
     // Insert method
-    writeln!(f, "{}", ctx.method)?;
+    writeln!(f, "{}", ctx.method)
+        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write method: {}", e)))?;
     // Insert encoded path
-    let path = percent_decode_str(&ctx.path).decode_utf8()?;
+    let path = percent_decode_str(&ctx.path)
+        .decode_utf8()
+        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to decode path: {}", e)))?;
     writeln!(
         f,
         "{}",
         utf8_percent_encode(&path, &super::constants::AWS_URI_ENCODE_SET)
-    )?;
+    )
+    .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write encoded path: {}", e)))?;
     // Insert query
     writeln!(
         f,
@@ -154,7 +172,8 @@ fn canonical_request_string(ctx: &mut SigningRequest) -> anyhow::Result<String> 
             .map(|(k, v)| { format!("{k}={v}") })
             .collect::<Vec<_>>()
             .join("&")
-    )?;
+    )
+    .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write query: {}", e)))?;
     // Insert signed headers
     let signed_headers = ctx.header_name_to_vec_sorted();
     for header in signed_headers.iter() {
@@ -164,15 +183,30 @@ fn canonical_request_string(ctx: &mut SigningRequest) -> anyhow::Result<String> 
             "{}:{}",
             header,
             value.to_str().expect("header value must be valid")
-        )?;
+        )
+        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write header: {}", e)))?;
     }
-    writeln!(f)?;
-    writeln!(f, "{}", signed_headers.join(";"))?;
+    writeln!(f)
+        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write newline: {}", e)))?;
+    writeln!(f, "{}", signed_headers.join(";")).map_err(|e| {
+        reqsign_core::Error::unexpected(format!("failed to write signed headers: {}", e))
+    })?;
 
     if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
-        write!(f, "UNSIGNED-PAYLOAD")?;
+        write!(f, "UNSIGNED-PAYLOAD").map_err(|e| {
+            reqsign_core::Error::unexpected(format!("failed to write unsigned payload: {}", e))
+        })?;
     } else {
-        write!(f, "{}", ctx.headers[X_AMZ_CONTENT_SHA_256].to_str()?)?;
+        write!(
+            f,
+            "{}",
+            ctx.headers[X_AMZ_CONTENT_SHA_256].to_str().map_err(|e| {
+                reqsign_core::Error::unexpected(format!("invalid header value: {}", e))
+            })?
+        )
+        .map_err(|e| {
+            reqsign_core::Error::unexpected(format!("failed to write content sha256: {}", e))
+        })?;
     }
 
     Ok(f)
@@ -183,7 +217,7 @@ fn canonicalize_header(
     cred: &Credential,
     expires_in: Option<Duration>,
     now: DateTime,
-) -> anyhow::Result<()> {
+) -> reqsign_core::Result<()> {
     // Header names and values need to be normalized according to Step 4 of https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
     for (_, value) in ctx.headers.iter_mut() {
         SigningRequest::header_value_normalize(value)
@@ -191,14 +225,23 @@ fn canonicalize_header(
 
     // Insert HOST header if not present.
     if ctx.headers.get(header::HOST).is_none() {
-        ctx.headers
-            .insert(header::HOST, ctx.authority.as_str().parse()?);
+        ctx.headers.insert(
+            header::HOST,
+            ctx.authority.as_str().parse().map_err(|e| {
+                reqsign_core::Error::unexpected(format!(
+                    "failed to parse authority as header value: {}",
+                    e
+                ))
+            })?,
+        );
     }
 
     if expires_in.is_none() {
         // Insert DATE header if not present.
         if ctx.headers.get(X_AMZ_DATE).is_none() {
-            let date_header = HeaderValue::try_from(format_iso8601(now))?;
+            let date_header = HeaderValue::try_from(format_iso8601(now)).map_err(|e| {
+                reqsign_core::Error::unexpected(format!("failed to create date header: {}", e))
+            })?;
             ctx.headers.insert(X_AMZ_DATE, date_header);
         }
 
@@ -212,7 +255,12 @@ fn canonicalize_header(
 
         // Insert X_AMZ_SECURITY_TOKEN header if security token exists.
         if let Some(token) = &cred.session_token {
-            let mut value = HeaderValue::from_str(token)?;
+            let mut value = HeaderValue::from_str(token).map_err(|e| {
+                reqsign_core::Error::unexpected(format!(
+                    "failed to create security token header: {}",
+                    e
+                ))
+            })?;
             // Set token value sensitive to valid leaking.
             value.set_sensitive(true);
 
@@ -230,7 +278,7 @@ fn canonicalize_query(
     now: DateTime,
     service: &str,
     region: &str,
-) -> anyhow::Result<()> {
+) -> reqsign_core::Result<()> {
     if let Some(expire) = expires_in {
         ctx.query
             .push(("X-Amz-Algorithm".into(), "AWS4-HMAC-SHA256".into()));

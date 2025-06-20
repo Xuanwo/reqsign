@@ -1,4 +1,4 @@
-use crate::Context;
+use crate::{Context, Result};
 use std::fmt::Debug;
 use std::time::Duration;
 
@@ -30,7 +30,7 @@ pub trait ProvideCredential: Debug + Send + Sync + Unpin + 'static {
     type Credential: Send + Sync + Unpin + 'static;
 
     /// Load signing credential from current env.
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>>;
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>>;
 }
 
 /// SignRequest is the trait used by signer to build the signing request.
@@ -60,7 +60,7 @@ pub trait SignRequest: Debug + Send + Sync + Unpin + 'static {
         req: &mut http::request::Parts,
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
-    ) -> anyhow::Result<()>;
+    ) -> Result<()>;
 }
 
 /// A chain of credential providers that will be tried in order.
@@ -87,7 +87,7 @@ pub trait SignRequest: Debug + Send + Sync + Unpin + 'static {
 /// impl ProvideCredential for EnvironmentProvider {
 ///     type Credential = MyCredential;
 ///     
-///     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+///     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
 ///         // Implementation
 ///         Ok(None)
 ///     }
@@ -164,7 +164,7 @@ where
 {
     type Credential = C;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         for provider in &self.providers {
             log::debug!("Trying credential provider: {:?}", provider);
 

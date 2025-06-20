@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::fmt::Write;
 use std::time::Duration;
 
-use anyhow::Result;
+use reqsign_core::Result;
 use http::header::AUTHORIZATION;
 use http::header::CONTENT_TYPE;
 use http::header::DATE;
@@ -62,7 +62,7 @@ impl SignRequest for RequestSigner {
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
     ) -> Result<()> {
-        let k = credential.ok_or_else(|| anyhow::anyhow!("missing credential"))?;
+        let k = credential.ok_or_else(|| reqsign_core::Error::credential_invalid("missing credential"))?;
         let now = self.time.unwrap_or_else(now);
         let method = if expires_in.is_some() {
             SigningMethod::Query(expires_in.unwrap())
@@ -132,7 +132,8 @@ fn string_to_sign(
     let mut s = String::new();
     s.write_str(ctx.method.as_str())?;
     s.write_str("\n")?;
-    s.write_str(ctx.header_get_or_default(&CONTENT_MD5.parse()?)?)?;
+    s.write_str(ctx.header_get_or_default(&CONTENT_MD5.parse()
+        .map_err(|e| reqsign_core::Error::unexpected(format!("Invalid header name: {}", e)))?)?)?;
     s.write_str("\n")?;
     s.write_str(ctx.header_get_or_default(&CONTENT_TYPE)?)?;
     s.write_str("\n")?;
@@ -279,7 +280,7 @@ mod tests {
     use std::str::FromStr;
     use std::sync::Arc;
 
-    use anyhow::Result;
+    use reqsign_core::Result;
     use chrono::Utc;
     use http::header::HeaderName;
     use http::Uri;

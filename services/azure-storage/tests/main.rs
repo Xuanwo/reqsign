@@ -71,9 +71,9 @@ async fn test_head_blob() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
-        .expect("request must success");
+        .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -110,9 +110,9 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
-        .expect("request must success");
+        .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
     debug!("got response: {:?}", resp);
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
@@ -153,9 +153,9 @@ async fn test_list_container_blobs() -> Result<()> {
 
         let client = Client::new();
         let resp = client
-            .execute(req.try_into()?)
+            .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
             .await
-            .expect("request must success");
+            .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
         debug!("got response: {:?}", resp);
         assert_eq!(StatusCode::OK, resp.status());
@@ -192,7 +192,7 @@ async fn test_can_head_blob_with_sas() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
         .expect("request must success");
 
@@ -236,9 +236,9 @@ async fn test_can_list_container_blobs() -> Result<()> {
 
         let client = Client::new();
         let resp = client
-            .execute(req.try_into()?)
+            .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
             .await
-            .expect("request must success");
+            .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
         debug!("got response: {:?}", resp);
         assert_eq!(StatusCode::OK, resp.status());
@@ -284,7 +284,7 @@ async fn test_head_blob_with_imds() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
         .expect("request must success");
 
@@ -336,9 +336,9 @@ async fn test_can_list_container_blobs_with_imds() -> Result<()> {
 
         let client = Client::new();
         let resp = client
-            .execute(req.try_into()?)
+            .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
             .await
-            .expect("request must success");
+            .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
         debug!("got response: {:?}", resp);
         assert_eq!(StatusCode::OK, resp.status());
@@ -391,7 +391,7 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
         .await
         .expect("request must success");
 
@@ -450,14 +450,14 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
 
         let client = Client::new();
         let resp = client
-            .execute(req.try_into()?)
+            .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?)
             .await
-            .expect("request must success");
+            .map_err(|e| reqsign_core::Error::unexpected("failed to execute request").with_source(anyhow::Error::new(e)))?;
 
         let stat = resp.status();
         debug!("got response: {:?}", resp);
         if stat != StatusCode::OK {
-            debug!("{}", resp.text().await?);
+            debug!("{}", resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to get response text").with_source(anyhow::Error::new(e)))?);
         }
 
         assert_eq!(StatusCode::OK, stat);

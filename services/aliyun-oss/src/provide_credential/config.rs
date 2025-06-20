@@ -20,7 +20,7 @@ impl ConfigCredentialProvider {
 impl ProvideCredential for ConfigCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         if let (Some(access_key_id), Some(access_key_secret)) =
             (&self.config.access_key_id, &self.config.access_key_secret)
         {

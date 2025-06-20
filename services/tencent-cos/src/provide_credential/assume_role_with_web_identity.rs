@@ -1,5 +1,5 @@
 use crate::{Config, Credential};
-use anyhow::{anyhow, Result};
+use reqsign_core::Result;
 use async_trait::async_trait;
 use http::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE};
 use log::debug;
@@ -73,7 +73,7 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
             web_identity_token: token,
             role_arn: role_arn.clone(),
             provider_id: provider_id.clone(),
-        })?;
+        }).map_err(|e| reqsign_core::Error::unexpected(format!("Failed to serialize request: {}", e)))?;
 
         let req = http::Request::builder()
             .method(http::Method::POST)
@@ -92,17 +92,18 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
         let body = resp.into_body();
 
         if status != http::StatusCode::OK {
-            return Err(anyhow!(
+            return Err(reqsign_core::Error::unexpected(format!(
                 "request to Tencent Cloud STS Services failed: {}",
                 String::from_utf8_lossy(&body)
-            ));
+            )));
         }
 
-        let resp: AssumeRoleWithWebIdentityResult = serde_json::from_slice(&body)?;
+        let resp: AssumeRoleWithWebIdentityResult = serde_json::from_slice(&body)
+            .map_err(|e| reqsign_core::Error::unexpected(format!("Failed to parse STS response: {}", e)))?;
         if let Some(error) = resp.response.error {
-            return Err(anyhow!(
+            return Err(reqsign_core::Error::unexpected(format!(
                 "request to Tencent Cloud STS Services failed: {error:?}"
-            ));
+            )));
         }
         let resp_expiration = resp.response.expiration;
         let resp_cred = resp.response.credentials;

@@ -33,7 +33,7 @@ impl StaticCredentialProvider {
 impl ProvideCredential for StaticCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         Ok(Some(Credential::new(
             self.access_key_id.clone(),
             self.secret_access_key.clone(),
@@ -50,7 +50,7 @@ struct EnvCredentialProvider;
 impl ProvideCredential for EnvCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         // Check for credentials in environment
         match (
             ctx.env_var("HUAWEI_CLOUD_ACCESS_KEY_ID"),
@@ -66,7 +66,7 @@ impl ProvideCredential for EnvCredentialProvider {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> reqsign_core::Result<()> {
     // Create context
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 

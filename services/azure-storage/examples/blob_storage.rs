@@ -70,12 +70,12 @@ async fn main() -> Result<()> {
 
             if !demo_mode {
                 // Execute the request only if we have real credentials
-                let req = http::Request::from_parts(parts, body).try_into()?;
+                let req = http::Request::from_parts(parts, body).try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?;
                 match client.execute(req).await {
                     Ok(resp) => {
                         println!("Response status: {}", resp.status());
                         if resp.status().is_success() {
-                            let text = resp.text().await?;
+                            let text = resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to get response text").with_source(anyhow::Error::new(e)))?;
                             println!("Containers XML response preview:");
                             println!("{}", &text[..500.min(text.len())]);
                         }

@@ -54,9 +54,9 @@ impl SignRequest for RequestSigner {
         req: &mut Parts,
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
-    ) -> anyhow::Result<()> {
+    ) -> reqsign_core::Result<()> {
         let Some(cred) = credential else {
-            return Err(anyhow::anyhow!("credential is required"));
+            return Err(reqsign_core::Error::request_invalid("credential is required"));
         };
 
         let method = if expires_in.is_some() {
@@ -77,13 +77,15 @@ impl SignRequest for RequestSigner {
                 // Bearer token authentication
                 match method {
                     SigningMethod::Query(_) => {
-                        return Err(anyhow::anyhow!("BearerToken can't be used in query string"));
+                        return Err(reqsign_core::Error::request_invalid("BearerToken can't be used in query string"));
                     }
                     SigningMethod::Header => {
                         ctx.headers
-                            .insert(X_MS_DATE, format_http_date(now()).parse()?);
+                            .insert(X_MS_DATE, format_http_date(now()).parse()
+                                .map_err(|e| reqsign_core::Error::unexpected("failed to parse date header").with_source(e))?);
                         ctx.headers.insert(header::AUTHORIZATION, {
-                            let mut value: HeaderValue = format!("Bearer {}", token).parse()?;
+                            let mut value: HeaderValue = format!("Bearer {}", token).parse()
+                                .map_err(|e| reqsign_core::Error::unexpected("failed to parse authorization header").with_source(e))?;
                             value.set_sensitive(true);
                             value
                         });
@@ -101,9 +103,11 @@ impl SignRequest for RequestSigner {
                         let signer = crate::account_sas::AccountSharedAccessSignature::new(
                             account_name.clone(),
                             account_key.clone(),
-                            now() + chrono::TimeDelta::from_std(d)?,
+                            now() + chrono::TimeDelta::from_std(d)
+                                .map_err(|e| reqsign_core::Error::unexpected("failed to convert duration").with_source(e))?,
                         );
-                        let signer_token = signer.token()?;
+                        let signer_token = signer.token()
+                            .map_err(|e| reqsign_core::Error::unexpected("failed to generate account SAS token").with_source(e))?;
                         signer_token.iter().for_each(|(k, v)| {
                             ctx.query_push(k, v);
                         });
@@ -111,13 +115,15 @@ impl SignRequest for RequestSigner {
                     SigningMethod::Header => {
                         let now_time = self.time.unwrap_or_else(now);
                         let string_to_sign = string_to_sign(&mut ctx, account_name, now_time)?;
-                        let decode_content = base64_decode(account_key)?;
+                        let decode_content = base64_decode(account_key)
+                            .map_err(|e| reqsign_core::Error::unexpected("failed to decode account key").with_source(e))?;
                         let signature =
                             base64_hmac_sha256(&decode_content, string_to_sign.as_bytes());
 
                         ctx.headers.insert(header::AUTHORIZATION, {
                             let mut value: HeaderValue =
-                                format!("SharedKey {}:{}", account_name, signature).parse()?;
+                                format!("SharedKey {}:{}", account_name, signature).parse()
+                                    .map_err(|e| reqsign_core::Error::unexpected("failed to parse authorization header").with_source(e))?;
                             value.set_sensitive(true);
                             value
                         });
@@ -166,56 +172,76 @@ fn string_to_sign(
     ctx: &mut SigningRequest,
     account_name: &str,
     now_time: DateTime,
-) -> anyhow::Result<String> {
+) -> reqsign_core::Result<String> {
     let mut s = String::with_capacity(128);
 
-    writeln!(&mut s, "{}", ctx.method.as_str())?;
+    writeln!(&mut s, "{}", ctx.method.as_str())
+        .map_err(|e| reqsign_core::Error::unexpected("failed to write method to string").with_source(e))?;
     writeln!(
         &mut s,
         "{}",
-        ctx.header_get_or_default(&header::CONTENT_ENCODING)?
-    )?;
+        ctx.header_get_or_default(&header::CONTENT_ENCODING)
+            .map_err(|e| reqsign_core::Error::unexpected("failed to get content-encoding header").with_source(e))?
+    ).map_err(|e| reqsign_core::Error::unexpected("failed to write content-encoding to string").with_source(e))?;
     writeln!(
         &mut s,
         "{}",
-        ctx.header_get_or_default(&header::CONTENT_LANGUAGE)?
-    )?;
+        ctx.header_get_or_default(&header::CONTENT_LANGUAGE)
+            .map_err(|e| reqsign_core::Error::unexpected("failed to get content-language header").with_source(e))?
+    ).map_err(|e| reqsign_core::Error::unexpected("failed to write content-language to string").with_source(e))?;
     writeln!(
         &mut s,
         "{}",
-        ctx.header_get_or_default(&header::CONTENT_LENGTH)
-            .map(|v| if v == "0" { "" } else { v })?
-    )?;
+        {
+            let content_length = ctx.header_get_or_default(&header::CONTENT_LENGTH)
+                .map_err(|e| reqsign_core::Error::unexpected("failed to get content-length header").with_source(e))?;
+            if content_length == "0" { "" } else { content_length }
+        }
+    ).map_err(|e| reqsign_core::Error::unexpected("failed to write content-length to string").with_source(e))?;
     writeln!(
         &mut s,
         "{}",
-        ctx.header_get_or_default(&"content-md5".parse()?)?
-    )?;
+        ctx.header_get_or_default(&"content-md5".parse()
+            .map_err(|e| reqsign_core::Error::unexpected("failed to parse content-md5 header name").with_source(e))?)
+            .map_err(|e| reqsign_core::Error::unexpected("failed to get content-md5 header").with_source(e))?
+    ).map_err(|e| reqsign_core::Error::unexpected("failed to write content-md5 to string").with_source(e))?;
     writeln!(
         &mut s,
         "{}",
-        ctx.header_get_or_default(&header::CONTENT_TYPE)?
-    )?;
-    writeln!(&mut s, "{}", ctx.header_get_or_default(&header::DATE)?)?;
+        ctx.header_get_or_default(&header::CONTENT_TYPE)
+            .map_err(|e| reqsign_core::Error::unexpected("failed to get content-type header").with_source(e))?
+    ).map_err(|e| reqsign_core::Error::unexpected("failed to write content-type to string").with_source(e))?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&header::DATE)
+        .map_err(|e| reqsign_core::Error::unexpected("failed to get date header").with_source(e))?)
+        .map_err(|e| reqsign_core::Error::unexpected("failed to write date to string").with_source(e))?;
     writeln!(
         &mut s,
         "{}",
-        ctx.header_get_or_default(&header::IF_MODIFIED_SINCE)?
-    )?;
-    writeln!(&mut s, "{}", ctx.header_get_or_default(&header::IF_MATCH)?)?;
+        ctx.header_get_or_default(&header::IF_MODIFIED_SINCE)
+            .map_err(|e| reqsign_core::Error::unexpected("failed to get if-modified-since header").with_source(e))?
+    ).map_err(|e| reqsign_core::Error::unexpected("failed to write if-modified-since to string").with_source(e))?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&header::IF_MATCH)
+        .map_err(|e| reqsign_core::Error::unexpected("failed to get if-match header").with_source(e))?)
+        .map_err(|e| reqsign_core::Error::unexpected("failed to write if-match to string").with_source(e))?;
     writeln!(
         &mut s,
         "{}",
-        ctx.header_get_or_default(&header::IF_NONE_MATCH)?
-    )?;
+        ctx.header_get_or_default(&header::IF_NONE_MATCH)
+            .map_err(|e| reqsign_core::Error::unexpected("failed to get if-none-match header").with_source(e))?
+    ).map_err(|e| reqsign_core::Error::unexpected("failed to write if-none-match to string").with_source(e))?;
     writeln!(
         &mut s,
         "{}",
-        ctx.header_get_or_default(&header::IF_UNMODIFIED_SINCE)?
-    )?;
-    writeln!(&mut s, "{}", ctx.header_get_or_default(&header::RANGE)?)?;
-    writeln!(&mut s, "{}", canonicalize_header(ctx, now_time)?)?;
-    write!(&mut s, "{}", canonicalize_resource(ctx, account_name))?;
+        ctx.header_get_or_default(&header::IF_UNMODIFIED_SINCE)
+            .map_err(|e| reqsign_core::Error::unexpected("failed to get if-unmodified-since header").with_source(e))?
+    ).map_err(|e| reqsign_core::Error::unexpected("failed to write if-unmodified-since to string").with_source(e))?;
+    writeln!(&mut s, "{}", ctx.header_get_or_default(&header::RANGE)
+        .map_err(|e| reqsign_core::Error::unexpected("failed to get range header").with_source(e))?)
+        .map_err(|e| reqsign_core::Error::unexpected("failed to write range to string").with_source(e))?;
+    writeln!(&mut s, "{}", canonicalize_header(ctx, now_time)?)
+        .map_err(|e| reqsign_core::Error::unexpected("failed to write canonicalized headers to string").with_source(e))?;
+    write!(&mut s, "{}", canonicalize_resource(ctx, account_name))
+        .map_err(|e| reqsign_core::Error::unexpected("failed to write canonicalized resource to string").with_source(e))?;
 
     debug!("string to sign: {}", &s);
 
@@ -225,9 +251,10 @@ fn string_to_sign(
 /// ## Reference
 ///
 /// - [Constructing the canonicalized headers string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string)
-fn canonicalize_header(ctx: &mut SigningRequest, now_time: DateTime) -> anyhow::Result<String> {
+fn canonicalize_header(ctx: &mut SigningRequest, now_time: DateTime) -> reqsign_core::Result<String> {
     ctx.headers
-        .insert(X_MS_DATE, format_http_date(now_time).parse()?);
+        .insert(X_MS_DATE, format_http_date(now_time).parse()
+            .map_err(|e| reqsign_core::Error::unexpected("failed to parse x-ms-date header").with_source(e))?);
 
     Ok(SigningRequest::header_to_string(
         ctx.header_to_vec_with_prefix("x-ms-"),

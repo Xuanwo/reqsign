@@ -2,8 +2,7 @@ use std::borrow::Cow;
 use std::mem;
 use std::time::Duration;
 
-use anyhow::anyhow;
-use anyhow::Result;
+use crate::{Error, Result};
 use http::header::HeaderName;
 use http::uri::Authority;
 use http::uri::PathAndQuery;
@@ -42,9 +41,9 @@ impl SigningRequest {
         Ok(SigningRequest {
             method: parts.method.clone(),
             scheme: uri.scheme.unwrap_or(Scheme::HTTP),
-            authority: uri
-                .authority
-                .ok_or_else(|| anyhow!("request without authority is invalid for signing"))?,
+            authority: uri.authority.ok_or_else(|| {
+                Error::request_invalid("request without authority is invalid for signing")
+            })?,
             path: paq.path().to_string(),
             query: paq
                 .query()
@@ -98,9 +97,14 @@ impl SigningRequest {
                     s
                 };
 
-                Some(PathAndQuery::from_str(&paq)?)
+                Some(PathAndQuery::from_str(&paq).map_err(|e| {
+                    Error::request_invalid("invalid path and query")
+                        .with_source(anyhow::Error::new(e))
+                })?)
             };
-            Uri::from_parts(uri_parts)?
+            Uri::from_parts(uri_parts).map_err(|e| {
+                Error::request_invalid("failed to build URI").with_source(anyhow::Error::new(e))
+            })?
         };
 
         Ok(())
@@ -205,7 +209,9 @@ impl SigningRequest {
     #[inline]
     pub fn header_get_or_default(&self, key: &HeaderName) -> Result<&str> {
         match self.headers.get(key) {
-            Some(v) => Ok(v.to_str()?),
+            Some(v) => v.to_str().map_err(|e| {
+                Error::request_invalid("invalid header value").with_source(anyhow::Error::new(e))
+            }),
             None => Ok(""),
         }
     }

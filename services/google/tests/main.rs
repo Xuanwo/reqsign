@@ -1,7 +1,6 @@
 use std::env;
 use std::time::Duration;
 
-use anyhow::Result;
 use http::StatusCode;
 use log::debug;
 use log::warn;
@@ -64,7 +63,7 @@ async fn init_signer_for_signed_url() -> Option<(Context, Signer<Credential>)> {
 }
 
 #[tokio::test]
-async fn test_get_object() -> Result<()> {
+async fn test_get_object() -> reqsign_core::Result<()> {
     let Some((_ctx, signer)) = init_signer().await else {
         warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
         return Ok(());
@@ -76,7 +75,7 @@ async fn test_get_object() -> Result<()> {
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
     builder = builder.uri(format!("{}/o/{}", url, "not_exist_file"));
-    let req = builder.body("")?;
+    let req = builder.body("").map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?;
 
     let (mut parts, body) = req.into_parts();
     signer
@@ -89,7 +88,7 @@ async fn test_get_object() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(e))?)
         .await
         .expect("request must succeed");
 
@@ -99,7 +98,7 @@ async fn test_get_object() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_list_objects() -> Result<()> {
+async fn test_list_objects() -> reqsign_core::Result<()> {
     let Some((_ctx, signer)) = init_signer().await else {
         warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
         return Ok(());
@@ -111,7 +110,7 @@ async fn test_list_objects() -> Result<()> {
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
     builder = builder.uri(format!("{url}/o"));
-    let req = builder.body("")?;
+    let req = builder.body("").map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?;
 
     let (mut parts, body) = req.into_parts();
     signer
@@ -124,7 +123,7 @@ async fn test_list_objects() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(e))?)
         .await
         .expect("request must succeed");
 
@@ -134,7 +133,7 @@ async fn test_list_objects() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_get_object_with_query() -> Result<()> {
+async fn test_get_object_with_query() -> reqsign_core::Result<()> {
     let Some((_ctx, signer)) = init_signer_for_signed_url().await else {
         warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
         return Ok(());
@@ -150,7 +149,7 @@ async fn test_get_object_with_query() -> Result<()> {
         url.replace("storage/v1/b/", ""),
         "not_exist_file"
     ));
-    let req = builder.body("")?;
+    let req = builder.body("").map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?;
 
     let (mut parts, body) = req.into_parts();
     signer
@@ -163,13 +162,13 @@ async fn test_get_object_with_query() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into()?)
+        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(e))?)
         .await
         .expect("request must succeed");
 
     let code = resp.status();
     debug!("got response: {:?}", resp);
-    debug!("got body: {}", resp.text().await?);
+    debug!("got body: {}", resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to read response body").with_source(e))?);
     assert_eq!(StatusCode::NOT_FOUND, code);
     Ok(())
 }

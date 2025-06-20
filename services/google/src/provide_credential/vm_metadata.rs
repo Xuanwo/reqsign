@@ -1,4 +1,3 @@
-use anyhow::Result;
 use log::debug;
 use serde::Deserialize;
 
@@ -31,12 +30,12 @@ impl VmMetadataCredentialProvider {
 impl ProvideCredential for VmMetadataCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         let scope = self
             .config
             .scope
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("scope is required for VM metadata"))?;
+            .ok_or_else(|| reqsign_core::Error::config_invalid("scope is required for VM metadata"))?;
 
         // Use "default" service account if not specified
         let service_account = "default";
@@ -55,7 +54,7 @@ impl ProvideCredential for VmMetadataCredentialProvider {
             .method(http::Method::GET)
             .uri(&url)
             .header("Metadata-Flavor", "Google")
-            .body(Vec::<u8>::new().into())?;
+            .body(Vec::<u8>::new().into()).map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?;
 
         let resp = ctx.http_send(req).await?;
 
@@ -65,7 +64,7 @@ impl ProvideCredential for VmMetadataCredentialProvider {
             return Ok(None);
         }
 
-        let token_resp: VmMetadataTokenResponse = serde_json::from_slice(resp.body())?;
+        let token_resp: VmMetadataTokenResponse = serde_json::from_slice(resp.body()).map_err(|e| reqsign_core::Error::unexpected("failed to parse VM metadata response").with_source(e))?;
 
         let expires_at = now()
             + chrono::TimeDelta::try_seconds(token_resp.expires_in as i64).expect("in bounds");

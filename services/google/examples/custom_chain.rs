@@ -36,7 +36,7 @@ impl StaticCredentialProvider {
 impl ProvideCredential for StaticCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         Ok(Some(self.credential.clone()))
     }
 }
@@ -49,7 +49,7 @@ struct EnvCredentialProvider;
 impl ProvideCredential for EnvCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         // Check for service account in environment
         if let (Some(email), Some(key)) = (
             ctx.env_var("GOOGLE_CLIENT_EMAIL"),
@@ -74,7 +74,7 @@ impl ProvideCredential for EnvCredentialProvider {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> reqsign_core::Result<()> {
     // Create context
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 

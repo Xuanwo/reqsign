@@ -1,5 +1,5 @@
 use crate::Config;
-use anyhow::anyhow;
+use reqsign_core::{Error, Result};
 
 /// Get the sts endpoint.
 ///
@@ -11,11 +11,11 @@ use anyhow::anyhow;
 /// We can check them by region name.
 ///
 /// ref: https://github.com/awslabs/aws-sdk-rust/blob/31cfae2cf23be0c68a47357070dea1aee9227e3a/sdk/sts/src/aws_endpoint.rs
-pub fn sts_endpoint(config: &Config) -> anyhow::Result<String> {
+pub fn sts_endpoint(config: &Config) -> Result<String> {
     // use regional sts if sts_regional_endpoints has been set.
     if config.sts_regional_endpoints == "regional" {
         let region = config.region.clone().ok_or_else(|| {
-            anyhow!("sts_regional_endpoints set to regional, but region is not set")
+            Error::config_invalid("sts_regional_endpoints set to regional, but region is not set")
         })?;
         if region.starts_with("cn-") {
             Ok(format!("sts.{region}.amazonaws.com.cn"))

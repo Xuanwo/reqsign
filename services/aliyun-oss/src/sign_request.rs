@@ -1,5 +1,5 @@
 use crate::credential::Credential;
-use anyhow::Result;
+use reqsign_core::Result;
 use async_trait::async_trait;
 use http::header::{AUTHORIZATION, CONTENT_TYPE, DATE};
 use http::HeaderValue;
@@ -111,7 +111,8 @@ impl RequestSigner {
         signing_time: DateTime,
         expires: Duration,
     ) -> Result<()> {
-        let expiration_time = signing_time + chrono::TimeDelta::from_std(expires)?;
+        let expiration_time = signing_time + chrono::TimeDelta::from_std(expires)
+            .map_err(|e| reqsign_core::Error::request_invalid(format!("Invalid expiration duration: {}", e)))?;
         let string_to_sign = self.build_string_to_sign(req, cred, signing_time, Some(expires))?;
         let signature =
             base64_hmac_sha1(cred.access_key_secret.as_bytes(), string_to_sign.as_bytes());
@@ -208,7 +209,8 @@ impl RequestSigner {
         // Date or Expires
         match expires {
             Some(expires_duration) => {
-                let expiration_time = signing_time + chrono::TimeDelta::from_std(expires_duration)?;
+                let expiration_time = signing_time + chrono::TimeDelta::from_std(expires_duration)
+                    .map_err(|e| reqsign_core::Error::request_invalid(format!("Invalid expiration duration: {}", e)))?;
                 writeln!(&mut s, "{}", expiration_time.timestamp())?;
             }
             None => {

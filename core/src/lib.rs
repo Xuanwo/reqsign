@@ -136,9 +136,13 @@
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
+/// Error types for reqsign operations
+pub mod error;
 pub mod hash;
 pub mod time;
 pub mod utils;
+
+pub use error::{Error, ErrorKind, Result};
 
 mod context;
 pub use context::Context;

@@ -20,7 +20,7 @@ struct CountingProvider {
 impl ProvideCredential for CountingProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         let mut count = self.call_count.lock().unwrap();
         *count += 1;
 
@@ -164,7 +164,7 @@ struct SecurityTokenProvider;
 impl ProvideCredential for SecurityTokenProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
         Ok(Some(Credential {
             secret_id: "temp_id".to_string(),
             secret_key: "temp_key".to_string(),

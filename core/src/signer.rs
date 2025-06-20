@@ -1,5 +1,4 @@
-use crate::{Context, ProvideCredential, SignRequest, SigningCredential};
-use anyhow::Result;
+use crate::{Context, ProvideCredential, Result, SignRequest, SigningCredential};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
