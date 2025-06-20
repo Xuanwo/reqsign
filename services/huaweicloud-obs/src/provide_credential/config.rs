@@ -1,29 +1,34 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential};
+use std::sync::Arc;
 
 use crate::config::Config;
 use crate::credential::Credential;
 
 /// ConfigCredentialProvider will load credential from config.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ConfigCredentialProvider {
-    config: Config,
+    config: Arc<Config>,
 }
 
 impl ConfigCredentialProvider {
     /// Create a new loader via config.
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Arc<Config>) -> Self {
         Self { config }
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl ProvideCredential for ConfigCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _: &Context) -> Result<Option<Self::Credential>> {
-        if let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.secret_access_key) {
-            let cred = Credential::new(ak.clone(), sk.clone(), self.config.security_token.clone());
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        // Load config from environment
+        let config = self.config.as_ref().clone().from_env(ctx);
+
+        if let (Some(ak), Some(sk)) = (&config.access_key_id, &config.secret_access_key) {
+            let cred = Credential::new(ak.clone(), sk.clone(), config.security_token.clone());
             return Ok(Some(cred));
         }
 
@@ -50,7 +55,7 @@ mod tests {
             || {
                 tokio::runtime::Runtime::new().unwrap().block_on(async {
                     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
-                    let config = Config::default().from_env(&ctx);
+                    let config = Arc::new(Config::default());
                     let loader = ConfigCredentialProvider::new(config);
 
                     let x = loader

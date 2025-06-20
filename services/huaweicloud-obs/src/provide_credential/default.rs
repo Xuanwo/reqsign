@@ -1,41 +1,33 @@
 use anyhow::Result;
-use log::debug;
-use reqsign_core::{Context, ProvideCredential};
+use async_trait::async_trait;
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use std::sync::Arc;
 
 use crate::config::Config;
 use crate::credential::Credential;
 use crate::provide_credential::ConfigCredentialProvider;
 
 /// DefaultCredentialProvider will try to load credential from different sources.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DefaultCredentialProvider {
-    config: Config,
+    chain: ProvideCredentialChain<Credential>,
 }
 
 impl DefaultCredentialProvider {
     /// Create a new DefaultCredentialProvider
     pub fn new(config: Config) -> Self {
-        Self { config }
+        let chain =
+            ProvideCredentialChain::new().push(ConfigCredentialProvider::new(Arc::new(config)));
+
+        Self { chain }
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        // Load config from environment
-        let config = self.config.clone().from_env(ctx);
-        let config_loader = ConfigCredentialProvider::new(config);
-
-        // Try to load from config
-        if let Ok(Some(cred)) = config_loader.provide_credential(ctx).await {
-            debug!("huaweicloud obs credential loaded from config");
-            return Ok(Some(cred));
-        }
-
-        // Return None if no credential found
-        debug!("huaweicloud obs credential not found");
-        Ok(None)
+        self.chain.provide_credential(ctx).await
     }
 }
