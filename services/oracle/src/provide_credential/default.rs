@@ -2,7 +2,8 @@ use crate::constants::{ORACLE_CONFIG_PATH, ORACLE_DEFAULT_PROFILE};
 use crate::{Config, Credential};
 use async_trait::async_trait;
 use log::debug;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use std::sync::Arc;
 
 /// Default loader for Oracle Cloud Infrastructure.
 ///
@@ -11,13 +12,17 @@ use reqsign_core::{Context, ProvideCredential};
 /// 2. From the default Oracle config file (~/.oci/config)
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
-    config: Config,
+    chain: ProvideCredentialChain<Credential>,
 }
 
 impl DefaultCredentialProvider {
     /// Create a new DefaultCredentialProvider
     pub fn new(config: Config) -> Self {
-        Self { config }
+        let chain = ProvideCredentialChain::new()
+            .push(EnvCredentialProvider::new(Arc::new(config.clone())))
+            .push(ConfigFileCredentialProvider::new(Arc::new(config)));
+
+        Self { chain }
     }
 }
 
@@ -26,31 +31,40 @@ impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
-        // Try to load from environment variables first
-        if let Ok(Some(cred)) = self.load_from_env(ctx).await {
-            return Ok(Some(cred));
-        }
-
-        // Try to load from config file
-        if let Ok(Some(cred)) = self.load_from_config_file(ctx).await {
-            return Ok(Some(cred));
-        }
-
-        Ok(None)
+        self.chain.provide_credential(ctx).await
     }
 }
 
-impl DefaultCredentialProvider {
-    async fn load_from_env(&self, ctx: &Context) -> anyhow::Result<Option<Credential>> {
-        // First check if we have config from environment
-        let env_config = Config::from_env(ctx);
+/// Provider that loads credentials from environment variables
+#[derive(Debug)]
+struct EnvCredentialProvider {
+    config: Arc<Config>,
+}
 
-        match (
-            &env_config.tenancy,
-            &env_config.user,
-            &env_config.key_file,
-            &env_config.fingerprint,
-        ) {
+impl EnvCredentialProvider {
+    fn new(config: Arc<Config>) -> Self {
+        Self { config }
+    }
+}
+
+#[async_trait]
+impl ProvideCredential for EnvCredentialProvider {
+    type Credential = Credential;
+
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+        // Get environment config
+        let env_config = Config::from_env(ctx);
+        let config = self.config.as_ref();
+
+        // Use environment values if available, otherwise fall back to config
+        let tenancy = env_config.tenancy.or_else(|| config.tenancy.clone());
+        let user = env_config.user.or_else(|| config.user.clone());
+        let key_file = env_config.key_file.or_else(|| config.key_file.clone());
+        let fingerprint = env_config
+            .fingerprint
+            .or_else(|| config.fingerprint.clone());
+
+        match (&tenancy, &user, &key_file, &fingerprint) {
             (Some(tenancy), Some(user), Some(key_file), Some(fingerprint)) => {
                 debug!("loading credential from environment variables");
                 Ok(Some(Credential {
@@ -67,8 +81,25 @@ impl DefaultCredentialProvider {
             _ => Ok(None),
         }
     }
+}
 
-    async fn load_from_config_file(&self, ctx: &Context) -> anyhow::Result<Option<Credential>> {
+/// Provider that loads credentials from config file
+#[derive(Debug)]
+struct ConfigFileCredentialProvider {
+    config: Arc<Config>,
+}
+
+impl ConfigFileCredentialProvider {
+    fn new(config: Arc<Config>) -> Self {
+        Self { config }
+    }
+}
+
+#[async_trait]
+impl ProvideCredential for ConfigFileCredentialProvider {
+    type Credential = Credential;
+
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
         // Determine config file path
         let config_file = self
             .config

@@ -23,3 +23,7 @@ serde.workspace = true
 
 
 [dev-dependencies]
+env_logger = "0.11"
+reqsign-file-read-tokio = { path = "../../context/file-read-tokio" }
+reqsign-http-send-reqwest = { path = "../../context/http-send-reqwest" }
+tokio = { version = "1", features = ["test-util", "macros", "rt-multi-thread"] }

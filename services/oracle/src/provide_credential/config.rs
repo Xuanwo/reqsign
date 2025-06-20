@@ -2,16 +2,17 @@ use crate::{Config, Credential};
 use async_trait::async_trait;
 use log::debug;
 use reqsign_core::{Context, ProvideCredential};
+use std::sync::Arc;
 
 /// Static configuration based loader.
 #[derive(Debug)]
 pub struct ConfigCredentialProvider {
-    config: Config,
+    config: Arc<Config>,
 }
 
 impl ConfigCredentialProvider {
     /// Create a new ConfigCredentialProvider
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Arc<Config>) -> Self {
         Self { config }
     }
 }
@@ -20,13 +21,20 @@ impl ConfigCredentialProvider {
 impl ProvideCredential for ConfigCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
-        match (
-            &self.config.tenancy,
-            &self.config.user,
-            &self.config.key_file,
-            &self.config.fingerprint,
-        ) {
+    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+        // Merge with environment config
+        let env_config = Config::from_env(ctx);
+        let config = self.config.as_ref();
+
+        // Use environment values if available, otherwise fall back to config
+        let tenancy = env_config.tenancy.or_else(|| config.tenancy.clone());
+        let user = env_config.user.or_else(|| config.user.clone());
+        let key_file = env_config.key_file.or_else(|| config.key_file.clone());
+        let fingerprint = env_config
+            .fingerprint
+            .or_else(|| config.fingerprint.clone());
+
+        match (&tenancy, &user, &key_file, &fingerprint) {
             (Some(tenancy), Some(user), Some(key_file), Some(fingerprint)) => {
                 debug!("loading credential from config");
                 Ok(Some(Credential {
