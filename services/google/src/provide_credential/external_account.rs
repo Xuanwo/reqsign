@@ -4,7 +4,7 @@ use http::header::{ACCEPT, CONTENT_TYPE};
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 
-use reqsign_core::{time::now, Context, ProvideCredential};
+use reqsign_core::{time::now, Context, ProvideCredential, Result};
 
 use crate::config::Config;
 use crate::credential::{external_account, Credential, ExternalAccount, Token};
@@ -62,7 +62,7 @@ impl ExternalAccountCredentialProvider {
         }
     }
 
-    async fn load_oidc_token(&self, ctx: &Context) -> reqsign_core::Result<String> {
+    async fn load_oidc_token(&self, ctx: &Context) -> Result<String> {
         match &self.external_account.credential_source {
             external_account::Source::File(source) => {
                 self.load_file_sourced_token(ctx, source).await
@@ -75,7 +75,7 @@ impl ExternalAccountCredentialProvider {
         &self,
         ctx: &Context,
         source: &external_account::FileSource,
-    ) -> reqsign_core::Result<String> {
+    ) -> Result<String> {
         debug!("loading OIDC token from file: {}", source.file);
         let content = ctx.file_read(&source.file).await?;
         source.format.parse(&content)
@@ -85,7 +85,7 @@ impl ExternalAccountCredentialProvider {
         &self,
         ctx: &Context,
         source: &external_account::UrlSource,
-    ) -> reqsign_core::Result<String> {
+    ) -> Result<String> {
         debug!("loading OIDC token from URL: {}", source.url);
 
         let mut req = http::Request::get(&source.url);
@@ -108,7 +108,7 @@ impl ExternalAccountCredentialProvider {
         source.format.parse(resp.body())
     }
 
-    async fn exchange_sts_token(&self, ctx: &Context, oidc_token: &str) -> reqsign_core::Result<Token> {
+    async fn exchange_sts_token(&self, ctx: &Context, oidc_token: &str) -> Result<Token> {
         debug!("exchanging OIDC token for STS access token");
 
         let request = StsTokenRequest {
@@ -153,7 +153,7 @@ impl ExternalAccountCredentialProvider {
         &self,
         ctx: &Context,
         access_token: &str,
-    ) -> reqsign_core::Result<Option<Token>> {
+    ) -> Result<Option<Token>> {
         let Some(url) = &self.external_account.service_account_impersonation_url else {
             return Ok(None);
         };
@@ -212,7 +212,7 @@ impl ExternalAccountCredentialProvider {
 impl ProvideCredential for ExternalAccountCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Load OIDC token from source
         let oidc_token = self.load_oidc_token(ctx).await?;
 

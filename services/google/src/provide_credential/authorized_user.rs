@@ -2,7 +2,7 @@ use http::header::CONTENT_TYPE;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 
-use reqsign_core::{time::now, Context, ProvideCredential};
+use reqsign_core::{time::now, Context, ProvideCredential, Result};
 
 use crate::config::Config;
 use crate::credential::{Credential, OAuth2Credentials, Token};
@@ -41,7 +41,7 @@ impl AuthorizedUserCredentialProvider {
 impl ProvideCredential for AuthorizedUserCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         debug!("exchanging refresh token for access token");
 
         let req_body = RefreshTokenRequest {

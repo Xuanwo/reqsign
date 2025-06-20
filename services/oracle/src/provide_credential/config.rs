@@ -1,7 +1,7 @@
 use crate::{Config, Credential};
 use async_trait::async_trait;
 use log::debug;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, Result};
 use std::sync::Arc;
 
 /// Static configuration based loader.
@@ -21,7 +21,7 @@ impl ConfigCredentialProvider {
 impl ProvideCredential for ConfigCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Merge with environment config
         let env_config = Config::from_env(ctx);
         let config = self.config.as_ref();

@@ -4,7 +4,7 @@ use std::time::Duration;
 use http::StatusCode;
 use log::debug;
 use log::warn;
-use reqsign_core::{Context, Signer};
+use reqsign_core::{Context, Result, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_google::{Config, Credential, DefaultCredentialProvider, RequestSigner};
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -63,7 +63,7 @@ async fn init_signer_for_signed_url() -> Option<(Context, Signer<Credential>)> {
 }
 
 #[tokio::test]
-async fn test_get_object() -> reqsign_core::Result<()> {
+async fn test_get_object() -> Result<()> {
     let Some((_ctx, signer)) = init_signer().await else {
         warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
         return Ok(());
@@ -98,7 +98,7 @@ async fn test_get_object() -> reqsign_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_list_objects() -> reqsign_core::Result<()> {
+async fn test_list_objects() -> Result<()> {
     let Some((_ctx, signer)) = init_signer().await else {
         warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
         return Ok(());
@@ -133,7 +133,7 @@ async fn test_list_objects() -> reqsign_core::Result<()> {
 }
 
 #[tokio::test]
-async fn test_get_object_with_query() -> reqsign_core::Result<()> {
+async fn test_get_object_with_query() -> Result<()> {
     let Some((_ctx, signer)) = init_signer_for_signed_url().await else {
         warn!("REQSIGN_GOOGLE_TEST is not set, skipped");
         return Ok(());

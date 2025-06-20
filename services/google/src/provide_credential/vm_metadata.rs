@@ -1,7 +1,7 @@
 use log::debug;
 use serde::Deserialize;
 
-use reqsign_core::{time::now, Context, ProvideCredential};
+use reqsign_core::{time::now, Context, ProvideCredential, Result};
 
 use crate::config::Config;
 use crate::credential::{Credential, Token};
@@ -30,7 +30,7 @@ impl VmMetadataCredentialProvider {
 impl ProvideCredential for VmMetadataCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         let scope = self
             .config
             .scope

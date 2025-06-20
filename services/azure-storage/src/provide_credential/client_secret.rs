@@ -1,6 +1,6 @@
 use crate::Credential;
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, Result};
 
 /// Load credential from Azure Client Secret.
 ///
@@ -52,7 +52,7 @@ impl ClientSecretCredentialProvider {
 impl ProvideCredential for ClientSecretCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Check if all required parameters are available
         let tenant_id = match &self.tenant_id {
             Some(id) if !id.is_empty() => id,
@@ -106,7 +106,7 @@ async fn get_client_secret_token(
     client_secret: &str,
     authority_host: &str,
     ctx: &Context,
-) -> reqsign_core::Result<Option<ClientSecretTokenResponse>> {
+) -> Result<Option<ClientSecretTokenResponse>> {
     let url = format!(
         "{}/{}/oauth2/v2.0/token",
         authority_host.trim_end_matches('/'),

@@ -9,7 +9,7 @@ use log::debug;
 use percent_encoding::{percent_decode_str, utf8_percent_encode};
 use reqsign_core::hash::{hex_hmac_sha256, hex_sha256, hmac_sha256};
 use reqsign_core::time::{format_date, format_iso8601, now, DateTime};
-use reqsign_core::{Context, SignRequest, SigningRequest};
+use reqsign_core::{Context, Result, SignRequest, SigningRequest};
 use std::fmt::Write;
 use std::time::Duration;
 
@@ -58,7 +58,7 @@ impl SignRequest for RequestSigner {
         req: &mut Parts,
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
-    ) -> reqsign_core::Result<()> {
+    ) -> Result<()> {
         let now = self.time.unwrap_or_else(now);
         let mut signed_req = SigningRequest::build(req)?;
 
@@ -146,7 +146,7 @@ impl SignRequest for RequestSigner {
     }
 }
 
-fn canonical_request_string(ctx: &mut SigningRequest) -> reqsign_core::Result<String> {
+fn canonical_request_string(ctx: &mut SigningRequest) -> Result<String> {
     // 256 is specially chosen to avoid reallocation for most requests.
     let mut f = String::with_capacity(256);
 
@@ -217,7 +217,7 @@ fn canonicalize_header(
     cred: &Credential,
     expires_in: Option<Duration>,
     now: DateTime,
-) -> reqsign_core::Result<()> {
+) -> Result<()> {
     // Header names and values need to be normalized according to Step 4 of https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
     for (_, value) in ctx.headers.iter_mut() {
         SigningRequest::header_value_normalize(value)
@@ -278,7 +278,7 @@ fn canonicalize_query(
     now: DateTime,
     service: &str,
     region: &str,
-) -> reqsign_core::Result<()> {
+) -> Result<()> {
     if let Some(expire) = expires_in {
         ctx.query
             .push(("X-Amz-Algorithm".into(), "AWS4-HMAC-SHA256".into()));

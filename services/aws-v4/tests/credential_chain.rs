@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use reqsign_aws_v4::{ConfigCredentialProvider, Credential};
 use reqsign_core::ProvideCredentialChain;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ impl ProvideCredential for CountingProvider {
     async fn provide_credential(
         &self,
         _ctx: &Context,
-    ) -> reqsign_core::Result<Option<Self::Credential>> {
+    ) -> Result<Option<Self::Credential>> {
         let mut count = self.call_count.lock().unwrap();
         *count += 1;
 

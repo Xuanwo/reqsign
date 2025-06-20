@@ -4,7 +4,7 @@ use http::header::CONTENT_TYPE;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 
-use reqsign_core::{time::now, Context, ProvideCredential};
+use reqsign_core::{time::now, Context, ProvideCredential, Result};
 
 use crate::config::Config;
 use crate::credential::{Credential, ImpersonatedServiceAccount, Token};
@@ -61,7 +61,7 @@ impl ImpersonatedServiceAccountCredentialProvider {
         }
     }
 
-    async fn generate_bearer_auth_token(&self, ctx: &Context) -> reqsign_core::Result<Token> {
+    async fn generate_bearer_auth_token(&self, ctx: &Context) -> Result<Token> {
         debug!("refreshing OAuth2 token for impersonated service account");
 
         let request = RefreshTokenRequest {
@@ -117,7 +117,7 @@ impl ImpersonatedServiceAccountCredentialProvider {
         })
     }
 
-    async fn generate_access_token(&self, ctx: &Context, bearer_token: &Token) -> reqsign_core::Result<Token> {
+    async fn generate_access_token(&self, ctx: &Context, bearer_token: &Token) -> Result<Token> {
         debug!("generating access token for impersonated service account");
 
         let scope =
@@ -179,7 +179,7 @@ impl ImpersonatedServiceAccountCredentialProvider {
 impl ProvideCredential for ImpersonatedServiceAccountCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // First get bearer token using OAuth2 refresh
         let bearer_token = self.generate_bearer_auth_token(ctx).await?;
 

@@ -11,7 +11,7 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use reqsign_core::{
-    hash::hex_sha256, time::*, Context, SignRequest, SigningCredential, SigningMethod,
+    hash::hex_sha256, time::*, Context, Result, SignRequest, SigningCredential, SigningMethod,
     SigningRequest,
 };
 
@@ -98,7 +98,7 @@ impl RequestSigner {
     ///
     /// This method is used internally when a token is needed but only a service account
     /// is available. It creates a JWT and exchanges it for an OAuth2 access token.
-    async fn exchange_token(&self, ctx: &Context, sa: &ServiceAccount) -> reqsign_core::Result<Token> {
+    async fn exchange_token(&self, ctx: &Context, sa: &ServiceAccount) -> Result<Token> {
         let scope = self
             .config
             .scope
@@ -148,7 +148,7 @@ impl RequestSigner {
         &self,
         parts: &mut http::request::Parts,
         token: &Token,
-    ) -> reqsign_core::Result<SigningRequest> {
+    ) -> Result<SigningRequest> {
         let mut req = SigningRequest::build(parts)?;
 
         req.headers.insert(header::AUTHORIZATION, {
@@ -166,7 +166,7 @@ impl RequestSigner {
         parts: &mut http::request::Parts,
         service_account: &ServiceAccount,
         expires_in: Duration,
-    ) -> reqsign_core::Result<SigningRequest> {
+    ) -> Result<SigningRequest> {
         let mut req = SigningRequest::build(parts)?;
         let now = now();
 
@@ -233,7 +233,7 @@ impl SignRequest for RequestSigner {
         req: &mut http::request::Parts,
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
-    ) -> reqsign_core::Result<()> {
+    ) -> Result<()> {
         let cred = credential.ok_or_else(|| reqsign_core::Error::credential_invalid("missing credential"))?;
 
         let signing_req = match expires_in {
@@ -276,7 +276,7 @@ impl SignRequest for RequestSigner {
     }
 }
 
-fn canonical_request_string(req: &mut SigningRequest) -> reqsign_core::Result<String> {
+fn canonical_request_string(req: &mut SigningRequest) -> Result<String> {
     // 256 is specially chosen to avoid reallocation for most requests.
     let mut f = String::with_capacity(256);
 
@@ -315,7 +315,7 @@ fn canonical_request_string(req: &mut SigningRequest) -> reqsign_core::Result<St
     Ok(f)
 }
 
-fn canonicalize_header(req: &mut SigningRequest) -> reqsign_core::Result<()> {
+fn canonicalize_header(req: &mut SigningRequest) -> Result<()> {
     for (_, value) in req.headers.iter_mut() {
         SigningRequest::header_value_normalize(value)
     }
@@ -336,7 +336,7 @@ fn canonicalize_query(
     now: DateTime,
     service: &str,
     region: &str,
-) -> reqsign_core::Result<()> {
+) -> Result<()> {
     if let SigningMethod::Query(expire) = method {
         req.query
             .push(("X-Goog-Algorithm".into(), "GOOG4-RSA-SHA256".into()));

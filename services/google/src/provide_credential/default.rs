@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use log::debug;
 
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 
 use crate::config::Config;
 use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
@@ -40,7 +40,7 @@ impl DefaultCredentialProvider {
 impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         self.chain.provide_credential(ctx).await
     }
 }
@@ -56,7 +56,7 @@ impl CredentialFileProvider {
         Self { config }
     }
 
-    async fn load_credential_file(&self, ctx: &Context) -> reqsign_core::Result<Option<CredentialFile>> {
+    async fn load_credential_file(&self, ctx: &Context) -> Result<Option<CredentialFile>> {
         // Try explicit content
         if let Some(content) = &self.config.credential_content {
             if let Ok(cred) = CredentialFile::from_base64(content) {
@@ -112,7 +112,7 @@ impl CredentialFileProvider {
 impl ProvideCredential for CredentialFileProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Try to load credential file
         if let Some(cred_file) = self.load_credential_file(ctx).await? {
             match cred_file {

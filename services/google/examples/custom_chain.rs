@@ -1,7 +1,7 @@
 //! Example of building a custom credential chain with specific providers
 
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_google::{Credential, ServiceAccount, Token};
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -36,7 +36,7 @@ impl StaticCredentialProvider {
 impl ProvideCredential for StaticCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> Result<Option<Self::Credential>> {
         Ok(Some(self.credential.clone()))
     }
 }
@@ -49,7 +49,7 @@ struct EnvCredentialProvider;
 impl ProvideCredential for EnvCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Check for service account in environment
         if let (Some(email), Some(key)) = (
             ctx.env_var("GOOGLE_CLIENT_EMAIL"),
@@ -74,7 +74,7 @@ impl ProvideCredential for EnvCredentialProvider {
 }
 
 #[tokio::main]
-async fn main() -> reqsign_core::Result<()> {
+async fn main() -> Result<()> {
     // Create context
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 

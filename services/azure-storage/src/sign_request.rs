@@ -7,7 +7,7 @@ use log::debug;
 use percent_encoding::percent_encode;
 use reqsign_core::hash::{base64_decode, base64_hmac_sha256};
 use reqsign_core::time::{format_http_date, now, DateTime};
-use reqsign_core::{Context, SignRequest, SigningMethod, SigningRequest};
+use reqsign_core::{Context, Result, SignRequest, SigningMethod, SigningRequest};
 use std::fmt::Write;
 use std::time::Duration;
 
@@ -54,7 +54,7 @@ impl SignRequest for RequestSigner {
         req: &mut Parts,
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
-    ) -> reqsign_core::Result<()> {
+    ) -> Result<()> {
         let Some(cred) = credential else {
             return Err(reqsign_core::Error::request_invalid("credential is required"));
         };
@@ -172,7 +172,7 @@ fn string_to_sign(
     ctx: &mut SigningRequest,
     account_name: &str,
     now_time: DateTime,
-) -> reqsign_core::Result<String> {
+) -> Result<String> {
     let mut s = String::with_capacity(128);
 
     writeln!(&mut s, "{}", ctx.method.as_str())
@@ -251,7 +251,7 @@ fn string_to_sign(
 /// ## Reference
 ///
 /// - [Constructing the canonicalized headers string](https://docs.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#constructing-the-canonicalized-headers-string)
-fn canonicalize_header(ctx: &mut SigningRequest, now_time: DateTime) -> reqsign_core::Result<String> {
+fn canonicalize_header(ctx: &mut SigningRequest, now_time: DateTime) -> Result<String> {
     ctx.headers
         .insert(X_MS_DATE, format_http_date(now_time).parse()
             .map_err(|e| reqsign_core::Error::unexpected("failed to parse x-ms-date header").with_source(e))?);

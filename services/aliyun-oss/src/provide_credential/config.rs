@@ -1,6 +1,6 @@
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, Result};
 use std::sync::Arc;
 
 /// ConfigCredentialProvider loads credential from static config.
@@ -20,7 +20,7 @@ impl ConfigCredentialProvider {
 impl ProvideCredential for ConfigCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> Result<Option<Self::Credential>> {
         if let (Some(access_key_id), Some(access_key_secret)) =
             (&self.config.access_key_id, &self.config.access_key_secret)
         {

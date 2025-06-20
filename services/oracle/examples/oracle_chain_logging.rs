@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use log::{debug, info};
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqsign_oracle::{ConfigCredentialProvider, Credential, DefaultCredentialProvider};
@@ -31,7 +31,7 @@ where
 {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         info!("Attempting to load credentials from: {}", self.name);
 
         match self.inner.provide_credential(ctx).await {
@@ -55,7 +55,7 @@ where
 }
 
 #[tokio::main]
-async fn main() -> reqsign_core::Result<()> {
+async fn main() -> Result<()> {
     env_logger::init();
 
     // Create context

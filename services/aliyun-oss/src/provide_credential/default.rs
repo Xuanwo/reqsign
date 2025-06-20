@@ -1,7 +1,7 @@
 use crate::provide_credential::{AssumeRoleWithOidcCredentialProvider, ConfigCredentialProvider};
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 use std::sync::Arc;
 
 /// DefaultCredentialProvider is a loader that will try to load credential via default chains.
@@ -30,7 +30,7 @@ impl DefaultCredentialProvider {
 impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         self.chain.provide_credential(ctx).await
     }
 }

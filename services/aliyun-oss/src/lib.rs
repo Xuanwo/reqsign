@@ -18,7 +18,7 @@
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //!
 //! #[tokio::main]
-//! async fn main() -> reqsign_core::Result<()> {
+//! async fn main() -> Result<()> {
 //!     // Create context
 //!     let ctx = Context::new(
 //!         TokioFileRead::default(),

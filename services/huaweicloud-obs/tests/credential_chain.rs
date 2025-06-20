@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use reqsign_core::ProvideCredentialChain;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqsign_huaweicloud_obs::{ConfigCredentialProvider, Credential};
@@ -20,7 +20,7 @@ struct CountingProvider {
 impl ProvideCredential for CountingProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> Result<Option<Self::Credential>> {
         let mut count = self.call_count.lock().unwrap();
         *count += 1;
 
@@ -166,7 +166,7 @@ struct SecurityTokenProvider;
 impl ProvideCredential for SecurityTokenProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> Result<Option<Self::Credential>> {
         Ok(Some(Credential::new(
             "temp_key".to_string(),
             "temp_secret".to_string(),

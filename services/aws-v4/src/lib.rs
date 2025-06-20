@@ -104,7 +104,7 @@
 //! impl ProvideCredential for MyCredentialProvider {
 //!     type Credential = Credential;
 //!     
-//!     async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+//!     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
 //!         // Your custom credential loading logic
 //!         Ok(None)
 //!     }

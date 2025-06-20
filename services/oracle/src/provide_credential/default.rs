@@ -2,7 +2,7 @@ use crate::constants::{ORACLE_CONFIG_PATH, ORACLE_DEFAULT_PROFILE};
 use crate::{Config, Credential};
 use async_trait::async_trait;
 use log::debug;
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 use std::sync::Arc;
 
 /// Default loader for Oracle Cloud Infrastructure.
@@ -30,7 +30,7 @@ impl DefaultCredentialProvider {
 impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         self.chain.provide_credential(ctx).await
     }
 }
@@ -51,7 +51,7 @@ impl EnvCredentialProvider {
 impl ProvideCredential for EnvCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Get environment config
         let env_config = Config::from_env(ctx);
         let config = self.config.as_ref();
@@ -99,7 +99,7 @@ impl ConfigFileCredentialProvider {
 impl ProvideCredential for ConfigFileCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Determine config file path
         let config_file = self
             .config

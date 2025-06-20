@@ -4,7 +4,7 @@ use crate::provide_credential::{
 };
 use crate::Credential;
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 
 /// Default loader that tries multiple credential sources in order.
 ///
@@ -131,7 +131,7 @@ impl DefaultCredentialProvider {
 impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> reqsign_core::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         self.chain.provide_credential(ctx).await
     }
 }
@@ -202,7 +202,7 @@ mod tests {
 
     #[async_trait]
     impl reqsign_core::FileRead for MockFileRead {
-        async fn file_read(&self, _path: &str) -> reqsign_core::Result<Vec<u8>> {
+        async fn file_read(&self, _path: &str) -> Result<Vec<u8>> {
             Ok(Vec::new())
         }
     }
@@ -215,7 +215,7 @@ mod tests {
         async fn http_send(
             &self,
             _req: http::Request<bytes::Bytes>,
-        ) -> reqsign_core::Result<http::Response<bytes::Bytes>> {
+        ) -> Result<http::Response<bytes::Bytes>> {
             Ok(http::Response::new(bytes::Bytes::new()))
         }
     }
