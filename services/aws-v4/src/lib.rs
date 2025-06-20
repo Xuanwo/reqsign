@@ -97,6 +97,7 @@
 //! use reqsign_core::{ProvideCredential, Context};
 //! use async_trait::async_trait;
 //!
+//! # #[derive(Debug)]
 //! # struct MyCredentialProvider;
 //! # type Credential = reqsign_aws_v4::Credential;
 //! #[async_trait]
