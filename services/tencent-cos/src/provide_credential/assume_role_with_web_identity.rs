@@ -6,16 +6,17 @@ use log::debug;
 use reqsign_core::time::{now, parse_rfc3339};
 use reqsign_core::{Context, ProvideCredential};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Loader that loads credential via AssumeRoleWithWebIdentity.
 #[derive(Debug)]
 pub struct AssumeRoleWithWebIdentityCredentialProvider {
-    config: Config,
+    config: Arc<Config>,
 }
 
 impl AssumeRoleWithWebIdentityCredentialProvider {
     /// Create a new AssumeRoleWithWebIdentityCredentialProvider
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Arc<Config>) -> Self {
         Self { config }
     }
 }
