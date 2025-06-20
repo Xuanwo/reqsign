@@ -277,6 +277,7 @@ static SUBRESOURCES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    use std::sync::Arc;
 
     use anyhow::Result;
     use chrono::Utc;
@@ -297,7 +298,7 @@ mod tests {
             secret_access_key: Some("123456".to_string()),
             ..Default::default()
         };
-        let loader = ConfigCredentialProvider::new(config);
+        let loader = ConfigCredentialProvider::new(Arc::new(config));
         let builder = RequestSigner::new("bucket").with_time(
             chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
                 .unwrap()
@@ -341,7 +342,7 @@ mod tests {
             secret_access_key: Some("123456".to_string()),
             ..Default::default()
         };
-        let loader = ConfigCredentialProvider::new(config);
+        let loader = ConfigCredentialProvider::new(Arc::new(config));
         let builder = RequestSigner::new("bucket").with_time(
             chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
                 .unwrap()
@@ -387,7 +388,7 @@ mod tests {
             secret_access_key: Some("123456".to_string()),
             ..Default::default()
         };
-        let loader = ConfigCredentialProvider::new(config);
+        let loader = ConfigCredentialProvider::new(Arc::new(config));
         let builder = RequestSigner::new("bucket").with_time(
             chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
                 .unwrap()
