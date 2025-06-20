@@ -81,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
     if !config.ec2_metadata_disabled {
         dynamic_chain = dynamic_chain.push(IMDSv2CredentialProvider::new(config.clone()));
     }
-    
+
     // Use the dynamic chain (for demonstration)
     let _dynamic_chain = dynamic_chain;
 
@@ -105,4 +105,3 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-

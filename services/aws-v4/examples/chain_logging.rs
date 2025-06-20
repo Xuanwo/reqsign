@@ -1,8 +1,6 @@
 //! Example demonstrating credential chain logging
 
-use reqsign_aws_v4::{
-    ConfigCredentialProvider, IMDSv2CredentialProvider, ProvideCredentialChain,
-};
+use reqsign_aws_v4::{ConfigCredentialProvider, IMDSv2CredentialProvider, ProvideCredentialChain};
 use reqsign_core::{Context, ProvideCredential};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -40,3 +38,4 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+

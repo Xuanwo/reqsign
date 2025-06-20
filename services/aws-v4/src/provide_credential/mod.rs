@@ -4,9 +4,6 @@ pub use assume_role::AssumeRoleCredentialProvider;
 mod assume_role_with_web_identity;
 pub use assume_role_with_web_identity::AssumeRoleWithWebIdentityCredentialProvider;
 
-mod chain;
-pub use chain::ProvideCredentialChain;
-
 mod config;
 pub use config::ConfigCredentialProvider;
 

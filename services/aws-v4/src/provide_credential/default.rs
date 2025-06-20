@@ -1,11 +1,10 @@
-use crate::provide_credential::chain::ProvideCredentialChain;
 use crate::provide_credential::config::ConfigCredentialProvider;
 use crate::provide_credential::{
     AssumeRoleWithWebIdentityCredentialProvider, IMDSv2CredentialProvider,
 };
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
 use std::sync::Arc;
 
 /// DefaultCredentialProvider is a loader that will try to load credential via default chains.
@@ -19,7 +18,7 @@ use std::sync::Arc;
 /// 5. EC2 IMDSv2
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
-    chain: ProvideCredentialChain,
+    chain: ProvideCredentialChain<Credential>,
 }
 
 impl DefaultCredentialProvider {
