@@ -1,7 +1,8 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use log::debug;
 
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
 
 use crate::config::Config;
 use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;
@@ -13,14 +14,46 @@ use super::{
 };
 
 /// DefaultCredentialProvider tries to load credentials from multiple sources in order.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DefaultCredentialProvider {
-    config: Config,
+    chain: ProvideCredentialChain<Credential>,
 }
 
 impl DefaultCredentialProvider {
     /// Create a new DefaultCredentialProvider.
     pub fn new(config: Config) -> Self {
+        // Build the chain based on the configuration
+        let mut chain = ProvideCredentialChain::new();
+
+        // Add credential file providers
+        chain = chain.push(CredentialFileProvider::new(config.clone()));
+
+        // Add VM metadata provider if environment is not disabled
+        if !config.disable_env {
+            chain = chain.push(VmMetadataCredentialProvider::new(config));
+        }
+
+        Self { chain }
+    }
+}
+
+#[async_trait]
+impl ProvideCredential for DefaultCredentialProvider {
+    type Credential = Credential;
+
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        self.chain.provide_credential(ctx).await
+    }
+}
+
+/// CredentialFileProvider loads credentials from files and handles all credential types.
+#[derive(Debug, Clone)]
+struct CredentialFileProvider {
+    config: Config,
+}
+
+impl CredentialFileProvider {
+    fn new(config: Config) -> Self {
         Self { config }
     }
 
@@ -76,8 +109,8 @@ impl DefaultCredentialProvider {
     }
 }
 
-#[async_trait::async_trait]
-impl ProvideCredential for DefaultCredentialProvider {
+#[async_trait]
+impl ProvideCredential for CredentialFileProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
@@ -110,15 +143,6 @@ impl ProvideCredential for DefaultCredentialProvider {
                         return Ok(Some(cred));
                     }
                 }
-            }
-        }
-
-        // Try VM metadata as last resort
-        if !self.config.disable_env {
-            debug!("trying VM metadata loader");
-            let vm_loader = VmMetadataCredentialProvider::new(self.config.clone());
-            if let Some(cred) = vm_loader.provide_credential(ctx).await? {
-                return Ok(Some(cred));
             }
         }
 
