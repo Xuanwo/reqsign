@@ -103,4 +103,3 @@ async fn test_chain_with_real_providers() {
     assert_eq!(cred.access_key_id, "test_key");
     assert_eq!(cred.secret_access_key, "test_secret");
 }
-
