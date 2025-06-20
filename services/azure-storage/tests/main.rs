@@ -8,7 +8,10 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign_azure_storage::{Credential, DefaultCredentialProvider, RequestSigner};
+use reqsign_azure_storage::{
+    ConfigCredentialProvider, Credential, DefaultCredentialProvider, ImdsCredentialProvider,
+    RequestSigner,
+};
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -26,12 +29,15 @@ fn init_signer() -> Option<(Context, Signer<Credential>)> {
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    let loader = DefaultCredentialProvider::new().with_account_key(
-        env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
-            .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),
-        env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY")
-            .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_KEY must set"),
-    );
+    let loader = ConfigCredentialProvider::new()
+        .with_account_name(
+            env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
+                .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),
+        )
+        .with_account_key(
+            env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY")
+                .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_KEY must set"),
+        );
 
     let builder = RequestSigner::new();
     let signer = Signer::new(ctx.clone(), loader, builder);
@@ -257,7 +263,7 @@ async fn test_head_blob_with_imds() -> Result<()> {
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    let loader = DefaultCredentialProvider::new().with_imds();
+    let loader = ImdsCredentialProvider::new();
     let builder = RequestSigner::new();
     let signer = Signer::new(ctx.clone(), loader, builder);
 
@@ -303,7 +309,7 @@ async fn test_can_list_container_blobs_with_imds() -> Result<()> {
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    let loader = DefaultCredentialProvider::new().with_imds();
+    let loader = ImdsCredentialProvider::new();
     let builder = RequestSigner::new();
     let signer = Signer::new(ctx.clone(), loader, builder);
 

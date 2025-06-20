@@ -4,7 +4,7 @@ use crate::provide_credential::{
 };
 use crate::Credential;
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential, SigningCredential};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
 
 /// Default loader that tries multiple credential sources in order.
 ///
@@ -13,12 +13,21 @@ use reqsign_core::{Context, ProvideCredential, SigningCredential};
 /// 2. Client secret (service principal)
 /// 3. Workload identity (federated credentials)
 /// 4. IMDS (Azure VM managed identity)
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct DefaultCredentialProvider {
-    config_loader: ConfigCredentialProvider,
-    client_secret_loader: ClientSecretCredentialProvider,
-    workload_identity_loader: WorkloadIdentityCredentialProvider,
-    imds_loader: ImdsCredentialProvider,
+    chain: ProvideCredentialChain<Credential>,
+}
+
+impl Default for DefaultCredentialProvider {
+    fn default() -> Self {
+        let chain = ProvideCredentialChain::new()
+            .push(ConfigCredentialProvider::new())
+            .push(ClientSecretCredentialProvider::new())
+            .push(WorkloadIdentityCredentialProvider::new())
+            .push(ImdsCredentialProvider::new());
+
+        Self { chain }
+    }
 }
 
 impl DefaultCredentialProvider {
@@ -27,96 +36,12 @@ impl DefaultCredentialProvider {
         Self::default()
     }
 
-    /// Set account name and key for shared key authentication.
-    pub fn with_account_key(
-        mut self,
-        account_name: impl Into<String>,
-        account_key: impl Into<String>,
-    ) -> Self {
-        self.config_loader = self
-            .config_loader
-            .with_account_name(account_name)
-            .with_account_key(account_key);
-        self
-    }
-
-    /// Set SAS token for SAS authentication.
-    pub fn with_sas_token(mut self, sas_token: impl Into<String>) -> Self {
-        self.config_loader = self.config_loader.with_sas_token(sas_token);
-        self
-    }
-
-    /// Set client credentials for service principal authentication.
-    pub fn with_client_secret(
-        mut self,
-        tenant_id: impl Into<String>,
-        client_id: impl Into<String>,
-        client_secret: impl Into<String>,
-    ) -> Self {
-        self.client_secret_loader = self
-            .client_secret_loader
-            .with_tenant_id(tenant_id)
-            .with_client_id(client_id)
-            .with_client_secret(client_secret);
-        self
-    }
-
-    /// Set workload identity parameters for federated authentication.
-    pub fn with_workload_identity(
-        mut self,
-        tenant_id: impl Into<String>,
-        client_id: impl Into<String>,
-        federated_token_file: impl Into<String>,
-    ) -> Self {
-        self.workload_identity_loader = self
-            .workload_identity_loader
-            .with_tenant_id(tenant_id)
-            .with_client_id(client_id)
-            .with_federated_token_file(federated_token_file);
-        self
-    }
-
-    /// Set IMDS parameters for managed identity authentication.
-    pub fn with_imds(mut self) -> Self {
-        self.imds_loader = ImdsCredentialProvider::new();
-        self
-    }
-
-    /// Set custom IMDS endpoint.
-    pub fn with_imds_endpoint(mut self, endpoint: impl Into<String>) -> Self {
-        self.imds_loader = self.imds_loader.with_endpoint(endpoint);
-        self
-    }
-
-    /// Set client ID for user-assigned managed identity.
-    pub fn with_imds_client_id(mut self, client_id: impl Into<String>) -> Self {
-        self.imds_loader = self.imds_loader.with_client_id(client_id);
-        self
-    }
-
-    /// Set object ID for user-assigned managed identity.
-    pub fn with_imds_object_id(mut self, object_id: impl Into<String>) -> Self {
-        self.imds_loader = self.imds_loader.with_object_id(object_id);
-        self
-    }
-
-    /// Set MSI resource ID for user-assigned managed identity.
-    pub fn with_imds_msi_res_id(mut self, msi_res_id: impl Into<String>) -> Self {
-        self.imds_loader = self.imds_loader.with_msi_res_id(msi_res_id);
-        self
-    }
-
-    /// Set authority host for OAuth endpoints.
-    pub fn with_authority_host(mut self, authority_host: impl Into<String>) -> Self {
-        let host = authority_host.into();
-        self.client_secret_loader = self.client_secret_loader.with_authority_host(host.clone());
-        self.workload_identity_loader = self.workload_identity_loader.with_authority_host(host);
-        self
-    }
-
     /// Load credentials from environment variables.
-    pub fn from_env(mut self, ctx: &Context) -> Self {
-        // Load environment variables
+    pub fn from_env(self, ctx: &Context) -> Self {
+        // Create providers configured from environment
+        let mut config_loader = ConfigCredentialProvider::new();
+
+        // Load environment variables for config
         let account_name = ctx
             .env_var("AZBLOB_ACCOUNT_NAME")
             .or_else(|| ctx.env_var("AZURE_STORAGE_ACCOUNT_NAME"));
@@ -125,70 +50,80 @@ impl DefaultCredentialProvider {
             .or_else(|| ctx.env_var("AZURE_STORAGE_ACCOUNT_KEY"));
         let sas_token = ctx.env_var("AZURE_STORAGE_SAS_TOKEN");
 
-        let tenant_id = ctx.env_var("AZURE_TENANT_ID");
-        let client_id = ctx.env_var("AZURE_CLIENT_ID");
-        let client_secret = ctx.env_var("AZURE_CLIENT_SECRET");
-        let federated_token_file = ctx.env_var("AZURE_FEDERATED_TOKEN_FILE");
-        let authority_host = ctx
-            .env_var("AZURE_AUTHORITY_HOST")
-            .unwrap_or_else(|| "https://login.microsoftonline.com".to_string());
-
-        // Configure loaders based on available environment variables
         if let (Some(account_name), Some(account_key)) = (account_name, account_key) {
-            self.config_loader = self
-                .config_loader
+            config_loader = config_loader
                 .with_account_name(account_name)
                 .with_account_key(account_key);
         }
 
         if let Some(sas_token) = sas_token {
-            self.config_loader = self.config_loader.with_sas_token(sas_token);
+            config_loader = config_loader.with_sas_token(sas_token);
         }
+
+        // Create client secret provider
+        let mut client_secret_loader = ClientSecretCredentialProvider::new();
+        let tenant_id = ctx.env_var("AZURE_TENANT_ID");
+        let client_id = ctx.env_var("AZURE_CLIENT_ID");
+        let client_secret = ctx.env_var("AZURE_CLIENT_SECRET");
+        let authority_host = ctx
+            .env_var("AZURE_AUTHORITY_HOST")
+            .unwrap_or_else(|| "https://login.microsoftonline.com".to_string());
 
         if let (Some(tenant_id), Some(client_id), Some(client_secret)) =
             (tenant_id.clone(), client_id.clone(), client_secret)
         {
-            self.client_secret_loader = self
-                .client_secret_loader
+            client_secret_loader = client_secret_loader
                 .with_tenant_id(tenant_id)
                 .with_client_id(client_id)
                 .with_client_secret(client_secret)
                 .with_authority_host(authority_host.clone());
         }
 
+        // Create workload identity provider
+        let mut workload_identity_loader = WorkloadIdentityCredentialProvider::new();
+        let federated_token_file = ctx.env_var("AZURE_FEDERATED_TOKEN_FILE");
+
         if let (Some(tenant_id), Some(client_id), Some(federated_token_file)) =
             (tenant_id, client_id.clone(), federated_token_file)
         {
-            self.workload_identity_loader = self
-                .workload_identity_loader
+            workload_identity_loader = workload_identity_loader
                 .with_tenant_id(tenant_id)
                 .with_client_id(client_id)
                 .with_federated_token_file(federated_token_file)
                 .with_authority_host(authority_host);
         }
 
-        // Configure IMDS loader with optional parameters
+        // Create IMDS provider
+        let mut imds_loader = ImdsCredentialProvider::new();
+
         if let Some(client_id) = ctx.env_var("AZURE_CLIENT_ID") {
-            self.imds_loader = self.imds_loader.with_client_id(client_id);
+            imds_loader = imds_loader.with_client_id(client_id);
         }
 
         if let Some(object_id) = ctx.env_var("AZURE_OBJECT_ID") {
-            self.imds_loader = self.imds_loader.with_object_id(object_id);
+            imds_loader = imds_loader.with_object_id(object_id);
         }
 
         if let Some(msi_res_id) = ctx.env_var("AZURE_MSI_RES_ID") {
-            self.imds_loader = self.imds_loader.with_msi_res_id(msi_res_id);
+            imds_loader = imds_loader.with_msi_res_id(msi_res_id);
         }
 
         if let Some(endpoint) = ctx.env_var("AZURE_MSI_ENDPOINT") {
-            self.imds_loader = self.imds_loader.with_endpoint(endpoint);
+            imds_loader = imds_loader.with_endpoint(endpoint);
         }
 
         if let Some(secret) = ctx.env_var("AZURE_MSI_SECRET") {
-            self.imds_loader = self.imds_loader.with_msi_secret(secret);
+            imds_loader = imds_loader.with_msi_secret(secret);
         }
 
-        self
+        // Build new chain with configured providers
+        let chain = ProvideCredentialChain::new()
+            .push(config_loader)
+            .push(client_secret_loader)
+            .push(workload_identity_loader)
+            .push(imds_loader);
+
+        Self { chain }
     }
 }
 
@@ -197,39 +132,7 @@ impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
-        // Try configuration loader first (account key, SAS token)
-        if let Some(cred) = self.config_loader.provide_credential(ctx).await? {
-            if cred.is_valid() {
-                return Ok(Some(cred));
-            }
-        }
-
-        // Try client secret loader
-        if let Some(cred) = self.client_secret_loader.provide_credential(ctx).await? {
-            if cred.is_valid() {
-                return Ok(Some(cred));
-            }
-        }
-
-        // Try workload identity loader
-        if let Some(cred) = self
-            .workload_identity_loader
-            .provide_credential(ctx)
-            .await?
-        {
-            if cred.is_valid() {
-                return Ok(Some(cred));
-            }
-        }
-
-        // Try IMDS loader (managed identity)
-        if let Some(cred) = self.imds_loader.provide_credential(ctx).await? {
-            if cred.is_valid() {
-                return Ok(Some(cred));
-            }
-        }
-
-        Ok(None)
+        self.chain.provide_credential(ctx).await
     }
 }
 
