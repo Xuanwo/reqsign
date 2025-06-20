@@ -20,10 +20,7 @@ struct CountingProvider {
 impl ProvideCredential for CountingProvider {
     type Credential = Credential;
 
-    async fn provide_credential(
-        &self,
-        _ctx: &Context,
-    ) -> Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> Result<Option<Self::Credential>> {
         let mut count = self.call_count.lock().unwrap();
         *count += 1;
 

@@ -125,19 +125,23 @@ async fn get_client_secret_token(
         .uri(&url)
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(bytes::Bytes::from(body))
-        .map_err(|e| reqsign_core::Error::unexpected("failed to build client secret request").with_source(e))?;
+        .map_err(|e| {
+            reqsign_core::Error::unexpected("failed to build client secret request").with_source(e)
+        })?;
 
     let resp = ctx.http_send(req).await?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let body = String::from_utf8_lossy(resp.body());
-        return Err(reqsign_core::Error::unexpected(
-            format!("Client secret request failed with status {}: {}", status, body)
-        ));
+        return Err(reqsign_core::Error::unexpected(format!(
+            "Client secret request failed with status {}: {}",
+            status, body
+        )));
     }
 
-    let token: ClientSecretTokenResponse = serde_json::from_slice(resp.body())
-        .map_err(|e| reqsign_core::Error::unexpected("failed to parse client secret response").with_source(e))?;
+    let token: ClientSecretTokenResponse = serde_json::from_slice(resp.body()).map_err(|e| {
+        reqsign_core::Error::unexpected("failed to parse client secret response").with_source(e)
+    })?;
     Ok(Some(token))
 }

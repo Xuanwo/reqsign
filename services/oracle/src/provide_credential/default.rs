@@ -129,8 +129,9 @@ impl ProvideCredential for ConfigFileCredentialProvider {
             .unwrap_or(ORACLE_DEFAULT_PROFILE);
 
         // Parse INI content
-        let ini = ini::Ini::read_from(&mut content.as_bytes())
-            .map_err(|e| reqsign_core::Error::config_invalid(format!("Failed to parse config file: {}", e)))?;
+        let ini = ini::Ini::read_from(&mut content.as_bytes()).map_err(|e| {
+            reqsign_core::Error::config_invalid(format!("Failed to parse config file: {}", e))
+        })?;
         let section = match ini.section(Some(profile)) {
             Some(section) => section,
             None => {
@@ -151,8 +152,9 @@ impl ProvideCredential for ConfigFileCredentialProvider {
 
                 // Expand key file path if it starts with ~
                 let expanded_key_file = if key_file.starts_with('~') {
-                    ctx.expand_home_dir(key_file)
-                        .ok_or_else(|| reqsign_core::Error::unexpected("Failed to expand home directory"))?
+                    ctx.expand_home_dir(key_file).ok_or_else(|| {
+                        reqsign_core::Error::unexpected("Failed to expand home directory")
+                    })?
                 } else {
                     key_file.to_string()
                 };

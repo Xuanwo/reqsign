@@ -1,5 +1,7 @@
 use reqsign_core::hash::base64_decode;
-use reqsign_core::{time::now, time::DateTime, utils::Redact, Result, SigningCredential as KeyTrait};
+use reqsign_core::{
+    time::now, time::DateTime, utils::Redact, Result, SigningCredential as KeyTrait,
+};
 use std::fmt::{self, Debug};
 
 /// ServiceAccount holds the client email and private key for service account authentication.
@@ -76,8 +78,8 @@ pub struct ExternalAccount {
 
 /// External account specific types.
 pub mod external_account {
-    use serde::Deserialize;
     use reqsign_core::Result;
+    use serde::Deserialize;
 
     /// Where to obtain the external account credentials from.
     #[derive(Clone, Deserialize, Debug)]
@@ -130,14 +132,20 @@ pub mod external_account {
         /// Parse a slice of bytes as the expected format.
         pub fn parse(&self, slice: &[u8]) -> Result<String> {
             match &self {
-                Self::Text => Ok(String::from_utf8(slice.to_vec()).map_err(|e| reqsign_core::Error::unexpected("invalid UTF-8").with_source(e))?),
+                Self::Text => Ok(String::from_utf8(slice.to_vec()).map_err(|e| {
+                    reqsign_core::Error::unexpected("invalid UTF-8").with_source(e)
+                })?),
                 Self::Json {
                     subject_token_field_name,
                 } => {
-                    let value: serde_json::Value = serde_json::from_slice(slice).map_err(|e| reqsign_core::Error::unexpected("failed to parse JSON").with_source(e))?;
+                    let value: serde_json::Value = serde_json::from_slice(slice).map_err(|e| {
+                        reqsign_core::Error::unexpected("failed to parse JSON").with_source(e)
+                    })?;
                     match value.get(subject_token_field_name) {
                         Some(serde_json::Value::String(access_token)) => Ok(access_token.clone()),
-                        _ => Err(reqsign_core::Error::unexpected(format!("JSON missing token field {subject_token_field_name}"))),
+                        _ => Err(reqsign_core::Error::unexpected(format!(
+                            "JSON missing token field {subject_token_field_name}"
+                        ))),
                     }
                 }
             }
@@ -259,12 +267,16 @@ pub enum CredentialFile {
 impl CredentialFile {
     /// Parse credential file from bytes.
     pub fn from_slice(v: &[u8]) -> Result<Self> {
-        serde_json::from_slice(v).map_err(|e| reqsign_core::Error::unexpected("failed to parse credential file").with_source(e))
+        serde_json::from_slice(v).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to parse credential file").with_source(e)
+        })
     }
 
     /// Parse credential file from base64-encoded content.
     pub fn from_base64(content: &str) -> Result<Self> {
-        let decoded = base64_decode(content).map_err(|e| reqsign_core::Error::unexpected("failed to decode base64").with_source(e))?;
+        let decoded = base64_decode(content).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to decode base64").with_source(e)
+        })?;
         Self::from_slice(&decoded)
     }
 }

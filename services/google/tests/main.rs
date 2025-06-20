@@ -75,7 +75,9 @@ async fn test_get_object() -> Result<()> {
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
     builder = builder.uri(format!("{}/o/{}", url, "not_exist_file"));
-    let req = builder.body("").map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?;
+    let req = builder.body("").map_err(|e| {
+        reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
+    })?;
 
     let (mut parts, body) = req.into_parts();
     signer
@@ -88,7 +90,9 @@ async fn test_get_object() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(e))?)
+        .execute(req.try_into().map_err(|e| {
+            reqsign_core::Error::unexpected("failed to convert request").with_source(e)
+        })?)
         .await
         .expect("request must succeed");
 
@@ -110,7 +114,9 @@ async fn test_list_objects() -> Result<()> {
     let mut builder = http::Request::builder();
     builder = builder.method(http::Method::GET);
     builder = builder.uri(format!("{url}/o"));
-    let req = builder.body("").map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?;
+    let req = builder.body("").map_err(|e| {
+        reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
+    })?;
 
     let (mut parts, body) = req.into_parts();
     signer
@@ -123,7 +129,9 @@ async fn test_list_objects() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(e))?)
+        .execute(req.try_into().map_err(|e| {
+            reqsign_core::Error::unexpected("failed to convert request").with_source(e)
+        })?)
         .await
         .expect("request must succeed");
 
@@ -149,7 +157,9 @@ async fn test_get_object_with_query() -> Result<()> {
         url.replace("storage/v1/b/", ""),
         "not_exist_file"
     ));
-    let req = builder.body("").map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?;
+    let req = builder.body("").map_err(|e| {
+        reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
+    })?;
 
     let (mut parts, body) = req.into_parts();
     signer
@@ -162,13 +172,22 @@ async fn test_get_object_with_query() -> Result<()> {
 
     let client = Client::new();
     let resp = client
-        .execute(req.try_into().map_err(|e| reqsign_core::Error::unexpected("failed to convert request").with_source(e))?)
+        .execute(req.try_into().map_err(|e| {
+            reqsign_core::Error::unexpected("failed to convert request").with_source(e)
+        })?)
         .await
         .expect("request must succeed");
 
     let code = resp.status();
     debug!("got response: {:?}", resp);
-    debug!("got body: {}", resp.text().await.map_err(|e| reqsign_core::Error::unexpected("failed to read response body").with_source(e))?);
+    debug!(
+        "got body: {}",
+        resp.text()
+            .await
+            .map_err(
+                |e| reqsign_core::Error::unexpected("failed to read response body").with_source(e)
+            )?
+    );
     assert_eq!(StatusCode::NOT_FOUND, code);
     Ok(())
 }

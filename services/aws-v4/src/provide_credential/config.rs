@@ -20,10 +20,7 @@ impl ConfigCredentialProvider {
 impl ProvideCredential for ConfigCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(
-        &self,
-        _: &Context,
-    ) -> Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _: &Context) -> Result<Option<Self::Credential>> {
         let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.secret_access_key)
         else {
             return Ok(None);

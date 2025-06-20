@@ -97,12 +97,19 @@ impl ExternalAccountCredentialProvider {
             }
         }
 
-        let resp = ctx.http_send(req.body(Vec::<u8>::new().into()).map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?).await?;
+        let resp = ctx
+            .http_send(req.body(Vec::<u8>::new().into()).map_err(|e| {
+                reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
+            })?)
+            .await?;
 
         if resp.status() != http::StatusCode::OK {
             error!("exchange token got unexpected response: {:?}", resp);
             let body = String::from_utf8_lossy(resp.body());
-            return Err(reqsign_core::Error::unexpected(format!("exchange OIDC token failed: {}", body)));
+            return Err(reqsign_core::Error::unexpected(format!(
+                "exchange OIDC token failed: {}",
+                body
+            )));
         }
 
         source.format.parse(resp.body())
@@ -120,24 +127,34 @@ impl ExternalAccountCredentialProvider {
             subject_token_type: self.external_account.subject_token_type.clone(),
         };
 
-        let body = serde_json::to_vec(&request).map_err(|e| reqsign_core::Error::unexpected("failed to serialize request").with_source(e))?;
+        let body = serde_json::to_vec(&request).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to serialize request").with_source(e)
+        })?;
 
         let req = http::Request::builder()
             .method(http::Method::POST)
             .uri(&self.external_account.token_url)
             .header(ACCEPT, "application/json")
             .header(CONTENT_TYPE, "application/json")
-            .body(body.into()).map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?;
+            .body(body.into())
+            .map_err(|e| {
+                reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
+            })?;
 
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {
             error!("exchange token got unexpected response: {:?}", resp);
             let body = String::from_utf8_lossy(resp.body());
-            return Err(reqsign_core::Error::unexpected(format!("exchange token failed: {}", body)));
+            return Err(reqsign_core::Error::unexpected(format!(
+                "exchange token failed: {}",
+                body
+            )));
         }
 
-        let token_resp: StsTokenResponse = serde_json::from_slice(resp.body()).map_err(|e| reqsign_core::Error::unexpected("failed to parse STS response").with_source(e))?;
+        let token_resp: StsTokenResponse = serde_json::from_slice(resp.body()).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to parse STS response").with_source(e)
+        })?;
 
         let expires_at = token_resp.expires_in.map(|expires_in| {
             now() + chrono::TimeDelta::try_seconds(expires_in as i64).expect("in bounds")
@@ -161,7 +178,9 @@ impl ExternalAccountCredentialProvider {
         debug!("impersonating service account");
 
         let scope = self.config.scope.as_ref().ok_or_else(|| {
-            reqsign_core::Error::config_invalid("scope is required for service account impersonation")
+            reqsign_core::Error::config_invalid(
+                "scope is required for service account impersonation",
+            )
         })?;
 
         let lifetime = self
@@ -176,7 +195,9 @@ impl ExternalAccountCredentialProvider {
             lifetime: format!("{lifetime}s"),
         };
 
-        let body = serde_json::to_vec(&request).map_err(|e| reqsign_core::Error::unexpected("failed to serialize request").with_source(e))?;
+        let body = serde_json::to_vec(&request).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to serialize request").with_source(e)
+        })?;
 
         let req = http::Request::builder()
             .method(http::Method::POST)
@@ -184,17 +205,27 @@ impl ExternalAccountCredentialProvider {
             .header(ACCEPT, "application/json")
             .header(CONTENT_TYPE, "application/json")
             .header("Authorization", format!("Bearer {}", access_token))
-            .body(body.into()).map_err(|e| reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e))?;
+            .body(body.into())
+            .map_err(|e| {
+                reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
+            })?;
 
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {
             error!("impersonated token got unexpected response: {:?}", resp);
             let body = String::from_utf8_lossy(resp.body());
-            return Err(reqsign_core::Error::unexpected(format!("exchange impersonated token failed: {}", body)));
+            return Err(reqsign_core::Error::unexpected(format!(
+                "exchange impersonated token failed: {}",
+                body
+            )));
         }
 
-        let token_resp: ImpersonatedTokenResponse = serde_json::from_slice(resp.body()).map_err(|e| reqsign_core::Error::unexpected("failed to parse impersonation response").with_source(e))?;
+        let token_resp: ImpersonatedTokenResponse =
+            serde_json::from_slice(resp.body()).map_err(|e| {
+                reqsign_core::Error::unexpected("failed to parse impersonation response")
+                    .with_source(e)
+            })?;
 
         // Parse expire time from RFC3339 format
         let expires_at = chrono::DateTime::parse_from_rfc3339(&token_resp.expire_time)

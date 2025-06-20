@@ -1,5 +1,5 @@
-use reqsign_core::Result;
 use reqsign_aliyun_oss::{Config, DefaultCredentialProvider, RequestSigner};
+use reqsign_core::Result;
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -69,19 +69,29 @@ async fn main() -> Result<()> {
 
             if !demo_mode {
                 // Execute the request only if we have real credentials
-                let req = http::Request::from_parts(parts, body).try_into()
-                    .map_err(|e: reqwest::Error| reqsign_core::Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e)))?;
+                let req = http::Request::from_parts(parts, body).try_into().map_err(
+                    |e: reqwest::Error| {
+                        reqsign_core::Error::unexpected("failed to convert request")
+                            .with_source(anyhow::Error::new(e))
+                    },
+                )?;
                 match client.execute(req).await {
                     Ok(resp) => {
                         println!("Response status: {}", resp.status());
                         if resp.status().is_success() {
-                            let text = resp.text().await
-                                .map_err(|e| reqsign_core::Error::unexpected("failed to read response text").with_source(anyhow::Error::new(e)))?;
+                            let text = resp.text().await.map_err(|e| {
+                                reqsign_core::Error::unexpected("failed to read response text")
+                                    .with_source(anyhow::Error::new(e))
+                            })?;
                             println!("Objects XML response preview:");
                             println!("{}", &text[..500.min(text.len())]);
                         }
                     }
-                    Err(e) => eprintln!("Request failed: {}", reqsign_core::Error::unexpected("HTTP request failed").with_source(anyhow::Error::new(e))),
+                    Err(e) => eprintln!(
+                        "Request failed: {}",
+                        reqsign_core::Error::unexpected("HTTP request failed")
+                            .with_source(anyhow::Error::new(e))
+                    ),
                 }
             } else {
                 println!("Demo mode: Skipping actual API call");

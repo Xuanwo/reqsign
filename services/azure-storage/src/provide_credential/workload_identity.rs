@@ -86,8 +86,12 @@ impl ProvideCredential for WorkloadIdentityCredentialProvider {
         match token {
             Some(token_response) => {
                 let expires_on = match token_response.expires_on {
-                    Some(expires_on) => reqsign_core::time::parse_rfc3339(&expires_on)
-                        .map_err(|e| reqsign_core::Error::unexpected("failed to parse expires_on time").with_source(e))?,
+                    Some(expires_on) => {
+                        reqsign_core::time::parse_rfc3339(&expires_on).map_err(|e| {
+                            reqsign_core::Error::unexpected("failed to parse expires_on time")
+                                .with_source(e)
+                        })?
+                    }
                     None => {
                         reqsign_core::time::now()
                             + chrono::TimeDelta::try_minutes(10).expect("in bounds")
@@ -119,8 +123,10 @@ async fn get_workload_identity_token(
 ) -> Result<Option<WorkloadIdentityTokenResponse>> {
     // Read the federated token from file
     let federated_token = match ctx.file_read(federated_token_file).await {
-        Ok(content) => String::from_utf8(content)
-            .map_err(|e| reqsign_core::Error::unexpected("failed to parse federated token file as UTF-8").with_source(e))?,
+        Ok(content) => String::from_utf8(content).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to parse federated token file as UTF-8")
+                .with_source(e)
+        })?,
         Err(_) => return Ok(None), // File doesn't exist or can't be read
     };
 
@@ -150,19 +156,26 @@ async fn get_workload_identity_token(
         .uri(&url)
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(bytes::Bytes::from(body))
-        .map_err(|e| reqsign_core::Error::unexpected("failed to build workload identity request").with_source(e))?;
+        .map_err(|e| {
+            reqsign_core::Error::unexpected("failed to build workload identity request")
+                .with_source(e)
+        })?;
 
     let resp = ctx.http_send(req).await?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let body = String::from_utf8_lossy(resp.body());
-        return Err(reqsign_core::Error::unexpected(
-            format!("Workload identity request failed with status {}: {}", status, body)
-        ));
+        return Err(reqsign_core::Error::unexpected(format!(
+            "Workload identity request failed with status {}: {}",
+            status, body
+        )));
     }
 
-    let token: WorkloadIdentityTokenResponse = serde_json::from_slice(resp.body())
-        .map_err(|e| reqsign_core::Error::unexpected("failed to parse workload identity response").with_source(e))?;
+    let token: WorkloadIdentityTokenResponse =
+        serde_json::from_slice(resp.body()).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to parse workload identity response")
+                .with_source(e)
+        })?;
     Ok(Some(token))
 }
