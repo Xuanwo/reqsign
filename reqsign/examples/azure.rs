@@ -13,8 +13,7 @@ async fn main() -> Result<()> {
     let ctx = Context::new(ctx_impl.clone(), ctx_impl.clone()).with_env(ctx_impl.clone());
 
     // Create credential loader - will try multiple credential sources
-    let loader =
-        DefaultCredentialProvider::new().with_account_key("myaccount", "base64-encoded-key"); // Optional: set account key
+    let loader = DefaultCredentialProvider::new().from_env(&ctx);
 
     // Create request builder
     let builder = RequestSigner::new();

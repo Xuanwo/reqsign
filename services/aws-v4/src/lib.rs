@@ -89,23 +89,26 @@
 //! config.role_arn = Some("arn:aws:iam::123456789012:role/MyRole".to_string());
 //! ```
 //!
-//! ### Custom Credential Provider Chain
+//! ### Custom Credential Provider
 //!
-//! You can create a custom credential provider chain to control the order and sources
-//! of credential loading:
+//! You can create custom credential providers by implementing the `ProvideCredential` trait:
 //!
 //! ```no_run
-//! use reqsign_aws_v4::{ProvideCredentialChain, ConfigCredentialProvider, IMDSv2CredentialProvider};
-//! use std::sync::Arc;
+//! use reqsign_core::{ProvideCredential, Context};
+//! use async_trait::async_trait;
 //!
-//! # async fn example() {
-//! let config = Arc::new(reqsign_aws_v4::Config::default());
-//!
-//! // Create a custom chain with specific order
-//! let chain = ProvideCredentialChain::new()
-//!     .push(ConfigCredentialProvider::new(config.clone()))
-//!     .push(IMDSv2CredentialProvider::new(config));
-//! # }
+//! # #[derive(Debug)]
+//! # struct MyCredentialProvider;
+//! # type Credential = reqsign_aws_v4::Credential;
+//! #[async_trait]
+//! impl ProvideCredential for MyCredentialProvider {
+//!     type Credential = Credential;
+//!     
+//!     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+//!         // Your custom credential loading logic
+//!         Ok(None)
+//!     }
+//! }
 //! ```
 //!
 //! ## Examples
@@ -124,9 +127,6 @@ mod sign_request;
 pub use sign_request::RequestSigner;
 mod provide_credential;
 pub use provide_credential::*;
-
-// Re-export ProvideCredentialChain from core for convenience
-pub use reqsign_core::ProvideCredentialChain;
 
 pub const EMPTY_STRING_SHA256: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";

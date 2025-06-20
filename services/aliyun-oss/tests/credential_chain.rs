@@ -1,7 +1,8 @@
 //! Integration tests for ProvideCredentialChain with Aliyun OSS
 
 use async_trait::async_trait;
-use reqsign_aliyun_oss::{ConfigCredentialProvider, Credential, ProvideCredentialChain};
+use reqsign_aliyun_oss::{ConfigCredentialProvider, Credential};
+use reqsign_core::ProvideCredentialChain;
 use reqsign_core::{Context, ProvideCredential};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;

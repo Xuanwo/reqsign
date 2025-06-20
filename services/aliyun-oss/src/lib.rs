@@ -158,6 +158,3 @@ pub use sign_request::RequestSigner;
 
 mod provide_credential;
 pub use provide_credential::*;
-
-// Re-export ProvideCredentialChain from core for convenience
-pub use reqsign_core::ProvideCredentialChain;
