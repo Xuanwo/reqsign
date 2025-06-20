@@ -1,7 +1,7 @@
 //! Example of building a custom credential chain with specific providers
 
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqsign_huaweicloud_obs::Credential;
@@ -33,7 +33,7 @@ impl StaticCredentialProvider {
 impl ProvideCredential for StaticCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> Result<Option<Self::Credential>> {
         Ok(Some(Credential::new(
             self.access_key_id.clone(),
             self.secret_access_key.clone(),
@@ -50,7 +50,7 @@ struct EnvCredentialProvider;
 impl ProvideCredential for EnvCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         // Check for credentials in environment
         match (
             ctx.env_var("HUAWEI_CLOUD_ACCESS_KEY_ID"),
@@ -66,7 +66,7 @@ impl ProvideCredential for EnvCredentialProvider {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     // Create context
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 

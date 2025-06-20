@@ -1,4 +1,3 @@
-use anyhow::Result;
 use http::header;
 use jsonwebtoken::{Algorithm, EncodingKey, Header as JwtHeader};
 use log::debug;
@@ -12,7 +11,7 @@ use std::borrow::Cow;
 use std::time::Duration;
 
 use reqsign_core::{
-    hash::hex_sha256, time::*, Context, SignRequest, SigningCredential, SigningMethod,
+    hash::hex_sha256, time::*, Context, Result, SignRequest, SigningCredential, SigningMethod,
     SigningRequest,
 };
 
@@ -100,11 +99,9 @@ impl RequestSigner {
     /// This method is used internally when a token is needed but only a service account
     /// is available. It creates a JWT and exchanges it for an OAuth2 access token.
     async fn exchange_token(&self, ctx: &Context, sa: &ServiceAccount) -> Result<Token> {
-        let scope = self
-            .config
-            .scope
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("scope is required for token exchange"))?;
+        let scope = self.config.scope.as_ref().ok_or_else(|| {
+            reqsign_core::Error::config_invalid("scope is required for token exchange")
+        })?;
 
         debug!("exchanging service account for token with scope: {}", scope);
 
@@ -112,8 +109,11 @@ impl RequestSigner {
         let jwt = jsonwebtoken::encode(
             &JwtHeader::new(Algorithm::RS256),
             &Claims::new(&sa.client_email, scope),
-            &EncodingKey::from_rsa_pem(sa.private_key.as_bytes())?,
-        )?;
+            &EncodingKey::from_rsa_pem(sa.private_key.as_bytes()).map_err(|e| {
+                reqsign_core::Error::unexpected("failed to parse RSA private key").with_source(e)
+            })?,
+        )
+        .map_err(|e| reqsign_core::Error::unexpected("failed to encode JWT").with_source(e))?;
 
         // Exchange JWT for access token
         let body = format!(
@@ -124,16 +124,24 @@ impl RequestSigner {
             .method(http::Method::POST)
             .uri("https://oauth2.googleapis.com/token")
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(body.into_bytes().into())?;
+            .body(body.into_bytes().into())
+            .map_err(|e| {
+                reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
+            })?;
 
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {
             let body = String::from_utf8_lossy(resp.body());
-            anyhow::bail!("exchange token failed: {}", body);
+            return Err(reqsign_core::Error::unexpected(format!(
+                "exchange token failed: {}",
+                body
+            )));
         }
 
-        let token_resp: TokenResponse = serde_json::from_slice(resp.body())?;
+        let token_resp: TokenResponse = serde_json::from_slice(resp.body()).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to parse token response").with_source(e)
+        })?;
 
         let expires_at = token_resp.expires_in.map(|expires_in| {
             now() + chrono::TimeDelta::try_seconds(expires_in as i64).expect("in bounds")
@@ -153,7 +161,11 @@ impl RequestSigner {
         let mut req = SigningRequest::build(parts)?;
 
         req.headers.insert(header::AUTHORIZATION, {
-            let mut value: http::HeaderValue = format!("Bearer {}", &token.access_token).parse()?;
+            let mut value: http::HeaderValue = format!("Bearer {}", &token.access_token)
+                .parse()
+                .map_err(|e| {
+                    reqsign_core::Error::unexpected("failed to parse header value").with_source(e)
+                })?;
             value.set_sensitive(true);
             value
         });
@@ -213,7 +225,10 @@ impl RequestSigner {
 
         // Sign the string
         let mut rng = thread_rng();
-        let private_key = rsa::RsaPrivateKey::from_pkcs8_pem(&service_account.private_key)?;
+        let private_key = rsa::RsaPrivateKey::from_pkcs8_pem(&service_account.private_key)
+            .map_err(|e| {
+                reqsign_core::Error::unexpected("failed to parse private key").with_source(e)
+            })?;
         let signing_key = SigningKey::<sha2::Sha256>::new(private_key);
         let signature = signing_key.sign_with_rng(&mut rng, string_to_sign.as_bytes());
 
@@ -235,15 +250,17 @@ impl SignRequest for RequestSigner {
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
     ) -> Result<()> {
-        let cred = credential.ok_or_else(|| anyhow::anyhow!("missing credential"))?;
+        let cred = credential
+            .ok_or_else(|| reqsign_core::Error::credential_invalid("missing credential"))?;
 
         let signing_req = match expires_in {
             // Query signing - must use ServiceAccount
             Some(expires) => {
-                let sa = cred
-                    .service_account
-                    .as_ref()
-                    .ok_or_else(|| anyhow::anyhow!("service account required for query signing"))?;
+                let sa = cred.service_account.as_ref().ok_or_else(|| {
+                    reqsign_core::Error::credential_invalid(
+                        "service account required for query signing",
+                    )
+                })?;
                 self.build_signed_query(ctx, req, sa, expires)?
             }
             // Header authentication - prefer valid token, otherwise exchange from SA
@@ -258,8 +275,8 @@ impl SignRequest for RequestSigner {
                         let new_token = self.exchange_token(ctx, sa).await?;
                         self.build_token_auth(req, &new_token)?
                     } else {
-                        return Err(anyhow::anyhow!(
-                            "token expired and no service account available"
+                        return Err(reqsign_core::Error::credential_expired(
+                            "token expired and no service account available",
                         ));
                     }
                 } else if let Some(sa) = &cred.service_account {
@@ -268,12 +285,16 @@ impl SignRequest for RequestSigner {
                     let token = self.exchange_token(ctx, sa).await?;
                     self.build_token_auth(req, &token)?
                 } else {
-                    return Err(anyhow::anyhow!("no valid credential available"));
+                    return Err(reqsign_core::Error::credential_invalid(
+                        "no valid credential available",
+                    ));
                 }
             }
         };
 
-        signing_req.apply(req)
+        signing_req.apply(req).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to apply signing request").with_source(e)
+        })
     }
 }
 
@@ -286,7 +307,9 @@ fn canonical_request_string(req: &mut SigningRequest) -> Result<String> {
     f.push('\n');
 
     // Insert encoded path
-    let path = percent_decode_str(&req.path).decode_utf8()?;
+    let path = percent_decode_str(&req.path)
+        .decode_utf8()
+        .map_err(|e| reqsign_core::Error::unexpected("failed to decode path").with_source(e))?;
     f.push_str(&Cow::from(utf8_percent_encode(&path, &GOOG_URI_ENCODE_SET)));
     f.push('\n');
 
@@ -323,8 +346,12 @@ fn canonicalize_header(req: &mut SigningRequest) -> Result<()> {
 
     // Insert HOST header if not present.
     if req.headers.get(header::HOST).is_none() {
-        req.headers
-            .insert(header::HOST, req.authority.as_str().parse()?);
+        req.headers.insert(
+            header::HOST,
+            req.authority.as_str().parse().map_err(|e| {
+                reqsign_core::Error::unexpected("failed to parse host header").with_source(e)
+            })?,
+        );
     }
 
     Ok(())

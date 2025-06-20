@@ -13,12 +13,12 @@
 //!
 //! ```no_run
 //! use reqsign_aliyun_oss::{RequestSigner, Config, DefaultCredentialProvider};
-//! use reqsign_core::{Context, Signer};
+//! use reqsign_core::{Context, Signer, Result};
 //! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //!
 //! #[tokio::main]
-//! async fn main() -> anyhow::Result<()> {
+//! async fn main() -> Result<()> {
 //!     // Create context
 //!     let ctx = Context::new(
 //!         TokioFileRead::default(),

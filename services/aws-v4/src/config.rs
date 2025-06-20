@@ -2,15 +2,13 @@ use std::fmt;
 
 use super::constants::*;
 #[cfg(not(target_arch = "wasm32"))]
-use anyhow::anyhow;
-#[cfg(not(target_arch = "wasm32"))]
-use anyhow::Result;
-#[cfg(not(target_arch = "wasm32"))]
 use ini::Ini;
 #[cfg(not(target_arch = "wasm32"))]
 use log::debug;
 use reqsign_core::utils::Redact;
 use reqsign_core::Context;
+#[cfg(not(target_arch = "wasm32"))]
+use reqsign_core::{Error, Result};
 
 /// Config for aws services.
 #[derive(Clone)]
@@ -244,14 +242,19 @@ impl Config {
     async fn load_via_profile_shared_credentials_file(&mut self, ctx: &Context) -> Result<()> {
         let path = ctx
             .expand_home_dir(&self.shared_credentials_file)
-            .ok_or_else(|| anyhow!("expand homedir failed"))?;
+            .ok_or_else(|| Error::config_invalid("expand homedir failed"))?;
 
-        let content = ctx.file_read(&path).await?;
-        let conf = Ini::load_from_str(&String::from_utf8_lossy(&content))?;
+        let content = ctx.file_read(&path).await.map_err(|e| {
+            Error::config_invalid("failed to read shared credentials file").with_source(e)
+        })?;
+        let conf = Ini::load_from_str(&String::from_utf8_lossy(&content)).map_err(|e| {
+            Error::config_invalid("failed to parse shared credentials file")
+                .with_source(anyhow::Error::new(e))
+        })?;
 
-        let props = conf
-            .section(Some(&self.profile))
-            .ok_or_else(|| anyhow!("section {} is not found", self.profile))?;
+        let props = conf.section(Some(&self.profile)).ok_or_else(|| {
+            Error::config_invalid(format!("section {} is not found", self.profile))
+        })?;
 
         if let Some(v) = props.get("aws_access_key_id") {
             self.access_key_id = Some(v.to_string())
@@ -270,18 +273,23 @@ impl Config {
     async fn load_via_profile_config_file(&mut self, ctx: &Context) -> Result<()> {
         let path = ctx
             .expand_home_dir(&self.config_file)
-            .ok_or_else(|| anyhow!("expand homedir failed"))?;
+            .ok_or_else(|| Error::config_invalid("expand homedir failed"))?;
 
-        let content = ctx.file_read(&path).await?;
-        let conf = Ini::load_from_str(&String::from_utf8_lossy(&content))?;
+        let content = ctx
+            .file_read(&path)
+            .await
+            .map_err(|e| Error::config_invalid("failed to read config file").with_source(e))?;
+        let conf = Ini::load_from_str(&String::from_utf8_lossy(&content)).map_err(|e| {
+            Error::config_invalid("failed to parse config file").with_source(anyhow::Error::new(e))
+        })?;
 
         let section = match self.profile.as_str() {
             "default" => "default".to_string(),
             x => format!("profile {x}"),
         };
-        let props = conf
-            .section(Some(section))
-            .ok_or_else(|| anyhow!("section {} is not found", self.profile))?;
+        let props = conf.section(Some(section)).ok_or_else(|| {
+            Error::config_invalid(format!("section {} is not found", self.profile))
+        })?;
 
         if let Some(v) = props.get("region") {
             self.region = Some(v.to_string())
@@ -332,7 +340,7 @@ mod tests {
 
     #[tokio::test]
     #[cfg(not(target_arch = "wasm32"))]
-    async fn test_config_from_profile_shared_credentials() -> Result<()> {
+    async fn test_config_from_profile_shared_credentials() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // Create a dummy credentials file to test against
@@ -379,7 +387,7 @@ mod tests {
 
     #[tokio::test]
     #[cfg(not(target_arch = "wasm32"))]
-    async fn test_config_from_profile_config() -> Result<()> {
+    async fn test_config_from_profile_config() -> anyhow::Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         // Create a dummy credentials file to test against

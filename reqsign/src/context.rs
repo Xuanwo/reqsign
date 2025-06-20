@@ -1,6 +1,6 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
+use reqsign_core::Result;
 use reqsign_core::{Env, FileRead, HttpSend};
 use reqwest::Client;
 use std::collections::HashMap;
@@ -39,7 +39,9 @@ impl FileRead for DefaultContext {
 #[async_trait]
 impl FileRead for DefaultContext {
     async fn file_read(&self, _path: &str) -> Result<Vec<u8>> {
-        Err(anyhow::anyhow!("File reading is not supported on WASM"))
+        Err(reqsign_core::Error::unexpected(
+            "File reading is not supported on WASM",
+        ))
     }
 }
 
@@ -56,12 +58,17 @@ impl HttpSend for DefaultContext {
         reqwest_req = reqwest_req.headers(headers);
         reqwest_req = reqwest_req.body(body);
 
-        let reqwest_resp = reqwest_req.send().await?;
+        let reqwest_resp = reqwest_req
+            .send()
+            .await
+            .map_err(|e| reqsign_core::Error::unexpected(format!("HTTP request failed: {}", e)))?;
 
         // Convert reqwest::Response to http::Response
         let status = reqwest_resp.status();
         let headers = reqwest_resp.headers().clone();
-        let body = reqwest_resp.bytes().await?;
+        let body = reqwest_resp.bytes().await.map_err(|e| {
+            reqsign_core::Error::unexpected(format!("Failed to read response body: {}", e))
+        })?;
 
         let mut http_resp = http::Response::builder().status(status);
 

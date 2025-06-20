@@ -1,7 +1,6 @@
-use anyhow::Result;
 use log::debug;
 
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, Result};
 
 use crate::config::Config;
 use crate::constants::GOOGLE_APPLICATION_CREDENTIALS;

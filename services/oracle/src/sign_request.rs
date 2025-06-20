@@ -1,5 +1,4 @@
 use crate::Credential;
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use base64::{engine::general_purpose, Engine as _};
 use http::request::Parts;
@@ -9,6 +8,7 @@ use http::{
 };
 use log::debug;
 use reqsign_core::time::{format_http_date, now};
+use reqsign_core::Result;
 use reqsign_core::{Context, SignRequest, SigningRequest};
 use rsa::pkcs1v15::SigningKey;
 use rsa::sha2::Sha256;
@@ -72,14 +72,15 @@ impl SignRequest for RequestSigner {
 
         // Read private key from file
         let private_key_content = ctx.file_read_as_string(&cred.key_file).await?;
-        let private_key = RsaPrivateKey::from_pkcs8_pem(&private_key_content)
-            .map_err(|e| anyhow!("Failed to read private key: {}", e))?;
+        let private_key = RsaPrivateKey::from_pkcs8_pem(&private_key_content).map_err(|e| {
+            reqsign_core::Error::credential_invalid(format!("Failed to read private key: {}", e))
+        })?;
 
         // Sign the string
         let signing_key = SigningKey::<Sha256>::new(private_key);
         let signature = signing_key
             .try_sign(string_to_sign.as_bytes())
-            .map_err(|e| anyhow!("Failed to sign: {}", e))?;
+            .map_err(|e| reqsign_core::Error::unexpected(format!("Failed to sign: {}", e)))?;
         let encoded_signature = general_purpose::STANDARD.encode(signature.to_bytes());
 
         // Set headers

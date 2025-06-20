@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use reqsign_core::ProvideCredentialChain;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_google::{ConfigCredentialProvider, Credential, ServiceAccount, Token};
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -20,7 +20,7 @@ struct CountingProvider {
 impl ProvideCredential for CountingProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> Result<Option<Self::Credential>> {
         let mut count = self.call_count.lock().unwrap();
         *count += 1;
 
@@ -169,7 +169,7 @@ struct TokenProvider {
 impl ProvideCredential for TokenProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, _ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, _ctx: &Context) -> Result<Option<Self::Credential>> {
         if self.return_valid {
             let expires_at =
                 reqsign_core::time::now() + chrono::TimeDelta::try_hours(1).expect("in bounds");

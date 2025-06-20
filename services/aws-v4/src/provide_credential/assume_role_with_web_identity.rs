@@ -1,11 +1,10 @@
 use crate::provide_credential::utils::sts_endpoint;
 use crate::{Config, Credential};
-use anyhow::anyhow;
 use async_trait::async_trait;
 use bytes::Bytes;
 use quick_xml::de;
 use reqsign_core::time::parse_rfc3339;
-use reqsign_core::{utils::Redact, Context, ProvideCredential};
+use reqsign_core::{utils::Redact, Context, Error, ProvideCredential, Result};
 use serde::Deserialize;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
@@ -27,17 +26,21 @@ impl AssumeRoleWithWebIdentityCredentialProvider {
 impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         let (token_file, role_arn) =
             match (&self.config.web_identity_token_file, &self.config.role_arn) {
                 (Some(token_file), Some(role_arn)) => (token_file, role_arn),
                 _ => return Ok(None),
             };
 
-        let token = ctx.file_read_as_string(token_file).await?;
+        let token = ctx.file_read_as_string(token_file).await.map_err(|e| {
+            Error::unexpected("failed to read web identity token file").with_source(e)
+        })?;
         let role_session_name = &self.config.role_session_name;
 
-        let endpoint = sts_endpoint(&self.config)?;
+        let endpoint = sts_endpoint(&self.config).map_err(|e| {
+            Error::config_invalid("failed to determine STS endpoint").with_source(e)
+        })?;
 
         // Construct request to AWS STS Service.
         let url = format!("https://{endpoint}/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
@@ -48,22 +51,31 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
                 http::header::CONTENT_TYPE.as_str(),
                 "application/x-www-form-urlencoded",
             )
-            .body(Bytes::new())?;
+            .body(Bytes::new())
+            .map_err(|e| Error::unexpected("failed to build HTTP request").with_source(e))?;
 
-        let resp = ctx.http_send_as_string(req).await?;
+        let resp = ctx
+            .http_send_as_string(req)
+            .await
+            .map_err(|e| Error::unexpected("failed to send HTTP request to STS").with_source(e))?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.into_body();
-            return Err(anyhow!("request to AWS STS Services failed: {content}"));
+            return Err(Error::credential_denied(format!(
+                "request to AWS STS Services failed: {content}"
+            )));
         }
 
-        let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.into_body())?;
+        let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&resp.into_body())
+            .map_err(|e| Error::unexpected("failed to parse STS response").with_source(e))?;
         let resp_cred = resp.result.credentials;
 
         let cred = Credential {
             access_key_id: resp_cred.access_key_id,
             secret_access_key: resp_cred.secret_access_key,
             session_token: Some(resp_cred.session_token),
-            expires_in: Some(parse_rfc3339(&resp_cred.expiration)?),
+            expires_in: Some(parse_rfc3339(&resp_cred.expiration).map_err(|e| {
+                Error::unexpected("failed to parse credential expiration time").with_source(e)
+            })?),
         };
 
         Ok(Some(cred))
@@ -106,7 +118,6 @@ impl Debug for AssumeRoleWithWebIdentityCredentials {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
 
     #[test]
     fn test_parse_assume_role_with_web_identity_response() -> Result<()> {

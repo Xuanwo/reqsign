@@ -1,11 +1,10 @@
 use crate::{Config, Credential};
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use bytes::Bytes;
 use http::header::CONTENT_LENGTH;
 use http::Method;
 use reqsign_core::time::{now, parse_rfc3339, DateTime};
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, Error, ProvideCredential, Result};
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
 
@@ -41,13 +40,14 @@ impl IMDSv2CredentialProvider {
             .header(CONTENT_LENGTH, "0")
             // 21600s (6h) is recommended by AWS.
             .header("x-aws-ec2-metadata-token-ttl-seconds", "21600")
-            .body(Bytes::new())?;
+            .body(Bytes::new())
+            .map_err(|e| Error::unexpected("failed to build token request").with_source(e))?;
         let resp = ctx.http_send_as_string(req).await?;
         if resp.status() != http::StatusCode::OK {
-            return Err(anyhow!(
+            return Err(Error::unexpected(format!(
                 "request to AWS EC2 Metadata Services failed: {}",
                 resp.body()
-            ));
+            )));
         }
         let ec2_token = resp.into_body();
         // Set expires_in to 10 minutes to enforce re-read.
@@ -81,13 +81,16 @@ impl ProvideCredential for IMDSv2CredentialProvider {
             .method(Method::GET)
             // 21600s (6h) is recommended by AWS.
             .header("x-aws-ec2-metadata-token", &token)
-            .body(Bytes::new())?;
+            .body(Bytes::new())
+            .map_err(|e| {
+                Error::unexpected("failed to build credentials list request").with_source(e)
+            })?;
         let resp = ctx.http_send_as_string(req).await?;
         if resp.status() != http::StatusCode::OK {
-            return Err(anyhow!(
+            return Err(Error::unexpected(format!(
                 "request to AWS EC2 Metadata Services failed: {}",
                 resp.body()
-            ));
+            )));
         }
 
         let profile_name = resp.into_body();
@@ -101,39 +104,43 @@ impl ProvideCredential for IMDSv2CredentialProvider {
             .method(Method::GET)
             // 21600s (6h) is recommended by AWS.
             .header("x-aws-ec2-metadata-token", &token)
-            .body(Bytes::new())?;
+            .body(Bytes::new())
+            .map_err(|e| {
+                Error::unexpected("failed to build credentials fetch request").with_source(e)
+            })?;
 
         let resp = ctx.http_send_as_string(req).await?;
         if resp.status() != http::StatusCode::OK {
-            return Err(anyhow!(
+            return Err(Error::unexpected(format!(
                 "request to AWS EC2 Metadata Services failed: {}",
                 resp.body()
-            ));
+            )));
         }
 
         let content = resp.into_body();
-        let resp: Ec2MetadataIamSecurityCredentials = serde_json::from_str(&content)?;
+        let resp: Ec2MetadataIamSecurityCredentials = serde_json::from_str(&content)
+            .map_err(|e| Error::unexpected("failed to parse IMDS response").with_source(e))?;
         if resp.code == "AssumeRoleUnauthorizedAccess" {
-            return Err(anyhow!(
+            return Err(Error::credential_denied(format!(
                 "Incorrect IMDS/IAM configuration: [{}] {}. \
                         Hint: Does this role have a trust relationship with EC2?",
-                resp.code,
-                resp.message
-            ));
+                resp.code, resp.message
+            )));
         }
         if resp.code != "Success" {
-            return Err(anyhow!(
+            return Err(Error::credential_invalid(format!(
                 "Error retrieving credentials from IMDS: {} {}",
-                resp.code,
-                resp.message
-            ));
+                resp.code, resp.message
+            )));
         }
 
         let cred = Credential {
             access_key_id: resp.access_key_id,
             secret_access_key: resp.secret_access_key,
             session_token: Some(resp.token),
-            expires_in: Some(parse_rfc3339(&resp.expiration)?),
+            expires_in: Some(parse_rfc3339(&resp.expiration).map_err(|e| {
+                Error::unexpected("failed to parse expiration time").with_source(e)
+            })?),
         };
 
         Ok(Some(cred))

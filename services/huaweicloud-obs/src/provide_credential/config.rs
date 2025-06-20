@@ -1,5 +1,5 @@
-use anyhow::Result;
 use async_trait::async_trait;
+use reqsign_core::Result;
 use reqsign_core::{Context, ProvideCredential};
 use std::sync::Arc;
 

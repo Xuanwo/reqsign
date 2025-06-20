@@ -7,7 +7,7 @@ use log::debug;
 use percent_encoding::{percent_decode_str, utf8_percent_encode};
 use reqsign_core::hash::{hex_hmac_sha1, hex_sha1};
 use reqsign_core::time::{format_http_date, now, DateTime};
-use reqsign_core::{Context, SignRequest, SigningRequest};
+use reqsign_core::{Context, Result, SignRequest, SigningRequest};
 use std::time::Duration;
 
 /// RequestSigner that implements Tencent COS signing.
@@ -47,7 +47,7 @@ impl SignRequest for RequestSigner {
         req: &mut Parts,
         credential: Option<&Self::Credential>,
         expires_in: Option<Duration>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let Some(cred) = credential else {
             return Ok(());
         };

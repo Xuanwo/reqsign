@@ -1,6 +1,6 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use http::request::Parts;
+use reqsign_core::Result;
 use reqsign_core::{Context, ProvideCredential, SignRequest, Signer, SigningCredential};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;

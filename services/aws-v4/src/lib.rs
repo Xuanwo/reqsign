@@ -19,7 +19,7 @@
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //!
 //! #[tokio::main]
-//! async fn main() -> anyhow::Result<()> {
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create context
 //!     let ctx = Context::new(
 //!         TokioFileRead::default(),
@@ -94,7 +94,7 @@
 //! You can create custom credential providers by implementing the `ProvideCredential` trait:
 //!
 //! ```no_run
-//! use reqsign_core::{ProvideCredential, Context};
+//! use reqsign_core::{ProvideCredential, Context, Result};
 //! use async_trait::async_trait;
 //!
 //! # #[derive(Debug)]
@@ -104,7 +104,7 @@
 //! impl ProvideCredential for MyCredentialProvider {
 //!     type Credential = Credential;
 //!     
-//!     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+//!     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
 //!         // Your custom credential loading logic
 //!         Ok(None)
 //!     }

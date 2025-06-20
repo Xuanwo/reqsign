@@ -2,12 +2,11 @@ use crate::constants::X_AMZ_CONTENT_SHA_256;
 use crate::credential::Credential;
 use crate::provide_credential::utils::sts_endpoint;
 use crate::{Config, EMPTY_STRING_SHA256};
-use anyhow::anyhow;
 use async_trait::async_trait;
 use bytes::Bytes;
 use quick_xml::de;
 use reqsign_core::time::parse_rfc3339;
-use reqsign_core::{Context, ProvideCredential, Signer};
+use reqsign_core::{Context, Error, ProvideCredential, Result, Signer};
 use serde::Deserialize;
 use std::fmt::Write;
 use std::sync::Arc;
@@ -22,7 +21,7 @@ pub struct AssumeRoleCredentialProvider {
 
 impl AssumeRoleCredentialProvider {
     /// Create a new assume role loader.
-    pub fn new(config: Arc<Config>, sts_signer: Signer<Credential>) -> anyhow::Result<Self> {
+    pub fn new(config: Arc<Config>, sts_signer: Signer<Credential>) -> Result<Self> {
         Ok(Self { config, sts_signer })
     }
 }
@@ -31,22 +30,26 @@ impl AssumeRoleCredentialProvider {
 impl ProvideCredential for AssumeRoleCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
-        let role_arn =self.config.role_arn.clone().ok_or_else(|| {
-            anyhow!("assume role loader requires role_arn, but not found, please check your configuration")
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        let role_arn = self.config.role_arn.clone().ok_or_else(|| {
+            Error::config_invalid("assume role loader requires role_arn, but not found, please check your configuration")
         })?;
 
         let role_session_name = &self.config.role_session_name;
 
-        let endpoint = sts_endpoint(&self.config)?;
+        let endpoint = sts_endpoint(&self.config).map_err(|e| {
+            Error::config_invalid("failed to determine STS endpoint").with_source(e)
+        })?;
 
         // Construct request to AWS STS Service.
         let mut url = format!("https://{endpoint}/?Action=AssumeRole&RoleArn={role_arn}&Version=2011-06-15&RoleSessionName={role_session_name}");
         if let Some(external_id) = &self.config.external_id {
-            write!(url, "&ExternalId={external_id}")?;
+            write!(url, "&ExternalId={external_id}")
+                .map_err(|e| Error::unexpected("failed to format URL").with_source(e))?;
         }
         if let Some(duration_seconds) = &self.config.duration_seconds {
-            write!(url, "&DurationSeconds={duration_seconds}")?;
+            write!(url, "&DurationSeconds={duration_seconds}")
+                .map_err(|e| Error::unexpected("failed to format URL").with_source(e))?;
         }
         if let Some(tags) = &self.config.tags {
             for (idx, (key, value)) in tags.iter().enumerate() {
@@ -54,7 +57,8 @@ impl ProvideCredential for AssumeRoleCredentialProvider {
                 write!(
                     url,
                     "&Tags.member.{tag_index}.Key={key}&Tags.member.{tag_index}.Value={value}"
-                )?;
+                )
+                .map_err(|e| Error::unexpected("failed to format URL").with_source(e))?;
             }
         }
 
@@ -67,26 +71,35 @@ impl ProvideCredential for AssumeRoleCredentialProvider {
             )
             // Set content sha to empty string.
             .header(X_AMZ_CONTENT_SHA_256, EMPTY_STRING_SHA256)
-            .body(Bytes::new())?;
+            .body(Bytes::new())
+            .map_err(|e| Error::unexpected("failed to build HTTP request").with_source(e))?;
 
         let (mut parts, body) = req.into_parts();
         self.sts_signer.sign(&mut parts, None).await?;
         let req = http::Request::from_parts(parts, body);
 
-        let resp = ctx.http_send_as_string(req).await?;
+        let resp = ctx
+            .http_send_as_string(req)
+            .await
+            .map_err(|e| Error::unexpected("failed to send HTTP request to STS").with_source(e))?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.into_body();
-            return Err(anyhow!("request to AWS STS Services failed: {content}"));
+            return Err(Error::credential_denied(format!(
+                "request to AWS STS Services failed: {content}"
+            )));
         }
 
-        let resp: AssumeRoleResponse = de::from_str(&resp.into_body())?;
+        let resp: AssumeRoleResponse = de::from_str(&resp.into_body())
+            .map_err(|e| Error::unexpected("failed to parse STS response").with_source(e))?;
         let resp_cred = resp.result.credentials;
 
         let cred = Credential {
             access_key_id: resp_cred.access_key_id,
             secret_access_key: resp_cred.secret_access_key,
             session_token: Some(resp_cred.session_token),
-            expires_in: Some(parse_rfc3339(&resp_cred.expiration)?),
+            expires_in: Some(parse_rfc3339(&resp_cred.expiration).map_err(|e| {
+                Error::unexpected("failed to parse credential expiration time").with_source(e)
+            })?),
         };
 
         Ok(Some(cred))
@@ -121,7 +134,7 @@ mod tests {
     use quick_xml::de;
 
     #[test]
-    fn test_parse_assume_role_response() -> anyhow::Result<()> {
+    fn test_parse_assume_role_response() -> Result<()> {
         let _ = env_logger::builder().is_test(true).try_init();
 
         let content = r#"<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">

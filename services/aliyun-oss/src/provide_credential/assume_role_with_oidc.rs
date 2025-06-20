@@ -1,7 +1,7 @@
 use crate::{Config, Credential};
-use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use reqsign_core::time::{format_rfc3339, now, parse_rfc3339};
+use reqsign_core::Result;
 use reqsign_core::{Context, ProvideCredential};
 use serde::Deserialize;
 use std::sync::Arc;
@@ -70,10 +70,15 @@ impl ProvideCredential for AssumeRoleWithOidcCredentialProvider {
 
         if resp.status() != http::StatusCode::OK {
             let content = String::from_utf8_lossy(resp.body());
-            return Err(anyhow!("request to Aliyun STS Services failed: {content}"));
+            return Err(reqsign_core::Error::unexpected(format!(
+                "request to Aliyun STS Services failed: {content}"
+            )));
         }
 
-        let resp: AssumeRoleWithOidcResponse = serde_json::from_slice(resp.body())?;
+        let resp: AssumeRoleWithOidcResponse =
+            serde_json::from_slice(resp.body()).map_err(|e| {
+                reqsign_core::Error::unexpected(format!("Failed to parse STS response: {}", e))
+            })?;
         let resp_cred = resp.credentials;
 
         let cred = Credential {

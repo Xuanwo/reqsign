@@ -1,6 +1,6 @@
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 use std::sync::Arc;
 
 /// Default loader for Tencent COS.
@@ -32,7 +32,7 @@ impl DefaultCredentialProvider {
 impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
-    async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         self.chain.provide_credential(ctx).await
     }
 }

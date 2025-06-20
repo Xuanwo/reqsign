@@ -14,9 +14,8 @@
 //! ## Example
 //!
 //! ```no_run
-//! use reqsign_core::{Context, Signer, ProvideCredential, SignRequest, SigningCredential};
+//! use reqsign_core::{Context, Signer, ProvideCredential, SignRequest, SigningCredential, Result};
 //! use async_trait::async_trait;
-//! use anyhow::Result;
 //! use http::request::Parts;
 //! use std::time::Duration;
 //!
@@ -136,9 +135,13 @@
 // Make sure all our public APIs have docs.
 #![warn(missing_docs)]
 
+/// Error types for reqsign operations
+pub mod error;
 pub mod hash;
 pub mod time;
 pub mod utils;
+
+pub use error::{Error, ErrorKind, Result};
 
 mod context;
 pub use context::Context;
