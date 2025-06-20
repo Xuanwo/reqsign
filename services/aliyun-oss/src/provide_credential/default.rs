@@ -1,7 +1,7 @@
 use crate::provide_credential::{AssumeRoleWithOidcCredentialProvider, ConfigCredentialProvider};
 use crate::{Config, Credential};
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain};
 use std::sync::Arc;
 
 /// DefaultCredentialProvider is a loader that will try to load credential via default chains.
@@ -12,20 +12,17 @@ use std::sync::Arc;
 /// 2. Assume Role with OIDC
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
-    config_loader: ConfigCredentialProvider,
-    assume_role_with_oidc_loader: AssumeRoleWithOidcCredentialProvider,
+    chain: ProvideCredentialChain<Credential>,
 }
 
 impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
     pub fn new(config: Arc<Config>) -> Self {
-        let config_loader = ConfigCredentialProvider::new(config.clone());
-        let assume_role_with_oidc_loader = AssumeRoleWithOidcCredentialProvider::new(config);
+        let chain = ProvideCredentialChain::new()
+            .push(ConfigCredentialProvider::new(config.clone()))
+            .push(AssumeRoleWithOidcCredentialProvider::new(config));
 
-        Self {
-            config_loader,
-            assume_role_with_oidc_loader,
-        }
+        Self { chain }
     }
 }
 
@@ -34,19 +31,7 @@ impl ProvideCredential for DefaultCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> anyhow::Result<Option<Self::Credential>> {
-        if let Some(cred) = self.config_loader.provide_credential(ctx).await? {
-            return Ok(Some(cred));
-        }
-
-        if let Some(cred) = self
-            .assume_role_with_oidc_loader
-            .provide_credential(ctx)
-            .await?
-        {
-            return Ok(Some(cred));
-        }
-
-        Ok(None)
+        self.chain.provide_credential(ctx).await
     }
 }
 
