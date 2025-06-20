@@ -14,9 +14,8 @@
 //! ## Example
 //!
 //! ```no_run
-//! use reqsign_core::{Context, Signer, ProvideCredential, SignRequest, SigningCredential};
+//! use reqsign_core::{Context, Signer, ProvideCredential, SignRequest, SigningCredential, Result};
 //! use async_trait::async_trait;
-//! use anyhow::Result;
 //! use http::request::Parts;
 //! use std::time::Duration;
 //!

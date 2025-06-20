@@ -72,7 +72,7 @@ pub trait SignRequest: Debug + Send + Sync + Unpin + 'static {
 /// # Example
 ///
 /// ```no_run
-/// use reqsign_core::{ProvideCredentialChain, Context, ProvideCredential};
+/// use reqsign_core::{ProvideCredentialChain, Context, ProvideCredential, Result};
 /// use async_trait::async_trait;
 ///
 /// #[derive(Debug)]

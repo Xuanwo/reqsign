@@ -94,7 +94,7 @@
 //! You can create custom credential providers by implementing the `ProvideCredential` trait:
 //!
 //! ```no_run
-//! use reqsign_core::{ProvideCredential, Context};
+//! use reqsign_core::{ProvideCredential, Context, Result};
 //! use async_trait::async_trait;
 //!
 //! # #[derive(Debug)]
