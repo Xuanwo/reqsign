@@ -1,6 +1,6 @@
-use crate::provide_credential::config::ConfigCredentialProvider;
 use crate::provide_credential::{
-    AssumeRoleWithWebIdentityCredentialProvider, IMDSv2CredentialProvider,
+    AssumeRoleWithWebIdentityCredentialProvider, EnvCredentialProvider, IMDSv2CredentialProvider,
+    ProfileCredentialProvider,
 };
 use crate::{Config, Credential};
 use async_trait::async_trait;
@@ -25,7 +25,8 @@ impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
     pub fn new(config: Arc<Config>) -> Self {
         let chain = ProvideCredentialChain::new()
-            .push(ConfigCredentialProvider::new(config.clone()))
+            .push(EnvCredentialProvider::new())
+            .push(ProfileCredentialProvider::new())
             .push(AssumeRoleWithWebIdentityCredentialProvider::new(
                 config.clone(),
             ))
@@ -92,7 +93,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(Arc::new(Config::default().from_env(&ctx)));
+        let l = DefaultCredentialProvider::new(Arc::new(Config::default()));
         let x = l.provide_credential(&ctx).await.expect("load must succeed");
 
         let x = x.expect("must load succeed");
@@ -129,13 +130,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(
-            Config::default()
-                .from_env(&ctx)
-                .from_profile(&ctx)
-                .await
-                .into(),
-        );
+        let l = DefaultCredentialProvider::new(Arc::new(Config::default()));
         let x = l.provide_credential(&ctx).await.unwrap().unwrap();
         assert_eq!("config_access_key_id", x.access_key_id);
         assert_eq!("config_secret_access_key", x.secret_access_key);
@@ -170,13 +165,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(
-            Config::default()
-                .from_env(&ctx)
-                .from_profile(&ctx)
-                .await
-                .into(),
-        );
+        let l = DefaultCredentialProvider::new(Arc::new(Config::default()));
         let x = l.provide_credential(&ctx).await.unwrap().unwrap();
         assert_eq!("shared_access_key_id", x.access_key_id);
         assert_eq!("shared_secret_access_key", x.secret_access_key);
@@ -212,13 +201,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(
-            Config::default()
-                .from_env(&ctx)
-                .from_profile(&ctx)
-                .await
-                .into(),
-        );
+        let l = DefaultCredentialProvider::new(Arc::new(Config::default()));
         let x = l
             .provide_credential(&ctx)
             .await

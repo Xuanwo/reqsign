@@ -348,8 +348,7 @@ mod tests {
     use std::time::SystemTime;
 
     use super::*;
-    use crate::Config;
-    use crate::DefaultCredentialProvider;
+    use crate::provide_credential::StaticCredentialProvider;
     use anyhow::Result;
     use aws_credential_types::Credentials;
     use aws_sigv4::http_request::PayloadChecksumKind;
@@ -625,14 +624,7 @@ mod tests {
         let (mut parts, body) = req.into_parts();
 
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
-        let loader = DefaultCredentialProvider::new(
-            Config {
-                access_key_id: Some("access_key_id".to_string()),
-                secret_access_key: Some("secret_access_key".to_string()),
-                ..Default::default()
-            }
-            .into(),
-        );
+        let loader = StaticCredentialProvider::new("access_key_id", "secret_access_key");
         let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = RequestSigner::new("s3", "test").with_time(now);
@@ -708,14 +700,7 @@ mod tests {
         let (mut parts, body) = req.into_parts();
 
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
-        let loader = DefaultCredentialProvider::new(
-            Config {
-                access_key_id: Some("access_key_id".to_string()),
-                secret_access_key: Some("secret_access_key".to_string()),
-                ..Default::default()
-            }
-            .into(),
-        );
+        let loader = StaticCredentialProvider::new("access_key_id", "secret_access_key");
         let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = RequestSigner::new("s3", "test").with_time(now);
@@ -793,15 +778,8 @@ mod tests {
         let (mut parts, body) = req.into_parts();
 
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
-        let loader = DefaultCredentialProvider::new(
-            Config {
-                access_key_id: Some("access_key_id".to_string()),
-                secret_access_key: Some("secret_access_key".to_string()),
-                session_token: Some("security_token".to_string()),
-                ..Default::default()
-            }
-            .into(),
-        );
+        let loader = StaticCredentialProvider::new("access_key_id", "secret_access_key")
+            .with_session_token("security_token");
         let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = RequestSigner::new("s3", "test").with_time(now);
@@ -879,15 +857,8 @@ mod tests {
         let (mut parts, body) = req.into_parts();
 
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
-        let loader = DefaultCredentialProvider::new(
-            Config {
-                access_key_id: Some("access_key_id".to_string()),
-                secret_access_key: Some("secret_access_key".to_string()),
-                session_token: Some("security_token".to_string()),
-                ..Default::default()
-            }
-            .into(),
-        );
+        let loader = StaticCredentialProvider::new("access_key_id", "secret_access_key")
+            .with_session_token("security_token");
         let cred = loader.provide_credential(&ctx).await?.unwrap();
 
         let builder = RequestSigner::new("s3", "test").with_time(now);

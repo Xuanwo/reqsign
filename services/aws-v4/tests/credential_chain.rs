@@ -1,7 +1,7 @@
 //! Integration tests for ProvideCredentialChain
 
 use async_trait::async_trait;
-use reqsign_aws_v4::{ConfigCredentialProvider, Credential};
+use reqsign_aws_v4::{Credential, EnvCredentialProvider};
 use reqsign_core::ProvideCredentialChain;
 use reqsign_core::{Context, ProvideCredential, Result};
 use reqsign_file_read_tokio::TokioFileRead;
@@ -92,10 +92,8 @@ async fn test_chain_with_real_providers() {
         ]),
     });
 
-    let config = Arc::new(reqsign_aws_v4::Config::default().from_env(&ctx));
-
-    // Create a chain with only ConfigCredentialProvider
-    let chain = ProvideCredentialChain::new().push(ConfigCredentialProvider::new(config));
+    // Create a chain with only EnvCredentialProvider
+    let chain = ProvideCredentialChain::new().push(EnvCredentialProvider::new());
 
     let result = chain.provide_credential(&ctx).await.unwrap();
     assert!(result.is_some());

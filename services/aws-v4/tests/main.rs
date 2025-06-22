@@ -30,25 +30,28 @@ async fn init_default_loader() -> Option<(Context, DefaultCredentialProvider, Re
         return None;
     }
 
-    let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    // Get credentials from test-specific env vars
+    let access_key =
+        env::var("REQSIGN_AWS_V4_ACCESS_KEY").expect("env REQSIGN_AWS_V4_ACCESS_KEY must set");
+    let secret_key =
+        env::var("REQSIGN_AWS_V4_SECRET_KEY").expect("env REQSIGN_AWS_V4_SECRET_KEY must set");
+    let region = env::var("REQSIGN_AWS_V4_REGION").expect("env REQSIGN_AWS_V4_REGION must set");
 
+    // Create context with AWS standard env vars for EnvCredentialProvider
+    let mut envs = HashMap::new();
+    envs.insert("AWS_ACCESS_KEY_ID".to_string(), access_key);
+    envs.insert("AWS_SECRET_ACCESS_KEY".to_string(), secret_key);
+
+    let context = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
+        home_dir: None,
+        envs,
+    });
+
+    // Create config for DefaultCredentialProvider (only needs region and other non-credential settings)
     let config = Config {
-        region: Some(
-            env::var("REQSIGN_AWS_V4_REGION").expect("env REQSIGN_AWS_V4_REGION must set"),
-        ),
-        access_key_id: Some(
-            env::var("REQSIGN_AWS_V4_ACCESS_KEY").expect("env REQSIGN_AWS_V4_ACCESS_KEY must set"),
-        ),
-        secret_access_key: Some(
-            env::var("REQSIGN_AWS_V4_SECRET_KEY").expect("env REQSIGN_AWS_V4_SECRET_KEY must set"),
-        ),
+        region: Some(region.clone()),
         ..Default::default()
-    }
-    .from_env(&context)
-    .from_profile(&context)
-    .await;
-
-    let region = config.region.as_deref().unwrap().to_string();
+    };
 
     let loader = DefaultCredentialProvider::new(config.into());
 
