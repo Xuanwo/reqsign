@@ -1,6 +1,6 @@
-use crate::provide_credential::config::ConfigCredentialProvider;
 use crate::provide_credential::{
-    AssumeRoleWithWebIdentityCredentialProvider, IMDSv2CredentialProvider,
+    AssumeRoleWithWebIdentityCredentialProvider, EnvCredentialProvider, IMDSv2CredentialProvider,
+    ProfileCredentialProvider,
 };
 use crate::{Config, Credential};
 use async_trait::async_trait;
@@ -25,7 +25,8 @@ impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
     pub fn new(config: Arc<Config>) -> Self {
         let chain = ProvideCredentialChain::new()
-            .push(ConfigCredentialProvider::new(config.clone()))
+            .push(EnvCredentialProvider::new())
+            .push(ProfileCredentialProvider::new())
             .push(AssumeRoleWithWebIdentityCredentialProvider::new(
                 config.clone(),
             ))

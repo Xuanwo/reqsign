@@ -10,7 +10,16 @@ pub use config::ConfigCredentialProvider;
 mod default;
 pub use default::DefaultCredentialProvider;
 
+mod env;
+pub use env::EnvCredentialProvider;
+
 mod imds;
 pub use imds::IMDSv2CredentialProvider;
+
+mod profile;
+pub use profile::ProfileCredentialProvider;
+
+mod r#static;
+pub use r#static::StaticCredentialProvider;
 
 mod utils;
