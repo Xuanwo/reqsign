@@ -7,6 +7,9 @@ pub use assume_role_with_web_identity::AssumeRoleWithWebIdentityCredentialProvid
 mod default;
 pub use default::DefaultCredentialProvider;
 
+mod ecs;
+pub use ecs::EcsCredentialProvider;
+
 mod env;
 pub use env::EnvCredentialProvider;
 

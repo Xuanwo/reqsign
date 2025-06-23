@@ -20,6 +20,9 @@ pub const AWS_ROLE_SESSION_NAME: &str = "AWS_ROLE_SESSION_NAME";
 pub const AWS_STS_REGIONAL_ENDPOINTS: &str = "AWS_STS_REGIONAL_ENDPOINTS";
 pub const AWS_EC2_METADATA_DISABLED: &str = "AWS_EC2_METADATA_DISABLED";
 pub const AWS_ENDPOINT_URL: &str = "AWS_ENDPOINT_URL";
+pub const AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: &str = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI";
+pub const AWS_CONTAINER_CREDENTIALS_FULL_URI: &str = "AWS_CONTAINER_CREDENTIALS_FULL_URI";
+pub const AWS_CONTAINER_CREDENTIALS_DISABLED: &str = "AWS_CONTAINER_CREDENTIALS_DISABLED";
 /// AsciiSet for [AWS UriEncode](https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html)
 ///
 /// - URI encode every byte except the unreserved characters: 'A'-'Z', 'a'-'z', '0'-'9', '-', '.', '_', and '~'.

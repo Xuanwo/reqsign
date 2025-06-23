@@ -1,6 +1,6 @@
 use crate::provide_credential::{
-    AssumeRoleWithWebIdentityCredentialProvider, EnvCredentialProvider, IMDSv2CredentialProvider,
-    ProfileCredentialProvider,
+    AssumeRoleWithWebIdentityCredentialProvider, EcsCredentialProvider, EnvCredentialProvider,
+    IMDSv2CredentialProvider, ProfileCredentialProvider,
 };
 use crate::{Config, Credential};
 use async_trait::async_trait;
@@ -14,7 +14,7 @@ use std::sync::Arc;
 /// 1. Environment variables
 /// 2. Shared config (`~/.aws/config`, `~/.aws/credentials`)
 /// 3. Web Identity Tokens
-/// 4. ECS (IAM Roles for Tasks) & General HTTP credentials (TODO)
+/// 4. ECS (IAM Roles for Tasks)
 /// 5. EC2 IMDSv2
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
@@ -30,6 +30,7 @@ impl DefaultCredentialProvider {
             .push(AssumeRoleWithWebIdentityCredentialProvider::new(
                 config.clone(),
             ))
+            .push(EcsCredentialProvider::new(config.clone()))
             .push(IMDSv2CredentialProvider::new(config));
 
         Self { chain }
