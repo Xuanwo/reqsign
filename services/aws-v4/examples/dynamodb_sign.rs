@@ -1,6 +1,6 @@
 use anyhow::Result;
-use reqsign_aws_v4::{Config, DefaultCredentialProvider, RequestSigner};
-use reqsign_core::{Context, Signer};
+use reqsign_aws_v4::{DefaultCredentialProvider, RequestSigner, StaticCredentialProvider};
+use reqsign_core::{Context, ProvideCredential, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
@@ -17,26 +17,26 @@ async fn main() -> Result<()> {
     // Create context
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
 
-    // Configure AWS credentials
-    let mut config = Config::default();
-    config = config.from_env(&ctx);
-    config.region = Some("us-east-1".to_string());
+    // Try to create default credential loader
+    let loader = DefaultCredentialProvider::new(&ctx);
 
-    // If no credentials are found, use demo credentials
-    if config.access_key_id.is_none() {
-        println!("No AWS credentials found, using demo credentials for example");
-        config.access_key_id = Some("AKIAIOSFODNN7EXAMPLE".to_string());
-        config.secret_access_key = Some("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
-    }
-
-    // Create credential loader
-    let loader = DefaultCredentialProvider::new(std::sync::Arc::new(config));
+    // Check if we have credentials by trying to load them
+    let test_cred = loader.provide_credential(&ctx).await?;
 
     // Create request builder for DynamoDB
     let builder = RequestSigner::new("dynamodb", "us-east-1");
 
     // Create the signer
-    let signer = Signer::new(ctx, loader, builder);
+    let signer = if test_cred.is_none() {
+        println!("No AWS credentials found, using demo credentials for example");
+        let static_provider = StaticCredentialProvider::new(
+            "AKIAIOSFODNN7EXAMPLE".to_string(),
+            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string(),
+        );
+        Signer::new(ctx, static_provider, builder)
+    } else {
+        Signer::new(ctx, loader, builder)
+    };
 
     // Example 1: List tables
     println!("Example 1: Listing DynamoDB tables");

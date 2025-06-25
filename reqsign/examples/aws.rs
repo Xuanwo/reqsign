@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqsign::aws::{Config, DefaultCredentialProvider, RequestSigner};
+use reqsign::aws::{DefaultCredentialProvider, RequestSigner};
 use reqsign::{Context, DefaultContext, Signer};
 
 #[tokio::main]
@@ -12,11 +12,8 @@ async fn main() -> Result<()> {
     // Create a Context from the implementation
     let ctx = Context::new(ctx_impl.clone(), ctx_impl.clone()).with_env(ctx_impl.clone());
 
-    // Configure AWS credential loading
-    let config = Config::default();
-
     // Create credential loader
-    let loader = DefaultCredentialProvider::new(config.into());
+    let loader = DefaultCredentialProvider::new(&ctx);
 
     // Create request builder for S3
     let builder = RequestSigner::new("s3", "us-east-1");

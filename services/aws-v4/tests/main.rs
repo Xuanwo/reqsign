@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::env;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -11,8 +10,7 @@ use log::debug;
 use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
-use reqsign_aws_v4::{AssumeRoleCredentialProvider, Config};
-use reqsign_aws_v4::{DefaultCredentialProvider, RequestSigner};
+use reqsign_aws_v4::{AssumeRoleCredentialProvider, DefaultCredentialProvider, RequestSigner};
 use reqsign_core::{Context, ProvideCredential, SignRequest, Signer, StaticEnv};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -47,13 +45,8 @@ async fn init_default_loader() -> Option<(Context, DefaultCredentialProvider, Re
         envs,
     });
 
-    // Create config for DefaultCredentialProvider (only needs region and other non-credential settings)
-    let config = Config {
-        region: Some(region.clone()),
-        ..Default::default()
-    };
-
-    let loader = DefaultCredentialProvider::new(config.into());
+    // Create DefaultCredentialProvider with the context
+    let loader = DefaultCredentialProvider::new(&context);
 
     let builder = RequestSigner::new(
         &env::var("REQSIGN_AWS_V4_SERVICE").expect("env REQSIGN_AWS_V4_SERVICE must set"),
@@ -415,8 +408,7 @@ async fn test_signer_with_web_loader() -> Result<()> {
         ]),
     });
 
-    let config = Config::default().from_env(&context);
-    let loader = DefaultCredentialProvider::new(config.into());
+    let loader = DefaultCredentialProvider::new(&context);
 
     let builder = RequestSigner::new("s3", &region);
 
@@ -515,27 +507,16 @@ async fn test_signer_with_web_loader_assume_role() -> Result<()> {
         ]),
     });
 
-    let cfg = Config {
-        ec2_metadata_disabled: true,
-        ..Default::default()
-    };
-    let cfg: Arc<Config> = cfg.from_env(&context).into();
-
-    let default_loader = DefaultCredentialProvider::new(cfg.clone());
+    let default_loader = DefaultCredentialProvider::new(&context);
     let sts_signer = Signer::new(
         context.clone(),
         default_loader,
         RequestSigner::new("sts", &region),
     );
 
-    let cfg = Config {
-        role_arn: Some(assume_role_arn.clone()),
-        region: Some(region.clone()),
-        sts_regional_endpoints: "regional".to_string(),
-        ..Default::default()
-    };
-    let loader = AssumeRoleCredentialProvider::new(cfg.into(), sts_signer)
-        .expect("AssumeRoleCredentialProvider must be valid");
+    let loader = AssumeRoleCredentialProvider::new(assume_role_arn.clone(), sts_signer)
+        .with_region(region.clone())
+        .with_regional_sts_endpoint();
 
     let builder = RequestSigner::new("s3", &region);
     let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
