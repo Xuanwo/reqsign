@@ -15,17 +15,17 @@ pub struct StaticCredentialProvider {
 
 impl StaticCredentialProvider {
     /// Create a new StaticCredentialProvider with access key ID and secret access key.
-    pub fn new(access_key_id: impl Into<String>, secret_access_key: impl Into<String>) -> Self {
+    pub fn new(access_key_id: &str, secret_access_key: &str) -> Self {
         Self {
-            access_key_id: access_key_id.into(),
-            secret_access_key: secret_access_key.into(),
+            access_key_id: access_key_id.to_string(),
+            secret_access_key: secret_access_key.to_string(),
             session_token: None,
         }
     }
 
     /// Set the session token.
-    pub fn with_session_token(mut self, token: impl Into<String>) -> Self {
-        self.session_token = Some(token.into());
+    pub fn with_session_token(mut self, token: &str) -> Self {
+        self.session_token = Some(token.to_string());
         self
     }
 }

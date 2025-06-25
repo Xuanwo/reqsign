@@ -29,8 +29,8 @@ async fn main() -> Result<()> {
     let signer = if test_cred.is_none() {
         println!("No AWS credentials found, using demo credentials for example");
         let static_provider = StaticCredentialProvider::new(
-            "AKIAIOSFODNN7EXAMPLE".to_string(),
-            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string(),
+            "AKIAIOSFODNN7EXAMPLE",
+            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         );
         Signer::new(ctx, static_provider, builder)
     } else {
