@@ -1,5 +1,5 @@
 use crate::provide_credential::{
-    ClientSecretCredentialProvider, ConfigCredentialProvider, ImdsCredentialProvider,
+    ClientSecretCredentialProvider, EnvCredentialProvider, ImdsCredentialProvider,
     WorkloadIdentityCredentialProvider,
 };
 use crate::Credential;
@@ -9,119 +9,23 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 /// Default loader that tries multiple credential sources in order.
 ///
 /// The default loader attempts to load credentials from the following sources in order:
-/// 1. Configuration (account key, SAS token)
+/// 1. Environment variables (account key, SAS token)
 /// 2. Client secret (service principal)
 /// 3. Workload identity (federated credentials)
 /// 4. IMDS (Azure VM managed identity)
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
-}
-
-impl Default for DefaultCredentialProvider {
-    fn default() -> Self {
-        let chain = ProvideCredentialChain::new()
-            .push(ConfigCredentialProvider::new())
-            .push(ClientSecretCredentialProvider::new())
-            .push(WorkloadIdentityCredentialProvider::new())
-            .push(ImdsCredentialProvider::new());
-
-        Self { chain }
-    }
 }
 
 impl DefaultCredentialProvider {
     /// Create a new default loader.
     pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Load credentials from environment variables.
-    pub fn from_env(self, ctx: &Context) -> Self {
-        // Create providers configured from environment
-        let mut config_loader = ConfigCredentialProvider::new();
-
-        // Load environment variables for config
-        let account_name = ctx
-            .env_var("AZBLOB_ACCOUNT_NAME")
-            .or_else(|| ctx.env_var("AZURE_STORAGE_ACCOUNT_NAME"));
-        let account_key = ctx
-            .env_var("AZBLOB_ACCOUNT_KEY")
-            .or_else(|| ctx.env_var("AZURE_STORAGE_ACCOUNT_KEY"));
-        let sas_token = ctx.env_var("AZURE_STORAGE_SAS_TOKEN");
-
-        if let (Some(account_name), Some(account_key)) = (account_name, account_key) {
-            config_loader = config_loader
-                .with_account_name(account_name)
-                .with_account_key(account_key);
-        }
-
-        if let Some(sas_token) = sas_token {
-            config_loader = config_loader.with_sas_token(sas_token);
-        }
-
-        // Create client secret provider
-        let mut client_secret_loader = ClientSecretCredentialProvider::new();
-        let tenant_id = ctx.env_var("AZURE_TENANT_ID");
-        let client_id = ctx.env_var("AZURE_CLIENT_ID");
-        let client_secret = ctx.env_var("AZURE_CLIENT_SECRET");
-        let authority_host = ctx
-            .env_var("AZURE_AUTHORITY_HOST")
-            .unwrap_or_else(|| "https://login.microsoftonline.com".to_string());
-
-        if let (Some(tenant_id), Some(client_id), Some(client_secret)) =
-            (tenant_id.clone(), client_id.clone(), client_secret)
-        {
-            client_secret_loader = client_secret_loader
-                .with_tenant_id(tenant_id)
-                .with_client_id(client_id)
-                .with_client_secret(client_secret)
-                .with_authority_host(authority_host.clone());
-        }
-
-        // Create workload identity provider
-        let mut workload_identity_loader = WorkloadIdentityCredentialProvider::new();
-        let federated_token_file = ctx.env_var("AZURE_FEDERATED_TOKEN_FILE");
-
-        if let (Some(tenant_id), Some(client_id), Some(federated_token_file)) =
-            (tenant_id, client_id.clone(), federated_token_file)
-        {
-            workload_identity_loader = workload_identity_loader
-                .with_tenant_id(tenant_id)
-                .with_client_id(client_id)
-                .with_federated_token_file(federated_token_file)
-                .with_authority_host(authority_host);
-        }
-
-        // Create IMDS provider
-        let mut imds_loader = ImdsCredentialProvider::new();
-
-        if let Some(client_id) = ctx.env_var("AZURE_CLIENT_ID") {
-            imds_loader = imds_loader.with_client_id(client_id);
-        }
-
-        if let Some(object_id) = ctx.env_var("AZURE_OBJECT_ID") {
-            imds_loader = imds_loader.with_object_id(object_id);
-        }
-
-        if let Some(msi_res_id) = ctx.env_var("AZURE_MSI_RES_ID") {
-            imds_loader = imds_loader.with_msi_res_id(msi_res_id);
-        }
-
-        if let Some(endpoint) = ctx.env_var("AZURE_MSI_ENDPOINT") {
-            imds_loader = imds_loader.with_endpoint(endpoint);
-        }
-
-        if let Some(secret) = ctx.env_var("AZURE_MSI_SECRET") {
-            imds_loader = imds_loader.with_msi_secret(secret);
-        }
-
-        // Build new chain with configured providers
         let chain = ProvideCredentialChain::new()
-            .push(config_loader)
-            .push(client_secret_loader)
-            .push(workload_identity_loader)
-            .push(imds_loader);
+            .push(EnvCredentialProvider::new())
+            .push(ClientSecretCredentialProvider::new())
+            .push(WorkloadIdentityCredentialProvider::new())
+            .push(ImdsCredentialProvider::new());
 
         Self { chain }
     }
@@ -158,7 +62,7 @@ mod tests {
         // Create a mock context - in real usage Context would be created with proper FileRead and HttpSend
         let ctx = reqsign_core::Context::new(MockFileRead, MockHttpSend).with_env(env);
 
-        let loader = DefaultCredentialProvider::new().from_env(&ctx);
+        let loader = DefaultCredentialProvider::new();
 
         let cred = loader.provide_credential(&ctx).await.unwrap().unwrap();
         match cred {
@@ -185,7 +89,7 @@ mod tests {
 
         let ctx = reqsign_core::Context::new(MockFileRead, MockHttpSend).with_env(env);
 
-        let loader = DefaultCredentialProvider::new().from_env(&ctx);
+        let loader = DefaultCredentialProvider::new();
 
         let cred = loader.provide_credential(&ctx).await.unwrap().unwrap();
         match cred {

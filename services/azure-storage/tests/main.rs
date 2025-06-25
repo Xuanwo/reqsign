@@ -9,8 +9,8 @@ use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
 use reqsign_azure_storage::{
-    ConfigCredentialProvider, Credential, DefaultCredentialProvider, ImdsCredentialProvider,
-    RequestSigner,
+    Credential, DefaultCredentialProvider, ImdsCredentialProvider, RequestSigner,
+    StaticCredentialProvider,
 };
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
@@ -29,15 +29,12 @@ fn init_signer() -> Option<(Context, Signer<Credential>)> {
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    let loader = ConfigCredentialProvider::new()
-        .with_account_name(
-            env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
-                .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),
-        )
-        .with_account_key(
-            env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY")
-                .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_KEY must set"),
-        );
+    let loader = StaticCredentialProvider::new_shared_key(
+        &env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
+            .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_NAME must set"),
+        &env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY")
+            .expect("env REQSIGN_AZURE_STORAGE_ACCOUNT_KEY must set"),
+    );
 
     let builder = RequestSigner::new();
     let signer = Signer::new(ctx.clone(), loader, builder);
@@ -406,7 +403,7 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    let loader = DefaultCredentialProvider::new().from_env(&ctx);
+    let loader = DefaultCredentialProvider::new();
     let builder = RequestSigner::new();
     let signer = Signer::new(ctx.clone(), loader, builder);
 
@@ -462,7 +459,7 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    let loader = DefaultCredentialProvider::new().from_env(&ctx);
+    let loader = DefaultCredentialProvider::new();
     let builder = RequestSigner::new();
     let signer = Signer::new(ctx.clone(), loader, builder);
 

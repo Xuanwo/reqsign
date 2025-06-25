@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqsign_azure_storage::{Config, DefaultCredentialProvider, RequestSigner};
+use reqsign_azure_storage::{DefaultCredentialProvider, RequestSigner};
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -17,13 +17,10 @@ async fn main() -> Result<()> {
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
 
     // Configure Azure Storage credentials
-    // This will try multiple sources:
+    // The DefaultCredentialProvider will try multiple sources:
     // 1. Environment variables (AZURE_STORAGE_ACCOUNT_NAME, AZURE_STORAGE_ACCOUNT_KEY)
     // 2. Managed identity (if running on Azure)
     // 3. Azure CLI credentials
-    let _config = Config::default()
-        .with_account_name("mystorageaccount") // Replace with your account
-        .from_env();
 
     // Check if we have real credentials
     let has_real_creds = ctx.env_var("AZURE_STORAGE_ACCOUNT_NAME").is_some()
@@ -39,7 +36,7 @@ async fn main() -> Result<()> {
     }
 
     // Create credential loader
-    let loader = DefaultCredentialProvider::new().from_env(&ctx);
+    let loader = DefaultCredentialProvider::new();
 
     // Create request builder
     let builder = RequestSigner::new();
@@ -177,11 +174,11 @@ async fn main() -> Result<()> {
 
     // Example 4: Using SAS token (if available)
     println!("\nExample 4: Using SAS token");
-    let _sas_config = Config::default()
-        .with_account_name(account_name)
-        .with_sas_token("sv=2021-12-02&ss=b&srt=sco&sp=rwdlacx&se=2024-12-31T23:59:59Z&..."); // Your SAS token
+    // For SAS tokens, you would typically use StaticCredentialProvider:
+    // let sas_loader = StaticCredentialProvider::new()
+    //     .with_sas_token("sv=2021-12-02&ss=b&srt=sco&sp=rwdlacx&se=2024-12-31T23:59:59Z&...");
 
-    let sas_loader = DefaultCredentialProvider::new().from_env(&ctx);
+    let sas_loader = DefaultCredentialProvider::new();
     let sas_signer = Signer::new(ctx.clone(), sas_loader, RequestSigner::new());
 
     let url_with_sas = format!(

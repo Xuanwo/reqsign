@@ -10,41 +10,12 @@ use reqsign_core::{Context, ProvideCredential, Result};
 ///
 /// Reference: <https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview>
 #[derive(Debug, Default)]
-pub struct WorkloadIdentityCredentialProvider {
-    tenant_id: Option<String>,
-    client_id: Option<String>,
-    federated_token_file: Option<String>,
-    authority_host: Option<String>,
-}
+pub struct WorkloadIdentityCredentialProvider;
 
 impl WorkloadIdentityCredentialProvider {
     /// Create a new workload identity loader.
     pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set the Azure tenant ID.
-    pub fn with_tenant_id(mut self, tenant_id: impl Into<String>) -> Self {
-        self.tenant_id = Some(tenant_id.into());
-        self
-    }
-
-    /// Set the Azure client ID.
-    pub fn with_client_id(mut self, client_id: impl Into<String>) -> Self {
-        self.client_id = Some(client_id.into());
-        self
-    }
-
-    /// Set the federated token file path.
-    pub fn with_federated_token_file(mut self, federated_token_file: impl Into<String>) -> Self {
-        self.federated_token_file = Some(federated_token_file.into());
-        self
-    }
-
-    /// Set the authority host URL.
-    pub fn with_authority_host(mut self, authority_host: impl Into<String>) -> Self {
-        self.authority_host = Some(authority_host.into());
-        self
+        Self
     }
 }
 
@@ -53,25 +24,28 @@ impl ProvideCredential for WorkloadIdentityCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        // Check if all required parameters are available
-        let tenant_id = match &self.tenant_id {
+        let envs = ctx.env_vars();
+
+        // Check if all required parameters are available from environment
+        let tenant_id = match envs.get("AZURE_TENANT_ID") {
             Some(id) if !id.is_empty() => id,
             _ => return Ok(None),
         };
 
-        let client_id = match &self.client_id {
+        let client_id = match envs.get("AZURE_CLIENT_ID") {
             Some(id) if !id.is_empty() => id,
             _ => return Ok(None),
         };
 
-        let federated_token_file = match &self.federated_token_file {
+        let federated_token_file = match envs.get("AZURE_FEDERATED_TOKEN_FILE") {
             Some(file) if !file.is_empty() => file,
             _ => return Ok(None),
         };
 
-        let authority_host = self
-            .authority_host
-            .as_deref()
+        let authority_host = envs
+            .get("AZURE_AUTHORITY_HOST")
+            .filter(|h| !h.is_empty())
+            .map(|s| s.as_str())
             .unwrap_or("https://login.microsoftonline.com");
 
         let token = get_workload_identity_token(
@@ -99,7 +73,7 @@ impl ProvideCredential for WorkloadIdentityCredentialProvider {
                 };
 
                 Ok(Some(Credential::with_bearer_token(
-                    token_response.access_token,
+                    &token_response.access_token,
                     Some(expires_on),
                 )))
             }

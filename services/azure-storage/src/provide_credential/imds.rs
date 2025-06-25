@@ -9,48 +9,12 @@ use reqsign_core::{Context, ProvideCredential, Result};
 ///
 /// Reference: <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
 #[derive(Debug, Default)]
-pub struct ImdsCredentialProvider {
-    object_id: Option<String>,
-    client_id: Option<String>,
-    msi_res_id: Option<String>,
-    msi_secret: Option<String>,
-    endpoint: Option<String>,
-}
+pub struct ImdsCredentialProvider;
 
 impl ImdsCredentialProvider {
     /// Create a new IMDS loader.
     pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Set object ID for user-assigned managed identity.
-    pub fn with_object_id(mut self, object_id: impl Into<String>) -> Self {
-        self.object_id = Some(object_id.into());
-        self
-    }
-
-    /// Set client ID for user-assigned managed identity.
-    pub fn with_client_id(mut self, client_id: impl Into<String>) -> Self {
-        self.client_id = Some(client_id.into());
-        self
-    }
-
-    /// Set MSI resource ID for user-assigned managed identity.
-    pub fn with_msi_res_id(mut self, msi_res_id: impl Into<String>) -> Self {
-        self.msi_res_id = Some(msi_res_id.into());
-        self
-    }
-
-    /// Set MSI secret header value.
-    pub fn with_msi_secret(mut self, msi_secret: impl Into<String>) -> Self {
-        self.msi_secret = Some(msi_secret.into());
-        self
-    }
-
-    /// Set custom IMDS endpoint.
-    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
-        self.endpoint = Some(endpoint.into());
-        self
+        Self
     }
 }
 
@@ -59,7 +23,7 @@ impl ProvideCredential for ImdsCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        let token = get_access_token("https://storage.azure.com/", self, ctx).await?;
+        let token = get_access_token("https://storage.azure.com/", ctx).await?;
 
         let expires_on = if token.expires_on.is_empty() {
             reqsign_core::time::now() + chrono::TimeDelta::try_minutes(10).expect("in bounds")
@@ -70,7 +34,7 @@ impl ProvideCredential for ImdsCredentialProvider {
         };
 
         Ok(Some(Credential::with_bearer_token(
-            token.access_token,
+            &token.access_token,
             Some(expires_on),
         )))
     }
@@ -82,24 +46,24 @@ struct AccessTokenResponse {
     expires_on: String,
 }
 
-async fn get_access_token(
-    resource: &str,
-    loader: &ImdsCredentialProvider,
-    ctx: &Context,
-) -> Result<AccessTokenResponse> {
-    let endpoint = loader
-        .endpoint
-        .as_deref()
+async fn get_access_token(resource: &str, ctx: &Context) -> Result<AccessTokenResponse> {
+    let envs = ctx.env_vars();
+
+    let endpoint = envs
+        .get("AZBLOB_ENDPOINT")
+        .or_else(|| envs.get("AZURE_IMDS_ENDPOINT"))
+        .filter(|e| !e.is_empty())
+        .map(|s| s.as_str())
         .unwrap_or("http://169.254.169.254/metadata/identity/oauth2/token");
 
     let mut url = format!("{}?api-version=2018-02-01&resource={}", endpoint, resource);
 
-    // Add identity parameters if specified
-    if let Some(object_id) = &loader.object_id {
+    // Add identity parameters if specified in environment
+    if let Some(object_id) = envs.get("AZURE_OBJECT_ID").filter(|s| !s.is_empty()) {
         url.push_str(&format!("&object_id={}", object_id));
-    } else if let Some(client_id) = &loader.client_id {
+    } else if let Some(client_id) = envs.get("AZURE_CLIENT_ID").filter(|s| !s.is_empty()) {
         url.push_str(&format!("&client_id={}", client_id));
-    } else if let Some(msi_res_id) = &loader.msi_res_id {
+    } else if let Some(msi_res_id) = envs.get("AZURE_MSI_RES_ID").filter(|s| !s.is_empty()) {
         url.push_str(&format!("&msi_res_id={}", msi_res_id));
     }
 
@@ -108,8 +72,8 @@ async fn get_access_token(
         .uri(&url)
         .header("Metadata", "true");
 
-    // Add MSI secret header if provided
-    if let Some(msi_secret) = &loader.msi_secret {
+    // Add MSI secret header if provided in environment
+    if let Some(msi_secret) = envs.get("AZURE_MSI_SECRET").filter(|s| !s.is_empty()) {
         req = req.header("X-IDENTITY-HEADER", msi_secret);
     }
 
