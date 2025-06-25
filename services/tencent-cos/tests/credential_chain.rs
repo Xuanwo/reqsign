@@ -5,7 +5,7 @@ use reqsign_core::ProvideCredentialChain;
 use reqsign_core::{Context, ProvideCredential, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
-use reqsign_tencent_cos::{ConfigCredentialProvider, Credential};
+use reqsign_tencent_cos::{Credential, EnvCredentialProvider};
 use std::sync::Arc;
 
 /// Mock provider that tracks how many times it was called
@@ -92,10 +92,8 @@ async fn test_chain_with_real_providers() {
         ]),
     });
 
-    let config = Arc::new(reqsign_tencent_cos::Config::default());
-
-    // Create a chain with only ConfigCredentialProvider
-    let chain = ProvideCredentialChain::new().push(ConfigCredentialProvider::new(config));
+    // Create a chain with EnvCredentialProvider
+    let chain = ProvideCredentialChain::new().push(EnvCredentialProvider::new());
 
     let result = chain.provide_credential(&ctx).await.unwrap();
     assert!(result.is_some());

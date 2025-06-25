@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use crate::constants::*;
 use ini::Ini;
 use reqsign_core::utils::Redact;
@@ -7,6 +9,10 @@ use std::fmt::{Debug, Formatter};
 
 /// Config for Oracle Cloud Infrastructure services.
 #[derive(Clone, Default)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Config is no longer needed. Use specific credential providers instead"
+)]
 pub struct Config {
     /// UserID for Oracle Cloud Infrastructure.
     pub user: Option<String>,

@@ -1,29 +1,35 @@
-use crate::{Config, Credential};
+use crate::Credential;
 use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
-use std::sync::Arc;
 
 /// Default loader for Tencent COS.
 ///
 /// This loader will try to load credentials in the following order:
-/// 1. From static configuration
+/// 1. From environment variables
 /// 2. From AssumeRoleWithWebIdentity
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
 }
 
+impl Default for DefaultCredentialProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DefaultCredentialProvider {
     /// Create a new DefaultCredentialProvider
-    pub fn new(config: Config) -> Self {
+    pub fn new() -> Self {
         let chain = ProvideCredentialChain::new()
-            .push(super::ConfigCredentialProvider::new(Arc::new(
-                config.clone(),
-            )))
-            .push(super::AssumeRoleWithWebIdentityCredentialProvider::new(
-                Arc::new(config),
-            ));
+            .push(super::EnvCredentialProvider::new())
+            .push(super::AssumeRoleWithWebIdentityCredentialProvider::new());
 
+        Self { chain }
+    }
+
+    /// Create with a custom credential chain.
+    pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
         Self { chain }
     }
 }
@@ -34,5 +40,70 @@ impl ProvideCredential for DefaultCredentialProvider {
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         self.chain.provide_credential(ctx).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::*;
+    use reqsign_core::StaticEnv;
+    use reqsign_file_read_tokio::TokioFileRead;
+    use reqsign_http_send_reqwest::ReqwestHttpSend;
+    use std::collections::HashMap;
+
+    #[tokio::test]
+    async fn test_default_loader_without_env() {
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = ctx.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::new(),
+        });
+
+        let loader = DefaultCredentialProvider::new();
+        let credential = loader.provide_credential(&ctx).await.unwrap();
+
+        assert!(credential.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_default_loader_with_env() {
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = ctx.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                (TENCENTCLOUD_SECRET_ID.to_string(), "secret_id".to_string()),
+                (
+                    TENCENTCLOUD_SECRET_KEY.to_string(),
+                    "secret_key".to_string(),
+                ),
+            ]),
+        });
+
+        let loader = DefaultCredentialProvider::new();
+        let credential = loader.provide_credential(&ctx).await.unwrap().unwrap();
+
+        assert_eq!("secret_id", credential.secret_id);
+        assert_eq!("secret_key", credential.secret_key);
+    }
+
+    #[tokio::test]
+    async fn test_default_loader_with_security_token() {
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = ctx.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                (TKE_SECRET_ID.to_string(), "secret_id".to_string()),
+                (TKE_SECRET_KEY.to_string(), "secret_key".to_string()),
+                (TENCENTCLOUD_TOKEN.to_string(), "security_token".to_string()),
+            ]),
+        });
+
+        let loader = DefaultCredentialProvider::new();
+        let credential = loader.provide_credential(&ctx).await.unwrap().unwrap();
+
+        assert_eq!("secret_id", credential.secret_id);
+        assert_eq!("secret_key", credential.secret_key);
+        assert_eq!("security_token", credential.security_token.unwrap());
     }
 }

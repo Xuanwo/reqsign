@@ -282,7 +282,6 @@ static SUBRESOURCES: Lazy<HashSet<&'static str>> = Lazy::new(|| {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use std::sync::Arc;
 
     use chrono::Utc;
     use http::header::HeaderName;
@@ -292,18 +291,12 @@ mod tests {
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
 
-    use super::super::config::Config;
-    use super::super::provide_credential::ConfigCredentialProvider;
+    use super::super::provide_credential::StaticCredentialProvider;
     use super::*;
 
     #[tokio::test]
     async fn test_sign() -> Result<()> {
-        let config = Config {
-            access_key_id: Some("access_key".to_string()),
-            secret_access_key: Some("123456".to_string()),
-            ..Default::default()
-        };
-        let loader = ConfigCredentialProvider::new(Arc::new(config));
+        let loader = StaticCredentialProvider::new("access_key", "123456");
         let builder = RequestSigner::new("bucket").with_time(
             chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
                 .unwrap()
@@ -342,12 +335,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sign_with_subresource() -> Result<()> {
-        let config = Config {
-            access_key_id: Some("access_key".to_string()),
-            secret_access_key: Some("123456".to_string()),
-            ..Default::default()
-        };
-        let loader = ConfigCredentialProvider::new(Arc::new(config));
+        let loader = StaticCredentialProvider::new("access_key", "123456");
         let builder = RequestSigner::new("bucket").with_time(
             chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
                 .unwrap()
@@ -388,12 +376,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sign_list_objects() -> Result<()> {
-        let config = Config {
-            access_key_id: Some("access_key".to_string()),
-            secret_access_key: Some("123456".to_string()),
-            ..Default::default()
-        };
-        let loader = ConfigCredentialProvider::new(Arc::new(config));
+        let loader = StaticCredentialProvider::new("access_key", "123456");
         let builder = RequestSigner::new("bucket").with_time(
             chrono::DateTime::parse_from_rfc2822("Mon, 15 Aug 2022 16:50:12 GMT")
                 .unwrap()

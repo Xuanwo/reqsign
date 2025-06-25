@@ -5,8 +5,9 @@ use log::{debug, info};
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
-use reqsign_oracle::{ConfigCredentialProvider, Credential, DefaultCredentialProvider};
-use std::sync::Arc;
+use reqsign_oracle::{
+    Credential, DefaultCredentialProvider, EnvCredentialProvider, StaticCredentialProvider,
+};
 
 /// Wrapper that logs when credentials are loaded
 #[derive(Debug)]
@@ -64,12 +65,21 @@ async fn main() -> Result<()> {
     // Build a chain with logging
     let chain = ProvideCredentialChain::new()
         .push(LoggingProvider::new(
-            "Config",
-            ConfigCredentialProvider::new(Arc::new(reqsign_oracle::Config::default())),
+            "Static",
+            StaticCredentialProvider::new(
+                "demo_user",
+                "demo_tenancy",
+                "/path/to/key.pem",
+                "demo_fingerprint",
+            ),
+        ))
+        .push(LoggingProvider::new(
+            "Environment",
+            EnvCredentialProvider::new(),
         ))
         .push(LoggingProvider::new(
             "Default",
-            DefaultCredentialProvider::new(reqsign_oracle::Config::default()),
+            DefaultCredentialProvider::new(),
         ));
 
     info!("Starting credential resolution...");

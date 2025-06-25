@@ -5,8 +5,9 @@ use log::{debug, info};
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
-use reqsign_huaweicloud_obs::{ConfigCredentialProvider, Credential, DefaultCredentialProvider};
-use std::sync::Arc;
+use reqsign_huaweicloud_obs::{
+    Credential, DefaultCredentialProvider, EnvCredentialProvider, StaticCredentialProvider,
+};
 
 /// Wrapper that logs when credentials are loaded
 #[derive(Debug)]
@@ -68,12 +69,16 @@ async fn main() -> Result<()> {
     // Build a chain with logging
     let chain = ProvideCredentialChain::new()
         .push(LoggingProvider::new(
-            "Config",
-            ConfigCredentialProvider::new(Arc::new(reqsign_huaweicloud_obs::Config::default())),
+            "Static",
+            StaticCredentialProvider::new("demo_key", "demo_secret"),
+        ))
+        .push(LoggingProvider::new(
+            "Environment",
+            EnvCredentialProvider::new(),
         ))
         .push(LoggingProvider::new(
             "Default",
-            DefaultCredentialProvider::new(reqsign_huaweicloud_obs::Config::default()),
+            DefaultCredentialProvider::new(),
         ));
 
     info!("Starting credential resolution...");

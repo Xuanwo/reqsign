@@ -1,4 +1,5 @@
-use crate::{Config, Credential};
+use crate::constants::*;
+use crate::Credential;
 use async_trait::async_trait;
 use http::header::{AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE};
 use log::debug;
@@ -6,18 +7,15 @@ use reqsign_core::time::{now, parse_rfc3339};
 use reqsign_core::Result;
 use reqsign_core::{Context, ProvideCredential};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// Loader that loads credential via AssumeRoleWithWebIdentity.
-#[derive(Debug)]
-pub struct AssumeRoleWithWebIdentityCredentialProvider {
-    config: Arc<Config>,
-}
+#[derive(Debug, Default)]
+pub struct AssumeRoleWithWebIdentityCredentialProvider {}
 
 impl AssumeRoleWithWebIdentityCredentialProvider {
     /// Create a new AssumeRoleWithWebIdentityCredentialProvider
-    pub fn new(config: Arc<Config>) -> Self {
-        Self { config }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -26,45 +24,51 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        let (region, token_file, role_arn, provider_id) = match (
-            &self.config.region,
-            &self.config.web_identity_token_file,
-            &self.config.role_arn,
-            &self.config.provider_id,
-        ) {
-            (Some(region), Some(token_file), Some(role_arn), Some(provider_id)) => {
-                (region, token_file, role_arn, provider_id)
-            }
-            _ => {
-                let missing = [
-                    ("region", self.config.region.is_none()),
-                    (
-                        "web_identity_token_file",
-                        self.config.web_identity_token_file.is_none(),
-                    ),
-                    ("role_arn", self.config.role_arn.is_none()),
-                    ("provider_id", self.config.provider_id.is_none()),
-                ]
-                .iter()
-                .filter_map(|&(k, v)| if v { Some(k) } else { None })
-                .collect::<Vec<_>>()
-                .join(", ");
-
-                debug!(
-                    "assume_role_with_web_identity is not configured fully: [{}] is missing",
-                    missing
-                );
-
-                return Ok(None);
-            }
-        };
-
-        let token = ctx.file_read_as_string(token_file).await?;
-        let role_session_name = self
-            .config
-            .role_session_name
-            .clone()
+        // Read environment variables at runtime
+        let region = ctx
+            .env_var(TENCENTCLOUD_REGION)
+            .or_else(|| ctx.env_var(TKE_REGION));
+        let token_file = ctx
+            .env_var(TENCENTCLOUD_WEB_IDENTITY_TOKEN_FILE)
+            .or_else(|| ctx.env_var(TKE_IDENTITY_TOKEN_FILE));
+        let role_arn = ctx
+            .env_var(TENCENTCLOUD_ROLE_ARN)
+            .or_else(|| ctx.env_var(TKE_ROLE_ARN));
+        let provider_id = ctx
+            .env_var(TENCENTCLOUD_PROVIDER_ID)
+            .or_else(|| ctx.env_var(TKE_PROVIDER_ID));
+        let role_session_name = ctx
+            .env_var(TENCENTCLOUD_ROLE_SESSSION_NAME)
+            .or_else(|| ctx.env_var(TKE_ROLE_SESSSION_NAME))
             .unwrap_or_else(|| "reqsign".to_string());
+
+        let (region, token_file, role_arn, provider_id) =
+            match (region, token_file, role_arn, provider_id) {
+                (Some(region), Some(token_file), Some(role_arn), Some(provider_id)) => {
+                    (region, token_file, role_arn, provider_id)
+                }
+                (region, token_file, role_arn, provider_id) => {
+                    let missing = [
+                        ("region", region.is_none()),
+                        ("web_identity_token_file", token_file.is_none()),
+                        ("role_arn", role_arn.is_none()),
+                        ("provider_id", provider_id.is_none()),
+                    ]
+                    .iter()
+                    .filter_map(|&(k, v)| if v { Some(k) } else { None })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                    debug!(
+                        "assume_role_with_web_identity is not configured fully: [{}] is missing",
+                        missing
+                    );
+
+                    return Ok(None);
+                }
+            };
+
+        let token = ctx.file_read_as_string(&token_file).await?;
 
         // Construct request to Tencent Cloud STS Service.
         let url = "https://sts.tencentcloudapi.com";
@@ -85,7 +89,7 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
             .header(CONTENT_TYPE.as_str(), "application/json")
             .header(CONTENT_LENGTH, bs.len())
             .header("X-TC-Action", "AssumeRoleWithWebIdentity")
-            .header("X-TC-Region", region)
+            .header("X-TC-Region", &region)
             .header("X-TC-Timestamp", now().timestamp())
             .header("X-TC-Version", "2018-08-13")
             .body(bs.into())?;

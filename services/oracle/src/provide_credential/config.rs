@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use crate::{Config, Credential};
 use async_trait::async_trait;
 use log::debug;
