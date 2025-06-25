@@ -1,6 +1,7 @@
 use crate::provide_credential::{
-    AssumeRoleWithWebIdentityCredentialProvider, EnvCredentialProvider, IMDSv2CredentialProvider,
-    ProfileCredentialProvider,
+    AssumeRoleWithWebIdentityCredentialProvider, ECSCredentialProvider, EnvCredentialProvider,
+    IMDSv2CredentialProvider, ProcessCredentialProvider, ProfileCredentialProvider,
+    SSOCredentialProvider,
 };
 use crate::Credential;
 use async_trait::async_trait;
@@ -12,9 +13,11 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 ///
 /// 1. Environment variables
 /// 2. Shared config (`~/.aws/config`, `~/.aws/credentials`)
-/// 3. Web Identity Tokens
-/// 4. ECS (IAM Roles for Tasks) & General HTTP credentials (TODO)
-/// 5. EC2 IMDSv2
+/// 3. SSO credentials
+/// 4. Web Identity Tokens
+/// 5. Process credentials
+/// 6. ECS (IAM Roles for Tasks) & Container credentials
+/// 7. EC2 IMDSv2
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
@@ -32,7 +35,10 @@ impl DefaultCredentialProvider {
         let chain = ProvideCredentialChain::new()
             .push(EnvCredentialProvider::new())
             .push(ProfileCredentialProvider::new())
+            .push(SSOCredentialProvider::new())
             .push(AssumeRoleWithWebIdentityCredentialProvider::new())
+            .push(ProcessCredentialProvider::new())
+            .push(ECSCredentialProvider::new())
             .push(IMDSv2CredentialProvider::new());
 
         Self { chain }
