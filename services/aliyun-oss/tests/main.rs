@@ -34,7 +34,7 @@ async fn init_signer() -> Option<(Context, Signer<reqsign_aliyun_oss::Credential
     let bucket =
         env::var("REQSIGN_ALIYUN_OSS_BUCKET").expect("env REQSIGN_ALIYUN_OSS_BUCKET must set");
 
-    let loader = StaticCredentialProvider::new(access_key_id, access_key_secret);
+    let loader = StaticCredentialProvider::new(&access_key_id, &access_key_secret);
     let builder = RequestSigner::new(&bucket);
     let signer = Signer::new(context.clone(), loader, builder);
 
