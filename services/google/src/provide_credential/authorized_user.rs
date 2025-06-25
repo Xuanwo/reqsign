@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 
 use reqsign_core::{time::now, Context, ProvideCredential, Result};
 
-use crate::config::Config;
 use crate::credential::{Credential, OAuth2Credentials, Token};
 
 /// OAuth2 refresh token request.
@@ -32,7 +31,7 @@ pub struct AuthorizedUserCredentialProvider {
 
 impl AuthorizedUserCredentialProvider {
     /// Create a new AuthorizedUserCredentialProvider.
-    pub fn new(_config: Config, oauth2_credentials: OAuth2Credentials) -> Self {
+    pub fn new(oauth2_credentials: OAuth2Credentials) -> Self {
         Self { oauth2_credentials }
     }
 }

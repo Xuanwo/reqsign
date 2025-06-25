@@ -13,8 +13,7 @@ async fn main() -> Result<()> {
     let ctx = Context::new(ctx_impl.clone(), ctx_impl.clone()).with_env(ctx_impl.clone());
 
     // Create credential loader
-    let config = reqsign::google::Config::default();
-    let loader = DefaultCredentialProvider::new(config);
+    let loader = DefaultCredentialProvider::new();
 
     // Create request builder (for Google Cloud Storage)
     let builder = RequestSigner::new("storage.googleapis.com");

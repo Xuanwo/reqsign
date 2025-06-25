@@ -6,7 +6,7 @@ use log::debug;
 use log::warn;
 use reqsign_core::{Context, Result, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
-use reqsign_google::{Config, Credential, DefaultCredentialProvider, RequestSigner};
+use reqsign_google::{Credential, RequestSigner, StaticCredentialProvider};
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
 
@@ -24,13 +24,10 @@ async fn init_signer() -> Option<(Context, Signer<Credential>)> {
     let scope = env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE")
         .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE must be set");
 
-    let config = Config::new()
-        .with_credential_content(credential_content)
-        .with_scope(scope)
-        .with_service("storage");
-
-    let loader = DefaultCredentialProvider::new(config.clone());
-    let builder = RequestSigner::with_config("storage", config);
+    let loader = StaticCredentialProvider::from_base64(credential_content)
+        .expect("credential must be valid base64")
+        .with_scope(&scope);
+    let builder = RequestSigner::new("storage").with_scope(&scope);
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
     let signer = Signer::new(ctx.clone(), loader, builder);
@@ -50,12 +47,9 @@ async fn init_signer_for_signed_url() -> Option<(Context, Signer<Credential>)> {
         env::var("REQSIGN_GOOGLE_CREDENTIAL").expect("env REQSIGN_GOOGLE_CREDENTIAL must be set");
 
     // Don't set scope for signed URL generation
-    let config = Config::new()
-        .with_credential_content(credential_content)
-        .with_service("storage");
-
-    let loader = DefaultCredentialProvider::new(config.clone());
-    let builder = RequestSigner::with_config("storage", config);
+    let loader = StaticCredentialProvider::from_base64(credential_content)
+        .expect("credential must be valid base64");
+    let builder = RequestSigner::new("storage");
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
     let signer = Signer::new(ctx.clone(), loader, builder);

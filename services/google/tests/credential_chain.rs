@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use reqsign_core::ProvideCredentialChain;
 use reqsign_core::{Context, ProvideCredential, Result};
 use reqsign_file_read_tokio::TokioFileRead;
-use reqsign_google::{ConfigCredentialProvider, Credential, ServiceAccount, Token};
+use reqsign_google::{Credential, DefaultCredentialProvider, ServiceAccount, Token};
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use std::sync::Arc;
 
@@ -25,10 +25,20 @@ impl ProvideCredential for CountingProvider {
         *count += 1;
 
         if self.return_credential {
-            Ok(Some(Credential::with_service_account(ServiceAccount {
-                private_key: format!("{}_private_key", self.name),
-                client_email: format!("{}@example.iam.gserviceaccount.com", self.name),
-            })))
+            // Return a credential with both service account and token for testing
+            Ok(Some(Credential {
+                service_account: Some(ServiceAccount {
+                    private_key: format!("{}_private_key", self.name),
+                    client_email: format!("{}@example.iam.gserviceaccount.com", self.name),
+                }),
+                token: Some(Token {
+                    access_token: format!("{}_token", self.name),
+                    expires_at: Some(
+                        reqsign_core::time::now()
+                            + chrono::TimeDelta::try_hours(1).expect("in bounds"),
+                    ),
+                }),
+            }))
         } else {
             Ok(None)
         }
@@ -65,9 +75,11 @@ async fn test_chain_stops_at_first_success() {
 
     let cred = result.unwrap();
     assert!(cred.has_service_account());
-    let sa = cred.service_account.unwrap();
+    assert!(cred.has_token());
+    let sa = cred.service_account.as_ref().unwrap();
     assert_eq!(sa.client_email, "provider2@example.iam.gserviceaccount.com");
-    assert_eq!(sa.private_key, "provider2_private_key");
+    let token = cred.token.as_ref().unwrap();
+    assert_eq!(token.access_token, "provider2_token");
 
     // Verify call counts
     assert_eq!(*count1.lock().unwrap(), 1);
@@ -95,17 +107,15 @@ async fn test_chain_with_real_providers() {
         )]),
     });
 
-    let config = reqsign_google::Config::default();
-
-    // Create a chain with only ConfigCredentialProvider
-    let chain = ProvideCredentialChain::new().push(ConfigCredentialProvider::new(config));
+    // Create a chain with DefaultCredentialProvider
+    let chain = ProvideCredentialChain::new().push(DefaultCredentialProvider::new());
 
     let result = chain.provide_credential(&ctx).await.unwrap();
     assert!(result.is_some());
 
     let cred = result.unwrap();
     assert!(cred.has_service_account());
-    let sa = cred.service_account.unwrap();
+    let sa = cred.service_account.as_ref().unwrap();
     assert_eq!(sa.client_email, "test-234@test.iam.gserviceaccount.com");
 }
 

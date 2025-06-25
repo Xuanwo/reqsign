@@ -1,4 +1,3 @@
-use reqsign_core::hash::base64_decode;
 use reqsign_core::{
     time::now, time::DateTime, utils::Redact, Result, SigningCredential as KeyTrait,
 };
@@ -198,10 +197,17 @@ impl KeyTrait for Token {
 
 /// Credential represents Google credentials that may contain both service account and token.
 ///
-/// This unified credential type allows for flexible authentication strategies:
-/// - Service account only: Used for signed URL generation
-/// - Token only: Used for Bearer authentication  
-/// - Both: Allows automatic token refresh when token expires
+/// **IMPORTANT**: This is a specially designed structure that can hold both ServiceAccount
+/// and Token simultaneously. This design is intentional and critical for Google's authentication:
+///
+/// - Service account only: Used for signed URL generation and JWT-based authentication
+/// - Token only: Used for Bearer authentication (e.g., from metadata server, OAuth2)  
+/// - Both: The RequestSigner is responsible for exchanging service account for tokens when needed,
+///   and can use cached tokens when available to avoid unnecessary exchanges
+///
+/// The RequestSigner implementation handles the logic of when to use which credential type
+/// and when to perform token exchanges. Providers should return credentials as they receive them
+/// without trying to perform exchanges themselves.
 #[derive(Clone, Debug, Default)]
 pub struct Credential {
     /// Service account information, if available.
@@ -270,14 +276,6 @@ impl CredentialFile {
         serde_json::from_slice(v).map_err(|e| {
             reqsign_core::Error::unexpected("failed to parse credential file").with_source(e)
         })
-    }
-
-    /// Parse credential file from base64-encoded content.
-    pub fn from_base64(content: &str) -> Result<Self> {
-        let decoded = base64_decode(content).map_err(|e| {
-            reqsign_core::Error::unexpected("failed to decode base64").with_source(e)
-        })?;
-        Self::from_slice(&decoded)
     }
 }
 

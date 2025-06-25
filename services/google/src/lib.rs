@@ -2,9 +2,6 @@
 
 mod constants;
 
-mod config;
-pub use config::Config;
-
 mod credential;
 pub use credential::{Credential, ServiceAccount, Token};
 
@@ -13,7 +10,5 @@ pub use sign_request::RequestSigner;
 
 mod provide_credential;
 pub use provide_credential::{
-    AuthorizedUserCredentialProvider, ConfigCredentialProvider, DefaultCredentialProvider,
-    ExternalAccountCredentialProvider, ImpersonatedServiceAccountCredentialProvider,
-    VmMetadataCredentialProvider,
+    DefaultCredentialProvider, StaticCredentialProvider, VmMetadataCredentialProvider,
 };

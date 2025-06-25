@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use reqsign_core::{time::now, Context, ProvideCredential, Result};
 
-use crate::config::Config;
 use crate::credential::{Credential, ImpersonatedServiceAccount, Token};
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
@@ -48,17 +47,23 @@ struct ImpersonatedTokenResponse {
 /// ImpersonatedServiceAccountCredentialProvider exchanges impersonated service account credentials for access tokens.
 #[derive(Debug, Clone)]
 pub struct ImpersonatedServiceAccountCredentialProvider {
-    config: Config,
     impersonated_service_account: ImpersonatedServiceAccount,
+    scope: Option<String>,
 }
 
 impl ImpersonatedServiceAccountCredentialProvider {
     /// Create a new ImpersonatedServiceAccountCredentialProvider.
-    pub fn new(config: Config, impersonated_service_account: ImpersonatedServiceAccount) -> Self {
+    pub fn new(impersonated_service_account: ImpersonatedServiceAccount) -> Self {
         Self {
-            config,
             impersonated_service_account,
+            scope: None,
         }
+    }
+
+    /// Set the OAuth2 scope.
+    pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
+        self.scope = Some(scope.into());
+        self
     }
 
     async fn generate_bearer_auth_token(&self, ctx: &Context) -> Result<Token> {
@@ -128,11 +133,11 @@ impl ImpersonatedServiceAccountCredentialProvider {
     async fn generate_access_token(&self, ctx: &Context, bearer_token: &Token) -> Result<Token> {
         debug!("generating access token for impersonated service account");
 
-        let scope = self.config.scope.as_ref().ok_or_else(|| {
-            reqsign_core::Error::config_invalid(
-                "scope is required for impersonated service account",
-            )
-        })?;
+        let scope = self
+            .scope
+            .clone()
+            .or_else(|| ctx.env_var(crate::constants::GOOGLE_SCOPE))
+            .unwrap_or_else(|| crate::constants::DEFAULT_SCOPE.to_string());
 
         let request = ImpersonationRequest {
             lifetime: format!("{}s", MAX_LIFETIME.as_secs()),
