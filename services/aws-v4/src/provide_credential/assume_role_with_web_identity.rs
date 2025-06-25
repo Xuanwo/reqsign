@@ -1,5 +1,5 @@
 use crate::provide_credential::utils::sts_endpoint;
-use crate::{Config, Credential};
+use crate::Credential;
 use async_trait::async_trait;
 use bytes::Bytes;
 use quick_xml::de;
@@ -7,18 +7,71 @@ use reqsign_core::time::parse_rfc3339;
 use reqsign_core::{utils::Redact, Context, Error, ProvideCredential, Result};
 use serde::Deserialize;
 use std::fmt::{Debug, Formatter};
-use std::sync::Arc;
+use std::path::PathBuf;
 
-/// AssumeRoleCredentialProvider will load credential via assume role.
+/// AssumeRoleWithWebIdentityCredentialProvider will load credential via assume role with web identity.
 #[derive(Debug)]
 pub struct AssumeRoleWithWebIdentityCredentialProvider {
-    config: Arc<Config>,
+    // Web Identity configuration
+    role_arn: String,
+    role_session_name: String,
+    web_identity_token_file: PathBuf,
+
+    // STS configuration
+    region: Option<String>,
+    use_regional_sts_endpoint: bool,
 }
 
 impl AssumeRoleWithWebIdentityCredentialProvider {
     /// Create a new `AssumeRoleWithWebIdentityCredentialProvider` instance.
-    pub fn new(cfg: Arc<Config>) -> Self {
-        Self { config: cfg }
+    pub fn new(role_arn: String, token_file: PathBuf) -> Self {
+        Self {
+            role_arn,
+            role_session_name: "reqsign".to_string(),
+            web_identity_token_file: token_file,
+            region: None,
+            use_regional_sts_endpoint: false,
+        }
+    }
+
+    /// Set the role session name.
+    pub fn with_role_session_name(mut self, name: String) -> Self {
+        self.role_session_name = name;
+        self
+    }
+
+    /// Set the region.
+    pub fn with_region(mut self, region: String) -> Self {
+        self.region = Some(region);
+        self
+    }
+
+    /// Use regional STS endpoint.
+    pub fn with_regional_sts_endpoint(mut self) -> Self {
+        self.use_regional_sts_endpoint = true;
+        self
+    }
+
+    /// Create from environment variables.
+    pub fn from_env(ctx: &Context) -> Option<Self> {
+        let role_arn = ctx.env_var("AWS_ROLE_ARN")?;
+        let token_file = ctx.env_var("AWS_WEB_IDENTITY_TOKEN_FILE")?;
+
+        let mut provider = Self::new(role_arn, PathBuf::from(token_file));
+
+        if let Some(name) = ctx.env_var("AWS_ROLE_SESSION_NAME") {
+            provider = provider.with_role_session_name(name);
+        }
+
+        if let Some(region) = ctx.env_var("AWS_REGION") {
+            provider = provider.with_region(region);
+        }
+
+        if ctx.env_var("AWS_STS_REGIONAL_ENDPOINTS") == Some("regional".to_string()) {
+            provider = provider.with_regional_sts_endpoint();
+        }
+
+        Some(provider)
     }
 }
 
@@ -27,23 +80,20 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        let (token_file, role_arn) =
-            match (&self.config.web_identity_token_file, &self.config.role_arn) {
-                (Some(token_file), Some(role_arn)) => (token_file, role_arn),
-                _ => return Ok(None),
-            };
+        let token = ctx
+            .file_read_as_string(&self.web_identity_token_file.to_string_lossy())
+            .await
+            .map_err(|e| {
+                Error::unexpected("failed to read web identity token file").with_source(e)
+            })?;
 
-        let token = ctx.file_read_as_string(token_file).await.map_err(|e| {
-            Error::unexpected("failed to read web identity token file").with_source(e)
-        })?;
-        let role_session_name = &self.config.role_session_name;
-
-        let endpoint = sts_endpoint(&self.config).map_err(|e| {
-            Error::config_invalid("failed to determine STS endpoint").with_source(e)
-        })?;
+        let endpoint = sts_endpoint(self.region.as_deref(), self.use_regional_sts_endpoint)
+            .map_err(|e| {
+                Error::config_invalid("failed to determine STS endpoint").with_source(e)
+            })?;
 
         // Construct request to AWS STS Service.
-        let url = format!("https://{endpoint}/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={role_session_name}");
+        let url = format!("https://{endpoint}/?Action=AssumeRoleWithWebIdentity&RoleArn={}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={}", self.role_arn, self.role_session_name);
         let req = http::request::Request::builder()
             .method("GET")
             .uri(url)

@@ -1,6 +1,6 @@
 use anyhow::Result;
-use reqsign_aws_v4::{Config, DefaultCredentialProvider, RequestSigner};
-use reqsign_core::{Context, Signer};
+use reqsign_aws_v4::{DefaultCredentialProvider, RequestSigner, StaticCredentialProvider};
+use reqsign_core::{Context, ProvideCredential, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
@@ -16,27 +16,26 @@ async fn main() -> Result<()> {
     // Create context with Tokio file reader and reqwest HTTP client
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
 
-    // Configure AWS credential loading
-    // For demo purposes, set demo credentials if none exist
-    let mut config = Config::default();
-    config = config.from_env(&ctx);
+    // Try to create default credential loader
+    let loader = DefaultCredentialProvider::new(&ctx);
 
-    // If no credentials are found, use demo credentials
-    if config.access_key_id.is_none() {
-        println!("No AWS credentials found, using demo credentials for example");
-        config.access_key_id = Some("AKIAIOSFODNN7EXAMPLE".to_string());
-        config.secret_access_key = Some("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
-        config.region = Some("us-east-1".to_string());
-    }
-
-    // Create credential loader
-    let loader = DefaultCredentialProvider::new(std::sync::Arc::new(config));
+    // Check if we have credentials by trying to load them
+    let test_cred = loader.provide_credential(&ctx).await?;
 
     // Create request builder for S3 in us-east-1
     let builder = RequestSigner::new("s3", "us-east-1");
 
     // Create the signer
-    let signer = Signer::new(ctx, loader, builder);
+    let signer = if test_cred.is_none() {
+        println!("No AWS credentials found, using demo credentials for example");
+        let static_provider = StaticCredentialProvider::new(
+            "AKIAIOSFODNN7EXAMPLE".to_string(),
+            "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string(),
+        );
+        Signer::new(ctx, static_provider, builder)
+    } else {
+        Signer::new(ctx, loader, builder)
+    };
 
     // Example 1: List buckets
     println!("Example 1: Listing S3 buckets");

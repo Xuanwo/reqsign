@@ -13,7 +13,7 @@
 //! ## Quick Start
 //!
 //! ```no_run
-//! use reqsign_aws_v4::{RequestSigner, Config, DefaultCredentialProvider};
+//! use reqsign_aws_v4::{RequestSigner, DefaultCredentialProvider};
 //! use reqsign_core::{Context, Signer};
 //! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -26,11 +26,8 @@
 //!         ReqwestHttpSend::default(),
 //!     );
 //!
-//!     // Configure AWS credential loading
-//!     let config = Config::default();
-//!
 //!     // Create credential loader
-//!     let loader = DefaultCredentialProvider::new(config.into());
+//!     let loader = DefaultCredentialProvider::new(&ctx);
 //!
 //!     // Create request builder for S3
 //!     let builder = RequestSigner::new("s3", "us-east-1");
@@ -74,19 +71,17 @@
 //!
 //! ## Advanced Configuration
 //!
-//! ### Using Config
+//! ### Using Custom Credential Providers
 //!
 //! ```no_run
-//! use reqsign_aws_v4::Config;
+//! use reqsign_aws_v4::{EnvCredentialProvider, ProfileCredentialProvider};
+//! use reqsign_core::ProvideCredentialChain;
 //!
-//! let mut config = Config::default();
-//! // Set specific credentials
-//! config.access_key_id = Some("AKIAIOSFODNN7EXAMPLE".to_string());
-//! config.secret_access_key = Some("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string());
-//! // Or use a specific profile
-//! config.profile = "production".to_string();
-//! // Or assume a role
-//! config.role_arn = Some("arn:aws:iam::123456789012:role/MyRole".to_string());
+//! // Create a custom credential chain
+//! let chain = ProvideCredentialChain::new()
+//!     .push(EnvCredentialProvider::new())
+//!     .push(ProfileCredentialProvider::new()
+//!         .with_profile("production"));
 //! ```
 //!
 //! ### Custom Credential Provider
@@ -119,14 +114,13 @@
 
 mod constants;
 
-mod config;
-pub use config::Config;
 mod credential;
 pub use credential::Credential;
 mod sign_request;
 pub use sign_request::RequestSigner;
 mod provide_credential;
 pub use provide_credential::*;
+
 
 pub const EMPTY_STRING_SHA256: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";

@@ -1,4 +1,4 @@
-use crate::{Config, Credential};
+use crate::Credential;
 use async_trait::async_trait;
 use bytes::Bytes;
 use http::header::CONTENT_LENGTH;
@@ -10,15 +10,40 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct IMDSv2CredentialProvider {
-    config: Arc<Config>,
+    disabled: bool,
     token: Arc<Mutex<(String, DateTime)>>,
+}
+
+impl Default for IMDSv2CredentialProvider {
+    fn default() -> Self {
+        Self {
+            disabled: false,
+            token: Arc::new(Mutex::new((String::new(), DateTime::default()))),
+        }
+    }
 }
 
 impl IMDSv2CredentialProvider {
     /// Create a new `IMDSv2CredentialProvider` instance.
-    pub fn new(cfg: Arc<Config>) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Disable the provider.
+    pub fn disabled(mut self) -> Self {
+        self.disabled = true;
+        self
+    }
+
+    /// Create from environment variables.
+    pub fn from_env(ctx: &Context) -> Self {
+        let disabled = ctx
+            .env_var("AWS_EC2_METADATA_DISABLED")
+            .map(|v| v == "true")
+            .unwrap_or(false);
+
         Self {
-            config: cfg,
+            disabled,
             token: Arc::new(Mutex::new((String::new(), DateTime::default()))),
         }
     }
@@ -67,8 +92,8 @@ impl ProvideCredential for IMDSv2CredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        // If ec2_metadata_disabled is set, return None.
-        if self.config.ec2_metadata_disabled {
+        // If disabled is set, return None.
+        if self.disabled {
             return Ok(None);
         }
 

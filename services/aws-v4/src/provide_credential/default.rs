@@ -2,10 +2,9 @@ use crate::provide_credential::{
     AssumeRoleWithWebIdentityCredentialProvider, EnvCredentialProvider, IMDSv2CredentialProvider,
     ProfileCredentialProvider,
 };
-use crate::{Config, Credential};
+use crate::Credential;
 use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
-use std::sync::Arc;
 
 /// DefaultCredentialProvider is a loader that will try to load credential via default chains.
 ///
@@ -23,15 +22,24 @@ pub struct DefaultCredentialProvider {
 
 impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
-    pub fn new(config: Arc<Config>) -> Self {
-        let chain = ProvideCredentialChain::new()
+    pub fn new(ctx: &Context) -> Self {
+        let mut chain = ProvideCredentialChain::new()
             .push(EnvCredentialProvider::new())
-            .push(ProfileCredentialProvider::new())
-            .push(AssumeRoleWithWebIdentityCredentialProvider::new(
-                config.clone(),
-            ))
-            .push(IMDSv2CredentialProvider::new(config));
+            .push(ProfileCredentialProvider::new());
 
+        // Add AssumeRoleWithWebIdentityCredentialProvider if configured
+        if let Some(provider) = AssumeRoleWithWebIdentityCredentialProvider::from_env(ctx) {
+            chain = chain.push(provider);
+        }
+
+        // Add IMDSv2CredentialProvider
+        chain = chain.push(IMDSv2CredentialProvider::from_env(ctx));
+
+        Self { chain }
+    }
+
+    /// Create with a custom credential chain.
+    pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
         Self { chain }
     }
 }
@@ -67,12 +75,7 @@ mod tests {
             envs: HashMap::new(),
         });
 
-        let cfg = Config {
-            ec2_metadata_disabled: true,
-            ..Default::default()
-        };
-
-        let l = DefaultCredentialProvider::new(Arc::new(cfg));
+        let l = DefaultCredentialProvider::new(&ctx);
         let x = l.provide_credential(&ctx).await.expect("load must succeed");
         assert!(x.is_none());
     }
@@ -93,7 +96,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(Arc::new(Config::default()));
+        let l = DefaultCredentialProvider::new(&ctx);
         let x = l.provide_credential(&ctx).await.expect("load must succeed");
 
         let x = x.expect("must load succeed");
@@ -130,7 +133,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(Arc::new(Config::default()));
+        let l = DefaultCredentialProvider::new(&ctx);
         let x = l.provide_credential(&ctx).await.unwrap().unwrap();
         assert_eq!("config_access_key_id", x.access_key_id);
         assert_eq!("config_secret_access_key", x.secret_access_key);
@@ -165,7 +168,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(Arc::new(Config::default()));
+        let l = DefaultCredentialProvider::new(&ctx);
         let x = l.provide_credential(&ctx).await.unwrap().unwrap();
         assert_eq!("shared_access_key_id", x.access_key_id);
         assert_eq!("shared_secret_access_key", x.secret_access_key);
@@ -201,7 +204,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(Arc::new(Config::default()));
+        let l = DefaultCredentialProvider::new(&ctx);
         let x = l
             .provide_credential(&ctx)
             .await
