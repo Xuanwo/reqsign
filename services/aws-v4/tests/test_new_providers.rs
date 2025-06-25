@@ -5,6 +5,10 @@ mod tests {
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
 
+    #[allow(unused_imports)]
+    #[cfg(not(target_arch = "wasm32"))]
+    use reqsign_aws_v4::{ProcessCredentialProvider, SSOCredentialProvider};
+
     #[tokio::test]
     async fn test_ecs_provider_compiles() {
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
@@ -15,6 +19,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[tokio::test]
     async fn test_sso_provider_compiles() {
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
@@ -27,6 +32,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[tokio::test]
     async fn test_process_provider_compiles() {
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());

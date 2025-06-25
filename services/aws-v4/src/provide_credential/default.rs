@@ -1,8 +1,9 @@
 use crate::provide_credential::{
     AssumeRoleWithWebIdentityCredentialProvider, ECSCredentialProvider, EnvCredentialProvider,
-    IMDSv2CredentialProvider, ProcessCredentialProvider, ProfileCredentialProvider,
-    SSOCredentialProvider,
+    IMDSv2CredentialProvider, ProfileCredentialProvider,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use crate::provide_credential::{ProcessCredentialProvider, SSOCredentialProvider};
 use crate::Credential;
 use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
@@ -32,12 +33,23 @@ impl Default for DefaultCredentialProvider {
 impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
     pub fn new() -> Self {
-        let chain = ProvideCredentialChain::new()
+        let mut chain = ProvideCredentialChain::new()
             .push(EnvCredentialProvider::new())
-            .push(ProfileCredentialProvider::new())
-            .push(SSOCredentialProvider::new())
-            .push(AssumeRoleWithWebIdentityCredentialProvider::new())
-            .push(ProcessCredentialProvider::new())
+            .push(ProfileCredentialProvider::new());
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            chain = chain.push(SSOCredentialProvider::new());
+        }
+
+        chain = chain.push(AssumeRoleWithWebIdentityCredentialProvider::new());
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            chain = chain.push(ProcessCredentialProvider::new());
+        }
+
+        chain = chain
             .push(ECSCredentialProvider::new())
             .push(IMDSv2CredentialProvider::new());
 

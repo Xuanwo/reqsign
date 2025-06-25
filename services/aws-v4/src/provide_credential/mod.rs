@@ -19,13 +19,17 @@ pub use env::EnvCredentialProvider;
 mod imds;
 pub use imds::IMDSv2CredentialProvider;
 
+#[cfg(not(target_arch = "wasm32"))]
 mod process;
+#[cfg(not(target_arch = "wasm32"))]
 pub use process::ProcessCredentialProvider;
 
 mod profile;
 pub use profile::ProfileCredentialProvider;
 
+#[cfg(not(target_arch = "wasm32"))]
 mod sso;
+#[cfg(not(target_arch = "wasm32"))]
 pub use sso::SSOCredentialProvider;
 
 mod r#static;
