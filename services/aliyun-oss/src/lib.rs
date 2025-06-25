@@ -12,7 +12,7 @@
 //! ## Quick Start
 //!
 //! ```no_run
-//! use reqsign_aliyun_oss::{RequestSigner, Config, DefaultCredentialProvider};
+//! use reqsign_aliyun_oss::{RequestSigner, DefaultCredentialProvider, StaticCredentialProvider};
 //! use reqsign_core::{Context, Signer, Result};
 //! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -25,13 +25,14 @@
 //!         ReqwestHttpSend::default(),
 //!     );
 //!
-//!     // Configure Aliyun OSS credentials
-//!     let mut config = Config::default();
-//!     config.access_key_id = Some("your-access-key-id".to_string());
-//!     config.access_key_secret = Some("your-access-key-secret".to_string());
+//!     // Create credential loader - uses environment variables by default
+//!     let loader = DefaultCredentialProvider::new();
 //!
-//!     // Create credential loader
-//!     let loader = DefaultCredentialProvider::new(config.into());
+//!     // Or use static credentials
+//!     // let loader = StaticCredentialProvider::new(
+//!     //     "your-access-key-id",
+//!     //     "your-access-key-secret",
+//!     // );
 //!
 //!     // Create request builder
 //!     let builder = RequestSigner::new("bucket");
@@ -114,14 +115,11 @@
 //! ### STS AssumeRole
 //!
 //! ```no_run
-//! use reqsign_aliyun_oss::{Config, AssumeRoleWithOidcCredentialProvider};
+//! use reqsign_aliyun_oss::AssumeRoleWithOidcCredentialProvider;
 //!
-//! let mut config = Config::default();
-//! config.role_arn = Some("acs:ram::123456789012:role/MyRole".to_string());
-//! config.oidc_provider_arn = Some("acs:ram::123456789012:oidc-provider/MyProvider".to_string());
-//! config.oidc_token_file = Some("/var/run/secrets/token".to_string());
-//!
-//! let loader = AssumeRoleWithOidcCredentialProvider::new(config.into());
+//! // Use environment variables
+//! // Set ALIBABA_CLOUD_ROLE_ARN, ALIBABA_CLOUD_OIDC_PROVIDER_ARN, ALIBABA_CLOUD_OIDC_TOKEN_FILE
+//! let loader = AssumeRoleWithOidcCredentialProvider::new();
 //! ```
 //!
 //! ### Custom Endpoints
@@ -146,9 +144,6 @@
 //! - [STS authentication](examples/sts_auth.rs)
 
 mod constants;
-
-mod config;
-pub use config::Config;
 
 mod credential;
 pub use credential::Credential;

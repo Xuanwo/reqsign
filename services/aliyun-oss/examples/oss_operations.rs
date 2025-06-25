@@ -1,4 +1,4 @@
-use reqsign_aliyun_oss::{Config, DefaultCredentialProvider, RequestSigner};
+use reqsign_aliyun_oss::{DefaultCredentialProvider, RequestSigner, StaticCredentialProvider};
 use reqsign_core::Result;
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
@@ -16,37 +16,33 @@ async fn main() -> Result<()> {
     // Create context
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
 
-    // Configure Aliyun OSS credentials
-    // This will try multiple sources:
-    // 1. Environment variables (ALIBABA_CLOUD_ACCESS_KEY_ID, ALIBABA_CLOUD_ACCESS_KEY_SECRET)
-    // 2. Aliyun CLI config file (~/.aliyun/config.json)
-    // 3. ECS RAM role (if running on Aliyun ECS)
-    let mut config = Config::default().from_env(&ctx);
-
     // Check if we have real credentials
     let has_real_creds = ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_ID").is_some()
-        || ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").is_some();
+        && ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_SECRET").is_some();
 
     let demo_mode = !has_real_creds;
-    if demo_mode {
-        println!("No Aliyun credentials found, using demo mode");
-        println!("To use real credentials, set ALIBABA_CLOUD_ACCESS_KEY_ID and ALIBABA_CLOUD_ACCESS_KEY_SECRET");
-        println!();
-
-        // Use demo credentials
-        config.access_key_id = Some("LTAI4GDemoAccessKeyId".to_string());
-        config.access_key_secret = Some("DemoAccessKeySecretForExample".to_string());
-    }
-
-    // Create credential loader
-    let loader = DefaultCredentialProvider::new(std::sync::Arc::new(config));
 
     // Create request builder
     let bucket = "my-bucket"; // Replace with your bucket name
     let builder = RequestSigner::new(bucket);
 
     // Create the signer
-    let signer = Signer::new(ctx, loader, builder);
+    let signer = if demo_mode {
+        println!("No Aliyun credentials found, using demo mode");
+        println!("To use real credentials, set ALIBABA_CLOUD_ACCESS_KEY_ID and ALIBABA_CLOUD_ACCESS_KEY_SECRET");
+        println!();
+
+        // Use demo credentials
+        let loader =
+            StaticCredentialProvider::new("LTAI4GDemoAccessKeyId", "DemoAccessKeySecretForExample");
+        Signer::new(ctx, loader, builder)
+    } else {
+        // This will try multiple sources:
+        // 1. Environment variables (ALIBABA_CLOUD_ACCESS_KEY_ID, ALIBABA_CLOUD_ACCESS_KEY_SECRET)
+        // 2. Assume Role with OIDC (if configured)
+        let loader = DefaultCredentialProvider::new();
+        Signer::new(ctx, loader, builder)
+    };
 
     // Example 1: List objects in a bucket
     println!("Example 1: List objects in bucket");

@@ -1,6 +1,5 @@
 use std::env;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::Duration;
 
 use http::header::CONTENT_LENGTH;
@@ -8,7 +7,7 @@ use http::Request;
 use http::StatusCode;
 use log::{debug, warn};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use reqsign_aliyun_oss::{Config, DefaultCredentialProvider, RequestSigner};
+use reqsign_aliyun_oss::{RequestSigner, StaticCredentialProvider};
 use reqsign_core::Result;
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
@@ -27,22 +26,15 @@ async fn init_signer() -> Option<(Context, Signer<reqsign_aliyun_oss::Credential
 
     let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
-    let config = Config {
-        access_key_id: Some(
-            env::var("REQSIGN_ALIYUN_OSS_ACCESS_KEY")
-                .expect("env REQSIGN_ALIYUN_OSS_ACCESS_KEY must set"),
-        ),
-        access_key_secret: Some(
-            env::var("REQSIGN_ALIYUN_OSS_SECRET_KEY")
-                .expect("env REQSIGN_ALIYUN_OSS_SECRET_KEY must set"),
-        ),
-        ..Default::default()
-    };
+    let access_key_id = env::var("REQSIGN_ALIYUN_OSS_ACCESS_KEY")
+        .expect("env REQSIGN_ALIYUN_OSS_ACCESS_KEY must set");
+    let access_key_secret = env::var("REQSIGN_ALIYUN_OSS_SECRET_KEY")
+        .expect("env REQSIGN_ALIYUN_OSS_SECRET_KEY must set");
 
     let bucket =
         env::var("REQSIGN_ALIYUN_OSS_BUCKET").expect("env REQSIGN_ALIYUN_OSS_BUCKET must set");
 
-    let loader = DefaultCredentialProvider::new(Arc::new(config));
+    let loader = StaticCredentialProvider::new(access_key_id, access_key_secret);
     let builder = RequestSigner::new(&bucket);
     let signer = Signer::new(context.clone(), loader, builder);
 

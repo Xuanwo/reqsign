@@ -1,26 +1,30 @@
-use crate::{Config, Credential};
+use crate::{constants::*, Credential};
 use async_trait::async_trait;
 use reqsign_core::time::{format_rfc3339, now, parse_rfc3339};
 use reqsign_core::Result;
 use reqsign_core::{Context, ProvideCredential};
 use serde::Deserialize;
-use std::sync::Arc;
 
 /// AssumeRoleWithOidcCredentialProvider loads credential via assume role with OIDC.
-#[derive(Debug)]
-pub struct AssumeRoleWithOidcCredentialProvider {
-    config: Arc<Config>,
-}
+///
+/// This provider reads configuration from environment variables at runtime:
+/// - `ALIBABA_CLOUD_ROLE_ARN`: The ARN of the role to assume
+/// - `ALIBABA_CLOUD_OIDC_PROVIDER_ARN`: The ARN of the OIDC provider
+/// - `ALIBABA_CLOUD_OIDC_TOKEN_FILE`: Path to the OIDC token file
+/// - `ALIBABA_CLOUD_STS_ENDPOINT`: Optional custom STS endpoint
+#[derive(Debug, Default)]
+pub struct AssumeRoleWithOidcCredentialProvider {}
 
 impl AssumeRoleWithOidcCredentialProvider {
     /// Create a new `AssumeRoleWithOidcCredentialProvider` instance.
-    pub fn new(config: Arc<Config>) -> Self {
-        Self { config }
+    /// This will read configuration from environment variables at runtime.
+    pub fn new() -> Self {
+        Self {}
     }
 
-    fn get_sts_endpoint(&self) -> String {
-        match &self.config.sts_endpoint {
-            Some(defined_sts_endpoint) => format!("https://{}", defined_sts_endpoint),
+    fn get_sts_endpoint(envs: &std::collections::HashMap<String, String>) -> String {
+        match envs.get(ALIBABA_CLOUD_STS_ENDPOINT) {
+            Some(endpoint) => format!("https://{}", endpoint),
             None => "https://sts.aliyuncs.com".to_string(),
         }
     }
@@ -31,25 +35,26 @@ impl ProvideCredential for AssumeRoleWithOidcCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        let (token_file, role_arn, provider_arn) = match (
-            &self.config.oidc_token_file,
-            &self.config.role_arn,
-            &self.config.oidc_provider_arn,
-        ) {
-            (Some(token_file), Some(role_arn), Some(provider_arn)) => {
-                (token_file, role_arn, provider_arn)
-            }
+        let envs = ctx.env_vars();
+
+        // Get values from environment variables
+        let token_file = envs.get(ALIBABA_CLOUD_OIDC_TOKEN_FILE);
+        let role_arn = envs.get(ALIBABA_CLOUD_ROLE_ARN);
+        let provider_arn = envs.get(ALIBABA_CLOUD_OIDC_PROVIDER_ARN);
+
+        let (token_file, role_arn, provider_arn) = match (token_file, role_arn, provider_arn) {
+            (Some(tf), Some(ra), Some(pa)) => (tf, ra, pa),
             _ => return Ok(None),
         };
 
         let token = ctx.file_read(token_file).await?;
         let token = String::from_utf8(token)?;
-        let role_session_name = &self.config.role_session_name;
+        let role_session_name = "reqsign"; // Default session name
 
         // Construct request to Aliyun STS Service.
         let url = format!(
             "{}/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}",
-            self.get_sts_endpoint(),
+            Self::get_sts_endpoint(&envs),
             provider_arn,
             role_arn,
             role_session_name,
@@ -165,8 +170,7 @@ mod tests {
             envs: HashMap::new(),
         });
 
-        let config = Config::default();
-        let loader = AssumeRoleWithOidcCredentialProvider::new(Arc::new(config));
+        let loader = AssumeRoleWithOidcCredentialProvider::new();
         let credential = loader.provide_credential(&ctx).await.unwrap();
 
         assert!(credential.is_none());
