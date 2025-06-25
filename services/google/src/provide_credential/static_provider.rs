@@ -133,8 +133,8 @@ mod tests {
         use reqsign_core::hash::base64_encode;
         let encoded = base64_encode(content.as_bytes());
 
-        let provider = StaticCredentialProvider::from_base64(encoded)
-            .expect("should decode base64");
+        let provider =
+            StaticCredentialProvider::from_base64(encoded).expect("should decode base64");
         let ctx = Context::new(
             reqsign_file_read_tokio::TokioFileRead,
             reqsign_http_send_reqwest::ReqwestHttpSend::default(),
