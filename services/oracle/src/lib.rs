@@ -4,6 +4,7 @@
 mod constants;
 
 mod config;
+#[allow(deprecated)]
 pub use config::Config;
 
 mod credential;
@@ -13,4 +14,9 @@ mod sign_request;
 pub use sign_request::RequestSigner;
 
 pub mod provide_credential;
-pub use provide_credential::{ConfigCredentialProvider, DefaultCredentialProvider};
+#[allow(deprecated)]
+pub use provide_credential::ConfigCredentialProvider;
+pub use provide_credential::{
+    ConfigFileCredentialProvider, DefaultCredentialProvider, EnvCredentialProvider,
+    StaticCredentialProvider,
+};

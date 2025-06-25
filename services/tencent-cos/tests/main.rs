@@ -13,7 +13,7 @@ use reqsign_core::Result;
 use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
-use reqsign_tencent_cos::{Config, Credential, DefaultCredentialProvider, RequestSigner};
+use reqsign_tencent_cos::{Credential, RequestSigner, StaticCredentialProvider};
 
 async fn init_signer() -> Option<Signer<Credential>> {
     let _ = env_logger::builder().is_test(true).try_init();
@@ -24,18 +24,11 @@ async fn init_signer() -> Option<Signer<Credential>> {
         return None;
     }
 
-    let config = Config {
-        secret_id: Some(
-            env::var("REQSIGN_TENCENT_COS_ACCESS_KEY")
-                .expect("env REQSIGN_TENCENT_COS_ACCESS_KEY must set"),
-        ),
-        secret_key: Some(
-            env::var("REQSIGN_TENCENT_COS_SECRET_KEY")
-                .expect("env REQSIGN_TENCENT_COS_SECRET_KEY must set"),
-        ),
-        ..Default::default()
-    };
-    let loader = DefaultCredentialProvider::new(config);
+    let secret_id = env::var("REQSIGN_TENCENT_COS_ACCESS_KEY")
+        .expect("env REQSIGN_TENCENT_COS_ACCESS_KEY must set");
+    let secret_key = env::var("REQSIGN_TENCENT_COS_SECRET_KEY")
+        .expect("env REQSIGN_TENCENT_COS_SECRET_KEY must set");
+    let loader = StaticCredentialProvider::new(&secret_id, &secret_key);
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
     let signer = Signer::new(ctx, loader, RequestSigner::new());
 
