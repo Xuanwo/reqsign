@@ -89,12 +89,9 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
             _ => return Ok(None),
         };
 
-        let token = ctx
-            .file_read_as_string(&token_file)
-            .await
-            .map_err(|e| {
-                Error::unexpected("failed to read web identity token file").with_source(e)
-            })?;
+        let token = ctx.file_read_as_string(&token_file).await.map_err(|e| {
+            Error::unexpected("failed to read web identity token file").with_source(e)
+        })?;
 
         // Get region from config or environment
         let region = self
@@ -110,10 +107,9 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
                 .unwrap_or(false)
         });
 
-        let endpoint = sts_endpoint(region.as_deref(), use_regional)
-            .map_err(|e| {
-                Error::config_invalid("failed to determine STS endpoint").with_source(e)
-            })?;
+        let endpoint = sts_endpoint(region.as_deref(), use_regional).map_err(|e| {
+            Error::config_invalid("failed to determine STS endpoint").with_source(e)
+        })?;
 
         // Get session name from config or environment or use default
         let session_name = self
