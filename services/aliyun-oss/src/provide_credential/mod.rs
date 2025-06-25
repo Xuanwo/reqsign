@@ -1,7 +1,6 @@
 mod assume_role_with_oidc;
 pub use assume_role_with_oidc::AssumeRoleWithOidcCredentialProvider;
 
-
 mod default;
 pub use default::DefaultCredentialProvider;
 

@@ -49,7 +49,7 @@ impl ProvideCredential for AssumeRoleWithOidcCredentialProvider {
 
         let token = ctx.file_read(token_file).await?;
         let token = String::from_utf8(token)?;
-        let role_session_name = "reqsign";  // Default session name
+        let role_session_name = "reqsign"; // Default session name
 
         // Construct request to Aliyun STS Service.
         let url = format!(

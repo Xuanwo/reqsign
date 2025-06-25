@@ -30,7 +30,6 @@ impl DefaultCredentialProvider {
         Self { chain }
     }
 
-
     /// Create with a custom credential chain.
     pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
         Self { chain }
