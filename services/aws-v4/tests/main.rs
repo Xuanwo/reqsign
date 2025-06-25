@@ -46,7 +46,7 @@ async fn init_default_loader() -> Option<(Context, DefaultCredentialProvider, Re
     });
 
     // Create DefaultCredentialProvider with the context
-    let loader = DefaultCredentialProvider::new(&context);
+    let loader = DefaultCredentialProvider::new();
 
     let builder = RequestSigner::new(
         &env::var("REQSIGN_AWS_V4_SERVICE").expect("env REQSIGN_AWS_V4_SERVICE must set"),
@@ -408,7 +408,7 @@ async fn test_signer_with_web_loader() -> Result<()> {
         ]),
     });
 
-    let loader = DefaultCredentialProvider::new(&context);
+    let loader = DefaultCredentialProvider::new();
 
     let builder = RequestSigner::new("s3", &region);
 
@@ -507,7 +507,7 @@ async fn test_signer_with_web_loader_assume_role() -> Result<()> {
         ]),
     });
 
-    let default_loader = DefaultCredentialProvider::new(&context);
+    let default_loader = DefaultCredentialProvider::new();
     let sts_signer = Signer::new(
         context.clone(),
         default_loader,

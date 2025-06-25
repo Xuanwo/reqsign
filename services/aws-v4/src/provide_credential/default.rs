@@ -20,20 +20,20 @@ pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
 }
 
+impl Default for DefaultCredentialProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
-    pub fn new(ctx: &Context) -> Self {
-        let mut chain = ProvideCredentialChain::new()
+    pub fn new() -> Self {
+        let chain = ProvideCredentialChain::new()
             .push(EnvCredentialProvider::new())
-            .push(ProfileCredentialProvider::new());
-
-        // Add AssumeRoleWithWebIdentityCredentialProvider if configured
-        if let Some(provider) = AssumeRoleWithWebIdentityCredentialProvider::from_env(ctx) {
-            chain = chain.push(provider);
-        }
-
-        // Add IMDSv2CredentialProvider
-        chain = chain.push(IMDSv2CredentialProvider::from_env(ctx));
+            .push(ProfileCredentialProvider::new())
+            .push(AssumeRoleWithWebIdentityCredentialProvider::new())
+            .push(IMDSv2CredentialProvider::new());
 
         Self { chain }
     }
@@ -75,7 +75,7 @@ mod tests {
             envs: HashMap::new(),
         });
 
-        let l = DefaultCredentialProvider::new(&ctx);
+        let l = DefaultCredentialProvider::new();
         let x = l.provide_credential(&ctx).await.expect("load must succeed");
         assert!(x.is_none());
     }
@@ -96,7 +96,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(&ctx);
+        let l = DefaultCredentialProvider::new();
         let x = l.provide_credential(&ctx).await.expect("load must succeed");
 
         let x = x.expect("must load succeed");
@@ -133,7 +133,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(&ctx);
+        let l = DefaultCredentialProvider::new();
         let x = l.provide_credential(&ctx).await.unwrap().unwrap();
         assert_eq!("config_access_key_id", x.access_key_id);
         assert_eq!("config_secret_access_key", x.secret_access_key);
@@ -168,7 +168,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(&ctx);
+        let l = DefaultCredentialProvider::new();
         let x = l.provide_credential(&ctx).await.unwrap().unwrap();
         assert_eq!("shared_access_key_id", x.access_key_id);
         assert_eq!("shared_secret_access_key", x.secret_access_key);
@@ -204,7 +204,7 @@ mod tests {
             ]),
         });
 
-        let l = DefaultCredentialProvider::new(&ctx);
+        let l = DefaultCredentialProvider::new();
         let x = l
             .provide_credential(&ctx)
             .await
