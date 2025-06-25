@@ -10,14 +10,14 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct IMDSv2CredentialProvider {
-    disabled: bool,
+    disabled: Option<bool>,
     token: Arc<Mutex<(String, DateTime)>>,
 }
 
 impl Default for IMDSv2CredentialProvider {
     fn default() -> Self {
         Self {
-            disabled: false,
+            disabled: None,
             token: Arc::new(Mutex::new((String::new(), DateTime::default()))),
         }
     }
@@ -31,21 +31,8 @@ impl IMDSv2CredentialProvider {
 
     /// Disable the provider.
     pub fn disabled(mut self) -> Self {
-        self.disabled = true;
+        self.disabled = Some(true);
         self
-    }
-
-    /// Create from environment variables.
-    pub fn from_env(ctx: &Context) -> Self {
-        let disabled = ctx
-            .env_var("AWS_EC2_METADATA_DISABLED")
-            .map(|v| v == "true")
-            .unwrap_or(false);
-
-        Self {
-            disabled,
-            token: Arc::new(Mutex::new((String::new(), DateTime::default()))),
-        }
     }
 }
 
@@ -92,8 +79,15 @@ impl ProvideCredential for IMDSv2CredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        // If disabled is set, return None.
-        if self.disabled {
+        // Check if disabled, first from config, then from environment
+        let disabled = self.disabled.unwrap_or_else(|| {
+            ctx.env_vars()
+                .get("AWS_EC2_METADATA_DISABLED")
+                .map(|v| v == "true")
+                .unwrap_or(false)
+        });
+
+        if disabled {
             return Ok(None);
         }
 

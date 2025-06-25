@@ -10,33 +10,42 @@ use std::fmt::{Debug, Formatter};
 use std::path::PathBuf;
 
 /// AssumeRoleWithWebIdentityCredentialProvider will load credential via assume role with web identity.
-#[derive(Debug)]
+///
+/// This provider reads configuration from:
+/// 1. Constructor parameters (if provided)
+/// 2. Environment variables (when constructor parameters are not set)
+#[derive(Debug, Default)]
 pub struct AssumeRoleWithWebIdentityCredentialProvider {
     // Web Identity configuration
-    role_arn: String,
-    role_session_name: String,
-    web_identity_token_file: PathBuf,
+    role_arn: Option<String>,
+    role_session_name: Option<String>,
+    web_identity_token_file: Option<PathBuf>,
 
     // STS configuration
     region: Option<String>,
-    use_regional_sts_endpoint: bool,
+    use_regional_sts_endpoint: Option<bool>,
 }
 
 impl AssumeRoleWithWebIdentityCredentialProvider {
-    /// Create a new `AssumeRoleWithWebIdentityCredentialProvider` instance.
-    pub fn new(role_arn: String, token_file: PathBuf) -> Self {
+    /// Create a new `AssumeRoleWithWebIdentityCredentialProvider` instance that reads from environment variables.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Create a new `AssumeRoleWithWebIdentityCredentialProvider` instance with explicit configuration.
+    pub fn with_config(role_arn: String, token_file: PathBuf) -> Self {
         Self {
-            role_arn,
-            role_session_name: "reqsign".to_string(),
-            web_identity_token_file: token_file,
+            role_arn: Some(role_arn),
+            role_session_name: None,
+            web_identity_token_file: Some(token_file),
             region: None,
-            use_regional_sts_endpoint: false,
+            use_regional_sts_endpoint: None,
         }
     }
 
     /// Set the role session name.
     pub fn with_role_session_name(mut self, name: String) -> Self {
-        self.role_session_name = name;
+        self.role_session_name = Some(name);
         self
     }
 
@@ -48,30 +57,8 @@ impl AssumeRoleWithWebIdentityCredentialProvider {
 
     /// Use regional STS endpoint.
     pub fn with_regional_sts_endpoint(mut self) -> Self {
-        self.use_regional_sts_endpoint = true;
+        self.use_regional_sts_endpoint = Some(true);
         self
-    }
-
-    /// Create from environment variables.
-    pub fn from_env(ctx: &Context) -> Option<Self> {
-        let role_arn = ctx.env_var("AWS_ROLE_ARN")?;
-        let token_file = ctx.env_var("AWS_WEB_IDENTITY_TOKEN_FILE")?;
-
-        let mut provider = Self::new(role_arn, PathBuf::from(token_file));
-
-        if let Some(name) = ctx.env_var("AWS_ROLE_SESSION_NAME") {
-            provider = provider.with_role_session_name(name);
-        }
-
-        if let Some(region) = ctx.env_var("AWS_REGION") {
-            provider = provider.with_region(region);
-        }
-
-        if ctx.env_var("AWS_STS_REGIONAL_ENDPOINTS") == Some("regional".to_string()) {
-            provider = provider.with_regional_sts_endpoint();
-        }
-
-        Some(provider)
     }
 }
 
@@ -80,20 +67,60 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        let token = ctx
-            .file_read_as_string(&self.web_identity_token_file.to_string_lossy())
-            .await
-            .map_err(|e| {
-                Error::unexpected("failed to read web identity token file").with_source(e)
-            })?;
+        let envs = ctx.env_vars();
 
-        let endpoint = sts_endpoint(self.region.as_deref(), self.use_regional_sts_endpoint)
-            .map_err(|e| {
-                Error::config_invalid("failed to determine STS endpoint").with_source(e)
-            })?;
+        // Get role_arn from config or environment
+        let role_arn = self
+            .role_arn
+            .as_ref()
+            .or_else(|| envs.get("AWS_ROLE_ARN"))
+            .cloned();
+
+        // Get token file from config or environment
+        let token_file = self
+            .web_identity_token_file
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string())
+            .or_else(|| envs.get("AWS_WEB_IDENTITY_TOKEN_FILE").cloned());
+
+        // If either is missing, we can't proceed
+        let (role_arn, token_file) = match (role_arn, token_file) {
+            (Some(arn), Some(file)) => (arn, file),
+            _ => return Ok(None),
+        };
+
+        let token = ctx.file_read_as_string(&token_file).await.map_err(|e| {
+            Error::unexpected("failed to read web identity token file").with_source(e)
+        })?;
+
+        // Get region from config or environment
+        let region = self
+            .region
+            .as_ref()
+            .or_else(|| envs.get("AWS_REGION"))
+            .cloned();
+
+        // Check if we should use regional STS endpoint
+        let use_regional = self.use_regional_sts_endpoint.unwrap_or_else(|| {
+            envs.get("AWS_STS_REGIONAL_ENDPOINTS")
+                .map(|v| v == "regional")
+                .unwrap_or(false)
+        });
+
+        let endpoint = sts_endpoint(region.as_deref(), use_regional).map_err(|e| {
+            Error::config_invalid("failed to determine STS endpoint").with_source(e)
+        })?;
+
+        // Get session name from config or environment or use default
+        let session_name = self
+            .role_session_name
+            .as_ref()
+            .or_else(|| envs.get("AWS_ROLE_SESSION_NAME"))
+            .cloned()
+            .unwrap_or_else(|| "reqsign".to_string());
 
         // Construct request to AWS STS Service.
-        let url = format!("https://{endpoint}/?Action=AssumeRoleWithWebIdentity&RoleArn={}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={}", self.role_arn, self.role_session_name);
+        let url = format!("https://{endpoint}/?Action=AssumeRoleWithWebIdentity&RoleArn={role_arn}&WebIdentityToken={token}&Version=2011-06-15&RoleSessionName={session_name}");
         let req = http::request::Request::builder()
             .method("GET")
             .uri(url)

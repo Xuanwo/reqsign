@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
 
     // Try to create default credential loader
-    let loader = DefaultCredentialProvider::new(&ctx);
+    let loader = DefaultCredentialProvider::new();
 
     // Check if we have credentials by trying to load them
     let test_cred = loader.provide_credential(&ctx).await?;

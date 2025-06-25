@@ -27,7 +27,7 @@
 //!     );
 //!
 //!     // Create credential loader
-//!     let loader = DefaultCredentialProvider::new(&ctx);
+//!     let loader = DefaultCredentialProvider::new();
 //!
 //!     // Create request builder for S3
 //!     let builder = RequestSigner::new("s3", "us-east-1");
