@@ -1,16 +1,10 @@
 use log::debug;
-use serde::Deserialize;
 
-use reqsign_core::{time::now, Context, ProvideCredential, Result};
+use reqsign_core::{Context, ProvideCredential, Result};
 
-use crate::credential::{Credential, Token};
+use crate::credential::Credential;
+use crate::oauth2::{helpers, types::TokenResponse};
 
-/// VM metadata token response.
-#[derive(Deserialize)]
-struct VmMetadataTokenResponse {
-    access_token: String,
-    expires_in: u64,
-}
 
 /// VmMetadataCredentialProvider loads tokens from Google Compute Engine VM metadata service.
 #[derive(Debug, Clone, Default)]
@@ -56,36 +50,24 @@ impl ProvideCredential for VmMetadataCredentialProvider {
             service_account, scope
         );
 
-        let req = http::Request::builder()
-            .method(http::Method::GET)
-            .uri(&url)
-            .header("Metadata-Flavor", "Google")
-            .body(Vec::<u8>::new().into())
-            .map_err(|e| {
-                reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
-            })?;
-
-        let resp = ctx.http_send(req).await?;
-
-        if resp.status() != http::StatusCode::OK {
-            // VM metadata service might not be available (e.g., not running on GCE)
-            debug!("VM metadata service not available or returned error");
-            return Ok(None);
-        }
-
-        let token_resp: VmMetadataTokenResponse =
-            serde_json::from_slice(resp.body()).map_err(|e| {
-                reqsign_core::Error::unexpected("failed to parse VM metadata response")
-                    .with_source(e)
-            })?;
-
-        let expires_at = now()
-            + chrono::TimeDelta::try_seconds(token_resp.expires_in as i64).expect("in bounds");
-
-        let token = Token {
-            access_token: token_resp.access_token,
-            expires_at: Some(expires_at),
+        // Use the new OAuth2 helper function
+        let token_resp: TokenResponse = match helpers::oauth2_get(
+            ctx,
+            &url,
+            Some(("Metadata-Flavor", "Google")),
+        )
+        .await
+        {
+            Ok(resp) => resp,
+            Err(_) => {
+                // VM metadata service might not be available (e.g., not running on GCE)
+                debug!("VM metadata service not available or returned error");
+                return Ok(None);
+            }
         };
+
+        // Convert response to Token (VM metadata always includes expires_in)
+        let token = helpers::token_from_response_required_expiry(&token_resp)?;
 
         Ok(Some(Credential::with_token(token)))
     }

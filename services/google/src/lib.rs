@@ -3,6 +3,7 @@
 mod constants;
 
 mod credential;
+mod oauth2;
 pub use credential::{Credential, ServiceAccount, Token};
 
 mod sign_request;

@@ -6,7 +6,7 @@ use rand::thread_rng;
 use rsa::pkcs1v15::SigningKey;
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::signature::RandomizedSigner;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::borrow::Cow;
 use std::time::Duration;
 
@@ -17,6 +17,7 @@ use reqsign_core::{
 
 use crate::constants::{DEFAULT_SCOPE, GOOGLE_SCOPE, GOOG_QUERY_ENCODE_SET, GOOG_URI_ENCODE_SET};
 use crate::credential::{Credential, ServiceAccount, Token};
+use crate::oauth2::{helpers, types::TokenResponse};
 
 /// Claims is used to build JWT for Google Cloud.
 #[derive(Debug, Serialize)]
@@ -42,13 +43,6 @@ impl Claims {
     }
 }
 
-/// OAuth2 token response.
-#[derive(Deserialize)]
-struct TokenResponse {
-    access_token: String,
-    #[serde(default)]
-    expires_in: Option<u64>,
-}
 
 /// RequestSigner for Google service requests.
 #[derive(Debug)]
@@ -114,6 +108,8 @@ impl RequestSigner {
         .map_err(|e| reqsign_core::Error::unexpected("failed to encode JWT").with_source(e))?;
 
         // Exchange JWT for access token
+        // Note: We can't use oauth2_post helper here because it expects JSON/form-encoded data,
+        // but we're sending a custom format with grant_type and assertion
         let body = format!(
             "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={}",
             jwt
@@ -141,14 +137,8 @@ impl RequestSigner {
             reqsign_core::Error::unexpected("failed to parse token response").with_source(e)
         })?;
 
-        let expires_at = token_resp.expires_in.map(|expires_in| {
-            now() + chrono::TimeDelta::try_seconds(expires_in as i64).expect("in bounds")
-        });
-
-        Ok(Token {
-            access_token: token_resp.access_token,
-            expires_at,
-        })
+        // Convert response to Token
+        Ok(helpers::token_from_response(&token_resp))
     }
 
     fn build_token_auth(

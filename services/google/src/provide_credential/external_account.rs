@@ -1,30 +1,16 @@
 use std::time::Duration;
 
-use http::header::{ACCEPT, CONTENT_TYPE};
-use log::{debug, error};
-use serde::{Deserialize, Serialize};
+use log::debug;
+use serde::Serialize;
 
-use reqsign_core::{time::now, Context, ProvideCredential, Result};
+use reqsign_core::{Context, ProvideCredential, Result};
 
-use crate::credential::{external_account, Credential, ExternalAccount, Token};
+use crate::credential::{external_account, Credential, ExternalAccount};
+use crate::oauth2::{helpers, types::{TokenResponse, ImpersonatedTokenResponse}};
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
 const MAX_LIFETIME: Duration = Duration::from_secs(3600);
 
-/// STS token response.
-#[derive(Deserialize)]
-struct StsTokenResponse {
-    access_token: String,
-    expires_in: Option<u64>,
-}
-
-/// Impersonated token response.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ImpersonatedTokenResponse {
-    access_token: String,
-    expire_time: String,
-}
 
 /// STS token exchange request.
 #[derive(Serialize)]
@@ -109,7 +95,7 @@ impl ExternalAccountCredentialProvider {
             .await?;
 
         if resp.status() != http::StatusCode::OK {
-            error!("exchange token got unexpected response: {:?}", resp);
+            log::error!("exchange token got unexpected response: {:?}", resp);
             let body = String::from_utf8_lossy(resp.body());
             return Err(reqsign_core::Error::unexpected(format!(
                 "exchange OIDC token failed: {}",
@@ -120,7 +106,7 @@ impl ExternalAccountCredentialProvider {
         source.format.parse(resp.body())
     }
 
-    async fn exchange_sts_token(&self, ctx: &Context, oidc_token: &str) -> Result<Token> {
+    async fn exchange_sts_token(&self, ctx: &Context, oidc_token: &str) -> Result<crate::credential::Token> {
         debug!("exchanging OIDC token for STS access token");
 
         let request = StsTokenRequest {
@@ -132,50 +118,24 @@ impl ExternalAccountCredentialProvider {
             subject_token_type: self.external_account.subject_token_type.clone(),
         };
 
-        let body = serde_json::to_vec(&request).map_err(|e| {
-            reqsign_core::Error::unexpected("failed to serialize request").with_source(e)
-        })?;
+        // Use the new OAuth2 helper function
+        let token_resp: TokenResponse = helpers::oauth2_post(
+            ctx,
+            &self.external_account.token_url,
+            &request,
+            "application/json",
+        )
+        .await?;
 
-        let req = http::Request::builder()
-            .method(http::Method::POST)
-            .uri(&self.external_account.token_url)
-            .header(ACCEPT, "application/json")
-            .header(CONTENT_TYPE, "application/json")
-            .body(body.into())
-            .map_err(|e| {
-                reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
-            })?;
-
-        let resp = ctx.http_send(req).await?;
-
-        if resp.status() != http::StatusCode::OK {
-            error!("exchange token got unexpected response: {:?}", resp);
-            let body = String::from_utf8_lossy(resp.body());
-            return Err(reqsign_core::Error::unexpected(format!(
-                "exchange token failed: {}",
-                body
-            )));
-        }
-
-        let token_resp: StsTokenResponse = serde_json::from_slice(resp.body()).map_err(|e| {
-            reqsign_core::Error::unexpected("failed to parse STS response").with_source(e)
-        })?;
-
-        let expires_at = token_resp.expires_in.map(|expires_in| {
-            now() + chrono::TimeDelta::try_seconds(expires_in as i64).expect("in bounds")
-        });
-
-        Ok(Token {
-            access_token: token_resp.access_token,
-            expires_at,
-        })
+        // Convert response to Token
+        Ok(helpers::token_from_response(&token_resp))
     }
 
     async fn impersonate_service_account(
         &self,
         ctx: &Context,
         access_token: &str,
-    ) -> Result<Option<Token>> {
+    ) -> Result<Option<crate::credential::Token>> {
         let Some(url) = &self.external_account.service_account_impersonation_url else {
             return Ok(None);
         };
@@ -200,44 +160,20 @@ impl ExternalAccountCredentialProvider {
             lifetime: format!("{lifetime}s"),
         };
 
-        let body = serde_json::to_vec(&request).map_err(|e| {
-            reqsign_core::Error::unexpected("failed to serialize request").with_source(e)
-        })?;
-
-        let req = http::Request::builder()
-            .method(http::Method::POST)
-            .uri(url)
-            .header(ACCEPT, "application/json")
-            .header(CONTENT_TYPE, "application/json")
-            .header("Authorization", format!("Bearer {}", access_token))
-            .body(body.into())
-            .map_err(|e| {
-                reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
-            })?;
-
-        let resp = ctx.http_send(req).await?;
-
-        if resp.status() != http::StatusCode::OK {
-            error!("impersonated token got unexpected response: {:?}", resp);
-            let body = String::from_utf8_lossy(resp.body());
-            return Err(reqsign_core::Error::unexpected(format!(
-                "exchange impersonated token failed: {}",
-                body
-            )));
-        }
-
-        let token_resp: ImpersonatedTokenResponse =
-            serde_json::from_slice(resp.body()).map_err(|e| {
-                reqsign_core::Error::unexpected("failed to parse impersonation response")
-                    .with_source(e)
-            })?;
+        // Use the new OAuth2 helper function with authorization
+        let token_resp: ImpersonatedTokenResponse = helpers::oauth2_post_with_auth(
+            ctx,
+            url,
+            &request,
+            "application/json",
+            Some(&format!("Bearer {}", access_token)),
+        )
+        .await?;
 
         // Parse expire time from RFC3339 format
-        let expires_at = chrono::DateTime::parse_from_rfc3339(&token_resp.expire_time)
-            .ok()
-            .map(|dt| dt.with_timezone(&chrono::Utc));
+        let expires_at = helpers::parse_rfc3339_expiration(&token_resp.expire_time)?;
 
-        Ok(Some(Token {
+        Ok(Some(crate::credential::Token {
             access_token: token_resp.access_token,
             expires_at,
         }))

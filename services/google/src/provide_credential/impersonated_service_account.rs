@@ -1,12 +1,12 @@
 use std::time::Duration;
 
-use http::header::CONTENT_TYPE;
-use log::{debug, error};
-use serde::{Deserialize, Serialize};
+use log::debug;
+use serde::Serialize;
 
-use reqsign_core::{time::now, Context, ProvideCredential, Result};
+use reqsign_core::{Context, ProvideCredential, Result};
 
-use crate::credential::{Credential, ImpersonatedServiceAccount, Token};
+use crate::credential::{Credential, ImpersonatedServiceAccount};
+use crate::oauth2::{helpers, types::{TokenResponse, ImpersonatedTokenResponse}};
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
 const MAX_LIFETIME: Duration = Duration::from_secs(3600);
@@ -20,13 +20,6 @@ struct RefreshTokenRequest {
     client_secret: String,
 }
 
-/// OAuth2 token response.
-#[derive(Deserialize)]
-struct RefreshTokenResponse {
-    access_token: String,
-    #[serde(default)]
-    expires_in: Option<u64>,
-}
 
 /// Impersonation request.
 #[derive(Serialize)]
@@ -36,13 +29,6 @@ struct ImpersonationRequest {
     delegates: Vec<String>,
 }
 
-/// Impersonated token response.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ImpersonatedTokenResponse {
-    access_token: String,
-    expire_time: String,
-}
 
 /// ImpersonatedServiceAccountCredentialProvider exchanges impersonated service account credentials for access tokens.
 #[derive(Debug, Clone)]
@@ -66,7 +52,7 @@ impl ImpersonatedServiceAccountCredentialProvider {
         self
     }
 
-    async fn generate_bearer_auth_token(&self, ctx: &Context) -> Result<Token> {
+    async fn generate_bearer_auth_token(&self, ctx: &Context) -> Result<crate::credential::Token> {
         debug!("refreshing OAuth2 token for impersonated service account");
 
         let request = RefreshTokenRequest {
@@ -88,49 +74,20 @@ impl ImpersonatedServiceAccountCredentialProvider {
                 .clone(),
         };
 
-        let body = serde_json::to_vec(&request).map_err(|e| {
-            reqsign_core::Error::unexpected("failed to serialize request").with_source(e)
-        })?;
+        // Use the new OAuth2 helper function
+        let token_resp: TokenResponse = helpers::oauth2_post(
+            ctx,
+            "https://oauth2.googleapis.com/token",
+            &request,
+            "application/json",
+        )
+        .await?;
 
-        let req = http::Request::builder()
-            .method(http::Method::POST)
-            .uri("https://oauth2.googleapis.com/token")
-            .header(CONTENT_TYPE, "application/json")
-            .body(body.into())
-            .map_err(|e| {
-                reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
-            })?;
-
-        let resp = ctx.http_send(req).await?;
-
-        if resp.status() != http::StatusCode::OK {
-            error!(
-                "bearer token loader for impersonated service account got unexpected response: {:?}",
-                resp
-            );
-            let body = String::from_utf8_lossy(resp.body());
-            return Err(reqsign_core::Error::unexpected(format!(
-                "bearer token loader for impersonated service account failed: {}",
-                body
-            )));
-        }
-
-        let token_resp: RefreshTokenResponse =
-            serde_json::from_slice(resp.body()).map_err(|e| {
-                reqsign_core::Error::unexpected("failed to parse token response").with_source(e)
-            })?;
-
-        let expires_at = token_resp.expires_in.map(|expires_in| {
-            now() + chrono::TimeDelta::try_seconds(expires_in as i64).expect("in bounds")
-        });
-
-        Ok(Token {
-            access_token: token_resp.access_token,
-            expires_at,
-        })
+        // Convert response to Token
+        Ok(helpers::token_from_response(&token_resp))
     }
 
-    async fn generate_access_token(&self, ctx: &Context, bearer_token: &Token) -> Result<Token> {
+    async fn generate_access_token(&self, ctx: &Context, bearer_token: &crate::credential::Token) -> Result<crate::credential::Token> {
         debug!("generating access token for impersonated service account");
 
         let scope = self
@@ -145,53 +102,22 @@ impl ImpersonatedServiceAccountCredentialProvider {
             delegates: self.impersonated_service_account.delegates.clone(),
         };
 
-        let body = serde_json::to_vec(&request).map_err(|e| {
-            reqsign_core::Error::unexpected("failed to serialize request").with_source(e)
-        })?;
-
-        let req = http::Request::builder()
-            .method(http::Method::POST)
-            .uri(
-                &self
-                    .impersonated_service_account
-                    .service_account_impersonation_url,
-            )
-            .header(CONTENT_TYPE, "application/json")
-            .header(
-                "Authorization",
-                format!("Bearer {}", bearer_token.access_token),
-            )
-            .body(body.into())
-            .map_err(|e| {
-                reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
-            })?;
-
-        let resp = ctx.http_send(req).await?;
-
-        if resp.status() != http::StatusCode::OK {
-            error!(
-                "access token loader for impersonated service account got unexpected response: {:?}",
-                resp
-            );
-            let body = String::from_utf8_lossy(resp.body());
-            return Err(reqsign_core::Error::unexpected(format!(
-                "access token loader for impersonated service account failed: {}",
-                body
-            )));
-        }
-
-        let token_resp: ImpersonatedTokenResponse =
-            serde_json::from_slice(resp.body()).map_err(|e| {
-                reqsign_core::Error::unexpected("failed to parse impersonation response")
-                    .with_source(e)
-            })?;
+        // Use the new OAuth2 helper function with authorization
+        let token_resp: ImpersonatedTokenResponse = helpers::oauth2_post_with_auth(
+            ctx,
+            &self
+                .impersonated_service_account
+                .service_account_impersonation_url,
+            &request,
+            "application/json",
+            Some(&format!("Bearer {}", bearer_token.access_token)),
+        )
+        .await?;
 
         // Parse expire time from RFC3339 format
-        let expires_at = chrono::DateTime::parse_from_rfc3339(&token_resp.expire_time)
-            .ok()
-            .map(|dt| dt.with_timezone(&chrono::Utc));
+        let expires_at = helpers::parse_rfc3339_expiration(&token_resp.expire_time)?;
 
-        Ok(Token {
+        Ok(crate::credential::Token {
             access_token: token_resp.access_token,
             expires_at,
         })
