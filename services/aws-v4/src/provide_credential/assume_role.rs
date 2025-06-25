@@ -20,6 +20,10 @@ pub struct AssumeRoleCredentialProvider {
     duration_seconds: Option<u32>,
     tags: Option<Vec<(String, String)>>,
 
+    // MFA configuration
+    serial_number: Option<String>,
+    token_code: Option<String>,
+
     // STS configuration
     region: Option<String>,
     use_regional_sts_endpoint: bool,
@@ -37,6 +41,8 @@ impl AssumeRoleCredentialProvider {
             external_id: None,
             duration_seconds: Some(3600),
             tags: None,
+            serial_number: None,
+            token_code: None,
             region: None,
             use_regional_sts_endpoint: false,
             sts_signer,
@@ -76,6 +82,18 @@ impl AssumeRoleCredentialProvider {
     /// Use regional STS endpoint.
     pub fn with_regional_sts_endpoint(mut self) -> Self {
         self.use_regional_sts_endpoint = true;
+        self
+    }
+
+    /// Set MFA serial number.
+    pub fn with_mfa_serial(mut self, serial_number: String) -> Self {
+        self.serial_number = Some(serial_number);
+        self
+    }
+
+    /// Set MFA token code.
+    pub fn with_mfa_code(mut self, token_code: String) -> Self {
+        self.token_code = Some(token_code);
         self
     }
 
@@ -133,6 +151,14 @@ impl ProvideCredential for AssumeRoleCredentialProvider {
                 )
                 .map_err(|e| Error::unexpected("failed to format URL").with_source(e))?;
             }
+        }
+        if let Some(serial_number) = &self.serial_number {
+            write!(url, "&SerialNumber={serial_number}")
+                .map_err(|e| Error::unexpected("failed to format URL").with_source(e))?;
+        }
+        if let Some(token_code) = &self.token_code {
+            write!(url, "&TokenCode={token_code}")
+                .map_err(|e| Error::unexpected("failed to format URL").with_source(e))?;
         }
 
         let req = http::request::Request::builder()

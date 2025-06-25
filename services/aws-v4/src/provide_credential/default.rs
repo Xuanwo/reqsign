@@ -1,7 +1,9 @@
 use crate::provide_credential::{
-    AssumeRoleWithWebIdentityCredentialProvider, EnvCredentialProvider, IMDSv2CredentialProvider,
-    ProfileCredentialProvider,
+    AssumeRoleWithWebIdentityCredentialProvider, ECSCredentialProvider, EnvCredentialProvider,
+    IMDSv2CredentialProvider, ProfileCredentialProvider,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use crate::provide_credential::{ProcessCredentialProvider, SSOCredentialProvider};
 use crate::Credential;
 use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
@@ -12,9 +14,11 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 ///
 /// 1. Environment variables
 /// 2. Shared config (`~/.aws/config`, `~/.aws/credentials`)
-/// 3. Web Identity Tokens
-/// 4. ECS (IAM Roles for Tasks) & General HTTP credentials (TODO)
-/// 5. EC2 IMDSv2
+/// 3. SSO credentials
+/// 4. Web Identity Tokens
+/// 5. Process credentials
+/// 6. ECS (IAM Roles for Tasks) & Container credentials
+/// 7. EC2 IMDSv2
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
@@ -29,10 +33,24 @@ impl Default for DefaultCredentialProvider {
 impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
     pub fn new() -> Self {
-        let chain = ProvideCredentialChain::new()
+        let mut chain = ProvideCredentialChain::new()
             .push(EnvCredentialProvider::new())
-            .push(ProfileCredentialProvider::new())
-            .push(AssumeRoleWithWebIdentityCredentialProvider::new())
+            .push(ProfileCredentialProvider::new());
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            chain = chain.push(SSOCredentialProvider::new());
+        }
+
+        chain = chain.push(AssumeRoleWithWebIdentityCredentialProvider::new());
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            chain = chain.push(ProcessCredentialProvider::new());
+        }
+
+        chain = chain
+            .push(ECSCredentialProvider::new())
             .push(IMDSv2CredentialProvider::new());
 
         Self { chain }
