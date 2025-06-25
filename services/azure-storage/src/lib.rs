@@ -16,7 +16,7 @@
 //!
 //! ```no_run
 //! use anyhow::Result;
-//! use reqsign_azure_storage::{Config, DefaultCredentialProvider, RequestSigner};
+//! use reqsign_azure_storage::{DefaultCredentialProvider, RequestSigner};
 //! use reqsign_core::{Context, Signer};
 //! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -75,7 +75,7 @@
 //! automatically uses managed identity:
 //!
 //! ```no_run
-//! use reqsign_azure_storage::{Config, DefaultCredentialProvider};
+//! use reqsign_azure_storage::DefaultCredentialProvider;
 //!
 //! // Create loader that will try managed identity
 //! let loader = DefaultCredentialProvider::new();
@@ -114,22 +114,24 @@
 //!
 //! Generate SAS tokens for delegated access:
 //!
-//! ```ignore
+//! ```text
 //! // Account SAS is not yet exposed in the public API
 //! // This is planned for future releases
 //! ```
 //!
-//! ### Custom Configuration
+//! ### Using Specific Credential Providers
 //!
 //! ```no_run
-//! use reqsign_azure_storage::Config;
+//! use reqsign_azure_storage::{StaticCredentialProvider, EnvCredentialProvider};
 //!
-//! let config = Config::default()
-//!     .with_account_name("mystorageaccount")
-//!     .with_account_key("base64key")
-//!     .with_sas_token("sv=2021-06-08...")
-//!     .with_client_id("azure-ad-client-id")
-//!     .with_authority_host("https://login.microsoftonline.com");
+//! // Use static credentials
+//! let static_loader = StaticCredentialProvider::new_shared_key(
+//!     "mystorageaccount",
+//!     "base64key"
+//! );
+//!
+//! // Or use environment variables
+//! let env_loader = EnvCredentialProvider::new();
 //! ```
 //!
 //! ## Examples
@@ -140,9 +142,6 @@
 
 mod account_sas;
 mod constants;
-
-mod config;
-pub use config::Config;
 
 mod credential;
 pub use credential::Credential;

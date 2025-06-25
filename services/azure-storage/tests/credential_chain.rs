@@ -1,7 +1,7 @@
 //! Integration tests for ProvideCredentialChain with Azure Storage
 
 use async_trait::async_trait;
-use reqsign_azure_storage::{ConfigCredentialProvider, Credential};
+use reqsign_azure_storage::{Credential, StaticCredentialProvider};
 use reqsign_core::ProvideCredentialChain;
 use reqsign_core::{Context, ProvideCredential, Result};
 use reqsign_file_read_tokio::TokioFileRead;
@@ -99,12 +99,11 @@ async fn test_chain_with_real_providers() {
         ]),
     });
 
-    // Create a chain with only ConfigCredentialProvider
-    let chain = ProvideCredentialChain::new().push(
-        ConfigCredentialProvider::new()
-            .with_account_name("testaccount")
-            .with_account_key("dGVzdGtleQ=="),
-    );
+    // Create a chain with only StaticCredentialProvider
+    let chain = ProvideCredentialChain::new().push(StaticCredentialProvider::new_shared_key(
+        "testaccount",
+        "dGVzdGtleQ==",
+    ));
 
     let result = chain.provide_credential(&ctx).await.unwrap();
     assert!(result.is_some());

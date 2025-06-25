@@ -76,30 +76,24 @@ impl SigningCredential for Credential {
 
 impl Credential {
     /// Create a new credential with shared key authentication.
-    pub fn with_shared_key(
-        account_name: impl Into<String>,
-        account_key: impl Into<String>,
-    ) -> Self {
+    pub fn with_shared_key(account_name: &str, account_key: &str) -> Self {
         Self::SharedKey {
-            account_name: account_name.into(),
-            account_key: account_key.into(),
+            account_name: account_name.to_string(),
+            account_key: account_key.to_string(),
         }
     }
 
     /// Create a new credential with SAS token authentication.
-    pub fn with_sas_token(sas_token: impl Into<String>) -> Self {
+    pub fn with_sas_token(sas_token: &str) -> Self {
         Self::SasToken {
-            token: sas_token.into(),
+            token: sas_token.to_string(),
         }
     }
 
     /// Create a new credential with bearer token authentication.
-    pub fn with_bearer_token(
-        bearer_token: impl Into<String>,
-        expires_in: Option<DateTime>,
-    ) -> Self {
+    pub fn with_bearer_token(bearer_token: &str, expires_in: Option<DateTime>) -> Self {
         Self::BearerToken {
-            token: bearer_token.into(),
+            token: bearer_token.to_string(),
             expires_in,
         }
     }

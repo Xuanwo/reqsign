@@ -1,5 +1,8 @@
-mod config;
-pub use config::ConfigCredentialProvider;
+mod env;
+pub use env::EnvCredentialProvider;
+
+mod static_provider;
+pub use static_provider::StaticCredentialProvider;
 
 mod default;
 pub use default::DefaultCredentialProvider;
