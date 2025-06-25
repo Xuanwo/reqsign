@@ -507,7 +507,6 @@ async fn test_signer_with_web_loader_assume_role() -> Result<()> {
         ]),
     });
 
-
     let default_loader = DefaultCredentialProvider::new(&context);
     let sts_signer = Signer::new(
         context.clone(),
