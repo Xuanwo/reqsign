@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use log::{debug, info};
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 use reqsign_file_read_tokio::TokioFileRead;
-use reqsign_google::{ConfigCredentialProvider, Credential, DefaultCredentialProvider};
+use reqsign_google::{Credential, DefaultCredentialProvider};
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 
 /// Wrapper that logs when credentials are loaded
@@ -37,9 +37,10 @@ where
             Ok(Some(cred)) => {
                 info!("Successfully loaded credentials from: {}", self.name);
                 if cred.has_service_account() {
-                    debug!("Loaded service account credential");
-                } else if cred.has_token() {
-                    debug!("Loaded token credential");
+                    debug!("Credential contains service account");
+                }
+                if cred.has_token() {
+                    debug!("Credential contains token");
                 }
                 Ok(Some(cred))
             }
@@ -63,25 +64,28 @@ async fn main() -> Result<()> {
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
 
     // Build a chain with logging
+    // You can add different providers to see which one resolves first
     let chain = ProvideCredentialChain::new()
         .push(LoggingProvider::new(
-            "Config",
-            ConfigCredentialProvider::new(reqsign_google::Config::default()),
+            "Environment/Well-known (via Default)",
+            DefaultCredentialProvider::new(),
         ))
-        .push(LoggingProvider::new(
-            "Default",
-            DefaultCredentialProvider::new(reqsign_google::Config::default()),
-        ));
+        // Example: Add a static provider if you have credentials in memory
+        // .push(LoggingProvider::new(
+        //     "Static",
+        //     StaticCredentialProvider::new(r#"{"type": "service_account", ...}"#),
+        // ))
+        ;
 
     info!("Starting credential resolution...");
 
     match chain.provide_credential(&ctx).await? {
         Some(cred) => {
             info!("Successfully resolved credentials!");
-            if let Some(sa) = cred.service_account {
+            if let Some(sa) = &cred.service_account {
                 println!("Service Account: {}", sa.client_email);
             }
-            if let Some(token) = cred.token {
+            if let Some(token) = &cred.token {
                 println!(
                     "Token: {}...",
                     &token.access_token[..20.min(token.access_token.len())]

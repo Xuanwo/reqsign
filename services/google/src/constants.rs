@@ -3,6 +3,10 @@ use percent_encoding::NON_ALPHANUMERIC;
 
 // Env values used in google services.
 pub const GOOGLE_APPLICATION_CREDENTIALS: &str = "GOOGLE_APPLICATION_CREDENTIALS";
+pub const GOOGLE_SCOPE: &str = "GOOGLE_SCOPE";
+
+// Default OAuth2 scope for Google Cloud services
+pub const DEFAULT_SCOPE: &str = "https://www.googleapis.com/auth/cloud-platform";
 
 /// AsciiSet for [Google UriEncode](https://cloud.google.com/storage/docs/authentication/canonical-requests)
 ///

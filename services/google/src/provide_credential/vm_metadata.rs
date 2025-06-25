@@ -3,7 +3,6 @@ use serde::Deserialize;
 
 use reqsign_core::{time::now, Context, ProvideCredential, Result};
 
-use crate::config::Config;
 use crate::credential::{Credential, Token};
 
 /// VM metadata token response.
@@ -14,15 +13,21 @@ struct VmMetadataTokenResponse {
 }
 
 /// VmMetadataCredentialProvider loads tokens from Google Compute Engine VM metadata service.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct VmMetadataCredentialProvider {
-    config: Config,
+    scope: Option<String>,
 }
 
 impl VmMetadataCredentialProvider {
     /// Create a new VmMetadataCredentialProvider.
-    pub fn new(config: Config) -> Self {
-        Self { config }
+    pub fn new() -> Self {
+        Self { scope: None }
+    }
+
+    /// Set the OAuth2 scope.
+    pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
+        self.scope = Some(scope.into());
+        self
     }
 }
 
@@ -31,9 +36,12 @@ impl ProvideCredential for VmMetadataCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        let scope = self.config.scope.as_ref().ok_or_else(|| {
-            reqsign_core::Error::config_invalid("scope is required for VM metadata")
-        })?;
+        // Get scope from instance, environment, or use default
+        let scope = self
+            .scope
+            .clone()
+            .or_else(|| ctx.env_var(crate::constants::GOOGLE_SCOPE))
+            .unwrap_or_else(|| crate::constants::DEFAULT_SCOPE.to_string());
 
         // Use "default" service account if not specified
         let service_account = "default";

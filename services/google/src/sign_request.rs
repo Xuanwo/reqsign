@@ -15,8 +15,7 @@ use reqsign_core::{
     SigningRequest,
 };
 
-use crate::config::Config;
-use crate::constants::{GOOG_QUERY_ENCODE_SET, GOOG_URI_ENCODE_SET};
+use crate::constants::{DEFAULT_SCOPE, GOOGLE_SCOPE, GOOG_QUERY_ENCODE_SET, GOOG_URI_ENCODE_SET};
 use crate::credential::{Credential, ServiceAccount, Token};
 
 /// Claims is used to build JWT for Google Cloud.
@@ -56,7 +55,7 @@ struct TokenResponse {
 pub struct RequestSigner {
     service: String,
     region: String,
-    config: Config,
+    scope: Option<String>,
 }
 
 impl Default for RequestSigner {
@@ -64,7 +63,7 @@ impl Default for RequestSigner {
         Self {
             service: String::new(),
             region: "auto".to_string(),
-            config: Config::default(),
+            scope: None,
         }
     }
 }
@@ -75,17 +74,14 @@ impl RequestSigner {
         Self {
             service: service.into(),
             region: "auto".to_string(),
-            config: Config::default(),
+            scope: None,
         }
     }
 
-    /// Create a new builder with the specified service and config.
-    pub fn with_config(service: impl Into<String>, config: Config) -> Self {
-        Self {
-            service: service.into(),
-            region: "auto".to_string(),
-            config,
-        }
+    /// Set the OAuth2 scope.
+    pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
+        self.scope = Some(scope.into());
+        self
     }
 
     /// Set the region for the builder.
@@ -99,16 +95,18 @@ impl RequestSigner {
     /// This method is used internally when a token is needed but only a service account
     /// is available. It creates a JWT and exchanges it for an OAuth2 access token.
     async fn exchange_token(&self, ctx: &Context, sa: &ServiceAccount) -> Result<Token> {
-        let scope = self.config.scope.as_ref().ok_or_else(|| {
-            reqsign_core::Error::config_invalid("scope is required for token exchange")
-        })?;
+        let scope = self
+            .scope
+            .clone()
+            .or_else(|| ctx.env_var(GOOGLE_SCOPE))
+            .unwrap_or_else(|| DEFAULT_SCOPE.to_string());
 
         debug!("exchanging service account for token with scope: {}", scope);
 
         // Create JWT
         let jwt = jsonwebtoken::encode(
             &JwtHeader::new(Algorithm::RS256),
-            &Claims::new(&sa.client_email, scope),
+            &Claims::new(&sa.client_email, &scope),
             &EncodingKey::from_rsa_pem(sa.private_key.as_bytes()).map_err(|e| {
                 reqsign_core::Error::unexpected("failed to parse RSA private key").with_source(e)
             })?,

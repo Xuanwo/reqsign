@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use reqsign_core::{time::now, Context, ProvideCredential, Result};
 
-use crate::config::Config;
 use crate::credential::{external_account, Credential, ExternalAccount, Token};
 
 /// The maximum impersonated token lifetime allowed, 1 hour.
@@ -49,17 +48,23 @@ struct ImpersonationRequest {
 /// ExternalAccountCredentialProvider exchanges external account credentials for access tokens.
 #[derive(Debug, Clone)]
 pub struct ExternalAccountCredentialProvider {
-    config: Config,
     external_account: ExternalAccount,
+    scope: Option<String>,
 }
 
 impl ExternalAccountCredentialProvider {
     /// Create a new ExternalAccountCredentialProvider.
-    pub fn new(config: Config, external_account: ExternalAccount) -> Self {
+    pub fn new(external_account: ExternalAccount) -> Self {
         Self {
-            config,
             external_account,
+            scope: None,
         }
+    }
+
+    /// Set the OAuth2 scope.
+    pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
+        self.scope = Some(scope.into());
+        self
     }
 
     async fn load_oidc_token(&self, ctx: &Context) -> Result<String> {
@@ -177,11 +182,11 @@ impl ExternalAccountCredentialProvider {
 
         debug!("impersonating service account");
 
-        let scope = self.config.scope.as_ref().ok_or_else(|| {
-            reqsign_core::Error::config_invalid(
-                "scope is required for service account impersonation",
-            )
-        })?;
+        let scope = self
+            .scope
+            .clone()
+            .or_else(|| ctx.env_var(crate::constants::GOOGLE_SCOPE))
+            .unwrap_or_else(|| crate::constants::DEFAULT_SCOPE.to_string());
 
         let lifetime = self
             .external_account
