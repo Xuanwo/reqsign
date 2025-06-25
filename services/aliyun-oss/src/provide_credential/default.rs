@@ -1,27 +1,38 @@
-use crate::provide_credential::{AssumeRoleWithOidcCredentialProvider, ConfigCredentialProvider};
-use crate::{Config, Credential};
+use crate::provide_credential::{AssumeRoleWithOidcCredentialProvider, EnvCredentialProvider};
+use crate::Credential;
 use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
-use std::sync::Arc;
 
 /// DefaultCredentialProvider is a loader that will try to load credential via default chains.
 ///
 /// Resolution order:
 ///
-/// 1. Static configuration (access_key_id and access_key_secret)
+/// 1. Environment variables
 /// 2. Assume Role with OIDC
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
 }
 
+impl Default for DefaultCredentialProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
-    pub fn new(config: Arc<Config>) -> Self {
+    pub fn new() -> Self {
         let chain = ProvideCredentialChain::new()
-            .push(ConfigCredentialProvider::new(config.clone()))
-            .push(AssumeRoleWithOidcCredentialProvider::new(config));
+            .push(EnvCredentialProvider::new())
+            .push(AssumeRoleWithOidcCredentialProvider::new());
 
+        Self { chain }
+    }
+
+
+    /// Create with a custom credential chain.
+    pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
         Self { chain }
     }
 }
@@ -45,22 +56,25 @@ mod tests {
     use std::collections::HashMap;
 
     #[tokio::test]
-    async fn test_default_loader_without_config() {
+    async fn test_default_loader_without_env() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::new(),
         });
 
-        let config = Config::default();
-        let loader = DefaultCredentialProvider::new(Arc::new(config));
+        let loader = DefaultCredentialProvider::new();
         let credential = loader.provide_credential(&ctx).await.unwrap();
 
         assert!(credential.is_none());
     }
 
     #[tokio::test]
-    async fn test_default_loader_with_config() {
+    async fn test_default_loader_with_env() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
         let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
@@ -76,11 +90,41 @@ mod tests {
             ]),
         });
 
-        let config = Config::default().from_env(&ctx);
-        let loader = DefaultCredentialProvider::new(Arc::new(config));
+        let loader = DefaultCredentialProvider::new();
         let credential = loader.provide_credential(&ctx).await.unwrap().unwrap();
 
         assert_eq!("access_key_id", credential.access_key_id);
         assert_eq!("secret_access_key", credential.access_key_secret);
+    }
+
+    #[tokio::test]
+    async fn test_default_loader_with_security_token() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = ctx.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                (
+                    ALIBABA_CLOUD_ACCESS_KEY_ID.to_string(),
+                    "access_key_id".to_string(),
+                ),
+                (
+                    ALIBABA_CLOUD_ACCESS_KEY_SECRET.to_string(),
+                    "secret_access_key".to_string(),
+                ),
+                (
+                    ALIBABA_CLOUD_SECURITY_TOKEN.to_string(),
+                    "security_token".to_string(),
+                ),
+            ]),
+        });
+
+        let loader = DefaultCredentialProvider::new();
+        let credential = loader.provide_credential(&ctx).await.unwrap().unwrap();
+
+        assert_eq!("access_key_id", credential.access_key_id);
+        assert_eq!("secret_access_key", credential.access_key_secret);
+        assert_eq!("security_token", credential.security_token.unwrap());
     }
 }

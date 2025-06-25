@@ -1,0 +1,144 @@
+use crate::{constants::*, Credential};
+use async_trait::async_trait;
+use reqsign_core::{Context, ProvideCredential, Result};
+
+/// EnvCredentialProvider loads Aliyun credentials from environment variables.
+///
+/// This provider looks for the following environment variables:
+/// - `ALIBABA_CLOUD_ACCESS_KEY_ID`: The Alibaba Cloud access key ID
+/// - `ALIBABA_CLOUD_ACCESS_KEY_SECRET`: The Alibaba Cloud access key secret
+/// - `ALIBABA_CLOUD_SECURITY_TOKEN`: The Alibaba Cloud security token (optional)
+#[derive(Debug, Default)]
+pub struct EnvCredentialProvider;
+
+impl EnvCredentialProvider {
+    /// Create a new EnvCredentialProvider.
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[async_trait]
+impl ProvideCredential for EnvCredentialProvider {
+    type Credential = Credential;
+
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        let envs = ctx.env_vars();
+
+        let access_key_id = envs.get(ALIBABA_CLOUD_ACCESS_KEY_ID);
+        let access_key_secret = envs.get(ALIBABA_CLOUD_ACCESS_KEY_SECRET);
+
+        match (access_key_id, access_key_secret) {
+            (Some(ak), Some(sk)) => Ok(Some(Credential {
+                access_key_id: ak.clone(),
+                access_key_secret: sk.clone(),
+                security_token: envs.get(ALIBABA_CLOUD_SECURITY_TOKEN).cloned(),
+                expires_in: None,
+            })),
+            _ => Ok(None),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use reqsign_core::StaticEnv;
+    use reqsign_file_read_tokio::TokioFileRead;
+    use reqsign_http_send_reqwest::ReqwestHttpSend;
+    use std::collections::HashMap;
+
+    #[tokio::test]
+    async fn test_env_credential_provider() -> anyhow::Result<()> {
+        // Test with valid credentials
+        let envs = HashMap::from([
+            (
+                ALIBABA_CLOUD_ACCESS_KEY_ID.to_string(),
+                "test_access_key".to_string(),
+            ),
+            (
+                ALIBABA_CLOUD_ACCESS_KEY_SECRET.to_string(),
+                "test_secret_key".to_string(),
+            ),
+        ]);
+
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
+            home_dir: None,
+            envs,
+        });
+
+        let provider = EnvCredentialProvider::new();
+        let cred = provider.provide_credential(&ctx).await?;
+        assert!(cred.is_some());
+        let cred = cred.unwrap();
+        assert_eq!(cred.access_key_id, "test_access_key");
+        assert_eq!(cred.access_key_secret, "test_secret_key");
+        assert!(cred.security_token.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_env_credential_provider_with_security_token() -> anyhow::Result<()> {
+        let envs = HashMap::from([
+            (
+                ALIBABA_CLOUD_ACCESS_KEY_ID.to_string(),
+                "test_access_key".to_string(),
+            ),
+            (
+                ALIBABA_CLOUD_ACCESS_KEY_SECRET.to_string(),
+                "test_secret_key".to_string(),
+            ),
+            (
+                ALIBABA_CLOUD_SECURITY_TOKEN.to_string(),
+                "test_security_token".to_string(),
+            ),
+        ]);
+
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
+            home_dir: None,
+            envs,
+        });
+
+        let provider = EnvCredentialProvider::new();
+        let cred = provider.provide_credential(&ctx).await?;
+        assert!(cred.is_some());
+        let cred = cred.unwrap();
+        assert_eq!(cred.access_key_id, "test_access_key");
+        assert_eq!(cred.access_key_secret, "test_secret_key");
+        assert_eq!(cred.security_token, Some("test_security_token".to_string()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_env_credential_provider_missing_credentials() -> anyhow::Result<()> {
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+
+        let provider = EnvCredentialProvider::new();
+        let cred = provider.provide_credential(&ctx).await?;
+        assert!(cred.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_env_credential_provider_partial_credentials() -> anyhow::Result<()> {
+        // Only access key ID
+        let envs = HashMap::from([(
+            ALIBABA_CLOUD_ACCESS_KEY_ID.to_string(),
+            "test_access_key".to_string(),
+        )]);
+
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
+            home_dir: None,
+            envs,
+        });
+
+        let provider = EnvCredentialProvider::new();
+        let cred = provider.provide_credential(&ctx).await?;
+        assert!(cred.is_none());
+
+        Ok(())
+    }
+}
