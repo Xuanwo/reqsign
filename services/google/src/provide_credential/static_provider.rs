@@ -1,6 +1,6 @@
 use log::debug;
 
-use reqsign_core::{Context, ProvideCredential, Result};
+use reqsign_core::{hash::base64_decode, Context, ProvideCredential, Result};
 
 use crate::credential::{Credential, CredentialFile};
 
@@ -24,6 +24,21 @@ impl StaticCredentialProvider {
             content: content.into(),
             scope: None,
         }
+    }
+
+    /// Create a new StaticCredentialProvider from base64-encoded JSON content.
+    pub fn from_base64(content: impl Into<String>) -> Result<Self> {
+        let content = content.into();
+        let decoded = base64_decode(&content).map_err(|e| {
+            reqsign_core::Error::unexpected("failed to decode base64").with_source(e)
+        })?;
+        let json_content = String::from_utf8(decoded).map_err(|e| {
+            reqsign_core::Error::unexpected("invalid UTF-8 in decoded content").with_source(e)
+        })?;
+        Ok(Self {
+            content: json_content,
+            scope: None,
+        })
     }
 
     /// Set the OAuth2 scope.
@@ -91,6 +106,35 @@ mod tests {
         }"#;
 
         let provider = StaticCredentialProvider::new(content);
+        let ctx = Context::new(
+            reqsign_file_read_tokio::TokioFileRead,
+            reqsign_http_send_reqwest::ReqwestHttpSend::default(),
+        );
+
+        let result = provider.provide_credential(&ctx).await;
+        assert!(result.is_ok());
+
+        let cred = result.unwrap();
+        assert!(cred.is_some());
+
+        let cred = cred.unwrap();
+        assert!(cred.has_service_account());
+    }
+
+    #[tokio::test]
+    async fn test_static_service_account_from_base64() {
+        let content = r#"{
+            "type": "service_account",
+            "private_key": "-----BEGIN RSA PRIVATE KEY-----\ntest\n-----END RSA PRIVATE KEY-----",
+            "client_email": "test@example.iam.gserviceaccount.com"
+        }"#;
+
+        // Base64 encode the content
+        use reqsign_core::hash::base64_encode;
+        let encoded = base64_encode(content.as_bytes());
+
+        let provider = StaticCredentialProvider::from_base64(encoded)
+            .expect("should decode base64");
         let ctx = Context::new(
             reqsign_file_read_tokio::TokioFileRead,
             reqsign_http_send_reqwest::ReqwestHttpSend::default(),

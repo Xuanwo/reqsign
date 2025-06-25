@@ -24,7 +24,9 @@ async fn init_signer() -> Option<(Context, Signer<Credential>)> {
     let scope = env::var("REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE")
         .expect("env REQSIGN_GOOGLE_CLOUD_STORAGE_SCOPE must be set");
 
-    let loader = StaticCredentialProvider::new(credential_content).with_scope(&scope);
+    let loader = StaticCredentialProvider::from_base64(credential_content)
+        .expect("credential must be valid base64")
+        .with_scope(&scope);
     let builder = RequestSigner::new("storage").with_scope(&scope);
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
@@ -45,7 +47,8 @@ async fn init_signer_for_signed_url() -> Option<(Context, Signer<Credential>)> {
         env::var("REQSIGN_GOOGLE_CREDENTIAL").expect("env REQSIGN_GOOGLE_CREDENTIAL must be set");
 
     // Don't set scope for signed URL generation
-    let loader = StaticCredentialProvider::new(credential_content);
+    let loader = StaticCredentialProvider::from_base64(credential_content)
+        .expect("credential must be valid base64");
     let builder = RequestSigner::new("storage");
 
     let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
