@@ -15,3 +15,6 @@ pub use workload_identity::WorkloadIdentityCredentialProvider;
 
 mod client_secret;
 pub use client_secret::ClientSecretCredentialProvider;
+
+mod azure_cli;
+pub use azure_cli::AzureCliCredentialProvider;
