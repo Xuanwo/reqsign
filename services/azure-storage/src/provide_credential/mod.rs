@@ -16,5 +16,12 @@ pub use workload_identity::WorkloadIdentityCredentialProvider;
 mod client_secret;
 pub use client_secret::ClientSecretCredentialProvider;
 
+#[cfg(not(target_arch = "wasm32"))]
 mod azure_cli;
+#[cfg(not(target_arch = "wasm32"))]
 pub use azure_cli::AzureCliCredentialProvider;
+
+#[cfg(not(target_arch = "wasm32"))]
+mod client_certificate;
+#[cfg(not(target_arch = "wasm32"))]
+pub use client_certificate::ClientCertificateCredentialProvider;
