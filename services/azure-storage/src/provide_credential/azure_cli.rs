@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::process::Command;
 
 use async_trait::async_trait;
@@ -17,31 +16,6 @@ pub struct AzureCliCredentialProvider {}
 impl AzureCliCredentialProvider {
     pub fn new() -> Self {
         Self {}
-    }
-
-    /// Get the Azure CLI config directory
-    #[allow(dead_code)]
-    fn get_azure_config_dir(&self) -> PathBuf {
-        if let Ok(config_dir) = std::env::var("AZURE_CONFIG_DIR") {
-            return PathBuf::from(config_dir);
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            if let Ok(userprofile) = std::env::var("USERPROFILE") {
-                return PathBuf::from(userprofile).join(".azure");
-            }
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            if let Ok(home) = std::env::var("HOME") {
-                return PathBuf::from(home).join(".azure");
-            }
-        }
-
-        // Fallback to current directory
-        PathBuf::from(".azure")
     }
 
     /// Execute `az account get-access-token` command
@@ -138,19 +112,6 @@ impl ProvideCredential for AzureCliCredentialProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_get_azure_config_dir() {
-        let provider = AzureCliCredentialProvider::new();
-        let config_dir = provider.get_azure_config_dir();
-
-        // Should return a valid path
-        assert!(!config_dir.as_os_str().is_empty());
-
-        // On Unix systems, should contain .azure
-        #[cfg(not(target_os = "windows"))]
-        assert!(config_dir.to_string_lossy().contains(".azure"));
-    }
 
     #[test]
     fn test_parse_azure_cli_token() {
