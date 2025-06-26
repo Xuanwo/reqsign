@@ -1,8 +1,8 @@
 #[cfg(not(target_arch = "wasm32"))]
 use crate::provide_credential::{AzureCliCredentialProvider, ClientCertificateCredentialProvider};
 use crate::provide_credential::{
-    ClientSecretCredentialProvider, EnvCredentialProvider, ImdsCredentialProvider,
-    WorkloadIdentityCredentialProvider,
+    AzurePipelinesCredentialProvider, ClientSecretCredentialProvider, EnvCredentialProvider,
+    ImdsCredentialProvider, WorkloadIdentityCredentialProvider,
 };
 use crate::Credential;
 use async_trait::async_trait;
@@ -15,8 +15,9 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 /// 2. Azure CLI (local development)
 /// 3. Client certificate (service principal with certificate)
 /// 4. Client secret (service principal)
-/// 5. Workload identity (federated credentials)
-/// 6. IMDS (Azure VM managed identity)
+/// 5. Azure Pipelines (workload identity)
+/// 6. Workload identity (federated credentials)
+/// 7. IMDS (Azure VM managed identity)
 #[derive(Debug, Default)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
@@ -36,6 +37,7 @@ impl DefaultCredentialProvider {
 
         chain = chain
             .push(ClientSecretCredentialProvider::new())
+            .push(AzurePipelinesCredentialProvider::new())
             .push(WorkloadIdentityCredentialProvider::new())
             .push(ImdsCredentialProvider::new());
 
