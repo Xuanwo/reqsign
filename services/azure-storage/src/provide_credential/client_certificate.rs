@@ -13,6 +13,20 @@ use sha2::{Digest, Sha256};
 
 use crate::credential::Credential;
 
+/// Generate a unique JWT ID using timestamp and a pseudo-random component
+fn generate_jti(now: u64) -> String {
+    // Use timestamp in nanoseconds + a hash of the timestamp for uniqueness
+    let nano_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    
+    // Create a pseudo-random component by hashing the nano time
+    let random_part = (nano_time.wrapping_mul(6364136223846793005).wrapping_add(1)) % 1_000_000;
+    
+    format!("{}-{}-{}", now, nano_time % 1_000_000_000, random_part)
+}
+
 /// ClientCertificateCredentialProvider provides credentials using a client certificate
 #[derive(Clone, Debug)]
 pub struct ClientCertificateCredentialProvider {
@@ -135,7 +149,7 @@ impl ClientCertificateCredentialProvider {
             ),
             exp: now + 600, // 10 minutes
             iss: client_id.to_string(),
-            jti: uuid::Uuid::new_v4().to_string(),
+            jti: generate_jti(now),
             nbf: now,
             sub: client_id.to_string(),
         };
