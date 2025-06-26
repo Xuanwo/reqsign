@@ -25,3 +25,6 @@ pub use azure_cli::AzureCliCredentialProvider;
 mod client_certificate;
 #[cfg(not(target_arch = "wasm32"))]
 pub use client_certificate::ClientCertificateCredentialProvider;
+
+mod azure_pipelines;
+pub use azure_pipelines::AzurePipelinesCredentialProvider;
