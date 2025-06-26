@@ -1,6 +1,7 @@
 use crate::provide_credential::{
-    AzureCliCredentialProvider, ClientSecretCredentialProvider, EnvCredentialProvider,
-    ImdsCredentialProvider, WorkloadIdentityCredentialProvider,
+    AzureCliCredentialProvider, ClientCertificateCredentialProvider,
+    ClientSecretCredentialProvider, EnvCredentialProvider, ImdsCredentialProvider,
+    WorkloadIdentityCredentialProvider,
 };
 use crate::Credential;
 use async_trait::async_trait;
@@ -11,9 +12,10 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 /// The default loader attempts to load credentials from the following sources in order:
 /// 1. Environment variables (account key, SAS token)
 /// 2. Azure CLI (local development)
-/// 3. Client secret (service principal)
-/// 4. Workload identity (federated credentials)
-/// 5. IMDS (Azure VM managed identity)
+/// 3. Client certificate (service principal with certificate)
+/// 4. Client secret (service principal)
+/// 5. Workload identity (federated credentials)
+/// 6. IMDS (Azure VM managed identity)
 #[derive(Debug, Default)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
@@ -25,6 +27,7 @@ impl DefaultCredentialProvider {
         let chain = ProvideCredentialChain::new()
             .push(EnvCredentialProvider::new())
             .push(AzureCliCredentialProvider::new())
+            .push(ClientCertificateCredentialProvider::new())
             .push(ClientSecretCredentialProvider::new())
             .push(WorkloadIdentityCredentialProvider::new())
             .push(ImdsCredentialProvider::new());

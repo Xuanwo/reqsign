@@ -18,3 +18,6 @@ pub use client_secret::ClientSecretCredentialProvider;
 
 mod azure_cli;
 pub use azure_cli::AzureCliCredentialProvider;
+
+mod client_certificate;
+pub use client_certificate::ClientCertificateCredentialProvider;
