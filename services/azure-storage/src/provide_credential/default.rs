@@ -1,9 +1,9 @@
+#[cfg(not(target_arch = "wasm32"))]
+use crate::provide_credential::{AzureCliCredentialProvider, ClientCertificateCredentialProvider};
 use crate::provide_credential::{
     ClientSecretCredentialProvider, EnvCredentialProvider, ImdsCredentialProvider,
     WorkloadIdentityCredentialProvider,
 };
-#[cfg(not(target_arch = "wasm32"))]
-use crate::provide_credential::{AzureCliCredentialProvider, ClientCertificateCredentialProvider};
 use crate::Credential;
 use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
@@ -25,16 +25,15 @@ pub struct DefaultCredentialProvider {
 impl DefaultCredentialProvider {
     /// Create a new default loader.
     pub fn new() -> Self {
-        let mut chain = ProvideCredentialChain::new()
-            .push(EnvCredentialProvider::new());
-        
+        let mut chain = ProvideCredentialChain::new().push(EnvCredentialProvider::new());
+
         #[cfg(not(target_arch = "wasm32"))]
         {
             chain = chain
                 .push(AzureCliCredentialProvider::new())
                 .push(ClientCertificateCredentialProvider::new());
         }
-        
+
         chain = chain
             .push(ClientSecretCredentialProvider::new())
             .push(WorkloadIdentityCredentialProvider::new())

@@ -20,10 +20,10 @@ fn generate_jti(now: u64) -> String {
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    
+
     // Create a pseudo-random component by hashing the nano time
     let random_part = (nano_time.wrapping_mul(6364136223846793005).wrapping_add(1)) % 1_000_000;
-    
+
     format!("{}-{}-{}", now, nano_time % 1_000_000_000, random_part)
 }
 
