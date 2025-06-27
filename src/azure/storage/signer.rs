@@ -69,7 +69,7 @@ impl Signer {
                     ctx.headers
                         .insert(X_MS_DATE, format_http_date(time::now()).parse()?);
                     ctx.headers.insert(AUTHORIZATION, {
-                        let mut value: HeaderValue = format!("Bearer {}", token).parse()?;
+                        let mut value: HeaderValue = format!("Bearer {token}").parse()?;
                         value.set_sensitive(true);
                         value
                     });

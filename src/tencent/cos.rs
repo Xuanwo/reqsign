@@ -149,7 +149,7 @@ fn build_signature(
     debug!("param list: {param_list}");
     let param_string = params
         .iter()
-        .map(|(k, v)| format!("{}={}", k, v))
+        .map(|(k, v)| format!("{k}={v}"))
         .collect::<Vec<_>>()
         .join("&");
     debug!("param string: {param_string}");
@@ -174,7 +174,7 @@ fn build_signature(
     debug!("header list: {header_list}");
     let header_string = headers
         .iter()
-        .map(|(k, v)| format!("{}={}", k, v))
+        .map(|(k, v)| format!("{k}={v}"))
         .collect::<Vec<_>>()
         .join("&");
     debug!("header string: {header_string}");

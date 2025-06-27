@@ -130,8 +130,7 @@ impl CredentialLoader {
                 .join(", ");
 
                 debug!(
-                    "assume_role_with_web_identity is not configured fully: [{}] is missing",
-                    missing
+                    "assume_role_with_web_identity is not configured fully: [{missing}] is missing"
                 );
 
                 return Ok(None);
@@ -350,7 +349,7 @@ mod tests {
                         .expect("sign request must success");
 
                     debug!("signed request url: {:?}", req.uri().to_string());
-                    debug!("signed request: {:?}", req);
+                    debug!("signed request: {req:?}");
 
                     let client = reqwest::Client::new();
                     let resp = client
@@ -359,7 +358,7 @@ mod tests {
                         .expect("request must succeed");
 
                     let status = resp.status();
-                    debug!("got response: {:?}", resp);
+                    debug!("got response: {resp:?}");
                     debug!("got response content: {}", resp.text().await.unwrap());
                     assert_eq!(StatusCode::NOT_FOUND, status);
                 })

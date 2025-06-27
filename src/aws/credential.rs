@@ -2,7 +2,6 @@ use std::fmt::Debug;
 use std::fmt::Write;
 use std::fs;
 use std::sync::Arc;
-use std::sync::Mutex;
 
 use anyhow::anyhow;
 use anyhow::Result;
@@ -19,11 +18,12 @@ use super::v4::Signer;
 use crate::time::now;
 use crate::time::parse_rfc3339;
 use crate::time::DateTime;
+use tokio::sync::Mutex;
 
 pub const EMPTY_STRING_SHA256: &str =
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
-/// Credential that holds the access_key and secret_key.
+/// Credential that holds the `access_key` and `secret_key`.
 #[derive(Default, Clone)]
 #[cfg_attr(test, derive(Debug))]
 pub struct Credential {
@@ -39,6 +39,11 @@ pub struct Credential {
 
 impl Credential {
     /// is current cred is valid?
+    ///
+    /// # Panics
+    ///
+    /// Panics if the time delta calculation overflows (which should not happen in practice).
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         if (self.access_key_id.is_empty() || self.secret_access_key.is_empty())
             && self.session_token.is_none()
@@ -69,7 +74,7 @@ pub trait CredentialLoad: 'static + Send + Sync {
     async fn load_credential(&self, client: Client) -> Result<Option<Credential>>;
 }
 
-/// CredentialLoader will load credential from different methods.
+/// `CredentialLoader` will load credential from different methods.
 pub struct DefaultLoader {
     client: Client,
     config: Config,
@@ -78,7 +83,8 @@ pub struct DefaultLoader {
 }
 
 impl DefaultLoader {
-    /// Create a new CredentialLoader
+    /// Create a new `CredentialLoader`
+    #[must_use]
     pub fn new(client: Client, config: Config) -> Self {
         let imds_v2_loader = if config.ec2_metadata_disabled {
             None
@@ -94,6 +100,7 @@ impl DefaultLoader {
     }
 
     /// Disable load from ec2 metadata.
+    #[must_use]
     pub fn with_disable_ec2_metadata(mut self) -> Self {
         self.imds_v2_loader = None;
         self
@@ -106,27 +113,31 @@ impl DefaultLoader {
     /// 2. Shared config (`~/.aws/config`, `~/.aws/credentials`)
     /// 3. Web Identity Tokens
     /// 4. ECS (IAM Roles for Tasks) & General HTTP credentials:
-    /// 5. EC2 IMDSv2
+    /// 5. EC2 `IMDSv2`
+    ///
+    /// # Errors
+    ///
+    /// Will return an error if credential loading fails from any source.
     pub async fn load(&self) -> Result<Option<Credential>> {
-        // Return cached credential if it has been loaded at least once.
-        match self.credential.lock().expect("lock poisoned").clone() {
-            Some(cred) if cred.is_valid() => return Ok(Some(cred)),
-            _ => (),
+        let mut lock = self.credential.lock().await;
+
+        // Return cached credential if it has been loaded and is still valid
+        if let Some(ref cred) = *lock {
+            if cred.is_valid() {
+                return Ok(Some(cred.clone()));
+            }
         }
 
-        let cred = self.load_inner().await?;
+        // Load new credential while holding the lock
+        // This ensures only one thread refreshes at a time
+        let new_cred = self.load_inner().await?;
+        lock.clone_from(&new_cred);
 
-        let mut lock = self.credential.lock().expect("lock poisoned");
-        lock.clone_from(&cred);
-
-        Ok(cred)
+        Ok(new_cred)
     }
 
     async fn load_inner(&self) -> Result<Option<Credential>> {
-        if let Some(cred) = self.load_via_config().map_err(|err| {
-            debug!("load credential via config failed: {err:?}");
-            err
-        })? {
+        if let Some(cred) = self.load_via_config() {
             return Ok(Some(cred));
         }
 
@@ -151,36 +162,35 @@ impl DefaultLoader {
         Ok(None)
     }
 
-    fn load_via_config(&self) -> Result<Option<Credential>> {
+    fn load_via_config(&self) -> Option<Credential> {
         if let (Some(ak), Some(sk)) = (&self.config.access_key_id, &self.config.secret_access_key) {
-            Ok(Some(Credential {
+            Some(Credential {
                 access_key_id: ak.clone(),
                 secret_access_key: sk.clone(),
                 session_token: self.config.session_token.clone(),
                 // Set expires_in to 10 minutes to enforce re-read
                 // from file.
                 expires_in: Some(now() + chrono::TimeDelta::try_minutes(10).expect("in bounds")),
-            }))
+            })
         } else {
-            Ok(None)
+            None
         }
     }
 
     async fn load_via_imds_v2(&self) -> Result<Option<Credential>> {
-        let loader = match &self.imds_v2_loader {
-            Some(loader) => loader,
-            None => return Ok(None),
+        let Some(loader) = &self.imds_v2_loader else {
+            return Ok(None);
         };
 
         loader.load().await
     }
 
     async fn load_via_assume_role_with_web_identity(&self) -> Result<Option<Credential>> {
-        let (token_file, role_arn) =
-            match (&self.config.web_identity_token_file, &self.config.role_arn) {
-                (Some(token_file), Some(role_arn)) => (token_file, role_arn),
-                _ => return Ok(None),
-            };
+        let (Some(token_file), Some(role_arn)) =
+            (&self.config.web_identity_token_file, &self.config.role_arn)
+        else {
+            return Ok(None);
+        };
 
         let token = fs::read_to_string(token_file)?;
         let role_session_name = &self.config.role_session_name;
@@ -222,7 +232,7 @@ impl DefaultLoader {
     /// AWS could have different sts endpoint based on it's region.
     /// We can check them by region name.
     ///
-    /// ref: https://github.com/awslabs/aws-sdk-rust/blob/31cfae2cf23be0c68a47357070dea1aee9227e3a/sdk/sts/src/aws_endpoint.rs
+    /// ref: <https://github.com/awslabs/aws-sdk-rust/blob/31cfae2cf23be0c68a47357070dea1aee9227e3a/sdk/sts/src/aws_endpoint.rs>
     fn sts_endpoint(&self) -> Result<String> {
         // use regional sts if sts_regional_endpoints has been set.
         if self.config.sts_regional_endpoints == "regional" {
@@ -261,11 +271,12 @@ pub struct IMDSv2Loader {
 }
 
 impl IMDSv2Loader {
-    /// Create a new IMDSv2Loader.
+    /// Create a new `IMDSv2Loader`.
+    #[must_use]
     pub fn new(client: Client) -> Self {
         Self {
             client,
-            token: Arc::new(Mutex::new(("".to_string(), DateTime::MIN_UTC))),
+            token: Arc::new(Mutex::new((String::new().to_string(), DateTime::MIN_UTC))),
         }
     }
 
@@ -321,17 +332,20 @@ impl IMDSv2Loader {
         Ok(Some(cred))
     }
 
-    /// load_ec2_metadata_token will load ec2 metadata token from IMDS.
+    /// `load_ec2_metadata_token` will load ec2 metadata token from IMDS.
     ///
-    /// Return value is (token, expires_in).
+    /// Return value is (token, `expires_in`).
     async fn load_ec2_metadata_token(&self) -> Result<String> {
-        {
-            let (token, expires_in) = self.token.lock().expect("lock poisoned").clone();
-            if expires_in > now() {
-                return Ok(token);
-            }
+        let mut lock = self.token.lock().await;
+        let (ref token, expires_in) = &*lock;
+
+        // Return cached token if still valid
+        if expires_in > &now() {
+            return Ok(token.clone());
         }
 
+        // Refresh token while holding the lock
+        // This ensures only one thread refreshes at a time
         let url = "http://169.254.169.254/latest/api/token";
         #[allow(unused_mut)]
         let mut req = self
@@ -359,9 +373,7 @@ impl IMDSv2Loader {
         let expires_in = now() + chrono::TimeDelta::try_seconds(21600).expect("in bounds")
             - chrono::TimeDelta::try_seconds(600).expect("in bounds");
 
-        {
-            *self.token.lock().expect("lock poisoned") = (ec2_token.clone(), expires_in);
-        }
+        *lock = (ec2_token.clone(), expires_in);
 
         Ok(ec2_token)
     }
@@ -375,7 +387,7 @@ impl CredentialLoad for IMDSv2Loader {
     }
 }
 
-/// AssumeRoleLoader will load credential via assume role.
+/// `AssumeRoleLoader` will load credential via assume role.
 pub struct AssumeRoleLoader {
     client: Client,
     config: Config,
@@ -386,6 +398,10 @@ pub struct AssumeRoleLoader {
 
 impl AssumeRoleLoader {
     /// Create a new assume role loader.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the region is not configured.
     pub fn new(
         client: Client,
         config: Config,
@@ -405,6 +421,10 @@ impl AssumeRoleLoader {
     }
 
     /// Load credential via assume role.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `role_arn` is not configured or if the STS request fails.
     pub async fn load(&self) -> Result<Option<Credential>> {
         let role_arn =self.config.role_arn.clone().ok_or_else(|| {
             anyhow!("assume role loader requires role_arn, but not found, please check your configuration")
@@ -481,7 +501,7 @@ impl AssumeRoleLoader {
     /// AWS could have different sts endpoint based on it's region.
     /// We can check them by region name.
     ///
-    /// ref: https://github.com/awslabs/aws-sdk-rust/blob/31cfae2cf23be0c68a47357070dea1aee9227e3a/sdk/sts/src/aws_endpoint.rs
+    /// ref: <https://github.com/awslabs/aws-sdk-rust/blob/31cfae2cf23be0c68a47357070dea1aee9227e3a/sdk/sts/src/aws_endpoint.rs>
     fn sts_endpoint(&self) -> Result<String> {
         // use regional sts if sts_regional_endpoints has been set.
         if self.config.sts_regional_endpoints == "regional" {
@@ -797,7 +817,7 @@ mod tests {
 
                     let signer = Signer::new("s3", &region);
 
-                    let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
+                    let endpoint = format!("https://s3.{region}.amazonaws.com/opendal-testing");
                     let mut req = Request::new("");
                     *req.method_mut() = http::Method::GET;
                     *req.uri_mut() =
@@ -812,13 +832,13 @@ mod tests {
                     signer.sign(&mut req, &cred).expect("sign must success");
 
                     debug!("signed request url: {:?}", req.uri().to_string());
-                    debug!("signed request: {:?}", req);
+                    debug!("signed request: {req:?}");
 
                     let client = Client::new();
                     let resp = client.execute(req.try_into().unwrap()).await.unwrap();
 
                     let status = resp.status();
-                    debug!("got response: {:?}", resp);
+                    debug!("got response: {resp:?}");
                     debug!("got response content: {:?}", resp.text().await.unwrap());
                     assert_eq!(status, StatusCode::NOT_FOUND);
                 })
@@ -888,7 +908,7 @@ mod tests {
                             .expect("AssumeRoleLoader must be valid");
 
                     let signer = Signer::new("s3", &region);
-                    let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
+                    let endpoint = format!("https://s3.{region}.amazonaws.com/opendal-testing");
                     let mut req = Request::new("");
                     *req.method_mut() = http::Method::GET;
                     *req.uri_mut() =
@@ -900,11 +920,11 @@ mod tests {
                         .unwrap();
                     signer.sign(&mut req, &cred).expect("sign must success");
                     debug!("signed request url: {:?}", req.uri().to_string());
-                    debug!("signed request: {:?}", req);
+                    debug!("signed request: {req:?}");
                     let client = Client::new();
                     let resp = client.execute(req.try_into().unwrap()).await.unwrap();
                     let status = resp.status();
-                    debug!("got response: {:?}", resp);
+                    debug!("got response: {resp:?}");
                     debug!("got response content: {:?}", resp.text().await.unwrap());
                     assert_eq!(status, StatusCode::NOT_FOUND);
                 })

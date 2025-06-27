@@ -278,7 +278,7 @@ fn canonical_request_string(ctx: &mut SigningContext) -> Result<String> {
     f.push('\n');
     f.push_str("UNSIGNED-PAYLOAD");
 
-    debug!("string to sign: {}", f);
+    debug!("string to sign: {f}");
     Ok(f)
 }
 

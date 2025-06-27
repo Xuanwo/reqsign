@@ -51,7 +51,7 @@ impl APIKeySigner {
                 cred.tenancy, cred.user, &fp
             )?;
             write!(auth_value, "algorithm=\"rsa-sha256\",")?;
-            write!(auth_value, "signature=\"{}\"", encoded_signature)?;
+            write!(auth_value, "signature=\"{encoded_signature}\"")?;
             ctx.headers
                 .insert(AUTHORIZATION, HeaderValue::from_str(&auth_value)?);
         } else {
