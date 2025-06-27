@@ -68,7 +68,7 @@ async fn test_head_blob() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -76,7 +76,7 @@ async fn test_head_blob() -> Result<()> {
         .await
         .expect("request must success");
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -112,7 +112,7 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -120,7 +120,7 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
         .await
         .expect("request must success");
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -160,7 +160,7 @@ async fn test_list_container_blobs() -> Result<()> {
             .sign(&mut req, &cred)
             .expect("sign request must success");
 
-        debug!("signed request: {:?}", req);
+        debug!("signed request: {req:?}");
 
         let client = Client::new();
         let resp = client
@@ -168,7 +168,7 @@ async fn test_list_container_blobs() -> Result<()> {
             .await
             .expect("request must success");
 
-        debug!("got response: {:?}", resp);
+        debug!("got response: {resp:?}");
         assert_eq!(StatusCode::OK, resp.status());
     }
 
@@ -202,7 +202,7 @@ async fn test_can_head_blob_with_sas() -> Result<()> {
         .sign_query(&mut req, Duration::from_secs(60), &cred)
         .expect("sign request must success");
 
-    println!("signed request: {:?}", req);
+    println!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -210,7 +210,7 @@ async fn test_can_head_blob_with_sas() -> Result<()> {
         .await
         .expect("request must success");
 
-    println!("got response: {:?}", resp);
+    println!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -257,7 +257,7 @@ async fn test_can_list_container_blobs() -> Result<()> {
             .await
             .expect("request must success");
 
-        debug!("got response: {:?}", resp);
+        debug!("got response: {resp:?}");
         assert_eq!(StatusCode::OK, resp.status());
     }
 
@@ -301,7 +301,7 @@ async fn test_head_blob_with_ldms() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    println!("signed request: {:?}", req);
+    println!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -365,7 +365,7 @@ async fn test_can_list_container_blobs_with_ldms() -> Result<()> {
             .await
             .expect("request must success");
 
-        debug!("got response: {:?}", resp);
+        debug!("got response: {resp:?}");
         assert_eq!(StatusCode::OK, resp.status());
     }
 
@@ -423,7 +423,7 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    println!("signed request: {:?}", req);
+    println!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -500,7 +500,7 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
             .await
             .expect("request must success");
         let stat = resp.status();
-        debug!("got response: {:?}", resp);
+        debug!("got response: {resp:?}");
         debug!("{}", resp.text().await?);
 
         assert_eq!(StatusCode::OK, stat);

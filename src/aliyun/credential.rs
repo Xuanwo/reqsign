@@ -166,7 +166,7 @@ impl Loader {
 
     fn get_sts_endpoint(&self) -> String {
         match &self.config.sts_endpoint {
-            Some(defined_sts_endpoint) => format!("https://{}", defined_sts_endpoint),
+            Some(defined_sts_endpoint) => format!("https://{defined_sts_endpoint}"),
             None => "https://sts.aliyuncs.com".to_string(),
         }
     }
@@ -333,7 +333,7 @@ mod tests {
                         .expect("sign request must success");
 
                     debug!("signed request url: {:?}", req.uri().to_string());
-                    debug!("signed request: {:?}", req);
+                    debug!("signed request: {req:?}");
 
                     let client = reqwest::Client::new();
                     let resp = client
@@ -342,7 +342,7 @@ mod tests {
                         .expect("request must succeed");
 
                     let status = resp.status();
-                    debug!("got response: {:?}", resp);
+                    debug!("got response: {resp:?}");
                     debug!("got response content: {}", resp.text().await.unwrap());
                     assert_eq!(StatusCode::NOT_FOUND, status);
                 })
@@ -432,7 +432,7 @@ mod tests {
                         .expect("sign request must success");
 
                     debug!("signed request url: {:?}", req.uri().to_string());
-                    debug!("signed request: {:?}", req);
+                    debug!("signed request: {req:?}");
 
                     let client = reqwest::Client::new();
                     let resp = client
@@ -441,7 +441,7 @@ mod tests {
                         .expect("request must succeed");
 
                     let status = resp.status();
-                    debug!("got response: {:?}", resp);
+                    debug!("got response: {resp:?}");
                     debug!("got response content: {}", resp.text().await.unwrap());
                     assert_eq!(StatusCode::NOT_FOUND, status);
                 })

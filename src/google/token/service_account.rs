@@ -41,7 +41,7 @@ impl TokenLoader {
             .await?;
 
         if !resp.status().is_success() {
-            error!("exchange token got unexpected response: {:?}", resp);
+            error!("exchange token got unexpected response: {resp:?}");
             bail!("exchange token failed: {}", resp.text().await?);
         }
 

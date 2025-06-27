@@ -71,7 +71,7 @@ async fn test_get_object() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -80,7 +80,7 @@ async fn test_get_object() -> Result<()> {
         .expect("request must succeed");
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!("got response content: {}", resp.text().await?);
     assert_eq!(StatusCode::NOT_FOUND, status);
     Ok(())
@@ -108,7 +108,7 @@ async fn test_delete_objects() -> Result<()> {
  </Delete>"#,
     );
     *req.method_mut() = http::Method::POST;
-    *req.uri_mut() = http::Uri::from_str(&format!("{}/?delete", url))?;
+    *req.uri_mut() = http::Uri::from_str(&format!("{url}/?delete"))?;
     req.headers_mut()
         .insert("CONTENT-MD5", "WOctCY1SS662e7ziElh4cw==".parse().unwrap());
 
@@ -121,7 +121,7 @@ async fn test_delete_objects() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -130,7 +130,7 @@ async fn test_delete_objects() -> Result<()> {
         .expect("request must succeed");
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!("got response content: {}", resp.text().await?);
     assert_eq!(StatusCode::OK, status);
     Ok(())
@@ -160,7 +160,7 @@ async fn test_get_object_with_query_sign() -> Result<()> {
         .sign_query(&mut req, Duration::from_secs(3600), &cred)
         .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -169,7 +169,7 @@ async fn test_get_object_with_query_sign() -> Result<()> {
         .expect("request must succeed");
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!("got response content: {}", resp.text().await?);
     assert_eq!(StatusCode::NOT_FOUND, status);
     Ok(())
@@ -203,7 +203,7 @@ async fn test_head_object_with_special_characters() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -211,7 +211,7 @@ async fn test_head_object_with_special_characters() -> Result<()> {
         .await
         .expect("request must success");
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -246,7 +246,7 @@ async fn test_put_object_with_special_characters() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -255,7 +255,7 @@ async fn test_put_object_with_special_characters() -> Result<()> {
         .expect("request must success");
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!("got response content: {:?}", resp.text().await?);
     assert_eq!(StatusCode::OK, status);
     Ok(())
@@ -286,7 +286,7 @@ async fn test_list_bucket() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -295,7 +295,7 @@ async fn test_list_bucket() -> Result<()> {
         .expect("request must success");
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!("got response content: {}", resp.text().await?);
     assert_eq!(StatusCode::OK, status);
     Ok(())
@@ -329,7 +329,7 @@ async fn test_list_bucket_with_invalid_token() -> Result<()> {
         .sign(&mut req, &cred)
         .expect("sign request must success");
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -338,7 +338,7 @@ async fn test_list_bucket_with_invalid_token() -> Result<()> {
         .expect("request must success");
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!("got response content: {}", resp.text().await?);
     assert_eq!(StatusCode::BAD_REQUEST, status);
     Ok(())

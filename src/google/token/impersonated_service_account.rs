@@ -57,7 +57,7 @@ impl TokenLoader {
             .await?;
 
         if !resp.status().is_success() {
-            error!("bearer token loader for impersonated service account got unexpected response: {:?}", resp);
+            error!("bearer token loader for impersonated service account got unexpected response: {resp:?}");
             bail!(
                 "bearer token loader for impersonated service account failed: {}",
                 resp.text().await?
@@ -93,7 +93,7 @@ impl TokenLoader {
             .await?;
 
         if !resp.status().is_success() {
-            error!("access token loader for impersonated service account got unexpected response: {:?}", resp);
+            error!("access token loader for impersonated service account got unexpected response: {resp:?}");
             bail!(
                 "access token loader for impersonated service account failed: {}",
                 resp.text().await?

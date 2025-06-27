@@ -120,7 +120,7 @@ mod tests {
         let token_content = sign.token().expect("token decode failed");
         let token = token_content
             .iter()
-            .map(|(k, v)| format!("{}={}", k, v))
+            .map(|(k, v)| format!("{k}={v}"))
             .collect::<Vec<String>>()
             .join("&");
 

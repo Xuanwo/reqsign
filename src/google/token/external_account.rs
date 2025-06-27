@@ -51,7 +51,7 @@ async fn load_security_token(
         .await?;
 
     if !resp.status().is_success() {
-        error!("exchange token got unexpected response: {:?}", resp);
+        error!("exchange token got unexpected response: {resp:?}");
         bail!("exchange token failed: {}", resp.text().await?);
     }
 
@@ -92,7 +92,7 @@ async fn load_impersonated_token(
         .await?;
 
     if !resp.status().is_success() {
-        error!("impersonated token got unexpected response: {:?}", resp);
+        error!("impersonated token got unexpected response: {resp:?}");
         bail!("exchange impersonated token failed: {}", resp.text().await?);
     }
 
@@ -160,7 +160,7 @@ mod credential_source {
 
         let resp = client.get(&source.url).headers(headers).send().await?;
         if !resp.status().is_success() {
-            error!("exchange token got unexpected response: {:?}", resp);
+            error!("exchange token got unexpected response: {resp:?}");
             bail!("exchange OIDC token failed: {}", resp.text().await?);
         }
 

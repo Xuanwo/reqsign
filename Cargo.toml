@@ -45,6 +45,7 @@ services-aws = [
   "dep:serde_json",
   "dep:quick-xml",
   "dep:rust-ini",
+  "dep:tokio",
 ]
 services-azblob = ["dep:serde", "dep:serde_json", "dep:reqwest"]
 services-google = [
@@ -88,11 +89,11 @@ toml = { version = "0.8.9", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 home = "0.5"
-tokio = { version = "1", features = ["fs"], optional = true }
+tokio = { version = "1", features = ["fs", "sync"], optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
-tokio = { version = "1", optional = true }
+tokio = { version = "1", features = ["sync"], optional = true }
 
 [dev-dependencies]
 aws-credential-types = "1.1.8"
