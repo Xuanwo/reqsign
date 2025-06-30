@@ -394,6 +394,7 @@ pub struct AssumeRoleLoader {
 
     source_credential: Box<dyn CredentialLoad>,
     sts_signer: Signer,
+    credential: Arc<Mutex<Option<Credential>>>,
 }
 
 impl AssumeRoleLoader {
@@ -417,6 +418,7 @@ impl AssumeRoleLoader {
             source_credential,
 
             sts_signer: Signer::new("sts", &region),
+            credential: Arc::default(),
         })
     }
 
@@ -426,6 +428,24 @@ impl AssumeRoleLoader {
     ///
     /// Returns an error if `role_arn` is not configured or if the STS request fails.
     pub async fn load(&self) -> Result<Option<Credential>> {
+        let mut lock = self.credential.lock().await;
+
+        // Return cached credential if it has been loaded and is still valid
+        if let Some(ref cred) = *lock {
+            if cred.is_valid() {
+                return Ok(Some(cred.clone()));
+            }
+        }
+
+        // Load new credential while holding the lock
+        // This ensures only one thread refreshes at a time
+        let new_cred = self.load_inner().await?;
+        lock.clone_from(&new_cred);
+
+        Ok(new_cred)
+    }
+
+    async fn load_inner(&self) -> Result<Option<Credential>> {
         let role_arn =self.config.role_arn.clone().ok_or_else(|| {
             anyhow!("assume role loader requires role_arn, but not found, please check your configuration")
         })?;
