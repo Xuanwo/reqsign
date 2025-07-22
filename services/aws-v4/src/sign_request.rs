@@ -1,5 +1,6 @@
 use crate::constants::{
-    AWS_QUERY_ENCODE_SET, X_AMZ_CONTENT_SHA_256, X_AMZ_DATE, X_AMZ_SECURITY_TOKEN,
+    AWS_QUERY_ENCODE_SET, X_AMZ_CONTENT_SHA_256, X_AMZ_DATE, X_AMZ_S3_SESSION_TOKEN,
+    X_AMZ_SECURITY_TOKEN,
 };
 use crate::Credential;
 use async_trait::async_trait;
@@ -251,7 +252,7 @@ fn canonicalize_header(
             );
         }
 
-        // Insert X_AMZ_SECURITY_TOKEN header if security token exists.
+        // Insert session token header if exists
         if let Some(token) = &cred.session_token {
             let mut value = HeaderValue::from_str(token).map_err(|e| {
                 reqsign_core::Error::unexpected(format!(
@@ -261,7 +262,15 @@ fn canonicalize_header(
             // Set token value sensitive to valid leaking.
             value.set_sensitive(true);
 
-            ctx.headers.insert(X_AMZ_SECURITY_TOKEN, value);
+            // Check if this is an S3 Express request by examining the URI
+            let is_s3_express = ctx.authority.as_str().contains("s3express")
+                || ctx.authority.as_str().contains("--x-s3");
+
+            if is_s3_express {
+                ctx.headers.insert(X_AMZ_S3_SESSION_TOKEN, value);
+            } else {
+                ctx.headers.insert(X_AMZ_SECURITY_TOKEN, value);
+            }
         }
     }
 

@@ -35,4 +35,7 @@ pub use sso::SSOCredentialProvider;
 mod r#static;
 pub use r#static::StaticCredentialProvider;
 
+mod s3_express_session;
+pub use s3_express_session::S3ExpressSessionProvider;
+
 mod utils;
