@@ -101,7 +101,7 @@ impl RequestSigner {
             .or_else(|| ctx.env_var(GOOGLE_SCOPE))
             .unwrap_or_else(|| DEFAULT_SCOPE.to_string());
 
-        debug!("exchanging service account for token with scope: {}", scope);
+        debug!("exchanging service account for token with scope: {scope}");
 
         // Create JWT
         let jwt = jsonwebtoken::encode(
@@ -114,10 +114,8 @@ impl RequestSigner {
         .map_err(|e| reqsign_core::Error::unexpected("failed to encode JWT").with_source(e))?;
 
         // Exchange JWT for access token
-        let body = format!(
-            "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={}",
-            jwt
-        );
+        let body =
+            format!("grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={jwt}");
         let req = http::Request::builder()
             .method(http::Method::POST)
             .uri("https://oauth2.googleapis.com/token")
@@ -132,8 +130,7 @@ impl RequestSigner {
         if resp.status() != http::StatusCode::OK {
             let body = String::from_utf8_lossy(resp.body());
             return Err(reqsign_core::Error::unexpected(format!(
-                "exchange token failed: {}",
-                body
+                "exchange token failed: {body}"
             )));
         }
 
@@ -333,7 +330,7 @@ fn canonical_request_string(req: &mut SigningRequest) -> Result<String> {
     f.push('\n');
     f.push_str("UNSIGNED-PAYLOAD");
 
-    debug!("canonical request string: {}", f);
+    debug!("canonical request string: {f}");
     Ok(f)
 }
 

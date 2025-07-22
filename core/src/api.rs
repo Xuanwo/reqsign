@@ -166,26 +166,19 @@ where
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         for provider in &self.providers {
-            log::debug!("Trying credential provider: {:?}", provider);
+            log::debug!("Trying credential provider: {provider:?}");
 
             match provider.provide_credential(ctx).await {
                 Ok(Some(cred)) => {
-                    log::debug!(
-                        "Successfully loaded credential from provider: {:?}",
-                        provider
-                    );
+                    log::debug!("Successfully loaded credential from provider: {provider:?}");
                     return Ok(Some(cred));
                 }
                 Ok(None) => {
-                    log::debug!("No credential found in provider: {:?}", provider);
+                    log::debug!("No credential found in provider: {provider:?}");
                     continue;
                 }
                 Err(e) => {
-                    log::warn!(
-                        "Error loading credential from provider {:?}: {:?}",
-                        provider,
-                        e
-                    );
+                    log::warn!("Error loading credential from provider {provider:?}: {e:?}");
                     // Continue to next provider on error
                     continue;
                 }

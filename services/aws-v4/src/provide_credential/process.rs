@@ -91,35 +91,34 @@ impl ProcessCredentialProvider {
         };
 
         let content = ctx.file_read(&expanded_path).await.map_err(|_| {
-            Error::config_invalid(format!("failed to read config file: {}", expanded_path))
+            Error::config_invalid(format!("failed to read config file: {expanded_path}"))
         })?;
 
         let conf = Ini::load_from_str(&String::from_utf8_lossy(&content))
-            .map_err(|e| Error::config_invalid(format!("failed to parse config file: {}", e)))?;
+            .map_err(|e| Error::config_invalid(format!("failed to parse config file: {e}")))?;
 
         let profile_section = if profile == "default" {
             profile.to_string()
         } else {
-            format!("profile {}", profile)
+            format!("profile {profile}")
         };
 
         let section = conf.section(Some(profile_section)).ok_or_else(|| {
-            Error::config_invalid(format!("profile '{}' not found in config", profile))
+            Error::config_invalid(format!("profile '{profile}' not found in config"))
         })?;
 
         section
             .get("credential_process")
             .ok_or_else(|| {
                 Error::config_invalid(format!(
-                    "credential_process not found in profile '{}'",
-                    profile
+                    "credential_process not found in profile '{profile}'"
                 ))
             })
             .map(|s| s.to_string())
     }
 
     async fn execute_process(&self, command: &str) -> Result<ProcessCredentialOutput> {
-        debug!("executing credential process: {}", command);
+        debug!("executing credential process: {command}");
 
         // Parse command into program and arguments
         let parts: Vec<&str> = command.split_whitespace().collect();
@@ -139,9 +138,7 @@ impl ProcessCredentialProvider {
             .stderr(Stdio::piped())
             .output()
             .await
-            .map_err(|e| {
-                Error::unexpected(format!("failed to execute credential process: {}", e))
-            })?;
+            .map_err(|e| Error::unexpected(format!("failed to execute credential process: {e}")))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -154,7 +151,7 @@ impl ProcessCredentialProvider {
         // Parse the output
         let stdout = &output.stdout;
         let creds: ProcessCredentialOutput = serde_json::from_slice(stdout).map_err(|e| {
-            Error::unexpected(format!("failed to parse credential process output: {}", e))
+            Error::unexpected(format!("failed to parse credential process output: {e}"))
         })?;
 
         // Validate version
@@ -196,13 +193,14 @@ impl ProvideCredential for ProcessCredentialProvider {
 
         let output = self.execute_process(&command).await?;
 
-        let expires_in = if let Some(exp_str) = &output.expiration {
-            Some(exp_str.parse::<DateTime<Utc>>().map_err(|e| {
-                Error::unexpected(format!("failed to parse expiration time: {}", e))
-            })?)
-        } else {
-            None
-        };
+        let expires_in =
+            if let Some(exp_str) = &output.expiration {
+                Some(exp_str.parse::<DateTime<Utc>>().map_err(|e| {
+                    Error::unexpected(format!("failed to parse expiration time: {e}"))
+                })?)
+            } else {
+                None
+            };
 
         Ok(Some(Credential {
             access_key_id: output.access_key_id,

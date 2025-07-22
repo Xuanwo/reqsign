@@ -34,10 +34,7 @@ impl AzureCliCredentialProvider {
             ])
             .output()
             .map_err(|e| {
-                reqsign_core::Error::unexpected(format!(
-                    "Failed to execute Azure CLI command: {}",
-                    e
-                ))
+                reqsign_core::Error::unexpected(format!("Failed to execute Azure CLI command: {e}"))
             })?;
 
         if !output.status.success() {
@@ -48,7 +45,7 @@ impl AzureCliCredentialProvider {
         }
 
         let token: AzureCliToken = serde_json::from_slice(&output.stdout).map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Failed to parse Azure CLI output: {}", e))
+            reqsign_core::Error::unexpected(format!("Failed to parse Azure CLI output: {e}"))
         })?;
 
         Ok(token)

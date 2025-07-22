@@ -79,7 +79,7 @@ impl ProfileCredentialProvider {
             match ctx.expand_home_dir(&path) {
                 Some(expanded) => expanded,
                 None => {
-                    debug!("failed to expand homedir for path: {}", path);
+                    debug!("failed to expand homedir for path: {path}");
                     return Ok(None);
                 }
             }
@@ -90,10 +90,7 @@ impl ProfileCredentialProvider {
         let content = match ctx.file_read(&expanded_path).await {
             Ok(content) => content,
             Err(err) => {
-                debug!(
-                    "failed to read credentials file {}: {:?}",
-                    expanded_path, err
-                );
+                debug!("failed to read credentials file {expanded_path}: {err:?}");
                 return Ok(None);
             }
         };
@@ -106,7 +103,7 @@ impl ProfileCredentialProvider {
         let props = match conf.section(Some(profile)) {
             Some(props) => props,
             None => {
-                debug!("profile {} not found in credentials file", profile);
+                debug!("profile {profile} not found in credentials file");
                 return Ok(None);
             }
         };
@@ -143,7 +140,7 @@ impl ProfileCredentialProvider {
             match ctx.expand_home_dir(&path) {
                 Some(expanded) => expanded,
                 None => {
-                    debug!("failed to expand homedir for path: {}", path);
+                    debug!("failed to expand homedir for path: {path}");
                     return Ok(None);
                 }
             }
@@ -154,7 +151,7 @@ impl ProfileCredentialProvider {
         let content = match ctx.file_read(&expanded_path).await {
             Ok(content) => content,
             Err(err) => {
-                debug!("failed to read config file {}: {:?}", expanded_path, err);
+                debug!("failed to read config file {expanded_path}: {err:?}");
                 return Ok(None);
             }
         };
@@ -171,7 +168,7 @@ impl ProfileCredentialProvider {
         let props = match conf.section(Some(&section)) {
             Some(props) => props,
             None => {
-                debug!("section {} not found in config file", profile);
+                debug!("section {profile} not found in config file");
                 return Ok(None);
             }
         };

@@ -141,8 +141,7 @@ async fn get_workload_identity_token(
         let status = resp.status();
         let body = String::from_utf8_lossy(resp.body());
         return Err(reqsign_core::Error::unexpected(format!(
-            "Workload identity request failed with status {}: {}",
-            status, body
+            "Workload identity request failed with status {status}: {body}"
         )));
     }
 

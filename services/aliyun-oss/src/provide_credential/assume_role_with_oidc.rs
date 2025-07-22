@@ -24,7 +24,7 @@ impl AssumeRoleWithOidcCredentialProvider {
 
     fn get_sts_endpoint(envs: &std::collections::HashMap<String, String>) -> String {
         match envs.get(ALIBABA_CLOUD_STS_ENDPOINT) {
-            Some(endpoint) => format!("https://{}", endpoint),
+            Some(endpoint) => format!("https://{endpoint}"),
             None => "https://sts.aliyuncs.com".to_string(),
         }
     }
@@ -82,7 +82,7 @@ impl ProvideCredential for AssumeRoleWithOidcCredentialProvider {
 
         let resp: AssumeRoleWithOidcResponse =
             serde_json::from_slice(resp.body()).map_err(|e| {
-                reqsign_core::Error::unexpected(format!("Failed to parse STS response: {}", e))
+                reqsign_core::Error::unexpected(format!("Failed to parse STS response: {e}"))
             })?;
         let resp_cred = resp.credentials;
 

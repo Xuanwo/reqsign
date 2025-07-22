@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
             );
             println!("X-Amz-Date header: {:?}", parts.headers.get("x-amz-date"));
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     // Example 2: Describe a specific table
@@ -99,7 +99,7 @@ async fn main() -> Result<()> {
                 parts.headers.get("authorization")
             );
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     // Example 3: Put item (write operation)
@@ -132,7 +132,7 @@ async fn main() -> Result<()> {
             println!("PutItem request signed successfully!");
             println!("The request is ready to be sent to DynamoDB");
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     Ok(())

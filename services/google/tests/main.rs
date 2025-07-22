@@ -80,7 +80,7 @@ async fn test_get_object() -> Result<()> {
         .expect("sign request must success");
     let req = http::Request::from_parts(parts, body);
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -90,7 +90,7 @@ async fn test_get_object() -> Result<()> {
         .await
         .expect("request must succeed");
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -119,7 +119,7 @@ async fn test_list_objects() -> Result<()> {
         .expect("sign request must success");
     let req = http::Request::from_parts(parts, body);
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -129,7 +129,7 @@ async fn test_list_objects() -> Result<()> {
         .await
         .expect("request must succeed");
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::OK, resp.status());
     Ok(())
 }
@@ -162,7 +162,7 @@ async fn test_get_object_with_query() -> Result<()> {
         .expect("sign request must success");
     let req = http::Request::from_parts(parts, body);
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -173,7 +173,7 @@ async fn test_get_object_with_query() -> Result<()> {
         .expect("request must succeed");
 
     let code = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!(
         "got body: {}",
         resp.text()

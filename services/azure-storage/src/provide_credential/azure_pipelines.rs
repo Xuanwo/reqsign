@@ -48,21 +48,21 @@ impl AzurePipelinesCredentialProvider {
         service_connection_id: Option<&String>,
     ) -> Result<String, reqsign_core::Error> {
         // Build the request URL
-        let mut url = format!("{}?api-version=7.1", oidc_request_uri);
+        let mut url = format!("{oidc_request_uri}?api-version=7.1");
         if let Some(sc_id) = service_connection_id {
-            url = format!("{}&serviceConnectionId={}", url, sc_id);
+            url = format!("{url}&serviceConnectionId={sc_id}");
         }
 
         // Create the request
         let req = http::Request::builder()
             .method(http::Method::POST)
             .uri(url)
-            .header("Authorization", format!("Bearer {}", system_access_token))
+            .header("Authorization", format!("Bearer {system_access_token}"))
             .header("Content-Type", "application/json")
             .header("Content-Length", "0")
             .body(bytes::Bytes::new())
             .map_err(|e| {
-                reqsign_core::Error::unexpected(format!("Failed to build OIDC request: {}", e))
+                reqsign_core::Error::unexpected(format!("Failed to build OIDC request: {e}"))
             })?;
 
         // Send the request
@@ -79,7 +79,7 @@ impl AzurePipelinesCredentialProvider {
         // Parse the response
         let body = resp.into_body();
         let oidc_response: OidcTokenResponse = serde_json::from_slice(&body).map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Failed to parse OIDC response: {}", e))
+            reqsign_core::Error::unexpected(format!("Failed to parse OIDC response: {e}"))
         })?;
 
         Ok(oidc_response.oidc_token)
@@ -93,10 +93,7 @@ impl AzurePipelinesCredentialProvider {
         client_id: &str,
         oidc_token: &str,
     ) -> Result<TokenResponse, reqsign_core::Error> {
-        let url = format!(
-            "https://login.microsoftonline.com/{}/oauth2/v2.0/token",
-            tenant_id
-        );
+        let url = format!("https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token");
 
         let mut params = HashMap::new();
         params.insert("scope", "https://storage.azure.com/.default");
@@ -118,7 +115,7 @@ impl AzurePipelinesCredentialProvider {
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(bytes::Bytes::from(body))
             .map_err(|e| {
-                reqsign_core::Error::unexpected(format!("Failed to build token request: {}", e))
+                reqsign_core::Error::unexpected(format!("Failed to build token request: {e}"))
             })?;
 
         let resp = ctx.http_send(req).await?;
@@ -133,7 +130,7 @@ impl AzurePipelinesCredentialProvider {
 
         let body = resp.into_body();
         let token_response: TokenResponse = serde_json::from_slice(&body).map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Failed to parse token response: {}", e))
+            reqsign_core::Error::unexpected(format!("Failed to parse token response: {e}"))
         })?;
 
         Ok(token_response)

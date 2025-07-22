@@ -61,13 +61,13 @@ impl HttpSend for DefaultContext {
         let reqwest_resp = reqwest_req
             .send()
             .await
-            .map_err(|e| reqsign_core::Error::unexpected(format!("HTTP request failed: {}", e)))?;
+            .map_err(|e| reqsign_core::Error::unexpected(format!("HTTP request failed: {e}")))?;
 
         // Convert reqwest::Response to http::Response
         let status = reqwest_resp.status();
         let headers = reqwest_resp.headers().clone();
         let body = reqwest_resp.bytes().await.map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Failed to read response body: {}", e))
+            reqsign_core::Error::unexpected(format!("Failed to read response body: {e}"))
         })?;
 
         let mut http_resp = http::Response::builder().status(status);

@@ -65,11 +65,10 @@ impl ProvideCredential for AuthorizedUserCredentialProvider {
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {
-            error!("refresh token exchange got unexpected response: {:?}", resp);
+            error!("refresh token exchange got unexpected response: {resp:?}");
             let body = String::from_utf8_lossy(resp.body());
             return Err(reqsign_core::Error::unexpected(format!(
-                "refresh token exchange failed: {}",
-                body
+                "refresh token exchange failed: {body}"
             )));
         }
 

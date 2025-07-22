@@ -91,7 +91,7 @@ async fn main() -> Result<()> {
                     &token.access_token[..20.min(token.access_token.len())]
                 );
                 if let Some(expires_at) = token.expires_at {
-                    println!("Expires at: {}", expires_at);
+                    println!("Expires at: {expires_at}");
                 }
             }
         }

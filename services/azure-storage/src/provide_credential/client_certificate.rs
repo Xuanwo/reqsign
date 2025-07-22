@@ -83,23 +83,19 @@ impl ClientCertificateCredentialProvider {
         path: &str,
     ) -> Result<(Vec<u8>, RsaPrivateKey), reqsign_core::Error> {
         let cert_data = ctx.file_read(path).await.map_err(|e| {
-            reqsign_core::Error::credential_invalid(format!(
-                "Failed to read certificate file: {}",
-                e
-            ))
+            reqsign_core::Error::credential_invalid(format!("Failed to read certificate file: {e}"))
         })?;
 
         // For now, we'll support PEM format. PFX support can be added later
         let pem_str = String::from_utf8(cert_data.clone()).map_err(|e| {
             reqsign_core::Error::credential_invalid(format!(
-                "Certificate file is not valid UTF-8: {}",
-                e
+                "Certificate file is not valid UTF-8: {e}"
             ))
         })?;
 
         // Extract certificate
         let cert_pem = pem::parse(&pem_str).map_err(|e| {
-            reqsign_core::Error::credential_invalid(format!("Failed to parse PEM: {}", e))
+            reqsign_core::Error::credential_invalid(format!("Failed to parse PEM: {e}"))
         })?;
 
         if cert_pem.tag() != "CERTIFICATE" {
@@ -113,8 +109,7 @@ impl ClientCertificateCredentialProvider {
         // Extract private key
         let private_key = RsaPrivateKey::from_pkcs8_pem(&pem_str).map_err(|e| {
             reqsign_core::Error::credential_invalid(format!(
-                "Failed to parse private key from PEM: {}",
-                e
+                "Failed to parse private key from PEM: {e}"
             ))
         })?;
 
@@ -138,15 +133,12 @@ impl ClientCertificateCredentialProvider {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|e| {
-                reqsign_core::Error::unexpected(format!("Failed to get current time: {}", e))
+                reqsign_core::Error::unexpected(format!("Failed to get current time: {e}"))
             })?
             .as_secs();
 
         let claims = ClientAssertionClaims {
-            aud: format!(
-                "https://login.microsoftonline.com/{}/oauth2/v2.0/token",
-                tenant_id
-            ),
+            aud: format!("https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"),
             exp: now + 600, // 10 minutes
             iss: client_id.to_string(),
             jti: generate_jti(now),
@@ -159,15 +151,15 @@ impl ClientCertificateCredentialProvider {
 
         let pem_private_key =
             rsa::pkcs8::EncodePrivateKey::to_pkcs8_pem(private_key, Default::default()).map_err(
-                |e| reqsign_core::Error::unexpected(format!("Failed to encode private key: {}", e)),
+                |e| reqsign_core::Error::unexpected(format!("Failed to encode private key: {e}")),
             )?;
 
         let encoding_key = EncodingKey::from_rsa_pem(pem_private_key.as_bytes()).map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Failed to create encoding key: {}", e))
+            reqsign_core::Error::unexpected(format!("Failed to create encoding key: {e}"))
         })?;
 
         jsonwebtoken::encode(&header, &claims, &encoding_key)
-            .map_err(|e| reqsign_core::Error::unexpected(format!("Failed to create JWT: {}", e)))
+            .map_err(|e| reqsign_core::Error::unexpected(format!("Failed to create JWT: {e}")))
     }
 
     /// Exchange client assertion for access token
@@ -178,10 +170,7 @@ impl ClientCertificateCredentialProvider {
         client_id: &str,
         client_assertion: &str,
     ) -> Result<TokenResponse, reqsign_core::Error> {
-        let url = format!(
-            "https://login.microsoftonline.com/{}/oauth2/v2.0/token",
-            tenant_id
-        );
+        let url = format!("https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token");
 
         let mut params = HashMap::new();
         params.insert("scope", "https://storage.azure.com/.default");
@@ -203,7 +192,7 @@ impl ClientCertificateCredentialProvider {
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(bytes::Bytes::from(body))
             .map_err(|e| {
-                reqsign_core::Error::unexpected(format!("Failed to build request: {}", e))
+                reqsign_core::Error::unexpected(format!("Failed to build request: {e}"))
             })?;
 
         let resp = ctx.http_send(req).await?;
@@ -218,7 +207,7 @@ impl ClientCertificateCredentialProvider {
 
         let body = resp.into_body();
         let token_response: TokenResponse = serde_json::from_slice(&body).map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Failed to parse token response: {}", e))
+            reqsign_core::Error::unexpected(format!("Failed to parse token response: {e}"))
         })?;
 
         Ok(token_response)

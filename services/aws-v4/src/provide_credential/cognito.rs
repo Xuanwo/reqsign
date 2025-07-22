@@ -89,7 +89,7 @@ impl CognitoIdentityCredentialProvider {
             .as_ref()
             .ok_or_else(|| Error::config_invalid("region is required".to_string()))?;
 
-        let endpoint = format!("https://cognito-identity.{}.amazonaws.com/", region);
+        let endpoint = format!("https://cognito-identity.{region}.amazonaws.com/");
 
         let body = if let Some(logins) = &self.logins {
             json!({
@@ -108,14 +108,14 @@ impl CognitoIdentityCredentialProvider {
             .header("x-amz-target", "AWSCognitoIdentityService.GetId")
             .header("content-type", "application/x-amz-json-1.1")
             .body(bytes::Bytes::from(serde_json::to_vec(&body).map_err(
-                |e| Error::unexpected(format!("failed to serialize request body: {}", e)),
+                |e| Error::unexpected(format!("failed to serialize request body: {e}")),
             )?))
-            .map_err(|e| Error::unexpected(format!("failed to build request: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to build request: {e}")))?;
 
         let resp = ctx
             .http_send(req)
             .await
-            .map_err(|e| Error::unexpected(format!("failed to get identity ID: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to get identity ID: {e}")))?;
 
         if resp.status() != StatusCode::OK {
             return Err(Error::unexpected(format!(
@@ -126,7 +126,7 @@ impl CognitoIdentityCredentialProvider {
 
         let body = resp.into_body();
         let result: GetIdResponse = serde_json::from_slice(&body)
-            .map_err(|e| Error::unexpected(format!("failed to parse GetId response: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to parse GetId response: {e}")))?;
 
         Ok(result.identity_id)
     }
@@ -142,7 +142,7 @@ impl CognitoIdentityCredentialProvider {
             .as_ref()
             .ok_or_else(|| Error::config_invalid("region is required".to_string()))?;
 
-        let endpoint = format!("https://cognito-identity.{}.amazonaws.com/", region);
+        let endpoint = format!("https://cognito-identity.{region}.amazonaws.com/");
 
         let body = if let Some(logins) = &self.logins {
             json!({
@@ -164,14 +164,14 @@ impl CognitoIdentityCredentialProvider {
             )
             .header("content-type", "application/x-amz-json-1.1")
             .body(bytes::Bytes::from(serde_json::to_vec(&body).map_err(
-                |e| Error::unexpected(format!("failed to serialize request body: {}", e)),
+                |e| Error::unexpected(format!("failed to serialize request body: {e}")),
             )?))
-            .map_err(|e| Error::unexpected(format!("failed to build request: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to build request: {e}")))?;
 
         let resp = ctx
             .http_send(req)
             .await
-            .map_err(|e| Error::unexpected(format!("failed to get credentials: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to get credentials: {e}")))?;
 
         if resp.status() != StatusCode::OK {
             return Err(Error::unexpected(format!(
@@ -181,9 +181,8 @@ impl CognitoIdentityCredentialProvider {
         }
 
         let body = resp.into_body();
-        let result: GetCredentialsResponse = serde_json::from_slice(&body).map_err(|e| {
-            Error::unexpected(format!("failed to parse credentials response: {}", e))
-        })?;
+        let result: GetCredentialsResponse = serde_json::from_slice(&body)
+            .map_err(|e| Error::unexpected(format!("failed to parse credentials response: {e}")))?;
 
         let creds = result.credentials;
         let expires_in = DateTime::from_timestamp(creds.expiration, 0)

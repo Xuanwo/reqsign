@@ -105,13 +105,11 @@ impl ImpersonatedServiceAccountCredentialProvider {
 
         if resp.status() != http::StatusCode::OK {
             error!(
-                "bearer token loader for impersonated service account got unexpected response: {:?}",
-                resp
+                "bearer token loader for impersonated service account got unexpected response: {resp:?}"
             );
             let body = String::from_utf8_lossy(resp.body());
             return Err(reqsign_core::Error::unexpected(format!(
-                "bearer token loader for impersonated service account failed: {}",
-                body
+                "bearer token loader for impersonated service account failed: {body}"
             )));
         }
 
@@ -170,13 +168,11 @@ impl ImpersonatedServiceAccountCredentialProvider {
 
         if resp.status() != http::StatusCode::OK {
             error!(
-                "access token loader for impersonated service account got unexpected response: {:?}",
-                resp
+                "access token loader for impersonated service account got unexpected response: {resp:?}"
             );
             let body = String::from_utf8_lossy(resp.body());
             return Err(reqsign_core::Error::unexpected(format!(
-                "access token loader for impersonated service account failed: {}",
-                body
+                "access token loader for impersonated service account failed: {body}"
             )));
         }
 

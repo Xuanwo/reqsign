@@ -109,11 +109,10 @@ impl ExternalAccountCredentialProvider {
             .await?;
 
         if resp.status() != http::StatusCode::OK {
-            error!("exchange token got unexpected response: {:?}", resp);
+            error!("exchange token got unexpected response: {resp:?}");
             let body = String::from_utf8_lossy(resp.body());
             return Err(reqsign_core::Error::unexpected(format!(
-                "exchange OIDC token failed: {}",
-                body
+                "exchange OIDC token failed: {body}"
             )));
         }
 
@@ -149,11 +148,10 @@ impl ExternalAccountCredentialProvider {
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {
-            error!("exchange token got unexpected response: {:?}", resp);
+            error!("exchange token got unexpected response: {resp:?}");
             let body = String::from_utf8_lossy(resp.body());
             return Err(reqsign_core::Error::unexpected(format!(
-                "exchange token failed: {}",
-                body
+                "exchange token failed: {body}"
             )));
         }
 
@@ -209,7 +207,7 @@ impl ExternalAccountCredentialProvider {
             .uri(url)
             .header(ACCEPT, "application/json")
             .header(CONTENT_TYPE, "application/json")
-            .header("Authorization", format!("Bearer {}", access_token))
+            .header("Authorization", format!("Bearer {access_token}"))
             .body(body.into())
             .map_err(|e| {
                 reqsign_core::Error::unexpected("failed to build HTTP request").with_source(e)
@@ -218,11 +216,10 @@ impl ExternalAccountCredentialProvider {
         let resp = ctx.http_send(req).await?;
 
         if resp.status() != http::StatusCode::OK {
-            error!("impersonated token got unexpected response: {:?}", resp);
+            error!("impersonated token got unexpected response: {resp:?}");
             let body = String::from_utf8_lossy(resp.body());
             return Err(reqsign_core::Error::unexpected(format!(
-                "exchange impersonated token failed: {}",
-                body
+                "exchange impersonated token failed: {body}"
             )));
         }
 

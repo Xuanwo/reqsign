@@ -56,15 +56,15 @@ async fn get_access_token(resource: &str, ctx: &Context) -> Result<AccessTokenRe
         .map(|s| s.as_str())
         .unwrap_or("http://169.254.169.254/metadata/identity/oauth2/token");
 
-    let mut url = format!("{}?api-version=2018-02-01&resource={}", endpoint, resource);
+    let mut url = format!("{endpoint}?api-version=2018-02-01&resource={resource}");
 
     // Add identity parameters if specified in environment
     if let Some(object_id) = envs.get("AZURE_OBJECT_ID").filter(|s| !s.is_empty()) {
-        url.push_str(&format!("&object_id={}", object_id));
+        url.push_str(&format!("&object_id={object_id}"));
     } else if let Some(client_id) = envs.get("AZURE_CLIENT_ID").filter(|s| !s.is_empty()) {
-        url.push_str(&format!("&client_id={}", client_id));
+        url.push_str(&format!("&client_id={client_id}"));
     } else if let Some(msi_res_id) = envs.get("AZURE_MSI_RES_ID").filter(|s| !s.is_empty()) {
-        url.push_str(&format!("&msi_res_id={}", msi_res_id));
+        url.push_str(&format!("&msi_res_id={msi_res_id}"));
     }
 
     let mut req = http::Request::builder()
@@ -87,8 +87,7 @@ async fn get_access_token(resource: &str, ctx: &Context) -> Result<AccessTokenRe
         let status = resp.status();
         let body = String::from_utf8_lossy(resp.body());
         return Err(reqsign_core::Error::unexpected(format!(
-            "IMDS request failed with status {}: {}",
-            status, body
+            "IMDS request failed with status {status}: {body}"
         )));
     }
 
