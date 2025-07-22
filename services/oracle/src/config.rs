@@ -62,12 +62,11 @@ impl Config {
     pub async fn from_config_file(ctx: &Context, path: &str, profile: &str) -> Result<Self> {
         let content = ctx.file_read_as_string(path).await?;
         let ini = Ini::read_from(&mut content.as_bytes()).map_err(|e| {
-            reqsign_core::Error::config_invalid(format!("Failed to parse config file: {}", e))
+            reqsign_core::Error::config_invalid(format!("Failed to parse config file: {e}"))
         })?;
         let section = ini.section(Some(profile)).ok_or_else(|| {
             reqsign_core::Error::config_invalid(format!(
-                "Profile {} not found in config file",
-                profile
+                "Profile {profile} not found in config file"
             ))
         })?;
 

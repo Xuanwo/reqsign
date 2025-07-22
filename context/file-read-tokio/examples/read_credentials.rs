@@ -15,14 +15,14 @@ async fn main() -> Result<()> {
         let demo_content =
             "[default]\naws_access_key_id = DEMO_KEY\naws_secret_access_key = DEMO_SECRET\n";
         if let Some(temp_dir) = std::env::temp_dir().to_str() {
-            let demo_path = format!("{}/reqsign_demo_credentials", temp_dir);
+            let demo_path = format!("{temp_dir}/reqsign_demo_credentials");
             let _ = std::fs::write(&demo_path, demo_content);
             return demo_path;
         }
         "demo_credentials".to_string()
     });
 
-    println!("Attempting to read file: {}", path);
+    println!("Attempting to read file: {path}");
 
     // Read the file asynchronously
     match ctx.file_read(&path).await {
@@ -33,14 +33,14 @@ async fn main() -> Result<()> {
             if let Ok(text) = String::from_utf8(content.clone()) {
                 let preview: String = text.lines().take(5).collect::<Vec<_>>().join("\n");
                 println!("\nFirst few lines:");
-                println!("{}", preview);
+                println!("{preview}");
                 if text.lines().count() > 5 {
                     println!("... ({} more lines)", text.lines().count() - 5);
                 }
             }
         }
         Err(e) => {
-            eprintln!("Failed to read file: {}", e);
+            eprintln!("Failed to read file: {e}");
             eprintln!("Make sure the file exists and you have permission to read it.");
         }
     }

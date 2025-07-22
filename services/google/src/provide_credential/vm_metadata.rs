@@ -52,8 +52,7 @@ impl ProvideCredential for VmMetadataCredentialProvider {
         );
 
         let url = format!(
-            "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/{}/token?scopes={}",
-            service_account, scope
+            "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/{service_account}/token?scopes={scope}"
         );
 
         let req = http::Request::builder()

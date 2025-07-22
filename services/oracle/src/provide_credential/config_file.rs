@@ -44,7 +44,7 @@ impl ProvideCredential for ConfigFileCredentialProvider {
         let content = match ctx.file_read_as_string(&expanded_path).await {
             Ok(content) => content,
             Err(_) => {
-                debug!("Oracle config file not found at {:?}", expanded_path);
+                debug!("Oracle config file not found at {expanded_path:?}");
                 return Ok(None);
             }
         };
@@ -57,12 +57,12 @@ impl ProvideCredential for ConfigFileCredentialProvider {
 
         // Parse INI content
         let ini = ini::Ini::read_from(&mut content.as_bytes()).map_err(|e| {
-            reqsign_core::Error::config_invalid(format!("Failed to parse config file: {}", e))
+            reqsign_core::Error::config_invalid(format!("Failed to parse config file: {e}"))
         })?;
         let section = match ini.section(Some(profile)) {
             Some(section) => section,
             None => {
-                debug!("Profile {} not found in config file", profile);
+                debug!("Profile {profile} not found in config file");
                 return Ok(None);
             }
         };

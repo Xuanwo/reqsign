@@ -68,7 +68,7 @@ impl ECSCredentialProvider {
         // Try to get token from file
         if let Some(token_file) = ctx.env_var(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE) {
             let token = ctx.file_read(&token_file).await.map_err(|e| {
-                Error::config_invalid(format!("failed to read auth token file: {}", e))
+                Error::config_invalid(format!("failed to read auth token file: {e}"))
             })?;
             return Ok(Some(String::from_utf8_lossy(&token).trim().to_string()));
         }
@@ -89,7 +89,7 @@ impl ECSCredentialProvider {
 
         // Try relative URI (ECS)
         if let Some(relative_uri) = ctx.env_var(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI) {
-            return Ok(format!("{}{}", ECS_METADATA_ENDPOINT, relative_uri));
+            return Ok(format!("{ECS_METADATA_ENDPOINT}{relative_uri}"));
         }
 
         Err(Error::config_invalid(
@@ -129,21 +129,21 @@ impl ProvideCredential for ECSCredentialProvider {
             .method(Method::GET)
             .uri(&endpoint)
             .body(bytes::Bytes::new())
-            .map_err(|e| Error::unexpected(format!("failed to build request: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to build request: {e}")))?;
 
         // Add authorization token if available
         if let Some(token) = self.load_auth_token(ctx).await? {
             req.headers_mut().insert(
                 "Authorization",
                 HeaderValue::from_str(&token)
-                    .map_err(|e| Error::unexpected(format!("invalid auth token: {}", e)))?,
+                    .map_err(|e| Error::unexpected(format!("invalid auth token: {e}")))?,
             );
         }
 
         let resp = ctx
             .http_send(req)
             .await
-            .map_err(|e| Error::unexpected(format!("failed to fetch ECS credentials: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to fetch ECS credentials: {e}")))?;
 
         if resp.status() != StatusCode::OK {
             return Err(Error::unexpected(format!(
@@ -154,12 +154,12 @@ impl ProvideCredential for ECSCredentialProvider {
 
         let body = resp.into_body();
         let creds: ECSCredentialResponse = serde_json::from_slice(&body)
-            .map_err(|e| Error::unexpected(format!("failed to parse ECS credentials: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to parse ECS credentials: {e}")))?;
 
         let expires_in = creds
             .expiration
             .parse()
-            .map_err(|e| Error::unexpected(format!("failed to parse expiration time: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to parse expiration time: {e}")))?;
 
         Ok(Some(Credential {
             access_key_id: creds.access_key_id,

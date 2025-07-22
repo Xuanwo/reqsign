@@ -135,7 +135,7 @@ fn string_to_sign(
     s.write_str("\n")?;
     s.write_str(
         ctx.header_get_or_default(&CONTENT_MD5.parse().map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Invalid header name: {}", e))
+            reqsign_core::Error::unexpected(format!("Invalid header name: {e}"))
         })?)?,
     )?;
     s.write_str("\n")?;

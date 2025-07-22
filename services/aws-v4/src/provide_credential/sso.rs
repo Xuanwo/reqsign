@@ -123,37 +123,37 @@ impl SSOCredentialProvider {
         };
 
         let content = ctx.file_read(&expanded_path).await.map_err(|_| {
-            Error::config_invalid(format!("failed to read config file: {}", expanded_path))
+            Error::config_invalid(format!("failed to read config file: {expanded_path}"))
         })?;
 
         let conf = Ini::load_from_str(&String::from_utf8_lossy(&content))
-            .map_err(|e| Error::config_invalid(format!("failed to parse config file: {}", e)))?;
+            .map_err(|e| Error::config_invalid(format!("failed to parse config file: {e}")))?;
 
         let profile_section = if profile == "default" {
             profile.to_string()
         } else {
-            format!("profile {}", profile)
+            format!("profile {profile}")
         };
 
         let section = conf.section(Some(profile_section)).ok_or_else(|| {
-            Error::config_invalid(format!("profile '{}' not found in config", profile))
+            Error::config_invalid(format!("profile '{profile}' not found in config"))
         })?;
 
         // Check if this profile has SSO configuration
         let sso_account_id = section.get(AWS_SSO_ACCOUNT_ID).ok_or_else(|| {
-            Error::config_invalid(format!("missing {} in profile", AWS_SSO_ACCOUNT_ID))
+            Error::config_invalid(format!("missing {AWS_SSO_ACCOUNT_ID} in profile"))
         })?;
 
         let sso_region = section.get(AWS_SSO_REGION).ok_or_else(|| {
-            Error::config_invalid(format!("missing {} in profile", AWS_SSO_REGION))
+            Error::config_invalid(format!("missing {AWS_SSO_REGION} in profile"))
         })?;
 
         let sso_role_name = section.get(AWS_SSO_ROLE_NAME).ok_or_else(|| {
-            Error::config_invalid(format!("missing {} in profile", AWS_SSO_ROLE_NAME))
+            Error::config_invalid(format!("missing {AWS_SSO_ROLE_NAME} in profile"))
         })?;
 
         let sso_start_url = section.get(AWS_SSO_START_URL).ok_or_else(|| {
-            Error::config_invalid(format!("missing {} in profile", AWS_SSO_START_URL))
+            Error::config_invalid(format!("missing {AWS_SSO_START_URL} in profile"))
         })?;
 
         Ok(SSOConfig {
@@ -180,19 +180,19 @@ impl SSOCredentialProvider {
 
         // Generate cache file name (SHA1 hash of start URL)
         let cache_key = hex_sha1(start_url.as_bytes());
-        let cache_file = cache_dir.join(format!("{}.json", cache_key));
+        let cache_file = cache_dir.join(format!("{cache_key}.json"));
 
-        debug!("looking for SSO token cache at: {:?}", cache_file);
+        debug!("looking for SSO token cache at: {cache_file:?}");
 
         match ctx.file_read(&cache_file.to_string_lossy()).await {
             Ok(content) => {
                 let token: CachedToken = serde_json::from_slice(&content).map_err(|e| {
-                    Error::unexpected(format!("failed to parse SSO token cache: {}", e))
+                    Error::unexpected(format!("failed to parse SSO token cache: {e}"))
                 })?;
 
                 // Check if token is expired
                 let expires_at: DateTime<Utc> = token.expires_at.parse().map_err(|e| {
-                    Error::unexpected(format!("failed to parse expiration time: {}", e))
+                    Error::unexpected(format!("failed to parse expiration time: {e}"))
                 })?;
 
                 if expires_at <= Utc::now() {
@@ -224,21 +224,21 @@ impl SSOCredentialProvider {
             ("role_name", &config.sso_role_name),
             ("account_id", &config.sso_account_id),
         ])
-        .map_err(|e| Error::unexpected(format!("failed to encode query params: {}", e)))?;
+        .map_err(|e| Error::unexpected(format!("failed to encode query params: {e}")))?;
 
-        let url = format!("{}?{}", endpoint, params);
+        let url = format!("{endpoint}?{params}");
 
         let req = Request::builder()
             .method(Method::GET)
             .uri(&url)
             .header("x-amz-sso_bearer_token", access_token)
             .body(bytes::Bytes::new())
-            .map_err(|e| Error::unexpected(format!("failed to build request: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to build request: {e}")))?;
 
         let resp = ctx
             .http_send(req)
             .await
-            .map_err(|e| Error::unexpected(format!("failed to fetch SSO credentials: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to fetch SSO credentials: {e}")))?;
 
         if resp.status() != StatusCode::OK {
             return Err(Error::unexpected(format!(
@@ -249,7 +249,7 @@ impl SSOCredentialProvider {
 
         let body = resp.into_body();
         let creds: SSOCredentialResponse = serde_json::from_slice(&body)
-            .map_err(|e| Error::unexpected(format!("failed to parse SSO credentials: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("failed to parse SSO credentials: {e}")))?;
 
         let role_creds = creds.role_credentials;
         let expires_in = DateTime::from_timestamp_millis(role_creds.expiration)

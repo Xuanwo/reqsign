@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
             println!("Headers: {:?}", parts.headers);
         }
         Err(e) => {
-            eprintln!("Failed to sign request: {}", e);
+            eprintln!("Failed to sign request: {e}");
         }
     }
 

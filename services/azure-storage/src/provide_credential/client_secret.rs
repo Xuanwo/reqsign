@@ -109,8 +109,7 @@ async fn get_client_secret_token(
         let status = resp.status();
         let body = String::from_utf8_lossy(resp.body());
         return Err(reqsign_core::Error::unexpected(format!(
-            "Client secret request failed with status {}: {}",
-            status, body
+            "Client secret request failed with status {status}: {body}"
         )));
     }
 
