@@ -83,9 +83,7 @@ impl ClientCertificateCredentialProvider {
         path: &str,
     ) -> Result<(Vec<u8>, RsaPrivateKey), reqsign_core::Error> {
         let cert_data = ctx.file_read(path).await.map_err(|e| {
-            reqsign_core::Error::credential_invalid(format!(
-                "Failed to read certificate file: {e}"
-            ))
+            reqsign_core::Error::credential_invalid(format!("Failed to read certificate file: {e}"))
         })?;
 
         // For now, we'll support PEM format. PFX support can be added later
@@ -140,9 +138,7 @@ impl ClientCertificateCredentialProvider {
             .as_secs();
 
         let claims = ClientAssertionClaims {
-            aud: format!(
-                "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
-            ),
+            aud: format!("https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"),
             exp: now + 600, // 10 minutes
             iss: client_id.to_string(),
             jti: generate_jti(now),
@@ -174,9 +170,7 @@ impl ClientCertificateCredentialProvider {
         client_id: &str,
         client_assertion: &str,
     ) -> Result<TokenResponse, reqsign_core::Error> {
-        let url = format!(
-            "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
-        );
+        let url = format!("https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token");
 
         let mut params = HashMap::new();
         params.insert("scope", "https://storage.azure.com/.default");

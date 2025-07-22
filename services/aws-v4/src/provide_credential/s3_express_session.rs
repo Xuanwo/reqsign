@@ -174,11 +174,7 @@ impl S3ExpressSessionProvider {
             az if az.starts_with("apne1-") => "ap-northeast-1",
             az if az.starts_with("apse1-") => "ap-southeast-1",
             az if az.starts_with("apse2-") => "ap-southeast-2",
-            _ => {
-                return Err(Error::unexpected(format!(
-                    "Unknown AZ ID format: {az_id}"
-                )))
-            }
+            _ => return Err(Error::unexpected(format!("Unknown AZ ID format: {az_id}"))),
         };
         Ok(region.to_string())
     }

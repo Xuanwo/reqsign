@@ -93,9 +93,7 @@ impl AzurePipelinesCredentialProvider {
         client_id: &str,
         oidc_token: &str,
     ) -> Result<TokenResponse, reqsign_core::Error> {
-        let url = format!(
-            "https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
-        );
+        let url = format!("https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token");
 
         let mut params = HashMap::new();
         params.insert("scope", "https://storage.azure.com/.default");

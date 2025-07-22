@@ -181,9 +181,8 @@ impl CognitoIdentityCredentialProvider {
         }
 
         let body = resp.into_body();
-        let result: GetCredentialsResponse = serde_json::from_slice(&body).map_err(|e| {
-            Error::unexpected(format!("failed to parse credentials response: {e}"))
-        })?;
+        let result: GetCredentialsResponse = serde_json::from_slice(&body)
+            .map_err(|e| Error::unexpected(format!("failed to parse credentials response: {e}")))?;
 
         let creds = result.credentials;
         let expires_in = DateTime::from_timestamp(creds.expiration, 0)

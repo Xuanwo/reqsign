@@ -114,9 +114,8 @@ impl RequestSigner {
         .map_err(|e| reqsign_core::Error::unexpected("failed to encode JWT").with_source(e))?;
 
         // Exchange JWT for access token
-        let body = format!(
-            "grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={jwt}"
-        );
+        let body =
+            format!("grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion={jwt}");
         let req = http::Request::builder()
             .method(http::Method::POST)
             .uri("https://oauth2.googleapis.com/token")

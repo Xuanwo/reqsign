@@ -170,9 +170,7 @@ where
 
             match provider.provide_credential(ctx).await {
                 Ok(Some(cred)) => {
-                    log::debug!(
-                        "Successfully loaded credential from provider: {provider:?}"
-                    );
+                    log::debug!("Successfully loaded credential from provider: {provider:?}");
                     return Ok(Some(cred));
                 }
                 Ok(None) => {
@@ -180,9 +178,7 @@ where
                     continue;
                 }
                 Err(e) => {
-                    log::warn!(
-                        "Error loading credential from provider {provider:?}: {e:?}"
-                    );
+                    log::warn!("Error loading credential from provider {provider:?}: {e:?}");
                     // Continue to next provider on error
                     continue;
                 }

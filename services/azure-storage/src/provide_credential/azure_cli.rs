@@ -34,9 +34,7 @@ impl AzureCliCredentialProvider {
             ])
             .output()
             .map_err(|e| {
-                reqsign_core::Error::unexpected(format!(
-                    "Failed to execute Azure CLI command: {e}"
-                ))
+                reqsign_core::Error::unexpected(format!("Failed to execute Azure CLI command: {e}"))
             })?;
 
         if !output.status.success() {

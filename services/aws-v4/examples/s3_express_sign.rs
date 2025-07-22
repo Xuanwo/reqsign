@@ -33,9 +33,7 @@ async fn main() -> Result<()> {
     // Example: GET object from S3 Express bucket
     println!("Example: GET object from S3 Express One Zone");
     let key = "test-file.txt";
-    let url = format!(
-        "https://{bucket}.s3express-usw2-az1.us-west-2.amazonaws.com/{key}"
-    );
+    let url = format!("https://{bucket}.s3express-usw2-az1.us-west-2.amazonaws.com/{key}");
 
     let req = http::Request::get(&url)
         .header("x-amz-content-sha256", reqsign_aws_v4::EMPTY_STRING_SHA256)

@@ -90,9 +90,7 @@ impl ProfileCredentialProvider {
         let content = match ctx.file_read(&expanded_path).await {
             Ok(content) => content,
             Err(err) => {
-                debug!(
-                    "failed to read credentials file {expanded_path}: {err:?}"
-                );
+                debug!("failed to read credentials file {expanded_path}: {err:?}");
                 return Ok(None);
             }
         };
