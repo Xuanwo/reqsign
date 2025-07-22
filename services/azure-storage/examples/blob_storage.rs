@@ -107,9 +107,7 @@ async fn main() -> Result<()> {
     println!("\nExample 2: Get blob properties");
     let container = "mycontainer";
     let blob = "myblob.txt";
-    let url = format!(
-        "https://{account_name}.blob.core.windows.net/{container}/{blob}"
-    );
+    let url = format!("https://{account_name}.blob.core.windows.net/{container}/{blob}");
 
     let req = http::Request::head(&url)
         .header("x-ms-version", "2021-12-02")
@@ -139,9 +137,7 @@ async fn main() -> Result<()> {
     // Example 3: Upload a blob
     println!("\nExample 3: Upload a blob");
     let upload_content = b"Hello from reqsign!";
-    let url = format!(
-        "https://{account_name}.blob.core.windows.net/{container}/hello.txt"
-    );
+    let url = format!("https://{account_name}.blob.core.windows.net/{container}/hello.txt");
 
     let req = http::Request::put(&url)
         .header("x-ms-version", "2021-12-02")

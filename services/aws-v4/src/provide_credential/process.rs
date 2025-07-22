@@ -138,9 +138,7 @@ impl ProcessCredentialProvider {
             .stderr(Stdio::piped())
             .output()
             .await
-            .map_err(|e| {
-                Error::unexpected(format!("failed to execute credential process: {e}"))
-            })?;
+            .map_err(|e| Error::unexpected(format!("failed to execute credential process: {e}")))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -195,13 +193,14 @@ impl ProvideCredential for ProcessCredentialProvider {
 
         let output = self.execute_process(&command).await?;
 
-        let expires_in = if let Some(exp_str) = &output.expiration {
-            Some(exp_str.parse::<DateTime<Utc>>().map_err(|e| {
-                Error::unexpected(format!("failed to parse expiration time: {e}"))
-            })?)
-        } else {
-            None
-        };
+        let expires_in =
+            if let Some(exp_str) = &output.expiration {
+                Some(exp_str.parse::<DateTime<Utc>>().map_err(|e| {
+                    Error::unexpected(format!("failed to parse expiration time: {e}"))
+                })?)
+            } else {
+                None
+            };
 
         Ok(Some(Credential {
             access_key_id: output.access_key_id,

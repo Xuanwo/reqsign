@@ -101,9 +101,7 @@ async fn main() -> Result<()> {
     // Example 2: Get object metadata
     println!("\nExample 2: Get object metadata");
     let object_key = "test-file.txt";
-    let url = format!(
-        "https://{bucket}.oss-cn-beijing.aliyuncs.com/{object_key}"
-    );
+    let url = format!("https://{bucket}.oss-cn-beijing.aliyuncs.com/{object_key}");
 
     let req = http::Request::head(&url)
         .body(reqwest::Body::from(""))
@@ -130,9 +128,7 @@ async fn main() -> Result<()> {
     println!("\nExample 3: Upload an object");
     let upload_content = b"Hello from reqsign to Aliyun OSS!";
     let upload_key = "hello-oss.txt";
-    let url = format!(
-        "https://{bucket}.oss-cn-beijing.aliyuncs.com/{upload_key}"
-    );
+    let url = format!("https://{bucket}.oss-cn-beijing.aliyuncs.com/{upload_key}");
 
     let req = http::Request::put(&url)
         .header("Content-Type", "text/plain")
@@ -156,9 +152,7 @@ async fn main() -> Result<()> {
     // Example 4: Delete an object
     println!("\nExample 4: Delete an object");
     let delete_key = "old-file.txt";
-    let url = format!(
-        "https://{bucket}.oss-cn-beijing.aliyuncs.com/{delete_key}"
-    );
+    let url = format!("https://{bucket}.oss-cn-beijing.aliyuncs.com/{delete_key}");
 
     let req = http::Request::delete(&url)
         .body(reqwest::Body::from(""))
@@ -178,9 +172,7 @@ async fn main() -> Result<()> {
 
     // Example 5: List objects with prefix
     println!("\nExample 5: List objects with prefix");
-    let url = format!(
-        "https://{bucket}.oss-cn-beijing.aliyuncs.com/?prefix=photos/2024/"
-    );
+    let url = format!("https://{bucket}.oss-cn-beijing.aliyuncs.com/?prefix=photos/2024/");
 
     let req = http::Request::get(&url)
         .body(reqwest::Body::from(""))
@@ -200,9 +192,8 @@ async fn main() -> Result<()> {
 
     // Example 6: Using internal endpoint (VPC)
     println!("\nExample 6: Using internal endpoint");
-    let internal_url = format!(
-        "https://{bucket}.oss-cn-beijing-internal.aliyuncs.com/{object_key}"
-    );
+    let internal_url =
+        format!("https://{bucket}.oss-cn-beijing-internal.aliyuncs.com/{object_key}");
 
     let req = http::Request::get(&internal_url)
         .body(reqwest::Body::from(""))

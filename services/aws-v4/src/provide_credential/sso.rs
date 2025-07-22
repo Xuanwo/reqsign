@@ -144,9 +144,9 @@ impl SSOCredentialProvider {
             Error::config_invalid(format!("missing {AWS_SSO_ACCOUNT_ID} in profile"))
         })?;
 
-        let sso_region = section.get(AWS_SSO_REGION).ok_or_else(|| {
-            Error::config_invalid(format!("missing {AWS_SSO_REGION} in profile"))
-        })?;
+        let sso_region = section
+            .get(AWS_SSO_REGION)
+            .ok_or_else(|| Error::config_invalid(format!("missing {AWS_SSO_REGION} in profile")))?;
 
         let sso_role_name = section.get(AWS_SSO_ROLE_NAME).ok_or_else(|| {
             Error::config_invalid(format!("missing {AWS_SSO_ROLE_NAME} in profile"))
