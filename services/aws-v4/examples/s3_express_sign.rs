@@ -55,13 +55,13 @@ async fn main() -> Result<()> {
             );
             println!("X-Amz-Date header: {:?}", parts.headers.get("x-amz-date"));
 
-            // Important: For actual S3 Express requests, the session token
-            // should be sent as x-amz-s3session-token instead of x-amz-security-token
-            // The session is automatically refreshed when it expires
-            if let Some(token_header) = parts.headers.get("x-amz-security-token") {
-                println!(
-                    "Session token found (should be moved to x-amz-s3session-token for S3 Express)"
-                );
+            // The RequestSigner now automatically detects S3 Express endpoints
+            // and uses x-amz-s3session-token instead of x-amz-security-token
+            if let Some(token_header) = parts.headers.get("x-amz-s3session-token") {
+                println!("S3 Express session token header found (correct!)");
+                println!("Token header: {:?}", token_header);
+            } else if let Some(token_header) = parts.headers.get("x-amz-security-token") {
+                println!("Standard security token header found");
                 println!("Token header: {:?}", token_header);
             }
         }

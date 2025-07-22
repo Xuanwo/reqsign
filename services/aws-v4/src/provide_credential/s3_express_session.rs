@@ -42,18 +42,17 @@ pub struct S3ExpressSessionProvider {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename = "CreateSessionResult")]
+#[serde(rename = "CreateSessionResult", rename_all = "PascalCase")]
 struct CreateSessionResponse {
-    #[serde(rename = "Credentials")]
     credentials: SessionCredentials,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct SessionCredentials {
-    access_key_id: String,
-    secret_access_key: String,
     session_token: String,
+    secret_access_key: String,
+    access_key_id: String,
     expiration: String,
 }
 
@@ -244,5 +243,24 @@ mod tests {
         // This will be tested when create_session is called
         // Just verify the provider can be created
         assert_eq!(provider.bucket, "invalid-bucket-name");
+    }
+
+    #[test]
+    fn test_parse_create_session_response() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <CreateSessionResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                <Credentials>
+                    <SessionToken>TESTSESSIONTOKEN</SessionToken>
+                    <SecretAccessKey>TESTSECRETKEY</SecretAccessKey>
+                    <AccessKeyId>ASIARTESTID</AccessKeyId>
+                    <Expiration>2024-01-29T18:53:01Z</Expiration>
+                </Credentials>
+            </CreateSessionResult>"#;
+
+        let response: CreateSessionResponse = quick_xml::de::from_str(xml).unwrap();
+        assert_eq!(response.credentials.access_key_id, "ASIARTESTID");
+        assert_eq!(response.credentials.secret_access_key, "TESTSECRETKEY");
+        assert_eq!(response.credentials.session_token, "TESTSESSIONTOKEN");
+        assert_eq!(response.credentials.expiration, "2024-01-29T18:53:01Z");
     }
 }

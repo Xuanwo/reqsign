@@ -5,6 +5,7 @@ use percent_encoding::NON_ALPHANUMERIC;
 pub const X_AMZ_CONTENT_SHA_256: &str = "x-amz-content-sha256";
 pub const X_AMZ_DATE: &str = "x-amz-date";
 pub const X_AMZ_SECURITY_TOKEN: &str = "x-amz-security-token";
+pub const X_AMZ_S3_SESSION_TOKEN: &str = "x-amz-s3session-token";
 
 // Env values used in aws services.
 pub const AWS_ACCESS_KEY_ID: &str = "AWS_ACCESS_KEY_ID";
