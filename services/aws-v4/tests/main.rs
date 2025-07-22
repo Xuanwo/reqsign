@@ -84,7 +84,7 @@ async fn test_head_object() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -98,7 +98,7 @@ async fn test_head_object() -> Result<()> {
                 .with_source(anyhow::Error::new(e))
         })?;
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -137,7 +137,7 @@ async fn test_put_object_with_query() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -201,7 +201,7 @@ async fn test_get_object_with_query() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -215,7 +215,7 @@ async fn test_get_object_with_query() -> Result<()> {
                 .with_source(anyhow::Error::new(e))
         })?;
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -252,7 +252,7 @@ async fn test_head_object_with_special_characters() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -263,7 +263,7 @@ async fn test_head_object_with_special_characters() -> Result<()> {
         .await
         .expect("request must success");
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -300,7 +300,7 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -314,7 +314,7 @@ async fn test_head_object_with_encoded_characters() -> Result<()> {
                 .with_source(anyhow::Error::new(e))
         })?;
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -348,7 +348,7 @@ async fn test_list_bucket() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -362,7 +362,7 @@ async fn test_list_bucket() -> Result<()> {
                 .with_source(anyhow::Error::new(e))
         })?;
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::OK, resp.status());
     Ok(())
 }
@@ -412,7 +412,7 @@ async fn test_signer_with_web_loader() -> Result<()> {
 
     let builder = RequestSigner::new("s3", &region);
 
-    let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
+    let endpoint = format!("https://s3.{region}.amazonaws.com/opendal-testing");
     let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
@@ -431,7 +431,7 @@ async fn test_signer_with_web_loader() -> Result<()> {
     let req = Request::from_parts(req, body);
 
     debug!("signed request url: {:?}", req.uri().to_string());
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -446,7 +446,7 @@ async fn test_signer_with_web_loader() -> Result<()> {
         })?;
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!(
         "got response content: {:?}",
         resp.text()
@@ -519,7 +519,7 @@ async fn test_signer_with_web_loader_assume_role() -> Result<()> {
         .with_regional_sts_endpoint();
 
     let builder = RequestSigner::new("s3", &region);
-    let endpoint = format!("https://s3.{}.amazonaws.com/opendal-testing", region);
+    let endpoint = format!("https://s3.{region}.amazonaws.com/opendal-testing");
     let mut req = Request::new("");
     *req.method_mut() = http::Method::GET;
     *req.uri_mut() = http::Uri::from_str(&format!("{}/{}", endpoint, "not_exist_file")).unwrap();
@@ -537,7 +537,7 @@ async fn test_signer_with_web_loader_assume_role() -> Result<()> {
     let req = Request::from_parts(parts, body);
 
     debug!("signed request url: {:?}", req.uri().to_string());
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
     let client = Client::new();
     let resp = client
         .execute(req.try_into().map_err(|e| {
@@ -550,7 +550,7 @@ async fn test_signer_with_web_loader_assume_role() -> Result<()> {
                 .with_source(anyhow::Error::new(e))
         })?;
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!(
         "got response content: {:?}",
         resp.text()

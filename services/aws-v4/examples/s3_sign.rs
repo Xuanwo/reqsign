@@ -59,14 +59,14 @@ async fn main() -> Result<()> {
             );
             println!("X-Amz-Date header: {:?}", parts.headers.get("x-amz-date"));
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     // Example 2: GET object (you'll need to change bucket/key to something you have access to)
     println!("\nExample 2: GET object from S3");
     let bucket = "my-test-bucket";
     let key = "test-file.txt";
-    let url = format!("https://{}.s3.amazonaws.com/{}", bucket, key);
+    let url = format!("https://{bucket}.s3.amazonaws.com/{key}");
 
     let req = http::Request::get(&url)
         .header("x-amz-content-sha256", reqsign_aws_v4::EMPTY_STRING_SHA256)
@@ -77,14 +77,14 @@ async fn main() -> Result<()> {
 
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
-            println!("GET request to {} signed successfully!", url);
+            println!("GET request to {url} signed successfully!");
             println!(
                 "Authorization header: {:?}",
                 parts.headers.get("authorization")
             );
             println!("X-Amz-Date header: {:?}", parts.headers.get("x-amz-date"));
         }
-        Err(e) => eprintln!("Failed to sign GET request: {}", e),
+        Err(e) => eprintln!("Failed to sign GET request: {e}"),
     }
 
     // Example 3: Sign with specific expiration (for pre-signed URLs)
@@ -103,7 +103,7 @@ async fn main() -> Result<()> {
         Ok(_) => {
             println!("Request signed with 1 hour expiration!");
         }
-        Err(e) => eprintln!("Failed to sign with expiration: {}", e),
+        Err(e) => eprintln!("Failed to sign with expiration: {e}"),
     }
 
     Ok(())

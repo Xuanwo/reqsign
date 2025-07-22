@@ -1,6 +1,6 @@
 use anyhow::Result;
 use reqsign_aws_v4::{DefaultCredentialProvider, RequestSigner, S3ExpressSessionProvider};
-use reqsign_core::{Context, ProvideCredential, Signer};
+use reqsign_core::{Context, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
@@ -34,8 +34,7 @@ async fn main() -> Result<()> {
     println!("Example: GET object from S3 Express One Zone");
     let key = "test-file.txt";
     let url = format!(
-        "https://{}.s3express-usw2-az1.us-west-2.amazonaws.com/{}",
-        bucket, key
+        "https://{bucket}.s3express-usw2-az1.us-west-2.amazonaws.com/{key}"
     );
 
     let req = http::Request::get(&url)
@@ -43,7 +42,7 @@ async fn main() -> Result<()> {
         .body(reqwest::Body::from(""))
         .unwrap();
 
-    let (mut parts, body) = req.into_parts();
+    let (mut parts, _body) = req.into_parts();
 
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
@@ -59,13 +58,13 @@ async fn main() -> Result<()> {
             // and uses x-amz-s3session-token instead of x-amz-security-token
             if let Some(token_header) = parts.headers.get("x-amz-s3session-token") {
                 println!("S3 Express session token header found (correct!)");
-                println!("Token header: {:?}", token_header);
+                println!("Token header: {token_header:?}");
             } else if let Some(token_header) = parts.headers.get("x-amz-security-token") {
                 println!("Standard security token header found");
-                println!("Token header: {:?}", token_header);
+                println!("Token header: {token_header:?}");
             }
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     // Example: PUT object to S3 Express bucket
@@ -87,7 +86,7 @@ async fn main() -> Result<()> {
                 parts.headers.get("authorization")
             );
         }
-        Err(e) => eprintln!("Failed to sign PUT request: {}", e),
+        Err(e) => eprintln!("Failed to sign PUT request: {e}"),
     }
 
     Ok(())

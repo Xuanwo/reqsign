@@ -60,8 +60,7 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
                     .join(", ");
 
                     debug!(
-                        "assume_role_with_web_identity is not configured fully: [{}] is missing",
-                        missing
+                        "assume_role_with_web_identity is not configured fully: [{missing}] is missing"
                     );
 
                     return Ok(None);
@@ -79,7 +78,7 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
             provider_id: provider_id.clone(),
         })
         .map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Failed to serialize request: {}", e))
+            reqsign_core::Error::unexpected(format!("Failed to serialize request: {e}"))
         })?;
 
         let req = http::Request::builder()
@@ -106,7 +105,7 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
         }
 
         let resp: AssumeRoleWithWebIdentityResult = serde_json::from_slice(&body).map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Failed to parse STS response: {}", e))
+            reqsign_core::Error::unexpected(format!("Failed to parse STS response: {e}"))
         })?;
         if let Some(error) = resp.response.error {
             return Err(reqsign_core::Error::unexpected(format!(

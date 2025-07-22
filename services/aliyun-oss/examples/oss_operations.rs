@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
 
     // Example 1: List objects in a bucket
     println!("Example 1: List objects in bucket");
-    let url = format!("https://{}.oss-cn-beijing.aliyuncs.com/", bucket);
+    let url = format!("https://{bucket}.oss-cn-beijing.aliyuncs.com/");
 
     let req = http::Request::get(&url)
         .body(reqwest::Body::from(""))
@@ -95,15 +95,14 @@ async fn main() -> Result<()> {
                 let _ = body;
             }
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     // Example 2: Get object metadata
     println!("\nExample 2: Get object metadata");
     let object_key = "test-file.txt";
     let url = format!(
-        "https://{}.oss-cn-beijing.aliyuncs.com/{}",
-        bucket, object_key
+        "https://{bucket}.oss-cn-beijing.aliyuncs.com/{object_key}"
     );
 
     let req = http::Request::head(&url)
@@ -124,7 +123,7 @@ async fn main() -> Result<()> {
                 println!("Demo mode: Not making actual API call");
             }
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     // Example 3: Upload an object
@@ -132,8 +131,7 @@ async fn main() -> Result<()> {
     let upload_content = b"Hello from reqsign to Aliyun OSS!";
     let upload_key = "hello-oss.txt";
     let url = format!(
-        "https://{}.oss-cn-beijing.aliyuncs.com/{}",
-        bucket, upload_key
+        "https://{bucket}.oss-cn-beijing.aliyuncs.com/{upload_key}"
     );
 
     let req = http::Request::put(&url)
@@ -147,20 +145,19 @@ async fn main() -> Result<()> {
     match signer.sign(&mut parts, None).await {
         Ok(_) => {
             println!("Upload object request signed successfully!");
-            println!("The request is ready to upload '{}' to OSS", upload_key);
+            println!("The request is ready to upload '{upload_key}' to OSS");
             if demo_mode {
                 println!("Demo mode: Not actually uploading the file");
             }
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     // Example 4: Delete an object
     println!("\nExample 4: Delete an object");
     let delete_key = "old-file.txt";
     let url = format!(
-        "https://{}.oss-cn-beijing.aliyuncs.com/{}",
-        bucket, delete_key
+        "https://{bucket}.oss-cn-beijing.aliyuncs.com/{delete_key}"
     );
 
     let req = http::Request::delete(&url)
@@ -176,14 +173,13 @@ async fn main() -> Result<()> {
                 println!("Demo mode: Not actually deleting the file");
             }
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     // Example 5: List objects with prefix
     println!("\nExample 5: List objects with prefix");
     let url = format!(
-        "https://{}.oss-cn-beijing.aliyuncs.com/?prefix=photos/2024/",
-        bucket
+        "https://{bucket}.oss-cn-beijing.aliyuncs.com/?prefix=photos/2024/"
     );
 
     let req = http::Request::get(&url)
@@ -199,14 +195,13 @@ async fn main() -> Result<()> {
                 println!("Demo mode: Not making actual API call");
             }
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     // Example 6: Using internal endpoint (VPC)
     println!("\nExample 6: Using internal endpoint");
     let internal_url = format!(
-        "https://{}.oss-cn-beijing-internal.aliyuncs.com/{}",
-        bucket, object_key
+        "https://{bucket}.oss-cn-beijing-internal.aliyuncs.com/{object_key}"
     );
 
     let req = http::Request::get(&internal_url)
@@ -223,7 +218,7 @@ async fn main() -> Result<()> {
                 println!("Demo mode: Not making actual API call");
             }
         }
-        Err(e) => eprintln!("Failed to sign request: {}", e),
+        Err(e) => eprintln!("Failed to sign request: {e}"),
     }
 
     Ok(())

@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
     // Example 1: List containers
     println!("Example 1: List containers");
     let account_name = "mystorageaccount"; // Replace with your account
-    let url = format!("https://{}.blob.core.windows.net/?comp=list", account_name);
+    let url = format!("https://{account_name}.blob.core.windows.net/?comp=list");
 
     let req = http::Request::get(&url)
         .header("x-ms-version", "2021-12-02")
@@ -85,7 +85,7 @@ async fn main() -> Result<()> {
                             println!("{}", &text[..500.min(text.len())]);
                         }
                     }
-                    Err(e) => eprintln!("Request failed: {}", e),
+                    Err(e) => eprintln!("Request failed: {e}"),
                 }
             } else {
                 println!("Demo mode: Skipping actual API call");
@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
                 println!("In demo mode, signing may fail without real credentials.");
                 println!("This is expected. The example shows how the API would be used.");
             } else {
-                eprintln!("Failed to sign request: {}", e);
+                eprintln!("Failed to sign request: {e}");
             }
         }
     }
@@ -108,8 +108,7 @@ async fn main() -> Result<()> {
     let container = "mycontainer";
     let blob = "myblob.txt";
     let url = format!(
-        "https://{}.blob.core.windows.net/{}/{}",
-        account_name, container, blob
+        "https://{account_name}.blob.core.windows.net/{container}/{blob}"
     );
 
     let req = http::Request::head(&url)
@@ -132,7 +131,7 @@ async fn main() -> Result<()> {
             if demo_mode {
                 println!("Signing failed in demo mode (expected without real credentials)");
             } else {
-                eprintln!("Failed to sign request: {}", e);
+                eprintln!("Failed to sign request: {e}");
             }
         }
     }
@@ -141,8 +140,7 @@ async fn main() -> Result<()> {
     println!("\nExample 3: Upload a blob");
     let upload_content = b"Hello from reqsign!";
     let url = format!(
-        "https://{}.blob.core.windows.net/{}/hello.txt",
-        account_name, container
+        "https://{account_name}.blob.core.windows.net/{container}/hello.txt"
     );
 
     let req = http::Request::put(&url)
@@ -167,7 +165,7 @@ async fn main() -> Result<()> {
             if demo_mode {
                 println!("Signing failed in demo mode (expected without real credentials)");
             } else {
-                eprintln!("Failed to sign request: {}", e);
+                eprintln!("Failed to sign request: {e}");
             }
         }
     }
@@ -182,8 +180,7 @@ async fn main() -> Result<()> {
     let sas_signer = Signer::new(ctx.clone(), sas_loader, RequestSigner::new());
 
     let url_with_sas = format!(
-        "https://{}.blob.core.windows.net/{}?comp=list&restype=container",
-        account_name, container
+        "https://{account_name}.blob.core.windows.net/{container}?comp=list&restype=container"
     );
 
     let req = http::Request::get(&url_with_sas)
@@ -204,7 +201,7 @@ async fn main() -> Result<()> {
                     "SAS token signing failed in demo mode (expected without real credentials)"
                 );
             } else {
-                eprintln!("Failed to sign with SAS token: {}", e);
+                eprintln!("Failed to sign with SAS token: {e}");
             }
         }
     }

@@ -108,7 +108,7 @@ impl S3ExpressSessionProvider {
             .header("x-amz-content-sha256", crate::EMPTY_STRING_SHA256)
             .header("x-amz-create-session-mode", "ReadWrite")
             .body(Bytes::new())
-            .map_err(|e| Error::unexpected(format!("Failed to build request: {}", e)))?;
+            .map_err(|e| Error::unexpected(format!("Failed to build request: {e}")))?;
 
         // Sign the request using base credentials
         let (mut parts, body) = req.into_parts();
@@ -127,19 +127,18 @@ impl S3ExpressSessionProvider {
             let body = resp.into_body();
             let error_msg = String::from_utf8_lossy(&body);
             return Err(Error::unexpected(format!(
-                "CreateSession failed with status {}: {}",
-                status, error_msg
+                "CreateSession failed with status {status}: {error_msg}"
             )));
         }
 
         // Parse XML response
         let body = resp.into_body();
         let body_str = String::from_utf8_lossy(&body);
-        debug!("CreateSession response body: {}", body_str);
+        debug!("CreateSession response body: {body_str}");
 
         let create_session_resp: CreateSessionResponse = quick_xml::de::from_str(&body_str)
             .map_err(|e| {
-                Error::unexpected(format!("Failed to parse CreateSession XML response: {}", e))
+                Error::unexpected(format!("Failed to parse CreateSession XML response: {e}"))
             })?;
 
         // Parse expiration time from ISO8601 format
@@ -147,8 +146,8 @@ impl S3ExpressSessionProvider {
             chrono::DateTime::parse_from_rfc3339(&create_session_resp.credentials.expiration)
                 .map_err(|e| {
                     Error::unexpected(format!(
-                        "Failed to parse expiration time '{}': {}",
-                        create_session_resp.credentials.expiration, e
+                        "Failed to parse expiration time '{}': {e}",
+                        create_session_resp.credentials.expiration
                     ))
                 })?;
 
@@ -177,8 +176,7 @@ impl S3ExpressSessionProvider {
             az if az.starts_with("apse2-") => "ap-southeast-2",
             _ => {
                 return Err(Error::unexpected(format!(
-                    "Unknown AZ ID format: {}",
-                    az_id
+                    "Unknown AZ ID format: {az_id}"
                 )))
             }
         };

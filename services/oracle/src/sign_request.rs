@@ -73,14 +73,14 @@ impl SignRequest for RequestSigner {
         // Read private key from file
         let private_key_content = ctx.file_read_as_string(&cred.key_file).await?;
         let private_key = RsaPrivateKey::from_pkcs8_pem(&private_key_content).map_err(|e| {
-            reqsign_core::Error::credential_invalid(format!("Failed to read private key: {}", e))
+            reqsign_core::Error::credential_invalid(format!("Failed to read private key: {e}"))
         })?;
 
         // Sign the string
         let signing_key = SigningKey::<Sha256>::new(private_key);
         let signature = signing_key
             .try_sign(string_to_sign.as_bytes())
-            .map_err(|e| reqsign_core::Error::unexpected(format!("Failed to sign: {}", e)))?;
+            .map_err(|e| reqsign_core::Error::unexpected(format!("Failed to sign: {e}")))?;
         let encoded_signature = general_purpose::STANDARD.encode(signature.to_bytes());
 
         // Set headers
@@ -98,7 +98,7 @@ impl SignRequest for RequestSigner {
             cred.tenancy, cred.user, cred.fingerprint
         )?;
         write!(auth_value, "algorithm=\"rsa-sha256\",")?;
-        write!(auth_value, "signature=\"{}\"", encoded_signature)?;
+        write!(auth_value, "signature=\"{encoded_signature}\"")?;
 
         signing_req
             .headers

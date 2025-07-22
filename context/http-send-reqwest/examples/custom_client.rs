@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
 
     // Test the HTTP client with a simple request
     let test_url = "https://httpbin.org/get";
-    println!("\nTesting HTTP client with GET {}", test_url);
+    println!("\nTesting HTTP client with GET {test_url}");
 
     let req = http::Request::builder()
         .method("GET")
@@ -39,17 +39,17 @@ async fn main() -> Result<()> {
             println!("Response status: {}", resp.status());
             println!("Response headers:");
             for (name, value) in resp.headers() {
-                println!("  {}: {:?}", name, value);
+                println!("  {name}: {value:?}");
             }
 
             let body = resp.body();
             if let Ok(text) = String::from_utf8(body.to_vec()) {
                 println!("\nResponse body:");
-                println!("{}", text);
+                println!("{text}");
             }
         }
         Err(e) => {
-            eprintln!("Request failed: {}", e);
+            eprintln!("Request failed: {e}");
         }
     }
 
@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
             println!("Response status: {}", resp.status());
         }
         Err(e) => {
-            eprintln!("POST request failed: {}", e);
+            eprintln!("POST request failed: {e}");
         }
     }
 

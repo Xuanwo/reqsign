@@ -100,16 +100,16 @@ impl SignRequest for RequestSigner {
         let string_to_sign = {
             let mut f = String::new();
             writeln!(f, "AWS4-HMAC-SHA256").map_err(|e| {
-                reqsign_core::Error::unexpected(format!("failed to write algorithm: {}", e))
+                reqsign_core::Error::unexpected(format!("failed to write algorithm: {e}"))
             })?;
             writeln!(f, "{}", format_iso8601(now)).map_err(|e| {
-                reqsign_core::Error::unexpected(format!("failed to write timestamp: {}", e))
+                reqsign_core::Error::unexpected(format!("failed to write timestamp: {e}"))
             })?;
             writeln!(f, "{}", &scope).map_err(|e| {
-                reqsign_core::Error::unexpected(format!("failed to write scope: {}", e))
+                reqsign_core::Error::unexpected(format!("failed to write scope: {e}"))
             })?;
             write!(f, "{}", &encoded_req).map_err(|e| {
-                reqsign_core::Error::unexpected(format!("failed to write encoded request: {}", e))
+                reqsign_core::Error::unexpected(format!("failed to write encoded request: {e}"))
             })?;
             f
         };
@@ -131,8 +131,7 @@ impl SignRequest for RequestSigner {
             ))
             .map_err(|e| {
                 reqsign_core::Error::unexpected(format!(
-                    "failed to create authorization header: {}",
-                    e
+                    "failed to create authorization header: {e}"
                 ))
             })?;
             authorization.set_sensitive(true);
@@ -153,17 +152,17 @@ fn canonical_request_string(ctx: &mut SigningRequest) -> Result<String> {
 
     // Insert method
     writeln!(f, "{}", ctx.method)
-        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write method: {}", e)))?;
+        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write method: {e}")))?;
     // Insert encoded path
     let path = percent_decode_str(&ctx.path)
         .decode_utf8()
-        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to decode path: {}", e)))?;
+        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to decode path: {e}")))?;
     writeln!(
         f,
         "{}",
         utf8_percent_encode(&path, &super::constants::AWS_URI_ENCODE_SET)
     )
-    .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write encoded path: {}", e)))?;
+    .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write encoded path: {e}")))?;
     // Insert query
     writeln!(
         f,
@@ -174,7 +173,7 @@ fn canonical_request_string(ctx: &mut SigningRequest) -> Result<String> {
             .collect::<Vec<_>>()
             .join("&")
     )
-    .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write query: {}", e)))?;
+    .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write query: {e}")))?;
     // Insert signed headers
     let signed_headers = ctx.header_name_to_vec_sorted();
     for header in signed_headers.iter() {
@@ -185,28 +184,28 @@ fn canonical_request_string(ctx: &mut SigningRequest) -> Result<String> {
             header,
             value.to_str().expect("header value must be valid")
         )
-        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write header: {}", e)))?;
+        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write header: {e}")))?;
     }
     writeln!(f)
-        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write newline: {}", e)))?;
+        .map_err(|e| reqsign_core::Error::unexpected(format!("failed to write newline: {e}")))?;
     writeln!(f, "{}", signed_headers.join(";")).map_err(|e| {
-        reqsign_core::Error::unexpected(format!("failed to write signed headers: {}", e))
+        reqsign_core::Error::unexpected(format!("failed to write signed headers: {e}"))
     })?;
 
     if ctx.headers.get(X_AMZ_CONTENT_SHA_256).is_none() {
         write!(f, "UNSIGNED-PAYLOAD").map_err(|e| {
-            reqsign_core::Error::unexpected(format!("failed to write unsigned payload: {}", e))
+            reqsign_core::Error::unexpected(format!("failed to write unsigned payload: {e}"))
         })?;
     } else {
         write!(
             f,
             "{}",
             ctx.headers[X_AMZ_CONTENT_SHA_256].to_str().map_err(|e| {
-                reqsign_core::Error::unexpected(format!("invalid header value: {}", e))
+                reqsign_core::Error::unexpected(format!("invalid header value: {e}"))
             })?
         )
         .map_err(|e| {
-            reqsign_core::Error::unexpected(format!("failed to write content sha256: {}", e))
+            reqsign_core::Error::unexpected(format!("failed to write content sha256: {e}"))
         })?;
     }
 
@@ -230,8 +229,7 @@ fn canonicalize_header(
             header::HOST,
             ctx.authority.as_str().parse().map_err(|e| {
                 reqsign_core::Error::unexpected(format!(
-                    "failed to parse authority as header value: {}",
-                    e
+                    "failed to parse authority as header value: {e}"
                 ))
             })?,
         );
@@ -241,7 +239,7 @@ fn canonicalize_header(
         // Insert DATE header if not present.
         if ctx.headers.get(X_AMZ_DATE).is_none() {
             let date_header = HeaderValue::try_from(format_iso8601(now)).map_err(|e| {
-                reqsign_core::Error::unexpected(format!("failed to create date header: {}", e))
+                reqsign_core::Error::unexpected(format!("failed to create date header: {e}"))
             })?;
             ctx.headers.insert(X_AMZ_DATE, date_header);
         }
@@ -258,8 +256,7 @@ fn canonicalize_header(
         if let Some(token) = &cred.session_token {
             let mut value = HeaderValue::from_str(token).map_err(|e| {
                 reqsign_core::Error::unexpected(format!(
-                    "failed to create security token header: {}",
-                    e
+                    "failed to create security token header: {e}"
                 ))
             })?;
             // Set token value sensitive to valid leaking.

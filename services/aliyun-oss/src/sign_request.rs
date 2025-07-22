@@ -113,7 +113,7 @@ impl RequestSigner {
     ) -> Result<()> {
         let expiration_time = signing_time
             + chrono::TimeDelta::from_std(expires).map_err(|e| {
-                reqsign_core::Error::request_invalid(format!("Invalid expiration duration: {}", e))
+                reqsign_core::Error::request_invalid(format!("Invalid expiration duration: {e}"))
             })?;
         let string_to_sign = self.build_string_to_sign(req, cred, signing_time, Some(expires))?;
         let signature =
@@ -159,7 +159,7 @@ impl RequestSigner {
                 if v.is_empty() {
                     k.clone()
                 } else {
-                    format!("{}={}", k, v)
+                    format!("{k}={v}")
                 }
             })
             .collect::<Vec<_>>()
@@ -169,7 +169,7 @@ impl RequestSigner {
             req.uri.clone()
         } else {
             let path = req.uri.path();
-            let new_path_and_query = format!("{}?{}", path, query_string);
+            let new_path_and_query = format!("{path}?{query_string}");
             let mut parts = req.uri.clone().into_parts();
             parts.path_and_query = Some(new_path_and_query.try_into()?);
             http::Uri::from_parts(parts)?
@@ -214,8 +214,7 @@ impl RequestSigner {
                 let expiration_time = signing_time
                     + chrono::TimeDelta::from_std(expires_duration).map_err(|e| {
                         reqsign_core::Error::request_invalid(format!(
-                            "Invalid expiration duration: {}",
-                            e
+                            "Invalid expiration duration: {e}"
                         ))
                     })?;
                 writeln!(&mut s, "{}", expiration_time.timestamp())?;
@@ -229,7 +228,7 @@ impl RequestSigner {
         if expires.is_none() {
             let canonicalized_headers = self.canonicalize_headers(req, cred);
             if !canonicalized_headers.is_empty() {
-                writeln!(&mut s, "{}", canonicalized_headers)?;
+                writeln!(&mut s, "{canonicalized_headers}")?;
             }
         }
 
@@ -267,7 +266,7 @@ impl RequestSigner {
         // Format as name:value
         oss_headers
             .iter()
-            .map(|(name, value)| format!("{}:{}", name, value))
+            .map(|(name, value)| format!("{name}:{value}"))
             .collect::<Vec<_>>()
             .join("\n")
     }
@@ -324,12 +323,12 @@ impl RequestSigner {
                     if v.is_empty() {
                         k.clone()
                     } else {
-                        format!("{}={}", k, v)
+                        format!("{k}={v}")
                     }
                 })
                 .collect::<Vec<_>>()
                 .join("&");
-            format!("{}?{}", resource_path, query_string)
+            format!("{resource_path}?{query_string}")
         }
     }
 }

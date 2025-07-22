@@ -93,7 +93,7 @@ impl SignRequest for RequestSigner {
                         );
                         ctx.headers.insert(header::AUTHORIZATION, {
                             let mut value: HeaderValue =
-                                format!("Bearer {}", token).parse().map_err(|e| {
+                                format!("Bearer {token}").parse().map_err(|e| {
                                     reqsign_core::Error::unexpected(
                                         "failed to parse authorization header",
                                     )
@@ -142,7 +142,7 @@ impl SignRequest for RequestSigner {
 
                         ctx.headers.insert(header::AUTHORIZATION, {
                             let mut value: HeaderValue =
-                                format!("SharedKey {}:{}", account_name, signature)
+                                format!("SharedKey {account_name}:{signature}")
                                     .parse()
                                     .map_err(|e| {
                                         reqsign_core::Error::unexpected(

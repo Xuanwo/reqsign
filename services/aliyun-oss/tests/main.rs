@@ -65,7 +65,7 @@ async fn test_get_object() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -80,7 +80,7 @@ async fn test_get_object() -> Result<()> {
         })?;
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!(
         "got response content: {}",
         resp.text()
@@ -116,7 +116,7 @@ async fn test_delete_objects() -> Result<()> {
  </Delete>"#,
     );
     *req.method_mut() = http::Method::POST;
-    *req.uri_mut() = http::Uri::from_str(&format!("{}/?delete", url))?;
+    *req.uri_mut() = http::Uri::from_str(&format!("{url}/?delete"))?;
     req.headers_mut()
         .insert("CONTENT-MD5", "WOctCY1SS662e7ziElh4cw==".parse().unwrap());
 
@@ -129,7 +129,7 @@ async fn test_delete_objects() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -144,7 +144,7 @@ async fn test_delete_objects() -> Result<()> {
         })?;
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!(
         "got response content: {}",
         resp.text()
@@ -182,7 +182,7 @@ async fn test_get_object_with_query_sign() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -197,7 +197,7 @@ async fn test_get_object_with_query_sign() -> Result<()> {
         })?;
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!(
         "got response content: {}",
         resp.text()
@@ -239,7 +239,7 @@ async fn test_head_object_with_special_characters() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -253,7 +253,7 @@ async fn test_head_object_with_special_characters() -> Result<()> {
                 .with_source(anyhow::Error::new(e))
         })?;
 
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     assert_eq!(StatusCode::NOT_FOUND, resp.status());
     Ok(())
 }
@@ -288,7 +288,7 @@ async fn test_put_object_with_special_characters() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -303,7 +303,7 @@ async fn test_put_object_with_special_characters() -> Result<()> {
         })?;
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!(
         "got response content: {:?}",
         resp.text()
@@ -342,7 +342,7 @@ async fn test_list_bucket() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -357,7 +357,7 @@ async fn test_list_bucket() -> Result<()> {
         })?;
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!(
         "got response content: {}",
         resp.text()
@@ -399,7 +399,7 @@ async fn test_list_bucket_with_invalid_token() -> Result<()> {
         Request::from_parts(parts, body)
     };
 
-    debug!("signed request: {:?}", req);
+    debug!("signed request: {req:?}");
 
     let client = Client::new();
     let resp = client
@@ -414,7 +414,7 @@ async fn test_list_bucket_with_invalid_token() -> Result<()> {
         })?;
 
     let status = resp.status();
-    debug!("got response: {:?}", resp);
+    debug!("got response: {resp:?}");
     debug!(
         "got response content: {}",
         resp.text()
