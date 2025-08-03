@@ -1,12 +1,12 @@
-mod env;
-mod profile;
 mod assume_role;
 mod assume_role_with_web_identity;
 mod cognito;
 mod ecs;
+mod env;
 mod imds;
 #[cfg(not(target_arch = "wasm32"))]
 mod process;
+mod profile;
 #[cfg(not(target_arch = "wasm32"))]
 mod sso;
 

@@ -21,10 +21,7 @@ async fn test_ecs_credential_provider() {
             relative_uri,
         );
     } else if let Ok(full_uri) = env::var("AWS_CONTAINER_CREDENTIALS_FULL_URI") {
-        envs.insert(
-            "AWS_CONTAINER_CREDENTIALS_FULL_URI".to_string(),
-            full_uri,
-        );
+        envs.insert("AWS_CONTAINER_CREDENTIALS_FULL_URI".to_string(), full_uri);
         // Full URI also requires authorization token
         if let Ok(token) = env::var("AWS_CONTAINER_AUTHORIZATION_TOKEN") {
             envs.insert("AWS_CONTAINER_AUTHORIZATION_TOKEN".to_string(), token);

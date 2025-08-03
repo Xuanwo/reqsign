@@ -22,8 +22,7 @@ async fn test_assume_role_with_web_identity_credential_provider() {
     );
     envs.insert(
         "AWS_WEB_IDENTITY_TOKEN_FILE".to_string(),
-        env::var("AWS_WEB_IDENTITY_TOKEN_FILE")
-            .expect("AWS_WEB_IDENTITY_TOKEN_FILE must be set"),
+        env::var("AWS_WEB_IDENTITY_TOKEN_FILE").expect("AWS_WEB_IDENTITY_TOKEN_FILE must be set"),
     );
 
     // Optional variables

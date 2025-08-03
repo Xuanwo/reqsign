@@ -1,6 +1,6 @@
-mod standard;
-mod special_chars;
 mod presigned;
+mod special_chars;
+mod standard;
 
 use anyhow::Result;
 use http::{Request, StatusCode};
@@ -14,10 +14,10 @@ use std::env;
 
 /// Load static credential from environment variables
 pub fn load_static_credential() -> Result<Credential> {
-    let access_key = env::var("REQSIGN_AWS_V4_ACCESS_KEY")
-        .expect("REQSIGN_AWS_V4_ACCESS_KEY must be set");
-    let secret_key = env::var("REQSIGN_AWS_V4_SECRET_KEY")
-        .expect("REQSIGN_AWS_V4_SECRET_KEY must be set");
+    let access_key =
+        env::var("REQSIGN_AWS_V4_ACCESS_KEY").expect("REQSIGN_AWS_V4_ACCESS_KEY must be set");
+    let secret_key =
+        env::var("REQSIGN_AWS_V4_SECRET_KEY").expect("REQSIGN_AWS_V4_SECRET_KEY must be set");
     let session_token = env::var("REQSIGN_AWS_V4_SESSION_TOKEN").ok();
 
     Ok(Credential {
@@ -77,13 +77,10 @@ pub async fn send_signed_request(
         })?;
 
     let status = resp.status();
-    let body = resp
-        .text()
-        .await
-        .map_err(|e| {
-            reqsign_core::Error::unexpected("failed to get response body")
-                .with_source(anyhow::Error::new(e))
-        })?;
+    let body = resp.text().await.map_err(|e| {
+        reqsign_core::Error::unexpected("failed to get response body")
+            .with_source(anyhow::Error::new(e))
+    })?;
 
     debug!("response status: {status}, body: {body}");
     Ok((status, body))

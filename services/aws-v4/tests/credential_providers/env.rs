@@ -37,7 +37,10 @@ async fn test_env_credential_provider() {
         .await
         .expect("EnvCredentialProvider should not fail");
 
-    assert!(cred.is_some(), "Should load credentials from AWS_* env vars");
+    assert!(
+        cred.is_some(),
+        "Should load credentials from AWS_* env vars"
+    );
     let cred = cred.unwrap();
     assert!(!cred.access_key_id.is_empty());
     assert!(!cred.secret_access_key.is_empty());

@@ -23,7 +23,12 @@ async fn test_get_object_with_presigned_url() -> Result<()> {
     // Sign with expiration time
     let (mut parts, body) = req.into_parts();
     signer
-        .sign_request(&ctx, &mut parts, Some(&cred), Some(Duration::from_secs(3600)))
+        .sign_request(
+            &ctx,
+            &mut parts,
+            Some(&cred),
+            Some(Duration::from_secs(3600)),
+        )
         .await
         .expect("sign request must succeed");
     let req = Request::from_parts(parts, body);
@@ -64,7 +69,12 @@ async fn test_put_object_with_presigned_url() -> Result<()> {
     // Sign with expiration time
     let (mut parts, body) = req.into_parts();
     signer
-        .sign_request(&ctx, &mut parts, Some(&cred), Some(Duration::from_secs(300)))
+        .sign_request(
+            &ctx,
+            &mut parts,
+            Some(&cred),
+            Some(Duration::from_secs(300)),
+        )
         .await
         .expect("sign request must succeed");
     let req = Request::from_parts(parts, body);
