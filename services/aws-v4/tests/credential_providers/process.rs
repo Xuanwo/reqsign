@@ -1,0 +1,41 @@
+use super::create_test_context_with_env;
+use log::info;
+use reqsign_aws_v4::ProcessCredentialProvider;
+use reqsign_core::ProvideCredential;
+use std::collections::HashMap;
+use std::env;
+
+#[tokio::test]
+async fn test_process_credential_provider() {
+    if env::var("REQSIGN_AWS_V4_TEST_PROCESS").unwrap_or_default() != "on" {
+        info!("REQSIGN_AWS_V4_TEST_PROCESS not set, skipping");
+        return;
+    }
+
+    let mut envs = HashMap::new();
+
+    // Process credentials are configured in AWS profile
+    if let Ok(profile) = env::var("AWS_PROFILE") {
+        envs.insert("AWS_PROFILE".to_string(), profile);
+    }
+
+    if let Ok(config_file) = env::var("AWS_CONFIG_FILE") {
+        envs.insert("AWS_CONFIG_FILE".to_string(), config_file);
+    }
+
+    let ctx = create_test_context_with_env(envs);
+    let provider = ProcessCredentialProvider::new();
+
+    let cred = provider
+        .provide_credential(&ctx)
+        .await
+        .expect("ProcessCredentialProvider should succeed");
+
+    assert!(
+        cred.is_some(),
+        "Should load credentials from external process"
+    );
+    let cred = cred.unwrap();
+    assert!(!cred.access_key_id.is_empty());
+    assert!(!cred.secret_access_key.is_empty());
+}
