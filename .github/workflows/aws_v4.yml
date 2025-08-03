@@ -13,54 +13,393 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Unit tests - always run, no secrets needed
   unit_test:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
     steps:
       - uses: actions/checkout@v4
-      - name: Test
+      - name: Run unit tests
         working-directory: ./services/aws-v4
-        run: cargo test --no-fail-fast
+        run: |
+          echo "::group::Running unit tests"
+          cargo test --lib --no-fail-fast
+          cargo test --doc --no-fail-fast
+          echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
           RUST_BACKTRACE: full
-          # AWS V4 Test
-          REQSIGN_AWS_V4_TEST: ${{ secrets.REQSIGN_AWS_V4_TEST }}
-          REQSIGN_AWS_V4_SERVICE: ${{ secrets.REQSIGN_AWS_V4_SERVICE }}
-          REQSIGN_AWS_V4_URL: ${{ secrets.REQSIGN_AWS_V4_URL }}
-          REQSIGN_AWS_V4_REGION: ${{ secrets.REQSIGN_AWS_V4_REGION }}
-          REQSIGN_AWS_V4_ACCESS_KEY: ${{ secrets.REQSIGN_AWS_V4_ACCESS_KEY }}
-          REQSIGN_AWS_V4_SECRET_KEY: ${{ secrets.REQSIGN_AWS_V4_SECRET_KEY }}
-          REQSIGN_AWS_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ROLE_ARN }}
-          REQSIGN_AWS_IDP_URL: ${{ secrets.REQSIGN_AWS_IDP_URL }}
-          REQSIGN_AWS_IDP_BODY: ${{ secrets.REQSIGN_AWS_IDP_BODY }}
 
-  aws_web_identity_test:
+  # Check if we can run integration tests
+  check_secrets:
     runs-on: ubuntu-latest
-    permissions:
-      contents: "read"
-      id-token: "write"
-    if: github.event_name == 'push' || !github.event.pull_request.head.repo.fork
+    outputs:
+      has_secrets: ${{ steps.check.outputs.has_secrets }}
+    steps:
+      - name: Check if secrets are available
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "push" || ( "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "false" ) ]]; then
+            echo "has_secrets=true" >> $GITHUB_OUTPUT
+            echo "::notice::Integration tests will be executed (base repository)"
+          else
+            echo "has_secrets=false" >> $GITHUB_OUTPUT
+            echo "::warning::Integration tests will be skipped (forked repository or no secrets available)"
+          fi
+
+  # Signing tests - test signature algorithm with static credentials
+  signing_test:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Get Id Token
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AWS_V4_TEST: op://services/aws-v4/test_enabled
+          REQSIGN_AWS_V4_ACCESS_KEY: op://services/aws-v4/access_key
+          REQSIGN_AWS_V4_SECRET_KEY: op://services/aws-v4/secret_key
+          REQSIGN_AWS_V4_REGION: op://services/aws-v4/region
+          REQSIGN_AWS_V4_SERVICE: op://services/aws-v4/service
+          REQSIGN_AWS_V4_URL: op://services/aws-v4/url
+      - name: Test signing
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Running signing tests"
+          cargo test signing:: --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+          RUST_BACKTRACE: full
+
+  # EnvCredentialProvider test
+  test_env_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AWS_V4_TEST_ENV: op://services/aws-v4/test_env_enabled
+          AWS_ACCESS_KEY_ID: op://services/aws-v4/env_access_key_id
+          AWS_SECRET_ACCESS_KEY: op://services/aws-v4/env_secret_access_key
+      - name: Test EnvCredentialProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing EnvCredentialProvider"
+          cargo test test_env_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+
+  # ProfileCredentialProvider test
+  test_profile_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup test AWS profile
+        run: |
+          mkdir -p ~/.aws
+          cat > ~/.aws/credentials << EOF
+          [default]
+          aws_access_key_id = test_profile_access_key
+          aws_secret_access_key = test_profile_secret_key
+
+          [test-profile]
+          aws_access_key_id = test_profile2_access_key
+          aws_secret_access_key = test_profile2_secret_key
+          aws_session_token = test_profile2_session_token
+          EOF
+
+          cat > ~/.aws/config << EOF
+          [default]
+          region = us-east-1
+
+          [profile test-profile]
+          region = us-west-2
+          output = json
+          EOF
+      - name: Test ProfileCredentialProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing ProfileCredentialProvider"
+          cargo test test_profile_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+          REQSIGN_AWS_V4_TEST_PROFILE: on
+
+  # AssumeRoleCredentialProvider test
+  test_assume_role_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AWS_V4_TEST_ASSUME_ROLE: op://services/aws-v4/test_assume_role_enabled
+          REQSIGN_AWS_V4_ASSUME_ROLE_ARN: op://services/aws-v4/assume_role_arn
+          AWS_ACCESS_KEY_ID: op://services/aws-v4/base_access_key_id
+          AWS_SECRET_ACCESS_KEY: op://services/aws-v4/base_secret_access_key
+          AWS_REGION: op://services/aws-v4/region
+      - name: Test AssumeRoleCredentialProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing AssumeRoleCredentialProvider"
+          cargo test test_assume_role_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+
+  # AssumeRoleWithWebIdentityCredentialProvider test
+  test_web_identity_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get GitHub OIDC token
         uses: actions/github-script@v7
         id: idtoken
         with:
           script: |
             let id_token = await core.getIDToken('sts.amazonaws.com')
-            core.exportVariable('GITHUB_ID_TOKEN', id_token)
             core.setSecret(id_token)
 
-      - name: Test
+            // Write token to file
+            const fs = require('fs');
+            fs.writeFileSync('/tmp/web_identity_token', id_token);
+
+            console.log('GitHub OIDC token obtained and saved');
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AWS_V4_TEST_WEB_IDENTITY: op://services/aws-v4/test_web_identity_enabled
+          AWS_ROLE_ARN: op://services/aws-v4/web_identity_role_arn
+          AWS_REGION: op://services/aws-v4/region
+      - name: Test AssumeRoleWithWebIdentityCredentialProvider
         working-directory: ./services/aws-v4
-        run: cargo test --no-fail-fast
+        run: |
+          echo "::group::Testing AssumeRoleWithWebIdentityCredentialProvider"
+          cargo test test_assume_role_with_web_identity_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
-          RUST_BACKTRACE: full
-          REQSIGN_AWS_S3_TEST: on
-          REQSIGN_AWS_S3_REGION: ap-northeast-1
-          REQSIGN_AWS_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ROLE_ARN }}
-          REQSIGN_AWS_ASSUME_ROLE_ARN: ${{ secrets.REQSIGN_AWS_ASSUME_ROLE_ARN }}
-          REQSIGN_AWS_PROVIDER_ARN: ${{ secrets.REQSIGN_AWS_PROVIDER_ARN }}
+          AWS_WEB_IDENTITY_TOKEN_FILE: /tmp/web_identity_token
+
+  # IMDSv2CredentialProvider test (only runs on EC2)
+  test_imds_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled by default, enable when running on EC2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test IMDSv2CredentialProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing IMDSv2CredentialProvider"
+          cargo test test_imds_v2_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+          REQSIGN_AWS_V4_TEST_IMDS: on
+
+  # ECSCredentialProvider test (only runs on ECS)
+  test_ecs_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled by default, enable when running on ECS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test ECSCredentialProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing ECSCredentialProvider"
+          cargo test test_ecs_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+          REQSIGN_AWS_V4_TEST_ECS: on
+
+  # SSOCredentialProvider test
+  test_sso_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled until SSO is configured
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Setup SSO configuration
+        run: |
+          # SSO configuration would be set up here
+          echo "SSO configuration setup would go here"
+      - name: Test SSOCredentialProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing SSOCredentialProvider"
+          cargo test test_sso_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+          REQSIGN_AWS_V4_TEST_SSO: on
+
+  # ProcessCredentialProvider test
+  test_process_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled until process provider is configured
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup process credential helper
+        run: |
+          # Create a simple credential process script
+          cat > /tmp/aws-credential-process.sh << 'EOF'
+          #!/bin/bash
+          echo '{
+            "Version": 1,
+            "AccessKeyId": "process_access_key",
+            "SecretAccessKey": "process_secret_key",
+            "SessionToken": "process_session_token",
+            "Expiration": "2099-01-01T00:00:00Z"
+          }'
+          EOF
+          chmod +x /tmp/aws-credential-process.sh
+
+          # Setup AWS config
+          mkdir -p ~/.aws
+          cat > ~/.aws/config << EOF
+          [default]
+          credential_process = /tmp/aws-credential-process.sh
+          EOF
+      - name: Test ProcessCredentialProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing ProcessCredentialProvider"
+          cargo test test_process_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+          REQSIGN_AWS_V4_TEST_PROCESS: on
+
+  # CognitoIdentityCredentialProvider test
+  test_cognito_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled until Cognito is configured
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AWS_V4_TEST_COGNITO: op://services/aws-v4/test_cognito_enabled
+          REQSIGN_AWS_V4_COGNITO_IDENTITY_POOL_ID: op://services/aws-v4/cognito_identity_pool_id
+          AWS_REGION: op://services/aws-v4/region
+      - name: Test CognitoIdentityCredentialProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing CognitoIdentityCredentialProvider"
+          cargo test test_cognito_identity_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+
+  # Summary report
+  summary:
+    if: always()
+    needs:
+      - unit_test
+      - check_secrets
+      - signing_test
+      - test_env_provider
+      - test_profile_provider
+      - test_assume_role_provider
+      - test_web_identity_provider
+      - test_imds_provider
+      - test_ecs_provider
+      - test_sso_provider
+      - test_process_provider
+      - test_cognito_provider
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Summary
+        run: |
+          echo "## AWS V4 Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check if integration tests were run
+          if [[ "${{ needs.check_secrets.outputs.has_secrets }}" == "true" ]]; then
+            echo "✅ **Integration tests were executed**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Integration tests were skipped** (forked repository or no secrets available)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit_test.result }} |" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.check_secrets.outputs.has_secrets }}" == "true" ]]; then
+            echo "| Signing Tests | ${{ needs.signing_test.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| EnvCredentialProvider | ${{ needs.test_env_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| ProfileCredentialProvider | ${{ needs.test_profile_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| AssumeRoleCredentialProvider | ${{ needs.test_assume_role_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| AssumeRoleWithWebIdentityCredentialProvider | ${{ needs.test_web_identity_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Disabled Tests" >> $GITHUB_STEP_SUMMARY
+          echo "The following tests are disabled by default:" >> $GITHUB_STEP_SUMMARY
+          echo "- IMDSv2CredentialProvider (requires EC2 instance)" >> $GITHUB_STEP_SUMMARY
+          echo "- ECSCredentialProvider (requires ECS environment)" >> $GITHUB_STEP_SUMMARY
+          echo "- SSOCredentialProvider (requires SSO configuration)" >> $GITHUB_STEP_SUMMARY
+          echo "- ProcessCredentialProvider (requires process credential helper)" >> $GITHUB_STEP_SUMMARY
+          echo "- CognitoIdentityCredentialProvider (requires Cognito setup)" >> $GITHUB_STEP_SUMMARY
