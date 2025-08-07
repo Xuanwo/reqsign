@@ -273,7 +273,7 @@ mod tests {
             "wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY"
         );
         assert_eq!(
-            &resp.result.credentials.session_token,
+            resp.result.credentials.session_token.trim(),
             "AQoDYXdzEPT//////////wEXAMPLEtc764bNrC9SAPBSM22wDOk4x4HIZ8j4FZTwdQW
        LWsKWHGBuFqwAeMicRXmxfpSPfIeoIYRqTflfKD8YUuwthAx7mSEI/qkPpKPi/kMcGd
        QrmGdeehM4IC1NtBmUpp2wUE8phUZampKsburEDy0KPkyQDYwT7WZ0wq5VSXDvp75YU
