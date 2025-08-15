@@ -214,7 +214,7 @@ jobs:
         with:
           export-env: true
         env:
-          REQSIGN_AWS_V4_TEST_WEB_IDENTITY: op://reqsign/aws-v4/test_web_identity_enabled
+          REQSIGN_AWS_V4_TEST_WEB_IDENTITY: on
           AWS_ROLE_ARN: op://reqsign/aws-v4/web_identity_role_arn
           AWS_REGION: op://reqsign/aws-v4/region
       - name: Test AssumeRoleWithWebIdentityCredentialProvider
@@ -224,7 +224,6 @@ jobs:
           cargo test test_assume_role_with_web_identity_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
         env:
-          RUST_LOG: DEBUG
           AWS_WEB_IDENTITY_TOKEN_FILE: /tmp/web_identity_token
 
   # IMDSv2CredentialProvider test (only runs on EC2)
