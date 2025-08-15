@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
+env:
+  RUST_LOG: DEBUG
+  RUST_BACKTRACE: full
+
 jobs:
   # Unit tests - always run, no secrets needed
   unit_test:
@@ -25,9 +29,6 @@ jobs:
           cargo test --lib --no-fail-fast
           cargo test --doc --no-fail-fast
           echo "::endgroup::"
-        env:
-          RUST_LOG: DEBUG
-          RUST_BACKTRACE: full
 
   # Check if we can run integration tests
   check_secrets:
@@ -63,7 +64,7 @@ jobs:
         with:
           export-env: true
         env:
-          REQSIGN_AWS_V4_TEST: op://reqsign/aws-v4/test_enabled
+          REQSIGN_AWS_V4_TEST: on
           REQSIGN_AWS_V4_ACCESS_KEY: op://reqsign/aws-v4/access_key
           REQSIGN_AWS_V4_SECRET_KEY: op://reqsign/aws-v4/secret_key
           REQSIGN_AWS_V4_REGION: op://reqsign/aws-v4/region
@@ -75,9 +76,6 @@ jobs:
           echo "::group::Running signing tests"
           cargo test signing:: --no-fail-fast -- --nocapture
           echo "::endgroup::"
-        env:
-          RUST_LOG: DEBUG
-          RUST_BACKTRACE: full
 
   # EnvCredentialProvider test
   test_env_provider:
@@ -96,7 +94,7 @@ jobs:
         with:
           export-env: true
         env:
-          REQSIGN_AWS_V4_TEST_ENV: op://reqsign/aws-v4/test_env_enabled
+          REQSIGN_AWS_V4_TEST_ENV: on
           AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/access_key
           AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/secret_key
       - name: Test EnvCredentialProvider
@@ -105,8 +103,6 @@ jobs:
           echo "::group::Testing EnvCredentialProvider"
           cargo test test_env_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
-        env:
-          RUST_LOG: DEBUG
 
   # ProfileCredentialProvider test
   test_profile_provider:
@@ -115,18 +111,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Load secrets
+        id: load_secret
+        uses: 1password/load-secrets-action@v2
+        env:
+          REQSIGN_AWS_V4_TEST_ENV: on
+          REQSIGN_AWS_V4_TEST_PROFILE: on
+          AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/access_key
+          AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/secret_key
       - name: Setup test AWS profile
         run: |
           mkdir -p ~/.aws
           cat > ~/.aws/credentials << EOF
           [default]
-          aws_access_key_id = test_profile_access_key
-          aws_secret_access_key = test_profile_secret_key
+          aws_access_key_id = ${{ steps.load_secrets.outputs.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ steps.load_secrets.outputs.AWS_SECRET_ACCESS_KEY }}
 
           [test-profile]
-          aws_access_key_id = test_profile2_access_key
-          aws_secret_access_key = test_profile2_secret_key
-          aws_session_token = test_profile2_session_token
+          aws_access_key_id = ${{ steps.load_secrets.outputs.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ steps.load_secrets.outputs.AWS_SECRET_ACCESS_KEY }}
           EOF
 
           cat > ~/.aws/config << EOF
@@ -134,7 +137,7 @@ jobs:
           region = us-east-1
 
           [profile test-profile]
-          region = us-west-2
+          region = us-west-1
           output = json
           EOF
       - name: Test ProfileCredentialProvider
@@ -143,9 +146,6 @@ jobs:
           echo "::group::Testing ProfileCredentialProvider"
           cargo test test_profile_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
-        env:
-          RUST_LOG: DEBUG
-          REQSIGN_AWS_V4_TEST_PROFILE: on
 
   # AssumeRoleCredentialProvider test
   test_assume_role_provider:
