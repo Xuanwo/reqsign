@@ -97,8 +97,8 @@ jobs:
           export-env: true
         env:
           REQSIGN_AWS_V4_TEST_ENV: op://reqsign/aws-v4/test_env_enabled
-          AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/env_access_key_id
-          AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/env_secret_access_key
+          AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/access_key
+          AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/secret_key
       - name: Test EnvCredentialProvider
         working-directory: ./services/aws-v4
         run: |
