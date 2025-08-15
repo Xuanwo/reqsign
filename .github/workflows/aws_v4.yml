@@ -169,10 +169,10 @@ jobs:
         with:
           export-env: true
         env:
-          REQSIGN_AWS_V4_TEST_ASSUME_ROLE: op://reqsign/aws-v4/test_assume_role_enabled
+          REQSIGN_AWS_V4_TEST_ASSUME_ROLE: on
           REQSIGN_AWS_V4_ASSUME_ROLE_ARN: op://reqsign/aws-v4/assume_role_arn
-          AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/base_access_key_id
-          AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/base_secret_access_key
+          AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/access_key
+          AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/secret_key
           AWS_REGION: op://reqsign/aws-v4/region
       - name: Test AssumeRoleCredentialProvider
         working-directory: ./services/aws-v4
@@ -180,8 +180,6 @@ jobs:
           echo "::group::Testing AssumeRoleCredentialProvider"
           cargo test test_assume_role_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
-        env:
-          RUST_LOG: DEBUG
 
   # AssumeRoleWithWebIdentityCredentialProvider test
   test_web_identity_provider:
