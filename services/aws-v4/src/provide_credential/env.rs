@@ -107,7 +107,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_env_credential_provider_missing_credentials() -> anyhow::Result<()> {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx =
+            Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv::default());
 
         let provider = EnvCredentialProvider::new();
         let cred = provider.provide_credential(&ctx).await?;

@@ -164,7 +164,7 @@ impl Env for OsEnv {
 /// StaticEnv provides a static env environment.
 ///
 /// This is useful for testing or for providing a fixed environment.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct StaticEnv {
     /// The home directory to use.
     pub home_dir: Option<PathBuf>,
