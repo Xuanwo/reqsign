@@ -80,8 +80,8 @@ The workflow uses 1Password GitHub Action to load secrets:
   with:
     export-env: true
   env:
-    REQSIGN_AWS_V4_TEST: op://services/aws-v4/test_enabled
-    REQSIGN_AWS_V4_ACCESS_KEY: op://services/aws-v4/access_key
+    REQSIGN_AWS_V4_TEST: op://reqsign/aws-v4/test_enabled
+    REQSIGN_AWS_V4_ACCESS_KEY: op://reqsign/aws-v4/access_key
     # ... more secrets
 ```
 

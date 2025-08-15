@@ -63,12 +63,12 @@ jobs:
         with:
           export-env: true
         env:
-          REQSIGN_AWS_V4_TEST: op://services/aws-v4/test_enabled
-          REQSIGN_AWS_V4_ACCESS_KEY: op://services/aws-v4/access_key
-          REQSIGN_AWS_V4_SECRET_KEY: op://services/aws-v4/secret_key
-          REQSIGN_AWS_V4_REGION: op://services/aws-v4/region
-          REQSIGN_AWS_V4_SERVICE: op://services/aws-v4/service
-          REQSIGN_AWS_V4_URL: op://services/aws-v4/url
+          REQSIGN_AWS_V4_TEST: op://reqsign/aws-v4/test_enabled
+          REQSIGN_AWS_V4_ACCESS_KEY: op://reqsign/aws-v4/access_key
+          REQSIGN_AWS_V4_SECRET_KEY: op://reqsign/aws-v4/secret_key
+          REQSIGN_AWS_V4_REGION: op://reqsign/aws-v4/region
+          REQSIGN_AWS_V4_SERVICE: op://reqsign/aws-v4/service
+          REQSIGN_AWS_V4_URL: op://reqsign/aws-v4/url
       - name: Test signing
         working-directory: ./services/aws-v4
         run: |
@@ -96,9 +96,9 @@ jobs:
         with:
           export-env: true
         env:
-          REQSIGN_AWS_V4_TEST_ENV: op://services/aws-v4/test_env_enabled
-          AWS_ACCESS_KEY_ID: op://services/aws-v4/env_access_key_id
-          AWS_SECRET_ACCESS_KEY: op://services/aws-v4/env_secret_access_key
+          REQSIGN_AWS_V4_TEST_ENV: op://reqsign/aws-v4/test_env_enabled
+          AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/env_access_key_id
+          AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/env_secret_access_key
       - name: Test EnvCredentialProvider
         working-directory: ./services/aws-v4
         run: |
@@ -164,11 +164,11 @@ jobs:
         with:
           export-env: true
         env:
-          REQSIGN_AWS_V4_TEST_ASSUME_ROLE: op://services/aws-v4/test_assume_role_enabled
-          REQSIGN_AWS_V4_ASSUME_ROLE_ARN: op://services/aws-v4/assume_role_arn
-          AWS_ACCESS_KEY_ID: op://services/aws-v4/base_access_key_id
-          AWS_SECRET_ACCESS_KEY: op://services/aws-v4/base_secret_access_key
-          AWS_REGION: op://services/aws-v4/region
+          REQSIGN_AWS_V4_TEST_ASSUME_ROLE: op://reqsign/aws-v4/test_assume_role_enabled
+          REQSIGN_AWS_V4_ASSUME_ROLE_ARN: op://reqsign/aws-v4/assume_role_arn
+          AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/base_access_key_id
+          AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/base_secret_access_key
+          AWS_REGION: op://reqsign/aws-v4/region
       - name: Test AssumeRoleCredentialProvider
         working-directory: ./services/aws-v4
         run: |
@@ -211,9 +211,9 @@ jobs:
         with:
           export-env: true
         env:
-          REQSIGN_AWS_V4_TEST_WEB_IDENTITY: op://services/aws-v4/test_web_identity_enabled
-          AWS_ROLE_ARN: op://services/aws-v4/web_identity_role_arn
-          AWS_REGION: op://services/aws-v4/region
+          REQSIGN_AWS_V4_TEST_WEB_IDENTITY: op://reqsign/aws-v4/test_web_identity_enabled
+          AWS_ROLE_ARN: op://reqsign/aws-v4/web_identity_role_arn
+          AWS_REGION: op://reqsign/aws-v4/region
       - name: Test AssumeRoleWithWebIdentityCredentialProvider
         working-directory: ./services/aws-v4
         run: |
@@ -339,9 +339,9 @@ jobs:
         with:
           export-env: true
         env:
-          REQSIGN_AWS_V4_TEST_COGNITO: op://services/aws-v4/test_cognito_enabled
-          REQSIGN_AWS_V4_COGNITO_IDENTITY_POOL_ID: op://services/aws-v4/cognito_identity_pool_id
-          AWS_REGION: op://services/aws-v4/region
+          REQSIGN_AWS_V4_TEST_COGNITO: op://reqsign/aws-v4/test_cognito_enabled
+          REQSIGN_AWS_V4_COGNITO_IDENTITY_POOL_ID: op://reqsign/aws-v4/cognito_identity_pool_id
+          AWS_REGION: op://reqsign/aws-v4/region
       - name: Test CognitoIdentityCredentialProvider
         working-directory: ./services/aws-v4
         run: |
