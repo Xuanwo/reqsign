@@ -65,8 +65,9 @@ impl SignRequest for RequestSigner {
         let k = credential
             .ok_or_else(|| reqsign_core::Error::credential_invalid("missing credential"))?;
         let now = self.time.unwrap_or_else(now);
-        let method = if expires_in.is_some() {
-            SigningMethod::Query(expires_in.unwrap())
+
+        let method = if let Some(expires_in) = expires_in {
+            SigningMethod::Query(expires_in)
         } else {
             SigningMethod::Header
         };

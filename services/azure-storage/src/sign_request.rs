@@ -61,8 +61,8 @@ impl SignRequest for RequestSigner {
             ));
         };
 
-        let method = if expires_in.is_some() {
-            SigningMethod::Query(expires_in.unwrap())
+        let method = if let Some(expires_in) = expires_in {
+            SigningMethod::Query(expires_in)
         } else {
             SigningMethod::Header
         };
