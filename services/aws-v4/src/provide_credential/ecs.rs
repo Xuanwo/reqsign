@@ -14,14 +14,21 @@ const ECS_CONTAINER_METADATA_URI: &str = "ECS_CONTAINER_METADATA_URI";
 
 /// ECS Task Role Credentials Provider
 ///
-/// This provider fetches credentials from the ECS container metadata endpoint.
+/// This provider fetches IAM credentials from the ECS Task IAM Roles endpoint.
 /// It supports both relative URI (ECS) and full URI (Fargate) modes.
+///
+/// # Important Note
+/// This provider fetches IAM **credentials**, not task metadata. The credentials
+/// endpoint is separate from the task metadata endpoints (v2/v3/v4). While metadata
+/// endpoints provide information about the task and container, the credentials
+/// endpoint provides IAM role credentials for authentication.
 ///
 /// # Environment Variables
 /// - `AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`: Relative URI to fetch credentials (ECS)
 /// - `AWS_CONTAINER_CREDENTIALS_FULL_URI`: Full URI to fetch credentials (Fargate)
 /// - `AWS_CONTAINER_AUTHORIZATION_TOKEN`: Authorization token for the request
 /// - `AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE`: File containing the authorization token
+/// - `ECS_CONTAINER_METADATA_URI`: Override the default base endpoint (for testing)
 #[derive(Debug, Clone)]
 pub struct ECSCredentialProvider {
     endpoint: Option<String>,
