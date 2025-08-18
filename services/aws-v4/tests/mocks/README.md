@@ -46,9 +46,29 @@ python3 imds_mock_server.py [port]
 
 **Note:** The IMDS test in CI currently uses the official `amazon-ec2-metadata-mock` tool instead of this Python mock.
 
+### Credential Process Helper (`credential_process_helper.py`)
+A Python script that outputs credentials in the format expected by AWS `credential_process`.
+
+**Usage:**
+```bash
+python3 credential_process_helper.py [--profile <profile_name>]
+```
+
+**Output:**
+Returns JSON with `Version`, `AccessKeyId`, `SecretAccessKey`, `SessionToken`, and `Expiration`.
+
+**Example AWS Config:**
+```ini
+[default]
+credential_process = python3 /path/to/credential_process_helper.py
+
+[profile custom]
+credential_process = python3 /path/to/credential_process_helper.py --profile test
+```
+
 ## Testing
 
-These mock servers are automatically used in GitHub Actions workflows. See `.github/workflows/aws_v4.yml` for usage examples.
+These mock servers and helpers are automatically used in GitHub Actions workflows. See `.github/workflows/aws_v4.yml` for usage examples.
 
 ## Development
 

@@ -431,41 +431,63 @@ jobs:
 
   # ProcessCredentialProvider test
   test_process_provider:
-    needs: check_secrets
-    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled until process provider is configured
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Setup process credential helper
         run: |
-          # Create a simple credential process script
-          cat > /tmp/aws-credential-process.sh << 'EOF'
-          #!/bin/bash
-          echo '{
-            "Version": 1,
-            "AccessKeyId": "process_access_key",
-            "SecretAccessKey": "process_secret_key",
-            "SessionToken": "process_session_token",
-            "Expiration": "2099-01-01T00:00:00Z"
-          }'
-          EOF
-          chmod +x /tmp/aws-credential-process.sh
-
-          # Setup AWS config
-          mkdir -p ~/.aws
-          cat > ~/.aws/config << EOF
+          # Create test home directory
+          TEST_HOME=$(mktemp -d)
+          echo "TEST_HOME=$TEST_HOME" >> $GITHUB_ENV
+          
+          # Copy the credential helper script
+          cp services/aws-v4/tests/mocks/credential_process_helper.py $TEST_HOME/credential-helper.py
+          chmod +x $TEST_HOME/credential-helper.py
+          
+          # Setup AWS config with credential_process
+          mkdir -p $TEST_HOME/.aws
+          cat > $TEST_HOME/.aws/config << EOF
           [default]
-          credential_process = /tmp/aws-credential-process.sh
+          credential_process = python3 $TEST_HOME/credential-helper.py
+          
+          [profile test-process]
+          credential_process = python3 $TEST_HOME/credential-helper.py --profile test
+          region = us-west-2
           EOF
-      - name: Test ProcessCredentialProvider
+          
+          # Test the credential helper works
+          echo "::group::Testing credential helper"
+          python3 $TEST_HOME/credential-helper.py
+          echo "::endgroup::"
+      - name: Test ProcessCredentialProvider with default profile
         working-directory: ./services/aws-v4
         run: |
-          echo "::group::Testing ProcessCredentialProvider"
+          echo "::group::Testing ProcessCredentialProvider (default profile)"
           cargo test test_process_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
           REQSIGN_AWS_V4_TEST_PROCESS: on
+          AWS_CONFIG_FILE: ${{ env.TEST_HOME }}/.aws/config
+          HOME: ${{ env.TEST_HOME }}
+      - name: Test ProcessCredentialProvider with named profile
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing ProcessCredentialProvider (named profile)"
+          cargo test test_process_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+          REQSIGN_AWS_V4_TEST_PROCESS: on
+          AWS_PROFILE: test-process
+          AWS_CONFIG_FILE: ${{ env.TEST_HOME }}/.aws/config
+          HOME: ${{ env.TEST_HOME }}
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ ! -z "$TEST_HOME" ]; then
+            rm -rf $TEST_HOME || true
+          fi
 
   # CognitoIdentityCredentialProvider test
   test_cognito_provider:
