@@ -302,22 +302,62 @@ jobs:
             kill $MOCK_PID || true
           fi
 
-  # ECSCredentialProvider test (only runs on ECS)
+  # ECSCredentialProvider test (using amazon-ecs-local-container-endpoints)
   test_ecs_provider:
-    needs: check_secrets
-    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled by default, enable when running on ECS
     runs-on: ubuntu-latest
+    services:
+      ecs-local-endpoints:
+        image: public.ecr.aws/aws-ecs/amazon-ecs-local-container-endpoints:latest
+        ports:
+          - 51679:51679
+        env:
+          # Configure mock credentials
+          ECS_LOCAL_METADATA_PORT: "51679"
+          HOME: "/home"
+        options: >-
+          --name ecs-local-endpoints
+          -v /var/run:/var/run
+          -v /home:/home
     steps:
       - uses: actions/checkout@v4
-      - name: Test ECSCredentialProvider
+      - name: Setup ECS Local Endpoints credentials
+        run: |
+          # Create credentials file for the local endpoints container
+          mkdir -p /home/.aws
+          cat > /home/.aws/credentials << 'EOF'
+          [default]
+          aws_access_key_id = AKIAIOSFODNN7EXAMPLE
+          aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+          EOF
+          
+          # Verify the local endpoints service is running
+          echo "::group::Verifying ECS local endpoints service"
+          sleep 5
+          curl -v http://localhost:51679/v2/metadata || echo "Metadata endpoint check"
+          echo "::endgroup::"
+      - name: Test ECSCredentialProvider with relative URI
         working-directory: ./services/aws-v4
         run: |
-          echo "::group::Testing ECSCredentialProvider"
+          echo "::group::Testing ECSCredentialProvider with relative URI"
           cargo test test_ecs_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
           REQSIGN_AWS_V4_TEST_ECS: on
+          AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: /creds
+          ECS_CONTAINER_METADATA_URI: http://localhost:51679
+          AWS_DEFAULT_REGION: us-east-1
+      - name: Test ECSCredentialProvider with full URI
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing ECSCredentialProvider with full URI"
+          cargo test test_ecs_credential_provider --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+        env:
+          RUST_LOG: DEBUG
+          REQSIGN_AWS_V4_TEST_ECS: on
+          AWS_CONTAINER_CREDENTIALS_FULL_URI: http://localhost:51679/creds
+          AWS_DEFAULT_REGION: us-east-1
 
   # SSOCredentialProvider test
   test_sso_provider:

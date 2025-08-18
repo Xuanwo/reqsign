@@ -10,6 +10,7 @@ const AWS_CONTAINER_CREDENTIALS_FULL_URI: &str = "AWS_CONTAINER_CREDENTIALS_FULL
 const AWS_CONTAINER_AUTHORIZATION_TOKEN: &str = "AWS_CONTAINER_AUTHORIZATION_TOKEN";
 const AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE: &str = "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE";
 const ECS_METADATA_ENDPOINT: &str = "http://169.254.170.2";
+const ECS_CONTAINER_METADATA_URI: &str = "ECS_CONTAINER_METADATA_URI";
 
 /// ECS Task Role Credentials Provider
 ///
@@ -89,7 +90,11 @@ impl ECSCredentialProvider {
 
         // Try relative URI (ECS)
         if let Some(relative_uri) = ctx.env_var(AWS_CONTAINER_CREDENTIALS_RELATIVE_URI) {
-            return Ok(format!("{ECS_METADATA_ENDPOINT}{relative_uri}"));
+            // Allow override of metadata endpoint for testing
+            let base_endpoint = ctx
+                .env_var(ECS_CONTAINER_METADATA_URI)
+                .unwrap_or_else(|| ECS_METADATA_ENDPOINT.to_string());
+            return Ok(format!("{base_endpoint}{relative_uri}"));
         }
 
         Err(Error::config_invalid(
@@ -205,6 +210,28 @@ mod tests {
         let provider = ECSCredentialProvider::new();
         let endpoint = provider.get_endpoint(&ctx).unwrap();
         assert_eq!(endpoint, "http://169.254.170.2/v2/credentials/task-role");
+    }
+
+    #[tokio::test]
+    async fn test_get_endpoint_relative_uri_with_custom_base() {
+        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = ctx.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                (
+                    AWS_CONTAINER_CREDENTIALS_RELATIVE_URI.to_string(),
+                    "/creds".to_string(),
+                ),
+                (
+                    ECS_CONTAINER_METADATA_URI.to_string(),
+                    "http://localhost:51679".to_string(),
+                ),
+            ]),
+        });
+
+        let provider = ECSCredentialProvider::new();
+        let endpoint = provider.get_endpoint(&ctx).unwrap();
+        assert_eq!(endpoint, "http://localhost:51679/creds");
     }
 
     #[tokio::test]
