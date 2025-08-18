@@ -228,8 +228,6 @@ jobs:
 
   # IMDSv2CredentialProvider test (using amazon-ec2-metadata-mock)
   test_imds_provider:
-    needs: check_secrets
-    if: needs.check_secrets.outputs.has_secrets == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -238,7 +236,7 @@ jobs:
           # Download ec2-metadata-mock binary
           curl -Lo ec2-metadata-mock https://github.com/aws/amazon-ec2-metadata-mock/releases/download/v1.13.0/ec2-metadata-mock-linux-amd64
           chmod +x ec2-metadata-mock
-          
+
           # Create configuration file
           cat > imds-config.json << 'EOF'
           {
@@ -264,15 +262,15 @@ jobs:
             }
           }
           EOF
-          
+
           # Start the mock service
           ./ec2-metadata-mock -c imds-config.json --imdsv2 &
           MOCK_PID=$!
           echo "MOCK_PID=$MOCK_PID" >> $GITHUB_ENV
-          
+
           # Wait for service to start
           sleep 3
-          
+
           # Verify the mock service is responding
           echo "::group::Verifying IMDS mock service"
           # Get IMDSv2 token
