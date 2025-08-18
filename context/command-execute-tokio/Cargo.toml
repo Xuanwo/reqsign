@@ -11,8 +11,8 @@ categories = ["asynchronous"]
 
 [dependencies]
 async-trait = "0.1"
-reqsign-core = { path = "../../core", version = "0.16" }
+reqsign-core.workspace = true
 tokio = { version = "1", features = ["process", "io-util"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features =  ["macros", "rt-multi-thread"] }
