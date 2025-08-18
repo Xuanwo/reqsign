@@ -76,7 +76,9 @@ impl ECSCredentialProvider {
         // Try to get token from file
         if let Some(token_file) = ctx.env_var(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE) {
             let token = ctx.file_read(&token_file).await.map_err(|e| {
-                Error::config_invalid(format!("failed to read auth token file: {e}"))
+                Error::config_invalid("failed to read ECS auth token file")
+                    .with_source(e)
+                    .with_context(format!("file: {}", token_file))
             })?;
             return Ok(Some(String::from_utf8_lossy(&token).trim().to_string()));
         }
@@ -105,8 +107,10 @@ impl ECSCredentialProvider {
         }
 
         Err(Error::config_invalid(
-            "neither AWS_CONTAINER_CREDENTIALS_RELATIVE_URI nor AWS_CONTAINER_CREDENTIALS_FULL_URI is set".to_string(),
-        ))
+            "ECS container credentials endpoint not configured"
+        )
+        .with_context("hint: set AWS_CONTAINER_CREDENTIALS_RELATIVE_URI or AWS_CONTAINER_CREDENTIALS_FULL_URI")
+        .with_context("note: are you running on ECS or Fargate?"))
     }
 }
 
@@ -141,37 +145,79 @@ impl ProvideCredential for ECSCredentialProvider {
             .method(Method::GET)
             .uri(&endpoint)
             .body(bytes::Bytes::new())
-            .map_err(|e| Error::unexpected(format!("failed to build request: {e}")))?;
+            .map_err(|e| {
+                Error::request_invalid("failed to build ECS credentials request")
+                    .with_source(e)
+                    .with_context(format!("endpoint: {}", endpoint))
+            })?;
 
         // Add authorization token if available
         if let Some(token) = self.load_auth_token(ctx).await? {
             req.headers_mut().insert(
                 "Authorization",
                 HeaderValue::from_str(&token)
-                    .map_err(|e| Error::unexpected(format!("invalid auth token: {e}")))?,
+                    .map_err(|e| {
+                        Error::config_invalid("invalid ECS authorization token")
+                            .with_source(e)
+                            .with_context("token_source: environment or file")
+                    })?,
             );
         }
 
         let resp = ctx
             .http_send(req)
             .await
-            .map_err(|e| Error::unexpected(format!("failed to fetch ECS credentials: {e}")))?;
+            .map_err(|e| {
+                Error::unexpected("failed to fetch ECS credentials")
+                    .with_source(e)
+                    .with_context(format!("endpoint: {}", endpoint))
+                    .with_context("hint: check if running on ECS/Fargate with proper IAM role")
+                    .set_retryable(true)
+            })?;
 
         if resp.status() != StatusCode::OK {
-            return Err(Error::unexpected(format!(
-                "ECS metadata endpoint returned status: {}",
-                resp.status()
-            )));
+            let status = resp.status();
+            let body = String::from_utf8_lossy(resp.body());
+            
+            let error = match status.as_u16() {
+                401 | 403 => Error::permission_denied(format!(
+                    "ECS task not authorized to fetch credentials: {}",
+                    body
+                ))
+                .with_context("hint: check if task has proper IAM role attached"),
+                404 => Error::config_invalid("ECS credentials endpoint not found")
+                    .with_context(format!("endpoint: {}", endpoint))
+                    .with_context("hint: verify the container credentials URI"),
+                500..=599 => Error::unexpected(format!("ECS metadata service error: {}", body))
+                    .set_retryable(true),
+                _ => Error::unexpected(format!(
+                    "ECS metadata endpoint returned unexpected status {}: {}",
+                    status, body
+                ))
+            };
+            
+            return Err(error
+                .with_context(format!("http_status: {}", status))
+                .with_context(format!("endpoint: {}", endpoint)));
         }
 
         let body = resp.into_body();
         let creds: ECSCredentialResponse = serde_json::from_slice(&body)
-            .map_err(|e| Error::unexpected(format!("failed to parse ECS credentials: {e}")))?;
+            .map_err(|e| {
+                Error::unexpected("failed to parse ECS credentials response")
+                    .with_source(e)
+                    .with_context(format!("response_length: {}", body.len()))
+                    .with_context(format!("endpoint: {}", endpoint))
+            })?;
 
         let expires_in = creds
             .expiration
             .parse()
-            .map_err(|e| Error::unexpected(format!("failed to parse expiration time: {e}")))?;
+            .map_err(|e| {
+                Error::unexpected("failed to parse ECS credential expiration")
+                    .with_source(e)
+                    .with_context(format!("expiration_value: {}", creds.expiration))
+            })?;
 
         Ok(Some(Credential {
             access_key_id: creds.access_key_id,
