@@ -11,15 +11,12 @@ async fn test_cognito_identity_credential_provider() {
         return;
     }
 
-    let identity_pool_id = env::var("REQSIGN_AWS_V4_COGNITO_IDENTITY_POOL_ID")
-        .expect("REQSIGN_AWS_V4_COGNITO_IDENTITY_POOL_ID must be set");
-
-    let region = env::var("AWS_REGION").unwrap_or_else(|_| "us-east-1".to_string());
-
+    // Provider will read configuration from environment variables:
+    // - AWS_COGNITO_IDENTITY_POOL_ID
+    // - AWS_REGION or AWS_DEFAULT_REGION
+    // - AWS_COGNITO_ENDPOINT (for mock server)
     let ctx = create_test_context();
-    let provider = CognitoIdentityCredentialProvider::new()
-        .with_identity_pool_id(identity_pool_id)
-        .with_region(region);
+    let provider = CognitoIdentityCredentialProvider::new();
 
     let cred = provider
         .provide_credential(&ctx)
