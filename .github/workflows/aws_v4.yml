@@ -493,32 +493,44 @@ jobs:
 
   # CognitoIdentityCredentialProvider test
   test_cognito_provider:
-    needs: check_secrets
-    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled until Cognito is configured
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
-        with:
-          connect-host: ${{ secrets.OP_CONNECT_HOST }}
-          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
-      - name: Load secrets
-        uses: 1password/load-secrets-action@v2
-        with:
-          export-env: true
-        env:
-          REQSIGN_AWS_V4_TEST_COGNITO: op://reqsign/aws-v4/test_cognito_enabled
-          REQSIGN_AWS_V4_COGNITO_IDENTITY_POOL_ID: op://reqsign/aws-v4/cognito_identity_pool_id
-          AWS_REGION: op://reqsign/aws-v4/region
-      - name: Test CognitoIdentityCredentialProvider
+      - name: Start Cognito Identity Mock Server
+        run: |
+          # Start the mock server
+          python3 services/aws-v4/tests/mocks/cognito_mock_server.py 8443 &
+          COGNITO_PID=$!
+          echo "COGNITO_PID=$COGNITO_PID" >> $GITHUB_ENV
+          
+          # Wait for server to start
+          sleep 2
+          
+          # Test the mock server
+          echo "::group::Testing mock Cognito server"
+          curl -X POST http://localhost:8443/ \
+            -H "x-amz-target: AWSCognitoIdentityService.GetId" \
+            -H "Content-Type: application/x-amz-json-1.1" \
+            -d '{"IdentityPoolId": "us-east-1:test-pool-id"}' || true
+          echo "::endgroup::"
+      - name: Test CognitoIdentityCredentialProvider - Unauthenticated
         working-directory: ./services/aws-v4
         run: |
-          echo "::group::Testing CognitoIdentityCredentialProvider"
+          echo "::group::Testing CognitoIdentityCredentialProvider (Unauthenticated)"
           cargo test test_cognito_identity_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
         env:
+          REQSIGN_AWS_V4_TEST_COGNITO: on
+          AWS_COGNITO_IDENTITY_POOL_ID: us-east-1:12345678-1234-1234-1234-123456789012
+          AWS_REGION: us-east-1
+          AWS_COGNITO_ENDPOINT: http://localhost:8443/
           RUST_LOG: DEBUG
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ ! -z "$COGNITO_PID" ]; then
+            kill $COGNITO_PID || true
+          fi
 
   # Summary report
   summary:

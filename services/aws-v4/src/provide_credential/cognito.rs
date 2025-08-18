@@ -16,6 +16,13 @@ use serde_json::json;
 /// - A Cognito Identity Pool ID
 /// - Optional: Identity token from a supported identity provider (Facebook, Google, etc.)
 ///
+/// # Environment Variables
+/// The provider supports the following environment variables:
+/// - `AWS_COGNITO_IDENTITY_POOL_ID`: The Cognito Identity Pool ID
+/// - `AWS_COGNITO_IDENTITY_ID`: A specific identity ID (if already known)
+/// - `AWS_REGION` or `AWS_DEFAULT_REGION`: The AWS region
+/// - `AWS_COGNITO_ENDPOINT`: Custom endpoint (for testing)
+///
 /// # Usage
 /// ```rust,no_run
 /// use reqsign_aws_v4::CognitoIdentityCredentialProvider;
@@ -75,21 +82,31 @@ impl CognitoIdentityCredentialProvider {
 
     /// Get or create an identity ID
     async fn get_identity_id(&self, ctx: &Context) -> Result<String> {
+        // Check for explicit identity ID or from environment
         if let Some(id) = &self.identity_id {
             return Ok(id.clone());
+        }
+        if let Some(id) = ctx.env_var("AWS_COGNITO_IDENTITY_ID") {
+            return Ok(id);
         }
 
         let pool_id = self
             .identity_pool_id
-            .as_ref()
+            .clone()
+            .or_else(|| ctx.env_var("AWS_COGNITO_IDENTITY_POOL_ID"))
             .ok_or_else(|| Error::config_invalid("identity_pool_id is required".to_string()))?;
 
         let region = self
             .region
-            .as_ref()
+            .clone()
+            .or_else(|| ctx.env_var("AWS_REGION"))
+            .or_else(|| ctx.env_var("AWS_DEFAULT_REGION"))
             .ok_or_else(|| Error::config_invalid("region is required".to_string()))?;
 
-        let endpoint = format!("https://cognito-identity.{region}.amazonaws.com/");
+        // Allow endpoint override for testing
+        let endpoint = ctx
+            .env_var("AWS_COGNITO_ENDPOINT")
+            .unwrap_or_else(|| format!("https://cognito-identity.{region}.amazonaws.com/"));
 
         let body = if let Some(logins) = &self.logins {
             json!({
@@ -139,10 +156,15 @@ impl CognitoIdentityCredentialProvider {
     ) -> Result<Credential> {
         let region = self
             .region
-            .as_ref()
+            .clone()
+            .or_else(|| ctx.env_var("AWS_REGION"))
+            .or_else(|| ctx.env_var("AWS_DEFAULT_REGION"))
             .ok_or_else(|| Error::config_invalid("region is required".to_string()))?;
 
-        let endpoint = format!("https://cognito-identity.{region}.amazonaws.com/");
+        // Allow endpoint override for testing
+        let endpoint = ctx
+            .env_var("AWS_COGNITO_ENDPOINT")
+            .unwrap_or_else(|| format!("https://cognito-identity.{region}.amazonaws.com/"));
 
         let body = if let Some(logins) = &self.logins {
             json!({
@@ -225,7 +247,11 @@ impl ProvideCredential for CognitoIdentityCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        if self.identity_pool_id.is_none() {
+        // Check if identity pool ID is available from config or environment
+        let has_pool_id = self.identity_pool_id.is_some()
+            || ctx.env_var("AWS_COGNITO_IDENTITY_POOL_ID").is_some();
+        
+        if !has_pool_id {
             debug!("Cognito Identity: no identity pool ID configured");
             return Ok(None);
         }

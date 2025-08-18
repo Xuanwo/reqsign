@@ -66,6 +66,24 @@ credential_process = python3 /path/to/credential_process_helper.py
 credential_process = python3 /path/to/credential_process_helper.py --profile test
 ```
 
+### Cognito Identity Mock Server (`cognito_mock_server.py`)
+Simulates the Amazon Cognito Identity service for testing `CognitoIdentityCredentialProvider`.
+
+**Usage:**
+```bash
+python3 cognito_mock_server.py [port]
+# Default port: 8443
+```
+
+**Endpoints:**
+- `POST /` with `x-amz-target: AWSCognitoIdentityService.GetId` - Get or create identity ID
+- `POST /` with `x-amz-target: AWSCognitoIdentityService.GetCredentialsForIdentity` - Get credentials for identity
+
+**Features:**
+- Supports both authenticated (with logins) and unauthenticated identities
+- Returns different credentials based on authentication state
+- Generates unique identity IDs for each request
+
 ## Testing
 
 These mock servers and helpers are automatically used in GitHub Actions workflows. See `.github/workflows/aws_v4.yml` for usage examples.
