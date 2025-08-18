@@ -61,55 +61,52 @@ pub fn parse_sts_error(
     if let Ok(error_resp) = quick_xml::de::from_str::<AwsErrorResponse>(body) {
         let code = &error_resp.error.code;
         let message = &error_resp.error.message;
-        
+
         // Map AWS error codes to appropriate ErrorKind
         let mut error = match code.as_str() {
             // Permission/Authorization errors
             "AccessDenied" | "UnauthorizedAccess" | "Forbidden" => {
                 Error::permission_denied(format!("{}: {}", code, message))
             }
-            
+
             // Credential errors
             "ExpiredToken" | "TokenRefreshRequired" | "InvalidToken" => {
                 Error::credential_invalid(format!("token expired or invalid: {}", message))
             }
-            
+
             // Configuration errors
             "InvalidParameterValue" | "MissingParameter" | "InvalidParameterCombination" => {
                 Error::config_invalid(format!("invalid configuration: {}", message))
             }
-            
+
             // Rate limiting
             "Throttling" | "RequestLimitExceeded" | "TooManyRequestsException" => {
                 Error::rate_limited(format!("AWS API rate limit: {}", message))
             }
-            
+
             // Service unavailable (retryable)
             "ServiceUnavailable" | "InternalError" | "InternalFailure" => {
-                Error::unexpected(format!("AWS service error: {}", message))
-                    .set_retryable(true)
+                Error::unexpected(format!("AWS service error: {}", message)).set_retryable(true)
             }
-            
+
             // Request errors
             "InvalidRequest" | "MalformedQueryString" => {
                 Error::request_invalid(format!("invalid request: {}", message))
             }
-            
+
             // Default to unexpected
-            _ => {
-                Error::unexpected(format!("AWS error [{}]: {}", code, message))
-            }
+            _ => Error::unexpected(format!("AWS error [{}]: {}", code, message)),
         };
-        
+
         // Add context
         error = error
             .with_context(format!("operation: {}", operation))
             .with_context(format!("error_code: {}", code));
-        
+
         if let Some(id) = request_id {
             error = error.with_context(format!("request_id: {}", id));
         }
-        
+
         error
     } else {
         // Failed to parse error response, return generic error based on status code
@@ -120,29 +117,23 @@ pub fn parse_sts_error(
             400..=499 if status == http::StatusCode::UNAUTHORIZED => {
                 Error::credential_invalid(format!("STS authentication failed: {}", body))
             }
-            429 => {
-                Error::rate_limited(format!("STS rate limit exceeded: {}", body))
-            }
+            429 => Error::rate_limited(format!("STS rate limit exceeded: {}", body)),
             400..=499 => {
                 Error::request_invalid(format!("STS request failed with {}: {}", status, body))
             }
-            500..=599 => {
-                Error::unexpected(format!("STS server error {}: {}", status, body))
-                    .set_retryable(true)
-            }
-            _ => {
-                Error::unexpected(format!("STS request failed with {}: {}", status, body))
-            }
+            500..=599 => Error::unexpected(format!("STS server error {}: {}", status, body))
+                .set_retryable(true),
+            _ => Error::unexpected(format!("STS request failed with {}: {}", status, body)),
         };
-        
+
         error = error
             .with_context(format!("operation: {}", operation))
             .with_context(format!("http_status: {}", status));
-        
+
         if let Some(id) = request_id {
             error = error.with_context(format!("request_id: {}", id));
         }
-        
+
         error
     }
 }
@@ -159,27 +150,23 @@ pub fn parse_imds_error(operation: &str, status: http::StatusCode, body: &str) -
         #[serde(rename = "Message")]
         message: String,
     }
-    
+
     if let Ok(error) = serde_json::from_str::<ImdsError>(body) {
         let err = match error.code.as_str() {
-            "AssumeRoleUnauthorizedAccess" => {
-                Error::permission_denied(format!(
-                    "EC2 instance not authorized to assume role: {}",
-                    error.message
-                ))
-                .with_context("hint: check if the IAM role has a trust relationship with EC2")
-            }
+            "AssumeRoleUnauthorizedAccess" => Error::permission_denied(format!(
+                "EC2 instance not authorized to assume role: {}",
+                error.message
+            ))
+            .with_context("hint: check if the IAM role has a trust relationship with EC2"),
             "InvalidUserData.Malformed" => {
                 Error::config_invalid(format!("malformed instance metadata: {}", error.message))
             }
             _ if error.code.contains("Expired") => {
                 Error::credential_invalid(format!("IMDS credentials expired: {}", error.message))
             }
-            _ => {
-                Error::unexpected(format!("IMDS error [{}]: {}", error.code, error.message))
-            }
+            _ => Error::unexpected(format!("IMDS error [{}]: {}", error.code, error.message)),
         };
-        
+
         err.with_context(format!("operation: {}", operation))
             .with_context(format!("error_code: {}", error.code))
     } else {

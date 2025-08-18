@@ -7,17 +7,17 @@ use thiserror::Error;
 pub struct Error {
     /// The category of error that occurred
     kind: ErrorKind,
-    
+
     /// Human-readable error message
     message: String,
-    
+
     /// The underlying error source
     #[source]
     source: Option<anyhow::Error>,
-    
+
     /// Additional context information for debugging
     context: Vec<String>,
-    
+
     /// Whether this error is retryable
     retryable: bool,
 }
@@ -28,23 +28,23 @@ pub enum ErrorKind {
     /// Credentials are invalid, expired, or malformed
     /// User action: Check credential format, refresh if expired
     CredentialInvalid,
-    
+
     /// Permission denied when accessing credentials or resources
     /// User action: Check IAM policies, role trust relationships
     PermissionDenied,
-    
+
     /// Required configuration is missing or invalid
     /// User action: Check configuration files, environment variables
     ConfigInvalid,
-    
+
     /// Request cannot be signed or is malformed
     /// User action: Check request parameters, headers
     RequestInvalid,
-    
+
     /// Rate limit exceeded
     /// User action: Implement backoff, check quotas
     RateLimited,
-    
+
     /// Unexpected error that doesn't fit other categories
     /// User action: Check logs, report bug if persistent
     Unexpected,
@@ -67,13 +67,13 @@ impl Error {
         self.source = Some(source.into());
         self
     }
-    
+
     /// Add context information for debugging
     pub fn with_context(mut self, context: impl fmt::Display) -> Self {
         self.context.push(context.to_string());
         self
     }
-    
+
     /// Override the retryable status
     pub fn set_retryable(mut self, retryable: bool) -> Self {
         self.retryable = retryable;
@@ -84,12 +84,12 @@ impl Error {
     pub fn kind(&self) -> ErrorKind {
         self.kind
     }
-    
+
     /// Check if this error is retryable
     pub fn is_retryable(&self) -> bool {
         self.retryable
     }
-    
+
     /// Get the context information
     pub fn context(&self) -> &[String] {
         &self.context
@@ -109,27 +109,27 @@ impl Error {
     pub fn credential_invalid(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::CredentialInvalid, message)
     }
-    
+
     /// Create a permission denied error
     pub fn permission_denied(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::PermissionDenied, message)
     }
-    
+
     /// Create a config invalid error
     pub fn config_invalid(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::ConfigInvalid, message)
     }
-    
+
     /// Create a request invalid error
     pub fn request_invalid(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::RequestInvalid, message)
     }
-    
+
     /// Create a rate limited error
     pub fn rate_limited(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::RateLimited, message)
     }
-    
+
     /// Create an unexpected error
     pub fn unexpected(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::Unexpected, message)
@@ -142,15 +142,15 @@ impl fmt::Debug for Error {
         let mut debug = f.debug_struct("Error");
         debug.field("kind", &self.kind);
         debug.field("message", &self.message);
-        
+
         if !self.context.is_empty() {
             debug.field("context", &self.context);
         }
-        
+
         if let Some(source) = &self.source {
             debug.field("source", source);
         }
-        
+
         debug.field("retryable", &self.retryable);
         debug.finish()
     }
@@ -218,26 +218,20 @@ impl From<std::string::FromUtf8Error> for Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Self {
         use std::io::ErrorKind;
-        
+
         let kind = err.kind();
         let message = err.to_string();
         let source = anyhow::Error::from(err);
-        
+
         match kind {
-            ErrorKind::NotFound => {
-                Self::config_invalid(message).with_source(source)
-            }
-            ErrorKind::PermissionDenied => {
-                Self::permission_denied(message).with_source(source)
-            }
-            _ => {
-                Self::unexpected(message)
-                    .with_source(source)
-                    .set_retryable(matches!(
-                        kind,
-                        ErrorKind::TimedOut | ErrorKind::Interrupted | ErrorKind::ConnectionRefused
-                    ))
-            }
+            ErrorKind::NotFound => Self::config_invalid(message).with_source(source),
+            ErrorKind::PermissionDenied => Self::permission_denied(message).with_source(source),
+            _ => Self::unexpected(message)
+                .with_source(source)
+                .set_retryable(matches!(
+                    kind,
+                    ErrorKind::TimedOut | ErrorKind::Interrupted | ErrorKind::ConnectionRefused
+                )),
         }
     }
 }
@@ -264,41 +258,42 @@ mod tests {
         assert_eq!(err.kind(), ErrorKind::CredentialInvalid);
         assert!(!err.is_retryable());
     }
-    
+
     #[test]
     fn test_error_with_context() {
         let err = Error::permission_denied("access denied")
             .with_context("role: arn:aws:iam::123456789012:role/MyRole")
             .with_context("operation: AssumeRole");
-        
+
         assert_eq!(err.context().len(), 2);
-        assert_eq!(err.context()[0], "role: arn:aws:iam::123456789012:role/MyRole");
+        assert_eq!(
+            err.context()[0],
+            "role: arn:aws:iam::123456789012:role/MyRole"
+        );
         assert_eq!(err.context()[1], "operation: AssumeRole");
     }
-    
+
     #[test]
     fn test_rate_limited_default_retryable() {
         let err = Error::rate_limited("too many requests");
         assert!(err.is_retryable());
     }
-    
+
     #[test]
     fn test_override_retryable() {
-        let err = Error::unexpected("network timeout")
-            .set_retryable(true);
+        let err = Error::unexpected("network timeout").set_retryable(true);
         assert!(err.is_retryable());
-        
-        let err = Error::rate_limited("quota exceeded")
-            .set_retryable(false);
+
+        let err = Error::rate_limited("quota exceeded").set_retryable(false);
         assert!(!err.is_retryable());
     }
-    
+
     #[test]
     fn test_error_debug_format() {
         let err = Error::config_invalid("missing region")
             .with_context("file: ~/.aws/config")
             .with_context("profile: default");
-        
+
         let debug_str = format!("{:?}", err);
         assert!(debug_str.contains("ConfigInvalid"));
         assert!(debug_str.contains("missing region"));

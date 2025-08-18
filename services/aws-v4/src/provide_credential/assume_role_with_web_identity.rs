@@ -110,9 +110,8 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
                 .unwrap_or(false)
         });
 
-        let endpoint = sts_endpoint(region.as_deref(), use_regional).map_err(|e| {
-            e.with_context(format!("role_arn: {}", role_arn))
-        })?;
+        let endpoint = sts_endpoint(region.as_deref(), use_regional)
+            .map_err(|e| e.with_context(format!("role_arn: {}", role_arn)))?;
 
         // Get session name from config or environment or use default
         let session_name = self
@@ -139,24 +138,22 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
                     .with_context(format!("endpoint: https://{}", endpoint))
             })?;
 
-        let resp = ctx
-            .http_send_as_string(req)
-            .await
-            .map_err(|e| {
-                Error::unexpected("failed to send AssumeRoleWithWebIdentity request to STS")
-                    .with_source(e)
-                    .with_context(format!("role_arn: {}", role_arn))
-                    .with_context(format!("endpoint: https://{}", endpoint))
-                    .set_retryable(true)
-            })?;
-        
+        let resp = ctx.http_send_as_string(req).await.map_err(|e| {
+            Error::unexpected("failed to send AssumeRoleWithWebIdentity request to STS")
+                .with_source(e)
+                .with_context(format!("role_arn: {}", role_arn))
+                .with_context(format!("endpoint: https://{}", endpoint))
+                .set_retryable(true)
+        })?;
+
         // Extract request ID and status before consuming response
         let status = resp.status();
-        let request_id = resp.headers()
+        let request_id = resp
+            .headers()
             .get("x-amzn-requestid")
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_string());
-        
+
         if status != http::StatusCode::OK {
             let content = resp.into_body();
             return Err(parse_sts_error(
@@ -171,13 +168,12 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
         }
 
         let body = resp.into_body();
-        let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&body)
-            .map_err(|e| {
-                Error::unexpected("failed to parse STS AssumeRoleWithWebIdentity response")
-                    .with_source(e)
-                    .with_context(format!("response_length: {}", body.len()))
-                    .with_context(format!("role_arn: {}", role_arn))
-            })?;
+        let resp: AssumeRoleWithWebIdentityResponse = de::from_str(&body).map_err(|e| {
+            Error::unexpected("failed to parse STS AssumeRoleWithWebIdentity response")
+                .with_source(e)
+                .with_context(format!("response_length: {}", body.len()))
+                .with_context(format!("role_arn: {}", role_arn))
+        })?;
         let resp_cred = resp.result.credentials;
 
         let cred = Credential {
