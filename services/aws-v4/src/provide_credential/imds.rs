@@ -56,7 +56,7 @@ impl IMDSv2CredentialProvider {
         let endpoint = self.get_endpoint(ctx);
         let url = format!("{}/latest/api/token", endpoint);
         let req = http::Request::builder()
-            .uri(url)
+            .uri(&url)
             .method(Method::PUT)
             .header(CONTENT_LENGTH, "0")
             // 21600s (6h) is recommended by AWS.
@@ -65,17 +65,17 @@ impl IMDSv2CredentialProvider {
             .map_err(|e| {
                 Error::request_invalid("failed to build IMDS token request")
                     .with_source(e)
-                    .with_context("endpoint: http://169.254.169.254/latest/api/token")
+                    .with_context(format!("url: {url}"))
             })?;
-        
+
         let resp = ctx.http_send_as_string(req).await.map_err(|e| {
             Error::unexpected("failed to connect to IMDS")
                 .with_source(e)
-                .with_context("endpoint: http://169.254.169.254")
+                .with_context("endpoint: {endpoint}")
                 .with_context("hint: check if running on EC2 instance")
                 .set_retryable(true)
         })?;
-        
+
         if resp.status() != http::StatusCode::OK {
             return Err(parse_imds_error(
                 "fetch_imds_token",
@@ -119,7 +119,7 @@ impl ProvideCredential for IMDSv2CredentialProvider {
         let endpoint = self.get_endpoint(ctx);
         let url = format!("{}/latest/meta-data/iam/security-credentials/", endpoint);
         let req = http::Request::builder()
-            .uri(url)
+            .uri(&url)
             .method(Method::GET)
             // 21600s (6h) is recommended by AWS.
             .header("x-aws-ec2-metadata-token", &token)
@@ -127,16 +127,16 @@ impl ProvideCredential for IMDSv2CredentialProvider {
             .map_err(|e| {
                 Error::request_invalid("failed to build IMDS credentials list request")
                     .with_source(e)
-                    .with_context("endpoint: http://169.254.169.254/latest/meta-data/iam/security-credentials/")
+                    .with_context("url: {url}")
             })?;
-        
+
         let resp = ctx.http_send_as_string(req).await.map_err(|e| {
             Error::unexpected("failed to list IMDS credentials")
                 .with_source(e)
                 .with_context("operation: list_instance_profiles")
                 .set_retryable(true)
         })?;
-        
+
         if resp.status() != http::StatusCode::OK {
             return Err(parse_imds_error(
                 "list_instance_profiles",
@@ -146,10 +146,12 @@ impl ProvideCredential for IMDSv2CredentialProvider {
         }
 
         let profile_name = resp.into_body();
-        
+
         if profile_name.is_empty() {
-            return Err(Error::config_invalid("no IAM role attached to EC2 instance")
-                .with_context("hint: attach an IAM role to your EC2 instance"));
+            return Err(
+                Error::config_invalid("no IAM role attached to EC2 instance")
+                    .with_context("hint: attach an IAM role to your EC2 instance"),
+            );
         }
 
         // Get the credentials via role_name.
@@ -176,27 +178,26 @@ impl ProvideCredential for IMDSv2CredentialProvider {
                 .with_context(format!("profile: {}", profile_name))
                 .set_retryable(true)
         })?;
-        
+
         if resp.status() != http::StatusCode::OK {
-            return Err(parse_imds_error(
-                "fetch_credentials",
-                resp.status(),
-                resp.body(),
-            ).with_context(format!("profile: {}", profile_name)));
+            return Err(
+                parse_imds_error("fetch_credentials", resp.status(), resp.body())
+                    .with_context(format!("profile: {}", profile_name)),
+            );
         }
 
         let content = resp.into_body();
-        let resp: Ec2MetadataIamSecurityCredentials = serde_json::from_str(&content)
-            .map_err(|e| {
+        let resp: Ec2MetadataIamSecurityCredentials =
+            serde_json::from_str(&content).map_err(|e| {
                 Error::unexpected("failed to parse IMDS credentials response")
                     .with_source(e)
                     .with_context(format!("response_length: {}", content.len()))
                     .with_context(format!("profile: {}", profile_name))
             })?;
-        
+
         // Check for specific error codes
         match resp.code.as_str() {
-            "Success" => {}, // Continue processing
+            "Success" => {} // Continue processing
             "AssumeRoleUnauthorizedAccess" => {
                 return Err(Error::permission_denied(format!(
                     "EC2 instance not authorized to assume role: {}",
