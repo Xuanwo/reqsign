@@ -6,7 +6,6 @@ use ini::Ini;
 use log::{debug, warn};
 use reqsign_core::{Context, Error, ProvideCredential, Result};
 use serde::Deserialize;
-use std::path::PathBuf;
 
 const AWS_SSO_ACCOUNT_ID: &str = "sso_account_id";
 const AWS_SSO_REGION: &str = "sso_region";
@@ -182,14 +181,12 @@ impl SSOCredentialProvider {
         ctx: &Context,
         start_url: &str,
     ) -> Result<Option<CachedToken>> {
+        // Get home directory and build cache path
         let home_dir = ctx
-            .expand_home_dir("~")
+            .home_dir()
             .ok_or_else(|| Error::config_invalid("HOME directory not found".to_string()))?;
 
-        let cache_dir = PathBuf::from(&home_dir)
-            .join(".aws")
-            .join("sso")
-            .join("cache");
+        let cache_dir = home_dir.join(".aws").join("sso").join("cache");
 
         // Generate cache file name (SHA1 hash of start URL)
         let cache_key = hex_sha1(start_url.as_bytes());
