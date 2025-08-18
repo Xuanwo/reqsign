@@ -226,13 +226,67 @@ jobs:
         env:
           AWS_WEB_IDENTITY_TOKEN_FILE: /tmp/web_identity_token
 
-  # IMDSv2CredentialProvider test (only runs on EC2)
+  # IMDSv2CredentialProvider test (using amazon-ec2-metadata-mock)
   test_imds_provider:
     needs: check_secrets
-    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled by default, enable when running on EC2
+    if: needs.check_secrets.outputs.has_secrets == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Start amazon-ec2-metadata-mock
+        run: |
+          # Download ec2-metadata-mock binary
+          curl -Lo ec2-metadata-mock https://github.com/aws/amazon-ec2-metadata-mock/releases/download/v1.13.0/ec2-metadata-mock-linux-amd64
+          chmod +x ec2-metadata-mock
+          
+          # Create configuration file
+          cat > imds-config.json << 'EOF'
+          {
+            "metadata": {
+              "values": {
+                "iam-info": {
+                  "Code": "Success",
+                  "LastUpdated": "2025-01-01T00:00:00Z",
+                  "InstanceProfileArn": "arn:aws:iam::123456789012:instance-profile/test-imds-role",
+                  "InstanceProfileId": "AIPA1234567890ABCDEF"
+                },
+                "iam-security-credentials": {
+                  "Code": "Success",
+                  "LastUpdated": "2025-01-01T00:00:00Z",
+                  "Type": "AWS-HMAC",
+                  "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
+                  "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                  "Token": "IQoJb3JpZ2luX2VjEJv//////////wEaCXVzLXdlc3QtMiJGMEQCIDyJl0YXJwU8iBG4gLVxiNJTYfLp3oFxEOpGGHmQuWmFAiBHEK/GkClQFb0aQ/+kOZkzHKVAPItVJW/VEXAMPLE=",
+                  "Expiration": "2025-12-31T23:59:59Z"
+                },
+                "iam-security-credentials-role": "test-imds-role"
+              }
+            }
+          }
+          EOF
+          
+          # Start the mock service
+          ./ec2-metadata-mock -c imds-config.json --imdsv2 &
+          MOCK_PID=$!
+          echo "MOCK_PID=$MOCK_PID" >> $GITHUB_ENV
+          
+          # Wait for service to start
+          sleep 3
+          
+          # Verify the mock service is responding
+          echo "::group::Verifying IMDS mock service"
+          # Get IMDSv2 token
+          TOKEN=$(curl -X PUT "http://localhost:1338/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          echo "Token obtained: ${TOKEN:0:20}..."
+          # Test fetching IAM info
+          echo "IAM Info:"
+          curl -H "X-aws-ec2-metadata-token: $TOKEN" http://localhost:1338/latest/meta-data/iam/info
+          echo ""
+          # Test fetching role name
+          echo "Role name:"
+          curl -H "X-aws-ec2-metadata-token: $TOKEN" http://localhost:1338/latest/meta-data/iam/security-credentials/
+          echo ""
+          echo "::endgroup::"
       - name: Test IMDSv2CredentialProvider
         working-directory: ./services/aws-v4
         run: |
@@ -242,6 +296,13 @@ jobs:
         env:
           RUST_LOG: DEBUG
           REQSIGN_AWS_V4_TEST_IMDS: on
+          AWS_EC2_METADATA_SERVICE_ENDPOINT: http://localhost:1338
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ ! -z "$MOCK_PID" ]; then
+            kill $MOCK_PID || true
+          fi
 
   # ECSCredentialProvider test (only runs on ECS)
   test_ecs_provider:
@@ -395,12 +456,12 @@ jobs:
             echo "| ProfileCredentialProvider | ${{ needs.test_profile_provider.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| AssumeRoleCredentialProvider | ${{ needs.test_assume_role_provider.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| AssumeRoleWithWebIdentityCredentialProvider | ${{ needs.test_web_identity_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| IMDSv2CredentialProvider (mocked) | ${{ needs.test_imds_provider.result }} |" >> $GITHUB_STEP_SUMMARY
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Disabled Tests" >> $GITHUB_STEP_SUMMARY
           echo "The following tests are disabled by default:" >> $GITHUB_STEP_SUMMARY
-          echo "- IMDSv2CredentialProvider (requires EC2 instance)" >> $GITHUB_STEP_SUMMARY
           echo "- ECSCredentialProvider (requires ECS environment)" >> $GITHUB_STEP_SUMMARY
           echo "- SSOCredentialProvider (requires SSO configuration)" >> $GITHUB_STEP_SUMMARY
           echo "- ProcessCredentialProvider (requires process credential helper)" >> $GITHUB_STEP_SUMMARY
