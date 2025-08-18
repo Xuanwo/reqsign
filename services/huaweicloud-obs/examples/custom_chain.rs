@@ -1,7 +1,7 @@
 //! Example of building a custom credential chain with specific providers
 
 use async_trait::async_trait;
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
+use reqsign_core::{Context, OsEnv, ProvideCredential, ProvideCredentialChain, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqsign_huaweicloud_obs::Credential;
@@ -68,7 +68,10 @@ impl ProvideCredential for EnvCredentialProvider {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create context
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     // Build a custom chain with specific priority order
     let chain = ProvideCredentialChain::new()

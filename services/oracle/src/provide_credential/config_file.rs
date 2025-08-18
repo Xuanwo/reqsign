@@ -108,17 +108,21 @@ impl ProvideCredential for ConfigFileCredentialProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reqsign_core::StaticEnv;
+    use reqsign_core::{OsEnv, StaticEnv};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
     use std::collections::HashMap;
 
     #[tokio::test]
     async fn test_config_file_credential_provider_file_not_found() -> anyhow::Result<()> {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
-            home_dir: Some("/home/user".into()),
-            envs: HashMap::new(),
-        });
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv)
+            .with_env(StaticEnv {
+                home_dir: Some("/home/user".into()),
+                envs: HashMap::new(),
+            });
 
         let provider = ConfigFileCredentialProvider::new();
         let cred = provider.provide_credential(&ctx).await?;

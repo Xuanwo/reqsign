@@ -1,6 +1,6 @@
 use reqsign_aliyun_oss::{DefaultCredentialProvider, RequestSigner, StaticCredentialProvider};
 use reqsign_core::Result;
-use reqsign_core::{Context, Signer};
+use reqsign_core::{Context, OsEnv, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
@@ -14,7 +14,10 @@ async fn main() -> Result<()> {
     let client = Client::new();
 
     // Create context
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::new(client.clone()))
+        .with_env(OsEnv);
 
     // Check if we have real credentials
     let has_real_creds = ctx.env_var("ALIBABA_CLOUD_ACCESS_KEY_ID").is_some()
@@ -35,13 +38,13 @@ async fn main() -> Result<()> {
         // Use demo credentials
         let loader =
             StaticCredentialProvider::new("LTAI4GDemoAccessKeyId", "DemoAccessKeySecretForExample");
-        Signer::new(ctx, loader, builder)
+        Signer::new(ctx.clone(), loader, builder)
     } else {
         // This will try multiple sources:
         // 1. Environment variables (ALIBABA_CLOUD_ACCESS_KEY_ID, ALIBABA_CLOUD_ACCESS_KEY_SECRET)
         // 2. Assume Role with OIDC (if configured)
         let loader = DefaultCredentialProvider::new();
-        Signer::new(ctx, loader, builder)
+        Signer::new(ctx.clone(), loader, builder)
     };
 
     // Example 1: List objects in a bucket

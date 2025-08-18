@@ -1,0 +1,18 @@
+[package]
+name = "reqsign-command-execute-tokio"
+version = "0.1.0"
+edition = "2021"
+authors = ["Xuanwo <github@xuanwo.io>"]
+description = "Tokio-based command execution implementation for reqsign"
+repository = "https://github.com/causal-agent/reqsign"
+license = "Apache-2.0"
+keywords = ["command", "tokio", "reqsign", "async"]
+categories = ["asynchronous"]
+
+[dependencies]
+async-trait = "0.1"
+reqsign-core = { path = "../../core", version = "0.16" }
+tokio = { version = "1", features = ["process", "io-util"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }

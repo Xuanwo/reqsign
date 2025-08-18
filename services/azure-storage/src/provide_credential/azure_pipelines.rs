@@ -254,10 +254,9 @@ mod tests {
     async fn test_provide_credential_no_environment() {
         // When not in Azure Pipelines environment, should return None
         let provider = AzurePipelinesCredentialProvider::new();
-        let ctx = reqsign_core::Context::new(
-            reqsign_file_read_tokio::TokioFileRead,
-            reqsign_http_send_reqwest::ReqwestHttpSend::default(),
-        );
+        let ctx = reqsign_core::Context::new()
+            .with_file_read(reqsign_file_read_tokio::TokioFileRead)
+            .with_http_send(reqsign_http_send_reqwest::ReqwestHttpSend::default());
 
         let result = provider.provide_credential(&ctx).await;
         assert!(result.is_ok());

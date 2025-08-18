@@ -25,7 +25,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
 //!     // Create context
-//!     let ctx = Context::new(
+//!     let ctx = Context::new().with_file_read(
 //!         TokioFileRead::default(),
 //!         ReqwestHttpSend::default()
 //!     );

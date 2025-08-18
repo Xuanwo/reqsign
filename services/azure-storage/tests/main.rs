@@ -12,7 +12,7 @@ use reqsign_azure_storage::{
     Credential, DefaultCredentialProvider, ImdsCredentialProvider, RequestSigner,
     StaticCredentialProvider,
 };
-use reqsign_core::{Context, Signer};
+use reqsign_core::{Context, OsEnv, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
@@ -27,7 +27,10 @@ fn init_signer() -> Option<(Context, Signer<Credential>)> {
         return None;
     }
 
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     let loader = StaticCredentialProvider::new_shared_key(
         &env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME")
@@ -285,7 +288,10 @@ async fn test_head_blob_with_imds() -> Result<()> {
         return Ok(());
     }
 
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     let loader = ImdsCredentialProvider::new();
     let builder = RequestSigner::new();
@@ -334,7 +340,10 @@ async fn test_can_list_container_blobs_with_imds() -> Result<()> {
         return Ok(());
     }
 
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     let loader = ImdsCredentialProvider::new();
     let builder = RequestSigner::new();
@@ -401,7 +410,10 @@ async fn test_head_blob_with_client_secret() -> Result<()> {
         return Ok(());
     }
 
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     let loader = DefaultCredentialProvider::new();
     let builder = RequestSigner::new();
@@ -457,7 +469,10 @@ async fn test_can_list_container_blobs_client_secret() -> Result<()> {
         return Ok(());
     }
 
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     let loader = DefaultCredentialProvider::new();
     let builder = RequestSigner::new();

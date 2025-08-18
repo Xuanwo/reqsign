@@ -367,7 +367,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_sso_provider_no_config() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: Some(std::path::PathBuf::from("/home/test")),
             envs: HashMap::new(),

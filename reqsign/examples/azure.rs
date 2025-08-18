@@ -10,7 +10,10 @@ async fn main() -> Result<()> {
     let ctx_impl = DefaultContext::new();
 
     // Create a Context from the implementation
-    let ctx = Context::new(ctx_impl.clone(), ctx_impl.clone()).with_env(ctx_impl.clone());
+    let ctx = Context::new()
+        .with_file_read(ctx_impl.clone())
+        .with_http_send(ctx_impl.clone())
+        .with_env(ctx_impl.clone());
 
     // Create credential loader - will try multiple credential sources
     let loader = DefaultCredentialProvider::new();

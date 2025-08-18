@@ -55,7 +55,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_default_loader_without_env() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::new(),
@@ -69,7 +71,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_default_loader_with_env() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([
@@ -93,7 +97,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_default_loader_with_security_token() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([

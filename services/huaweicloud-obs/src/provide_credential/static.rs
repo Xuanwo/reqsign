@@ -53,7 +53,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_static_credential_provider() -> anyhow::Result<()> {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
 
         let provider = StaticCredentialProvider::new("test_access_key", "test_secret_key");
         let cred = provider.provide_credential(&ctx).await?;

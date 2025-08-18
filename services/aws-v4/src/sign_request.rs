@@ -629,7 +629,9 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let loader = StaticCredentialProvider::new("access_key_id", "secret_access_key");
         let cred = loader.provide_credential(&ctx).await?.unwrap();
 
@@ -705,7 +707,9 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let loader = StaticCredentialProvider::new("access_key_id", "secret_access_key");
         let cred = loader.provide_credential(&ctx).await?.unwrap();
 
@@ -783,7 +787,9 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let loader = StaticCredentialProvider::new("access_key_id", "secret_access_key")
             .with_session_token("security_token");
         let cred = loader.provide_credential(&ctx).await?.unwrap();
@@ -862,7 +868,9 @@ mod tests {
         let req = req_fn();
         let (mut parts, body) = req.into_parts();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let loader = StaticCredentialProvider::new("access_key_id", "secret_access_key")
             .with_session_token("security_token");
         let cred = loader.provide_credential(&ctx).await?.unwrap();

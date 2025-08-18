@@ -4,7 +4,7 @@ use std::time::Duration;
 use http::StatusCode;
 use log::debug;
 use log::warn;
-use reqsign_core::{Context, Result, Signer};
+use reqsign_core::{Context, OsEnv, Result, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_google::{Credential, RequestSigner, StaticCredentialProvider};
 use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -29,7 +29,10 @@ async fn init_signer() -> Option<(Context, Signer<Credential>)> {
         .with_scope(&scope);
     let builder = RequestSigner::new("storage").with_scope(&scope);
 
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
     let signer = Signer::new(ctx.clone(), loader, builder);
     Some((ctx, signer))
 }
@@ -51,7 +54,10 @@ async fn init_signer_for_signed_url() -> Option<(Context, Signer<Credential>)> {
         .expect("credential must be valid base64");
     let builder = RequestSigner::new("storage");
 
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
     let signer = Signer::new(ctx.clone(), loader, builder);
     Some((ctx, signer))
 }

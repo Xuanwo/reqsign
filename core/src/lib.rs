@@ -14,7 +14,7 @@
 //! ## Example
 //!
 //! ```no_run
-//! use reqsign_core::{Context, Signer, ProvideCredential, SignRequest, SigningCredential, Result};
+//! use reqsign_core::{Context, OsEnv, ProvideCredential, Result, SignRequest, Signer, SigningCredential};
 //! use async_trait::async_trait;
 //! use http::request::Parts;
 //! use std::time::Duration;
@@ -94,7 +94,10 @@
 //! # }
 //! #
 //! // Create a context with your implementations
-//! let ctx = Context::new(MockFileRead, MockHttpSend);
+//! let ctx = Context::new()
+//!     .with_file_read(MockFileRead)
+//!     .with_http_send(MockHttpSend)
+//!     .with_env(OsEnv);
 //!
 //! // Create a signer
 //! let signer = Signer::new(ctx, MyLoader, MyBuilder);
@@ -144,10 +147,17 @@ pub mod utils;
 pub use error::{Error, ErrorKind, Result};
 
 mod context;
+pub use context::CommandExecute;
+pub use context::CommandOutput;
 pub use context::Context;
 pub use context::Env;
 pub use context::FileRead;
 pub use context::HttpSend;
+pub use context::NoopCommandExecute;
+pub use context::NoopEnv;
+pub use context::NoopFileRead;
+pub use context::NoopHttpSend;
+pub use context::OsEnv;
 pub use context::StaticEnv;
 
 mod api;

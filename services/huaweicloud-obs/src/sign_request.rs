@@ -290,7 +290,7 @@ mod tests {
     use http::header::HeaderName;
     use http::Uri;
     use reqsign_core::Result;
-    use reqsign_core::{Context, Signer};
+    use reqsign_core::{Context, OsEnv, Signer};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
 
@@ -306,7 +306,10 @@ mod tests {
                 .with_timezone(&Utc),
         );
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let signer = Signer::new(ctx, loader, builder);
 
         let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com/object.txt";
@@ -345,7 +348,10 @@ mod tests {
                 .with_timezone(&Utc),
         );
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let signer = Signer::new(ctx, loader, builder);
 
         let get_req =
@@ -386,7 +392,10 @@ mod tests {
                 .with_timezone(&Utc),
         );
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let signer = Signer::new(ctx, loader, builder);
 
         let get_req = "http://bucket.obs.cn-north-4.myhuaweicloud.com?name=hello&abc=def";

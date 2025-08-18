@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::{Error, Result};
 use bytes::Bytes;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -6,28 +6,94 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Context provides the context for the request signing.
-#[derive(Debug, Clone)]
+///
+/// ## Important
+///
+/// reqsign provides NO default implementations. Users MAY configure components they need.
+/// Any unconfigured component will use a no-op implementation that returns errors or empty values when called.
+///
+/// ## Example
+///
+/// ```
+/// use reqsign_core::{Context, OsEnv};
+/// use reqsign_file_read_tokio::TokioFileRead;
+/// use reqsign_http_send_reqwest::ReqwestHttpSend;
+///
+/// // Create a context with explicit implementations
+/// let ctx = Context::new()
+///     .with_file_read(TokioFileRead)
+///     .with_http_send(ReqwestHttpSend::default())
+///     .with_env(OsEnv);  // Optionally configure environment implementation
+/// ```
+#[derive(Clone)]
 pub struct Context {
     fs: Arc<dyn FileRead>,
     http: Arc<dyn HttpSend>,
     env: Arc<dyn Env>,
+    cmd: Arc<dyn CommandExecute>,
+}
+
+impl Debug for Context {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Context")
+            .field("fs", &self.fs)
+            .field("http", &self.http)
+            .field("env", &self.env)
+            .field("cmd", &self.cmd)
+            .finish()
+    }
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Context {
-    /// Create a new context.
-    #[inline]
-    pub fn new(fs: impl FileRead, http: impl HttpSend) -> Self {
+    /// Create a new Context with no-op implementations.
+    ///
+    /// All components use no-op implementations by default.
+    /// Use the `with_*` methods to configure the components you need.
+    ///
+    /// ```
+    /// use reqsign_core::{Context, OsEnv};
+    ///
+    /// let ctx = Context::new()
+    ///     .with_file_read(my_file_reader)  // Optional: for file operations
+    ///     .with_http_send(my_http_client)  // Optional: for HTTP operations
+    ///     .with_env(OsEnv);                // Optional: for env var access
+    /// ```
+    pub fn new() -> Self {
         Self {
-            fs: Arc::new(fs),
-            http: Arc::new(http),
-            env: Arc::new(OsEnv),
+            fs: Arc::new(NoopFileRead),
+            http: Arc::new(NoopHttpSend),
+            env: Arc::new(NoopEnv),
+            cmd: Arc::new(NoopCommandExecute),
         }
     }
 
-    /// Set the environment for the context. Use this if you want to mock the environment.
-    #[inline]
+    /// Replace the file reader implementation.
+    pub fn with_file_read(mut self, fs: impl FileRead) -> Self {
+        self.fs = Arc::new(fs);
+        self
+    }
+
+    /// Replace the HTTP client implementation.
+    pub fn with_http_send(mut self, http: impl HttpSend) -> Self {
+        self.http = Arc::new(http);
+        self
+    }
+
+    /// Replace the environment implementation.
     pub fn with_env(mut self, env: impl Env) -> Self {
         self.env = Arc::new(env);
+        self
+    }
+
+    /// Replace the command executor implementation.
+    pub fn with_command_execute(mut self, cmd: impl CommandExecute) -> Self {
+        self.cmd = Arc::new(cmd);
         self
     }
 
@@ -93,6 +159,13 @@ impl Context {
     #[inline]
     pub fn env_vars(&self) -> HashMap<String, String> {
         self.env.vars()
+    }
+
+    /// Execute an external command with the given program and arguments.
+    ///
+    /// Returns the command output including exit status, stdout, and stderr.
+    pub async fn command_execute(&self, program: &str, args: &[&str]) -> Result<CommandOutput> {
+        self.cmd.command_execute(program, args).await
     }
 }
 
@@ -183,6 +256,102 @@ impl Env for StaticEnv {
 
     fn home_dir(&self) -> Option<PathBuf> {
         self.home_dir.clone()
+    }
+}
+
+/// CommandOutput represents the output of a command execution.
+#[derive(Debug, Clone)]
+pub struct CommandOutput {
+    /// Exit status code (0 for success)
+    pub status: i32,
+    /// Standard output as bytes
+    pub stdout: Vec<u8>,
+    /// Standard error as bytes
+    pub stderr: Vec<u8>,
+}
+
+impl CommandOutput {
+    /// Check if the command exited successfully.
+    pub fn success(&self) -> bool {
+        self.status == 0
+    }
+}
+
+/// CommandExecute is used to execute external commands for credential retrieval.
+///
+/// This trait abstracts command execution to support different runtime environments:
+/// - Tokio-based async execution
+/// - Blocking execution for non-async contexts
+/// - WebAssembly environments (returning errors)
+/// - Mock implementations for testing
+#[async_trait::async_trait]
+pub trait CommandExecute: Debug + Send + Sync + 'static {
+    /// Execute a command with the given program and arguments.
+    async fn command_execute(&self, program: &str, args: &[&str]) -> Result<CommandOutput>;
+}
+
+/// NoopFileRead is a no-op implementation that always returns an error.
+///
+/// This is used when no file reader is configured.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoopFileRead;
+
+#[async_trait::async_trait]
+impl FileRead for NoopFileRead {
+    async fn file_read(&self, _path: &str) -> Result<Vec<u8>> {
+        Err(Error::unexpected(
+            "file reading not supported: no file reader configured",
+        ))
+    }
+}
+
+/// NoopHttpSend is a no-op implementation that always returns an error.
+///
+/// This is used when no HTTP client is configured.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoopHttpSend;
+
+#[async_trait::async_trait]
+impl HttpSend for NoopHttpSend {
+    async fn http_send(&self, _req: http::Request<Bytes>) -> Result<http::Response<Bytes>> {
+        Err(Error::unexpected(
+            "HTTP sending not supported: no HTTP client configured",
+        ))
+    }
+}
+
+/// NoopEnv is a no-op implementation that always returns None/empty.
+///
+/// This is used when no environment is configured.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoopEnv;
+
+impl Env for NoopEnv {
+    fn var(&self, _key: &str) -> Option<String> {
+        None
+    }
+
+    fn vars(&self) -> HashMap<String, String> {
+        HashMap::new()
+    }
+
+    fn home_dir(&self) -> Option<PathBuf> {
+        None
+    }
+}
+
+/// NoopCommandExecute is a no-op implementation that always returns an error.
+///
+/// This is used when no command executor is configured.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoopCommandExecute;
+
+#[async_trait::async_trait]
+impl CommandExecute for NoopCommandExecute {
+    async fn command_execute(&self, _program: &str, _args: &[&str]) -> Result<CommandOutput> {
+        Err(Error::unexpected(
+            "command execution not supported: no command executor configured",
+        ))
     }
 }
 

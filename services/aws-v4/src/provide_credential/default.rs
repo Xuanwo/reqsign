@@ -77,7 +77,7 @@ mod tests {
     use crate::constants::{
         AWS_ACCESS_KEY_ID, AWS_CONFIG_FILE, AWS_SECRET_ACCESS_KEY, AWS_SHARED_CREDENTIALS_FILE,
     };
-    use reqsign_core::StaticEnv;
+    use reqsign_core::{OsEnv, StaticEnv};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
     use std::collections::HashMap;
@@ -87,7 +87,10 @@ mod tests {
     async fn test_credential_env_loader_without_env() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::new(),
@@ -102,7 +105,10 @@ mod tests {
     async fn test_credential_env_loader_with_env() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([
@@ -126,7 +132,10 @@ mod tests {
     async fn test_credential_profile_loader_from_config() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([
@@ -161,7 +170,10 @@ mod tests {
     async fn test_credential_profile_loader_from_shared() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([
@@ -197,7 +209,10 @@ mod tests {
     async fn test_credential_profile_loader_from_both() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([

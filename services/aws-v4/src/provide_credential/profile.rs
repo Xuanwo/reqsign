@@ -245,10 +245,13 @@ mod tests {
         writeln!(tmp_file, "aws_secret_access_key = PROFILE1SECRETACCESSKEY")?;
         writeln!(tmp_file, "aws_session_token = PROFILE1SESSIONTOKEN")?;
 
-        let context = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
-            home_dir: None,
-            envs: HashMap::new(),
-        });
+        let context = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(StaticEnv {
+                home_dir: None,
+                envs: HashMap::new(),
+            });
 
         // Test default profile
         let provider =
@@ -289,10 +292,13 @@ mod tests {
         writeln!(tmp_file, "aws_access_key_id = PROFILE1ACCESSKEYID")?;
         writeln!(tmp_file, "aws_secret_access_key = PROFILE1SECRETACCESSKEY")?;
 
-        let context = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
-            home_dir: None,
-            envs: HashMap::new(),
-        });
+        let context = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(StaticEnv {
+                home_dir: None,
+                envs: HashMap::new(),
+            });
 
         // Test default profile
         let provider =
@@ -333,10 +339,13 @@ mod tests {
         writeln!(tmp_file, "aws_access_key_id = PROFILE1ACCESSKEYID")?;
         writeln!(tmp_file, "aws_secret_access_key = PROFILE1SECRETACCESSKEY")?;
 
-        let context = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
-            home_dir: None,
-            envs: HashMap::from([(AWS_PROFILE.to_string(), "profile1".to_string())]),
-        });
+        let context = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(StaticEnv {
+                home_dir: None,
+                envs: HashMap::from([(AWS_PROFILE.to_string(), "profile1".to_string())]),
+            });
 
         // Even though we set default, AWS_PROFILE should override
         let provider = ProfileCredentialProvider::new()
@@ -353,7 +362,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_profile_missing_credentials() -> anyhow::Result<()> {
-        let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let context = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
 
         let provider = ProfileCredentialProvider::new()
             .with_credentials_file("/non/existent/path")

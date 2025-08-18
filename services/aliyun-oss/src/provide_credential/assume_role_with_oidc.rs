@@ -164,7 +164,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_assume_role_with_oidc_loader_without_config() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::new(),

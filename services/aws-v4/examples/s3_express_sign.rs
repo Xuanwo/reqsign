@@ -1,6 +1,6 @@
 use anyhow::Result;
 use reqsign_aws_v4::{DefaultCredentialProvider, RequestSigner, S3ExpressSessionProvider};
-use reqsign_core::{Context, Signer};
+use reqsign_core::{Context, OsEnv, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
@@ -14,7 +14,10 @@ async fn main() -> Result<()> {
     let client = Client::new();
 
     // Create context with Tokio file reader and reqwest HTTP client
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::new(client.clone()))
+        .with_env(OsEnv);
 
     // Example S3 Express One Zone bucket name
     // Format: bucket-name--azid--x-s3

@@ -21,7 +21,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create context
-//!     let ctx = Context::new(
+//!     let ctx = Context::new().with_file_read(
 //!         TokioFileRead::default(),
 //!         ReqwestHttpSend::default(),
 //!     );

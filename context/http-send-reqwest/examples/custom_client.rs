@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bytes::Bytes;
-use reqsign_core::Context;
+use reqsign_core::{Context, OsEnv};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
@@ -22,7 +22,10 @@ async fn main() -> Result<()> {
     println!("  - Custom user agent");
 
     // Create context with the custom client
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client));
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::new(client))
+        .with_env(OsEnv);
 
     // Test the HTTP client with a simple request
     let test_url = "https://httpbin.org/get";
@@ -55,7 +58,10 @@ async fn main() -> Result<()> {
 
     // Demonstrate using the default client
     println!("\n--- Using default client ---");
-    let default_ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let default_ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     let req2 = http::Request::builder()
         .method("POST")

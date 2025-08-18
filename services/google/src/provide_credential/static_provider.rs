@@ -106,10 +106,9 @@ mod tests {
         }"#;
 
         let provider = StaticCredentialProvider::new(content);
-        let ctx = Context::new(
-            reqsign_file_read_tokio::TokioFileRead,
-            reqsign_http_send_reqwest::ReqwestHttpSend::default(),
-        );
+        let ctx = Context::new()
+            .with_file_read(reqsign_file_read_tokio::TokioFileRead)
+            .with_http_send(reqsign_http_send_reqwest::ReqwestHttpSend::default());
 
         let result = provider.provide_credential(&ctx).await;
         assert!(result.is_ok());
@@ -135,10 +134,9 @@ mod tests {
 
         let provider =
             StaticCredentialProvider::from_base64(encoded).expect("should decode base64");
-        let ctx = Context::new(
-            reqsign_file_read_tokio::TokioFileRead,
-            reqsign_http_send_reqwest::ReqwestHttpSend::default(),
-        );
+        let ctx = Context::new()
+            .with_file_read(reqsign_file_read_tokio::TokioFileRead)
+            .with_http_send(reqsign_http_send_reqwest::ReqwestHttpSend::default());
 
         let result = provider.provide_credential(&ctx).await;
         assert!(result.is_ok());

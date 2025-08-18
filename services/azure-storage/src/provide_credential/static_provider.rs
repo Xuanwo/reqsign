@@ -43,14 +43,17 @@ impl ProvideCredential for StaticCredentialProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reqsign_core::Context;
+    use reqsign_core::{Context, OsEnv};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
 
     #[tokio::test]
     async fn test_static_credential_provider_shared_key() {
         let provider = StaticCredentialProvider::new_shared_key("myaccount", "mykey");
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let cred = provider.provide_credential(&ctx).await.unwrap();
 
         match cred {
@@ -68,7 +71,10 @@ mod tests {
     #[tokio::test]
     async fn test_static_credential_provider_sas_token() {
         let provider = StaticCredentialProvider::new_sas_token("mysastoken");
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let cred = provider.provide_credential(&ctx).await.unwrap();
 
         match cred {
@@ -82,7 +88,10 @@ mod tests {
     #[tokio::test]
     async fn test_static_credential_provider_bearer_token() {
         let provider = StaticCredentialProvider::new_bearer_token("mybearertoken");
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let cred = provider.provide_credential(&ctx).await.unwrap();
 
         match cred {

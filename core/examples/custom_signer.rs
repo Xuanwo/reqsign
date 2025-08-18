@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use http::request::Parts;
 use reqsign_core::Result;
-use reqsign_core::{Context, ProvideCredential, SignRequest, Signer, SigningCredential};
+use reqsign_core::{Context, OsEnv, ProvideCredential, SignRequest, Signer, SigningCredential};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use std::time::Duration;
@@ -82,7 +82,10 @@ impl SignRequest for MyRequestBuilder {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create a context with default implementations
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     // Create the credential loader and request builder
     let loader = MyCredentialLoader;

@@ -10,7 +10,7 @@ use log::warn;
 use percent_encoding::utf8_percent_encode;
 use percent_encoding::NON_ALPHANUMERIC;
 use reqsign_core::Result;
-use reqsign_core::{Context, Signer};
+use reqsign_core::{Context, OsEnv, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqsign_tencent_cos::{Credential, RequestSigner, StaticCredentialProvider};
@@ -29,7 +29,10 @@ async fn init_signer() -> Option<Signer<Credential>> {
     let secret_key = env::var("REQSIGN_TENCENT_COS_SECRET_KEY")
         .expect("env REQSIGN_TENCENT_COS_SECRET_KEY must set");
     let loader = StaticCredentialProvider::new(&secret_id, &secret_key);
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
     let signer = Signer::new(ctx, loader, RequestSigner::new());
 
     Some(signer)
