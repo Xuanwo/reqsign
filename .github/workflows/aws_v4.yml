@@ -302,44 +302,59 @@ jobs:
             kill $MOCK_PID || true
           fi
 
-  # ECSCredentialProvider test (using amazon-ecs-local-container-endpoints)
+  # ECSCredentialProvider test (using mock server)
   test_ecs_provider:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup test credentials
+      - name: Setup Mock ECS Credentials Server
         run: |
-          # Create credentials in runner's home directory
-          mkdir -p $HOME/.aws
-          cat > $HOME/.aws/credentials << 'EOF'
-          [default]
-          aws_access_key_id = AKIAIOSFODNN7EXAMPLE
-          aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+          # Create a simple Python script to mock ECS credentials endpoint
+          cat > mock_ecs_server.py << 'EOF'
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          import json
+          from datetime import datetime, timedelta
+          
+          class ECSHandler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == '/creds':
+                      # Return mock credentials
+                      expiration = (datetime.utcnow() + timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')
+                      response = {
+                          'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE',
+                          'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                          'Token': 'IQoJb3JpZ2luX2VjEJv//////////wEaCXVzLXdlc3QtMiJGMEQCIDyJl0YXJwU8iBG4gLVxiNJTYfLp3oFxEOpGGHmQuWmFAiBHEK/GkClQFb0aQ/+kOZkzHKVAPItVJW/VEXAMPLE=',
+                          'Expiration': expiration
+                      }
+                      self.send_response(200)
+                      self.send_header('Content-Type', 'application/json')
+                      self.end_headers()
+                      self.wfile.write(json.dumps(response).encode())
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+              
+              def log_message(self, format, *args):
+                  # Suppress logs to stderr
+                  pass
+          
+          if __name__ == '__main__':
+              server = HTTPServer(('0.0.0.0', 51679), ECSHandler)
+              print('Mock ECS server running on port 51679')
+              server.serve_forever()
           EOF
-      - name: Start ECS Local Endpoints
-        run: |
-          # Run the container with proper volume mounts
-          docker run -d \
-            --name ecs-local-endpoints \
-            -p 51679:80 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $HOME/.aws:/home/.aws \
-            -e ECS_LOCAL_METADATA_PORT=80 \
-            -e AWS_DEFAULT_REGION=us-east-1 \
-            public.ecr.aws/ecs-local/amazon-ecs-local-container-endpoints:latest
           
-          # Wait for service to start
-          sleep 5
+          # Start the mock server in background
+          python3 mock_ecs_server.py &
+          MOCK_PID=$!
+          echo "MOCK_PID=$MOCK_PID" >> $GITHUB_ENV
           
-          # Check container logs
-          echo "::group::Container logs"
-          docker logs ecs-local-endpoints
-          echo "::endgroup::"
+          # Wait for server to start
+          sleep 2
           
-          # Verify the service is running
-          echo "::group::Verifying ECS local endpoints service"
-          curl -v http://localhost:51679/creds || echo "Credentials endpoint check failed"
-          curl -v http://localhost:51679/v2/metadata || echo "Metadata endpoint check failed"
+          # Verify the mock server is running
+          echo "::group::Verifying mock ECS credentials server"
+          curl -v http://localhost:51679/creds
           echo "::endgroup::"
       - name: Test ECSCredentialProvider with relative URI
         working-directory: ./services/aws-v4
@@ -367,8 +382,9 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker stop ecs-local-endpoints || true
-          docker rm ecs-local-endpoints || true
+          if [ ! -z "$MOCK_PID" ]; then
+            kill $MOCK_PID || true
+          fi
 
   # SSOCredentialProvider test
   test_sso_provider:
