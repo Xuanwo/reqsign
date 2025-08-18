@@ -126,26 +126,20 @@ impl ReqwestHttpSend {
 #[async_trait]
 impl HttpSend for ReqwestHttpSend {
     async fn http_send(&self, req: http::Request<Bytes>) -> Result<http::Response<Bytes>> {
-        let req = Request::try_from(req).map_err(|e| {
-            Error::unexpected("failed to convert request").with_source(anyhow::Error::new(e))
-        })?;
+        let req = Request::try_from(req)
+            .map_err(|e| Error::unexpected("failed to convert request").with_source(e))?;
         let resp: http::Response<_> = self
             .client
             .execute(req)
             .await
-            .map_err(|e| {
-                Error::unexpected("failed to send HTTP request").with_source(anyhow::Error::new(e))
-            })?
+            .map_err(|e| Error::unexpected("failed to send HTTP request").with_source(e))?
             .into();
 
         let (parts, body) = resp.into_parts();
         let bs = BodyExt::collect(body)
             .await
             .map(|buf| buf.to_bytes())
-            .map_err(|e| {
-                Error::unexpected("failed to collect response body")
-                    .with_source(anyhow::Error::new(e))
-            })?;
+            .map_err(|e| Error::unexpected("failed to collect response body").with_source(e))?;
         Ok(http::Response::from_parts(parts, bs))
     }
 }

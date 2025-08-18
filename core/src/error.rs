@@ -181,37 +181,37 @@ impl From<anyhow::Error> for Error {
 
 impl From<std::fmt::Error> for Error {
     fn from(err: std::fmt::Error) -> Self {
-        Self::unexpected(err.to_string()).with_source(anyhow::Error::from(err))
+        Self::unexpected(err.to_string()).with_source(err)
     }
 }
 
 impl From<http::Error> for Error {
     fn from(err: http::Error) -> Self {
-        Self::request_invalid(err.to_string()).with_source(anyhow::Error::from(err))
+        Self::request_invalid(err.to_string()).with_source(err)
     }
 }
 
 impl From<http::header::InvalidHeaderValue> for Error {
     fn from(err: http::header::InvalidHeaderValue) -> Self {
-        Self::request_invalid(err.to_string()).with_source(anyhow::Error::from(err))
+        Self::request_invalid(err.to_string()).with_source(err)
     }
 }
 
 impl From<http::uri::InvalidUri> for Error {
     fn from(err: http::uri::InvalidUri) -> Self {
-        Self::request_invalid(err.to_string()).with_source(anyhow::Error::from(err))
+        Self::request_invalid(err.to_string()).with_source(err)
     }
 }
 
 impl From<http::uri::InvalidUriParts> for Error {
     fn from(err: http::uri::InvalidUriParts) -> Self {
-        Self::request_invalid(err.to_string()).with_source(anyhow::Error::from(err))
+        Self::request_invalid(err.to_string()).with_source(err)
     }
 }
 
 impl From<std::string::FromUtf8Error> for Error {
     fn from(err: std::string::FromUtf8Error) -> Self {
-        Self::unexpected(err.to_string()).with_source(anyhow::Error::from(err))
+        Self::unexpected(err.to_string()).with_source(err)
     }
 }
 
@@ -238,13 +238,13 @@ impl From<std::io::Error> for Error {
 
 impl From<http::header::InvalidHeaderName> for Error {
     fn from(err: http::header::InvalidHeaderName) -> Self {
-        Self::request_invalid(err.to_string()).with_source(anyhow::Error::from(err))
+        Self::request_invalid(err.to_string()).with_source(err)
     }
 }
 
 impl From<http::header::ToStrError> for Error {
     fn from(err: http::header::ToStrError) -> Self {
-        Self::request_invalid(err.to_string()).with_source(anyhow::Error::from(err))
+        Self::request_invalid(err.to_string()).with_source(err)
     }
 }
 
