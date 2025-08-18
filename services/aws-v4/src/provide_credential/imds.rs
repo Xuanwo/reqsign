@@ -37,6 +37,13 @@ impl IMDSv2CredentialProvider {
 }
 
 impl IMDSv2CredentialProvider {
+    fn get_endpoint(&self, ctx: &Context) -> String {
+        ctx.env_vars()
+            .get("AWS_EC2_METADATA_SERVICE_ENDPOINT")
+            .cloned()
+            .unwrap_or_else(|| "http://169.254.169.254".into())
+    }
+
     async fn load_ec2_metadata_token(&self, ctx: &Context) -> Result<String> {
         {
             let (token, expires_in) = self.token.lock().expect("lock poisoned").clone();
@@ -45,7 +52,8 @@ impl IMDSv2CredentialProvider {
             }
         }
 
-        let url = "http://169.254.169.254/latest/api/token";
+        let endpoint = self.get_endpoint(ctx);
+        let url = format!("{}/latest/api/token", endpoint);
         let req = http::Request::builder()
             .uri(url)
             .method(Method::PUT)
@@ -94,7 +102,8 @@ impl ProvideCredential for IMDSv2CredentialProvider {
         let token = self.load_ec2_metadata_token(ctx).await?;
 
         // List all credentials that node has.
-        let url = "http://169.254.169.254/latest/meta-data/iam/security-credentials/";
+        let endpoint = self.get_endpoint(ctx);
+        let url = format!("{}/latest/meta-data/iam/security-credentials/", endpoint);
         let req = http::Request::builder()
             .uri(url)
             .method(Method::GET)
@@ -115,8 +124,10 @@ impl ProvideCredential for IMDSv2CredentialProvider {
         let profile_name = resp.into_body();
 
         // Get the credentials via role_name.
+        let endpoint = self.get_endpoint(ctx);
         let url = format!(
-            "http://169.254.169.254/latest/meta-data/iam/security-credentials/{profile_name}"
+            "{}/latest/meta-data/iam/security-credentials/{profile_name}",
+            endpoint
         );
         let req = http::Request::builder()
             .uri(url)

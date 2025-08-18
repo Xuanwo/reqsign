@@ -6,7 +6,6 @@ use ini::Ini;
 use log::{debug, warn};
 use reqsign_core::{Context, Error, ProvideCredential, Result};
 use serde::Deserialize;
-use std::path::PathBuf;
 
 const AWS_SSO_ACCOUNT_ID: &str = "sso_account_id";
 const AWS_SSO_REGION: &str = "sso_region";
@@ -36,6 +35,7 @@ pub struct SSOCredentialProvider {
     sso_region: Option<String>,
     sso_role_name: Option<String>,
     sso_start_url: Option<String>,
+    sso_endpoint: Option<String>, // Allow custom endpoint for testing
 }
 
 impl Default for SSOCredentialProvider {
@@ -53,6 +53,7 @@ impl SSOCredentialProvider {
             sso_region: None,
             sso_role_name: None,
             sso_start_url: None,
+            sso_endpoint: None,
         }
     }
 
@@ -86,6 +87,12 @@ impl SSOCredentialProvider {
         self
     }
 
+    /// Set custom SSO endpoint (for testing)
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.sso_endpoint = Some(endpoint.into());
+        self
+    }
+
     async fn load_sso_config(&self, ctx: &Context) -> Result<SSOConfig> {
         // If all fields are provided directly, use them
         if let (Some(account_id), Some(region), Some(role_name), Some(start_url)) = (
@@ -103,8 +110,13 @@ impl SSOCredentialProvider {
         }
 
         // Otherwise, load from config file
-        let profile_name = self.profile.as_deref().unwrap_or("default");
-        self.load_from_config_file(ctx, profile_name).await
+        // Priority: 1. self.profile, 2. AWS_PROFILE env var, 3. "default"
+        let profile_name = self
+            .profile
+            .clone()
+            .or_else(|| ctx.env_var("AWS_PROFILE"))
+            .unwrap_or_else(|| "default".to_string());
+        self.load_from_config_file(ctx, &profile_name).await
     }
 
     async fn load_from_config_file(&self, ctx: &Context, profile: &str) -> Result<SSOConfig> {
@@ -169,14 +181,12 @@ impl SSOCredentialProvider {
         ctx: &Context,
         start_url: &str,
     ) -> Result<Option<CachedToken>> {
+        // Get home directory and build cache path
         let home_dir = ctx
-            .expand_home_dir("~")
+            .home_dir()
             .ok_or_else(|| Error::config_invalid("HOME directory not found".to_string()))?;
 
-        let cache_dir = PathBuf::from(&home_dir)
-            .join(".aws")
-            .join("sso")
-            .join("cache");
+        let cache_dir = home_dir.join(".aws").join("sso").join("cache");
 
         // Generate cache file name (SHA1 hash of start URL)
         let cache_key = hex_sha1(start_url.as_bytes());
@@ -215,10 +225,17 @@ impl SSOCredentialProvider {
         config: &SSOConfig,
         access_token: &str,
     ) -> Result<Credential> {
-        let endpoint = format!(
-            "https://portal.sso.{}.amazonaws.com/federation/credentials",
-            config.sso_region
-        );
+        // Allow endpoint override for testing
+        let endpoint = self
+            .sso_endpoint
+            .clone()
+            .or_else(|| ctx.env_var("AWS_SSO_ENDPOINT"))
+            .unwrap_or_else(|| {
+                format!(
+                    "https://portal.sso.{}.amazonaws.com/federation/credentials",
+                    config.sso_region
+                )
+            });
 
         let params = serde_urlencoded::to_string([
             ("role_name", &config.sso_role_name),
