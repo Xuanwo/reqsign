@@ -111,8 +111,13 @@ impl SSOCredentialProvider {
         }
 
         // Otherwise, load from config file
-        let profile_name = self.profile.as_deref().unwrap_or("default");
-        self.load_from_config_file(ctx, profile_name).await
+        // Priority: 1. self.profile, 2. AWS_PROFILE env var, 3. "default"
+        let profile_name = self
+            .profile
+            .clone()
+            .or_else(|| ctx.env_var("AWS_PROFILE"))
+            .unwrap_or_else(|| "default".to_string());
+        self.load_from_config_file(ctx, &profile_name).await
     }
 
     async fn load_from_config_file(&self, ctx: &Context, profile: &str) -> Result<SSOConfig> {

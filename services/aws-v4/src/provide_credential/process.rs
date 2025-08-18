@@ -71,8 +71,13 @@ impl ProcessCredentialProvider {
         }
 
         // Otherwise, load from config file
-        let profile_name = self.profile.as_deref().unwrap_or("default");
-        self.load_command_from_config(ctx, profile_name).await
+        // Priority: 1. self.profile, 2. AWS_PROFILE env var, 3. "default"
+        let profile_name = self
+            .profile
+            .clone()
+            .or_else(|| ctx.env_var("AWS_PROFILE"))
+            .unwrap_or_else(|| "default".to_string());
+        self.load_command_from_config(ctx, &profile_name).await
     }
 
     async fn load_command_from_config(&self, ctx: &Context, profile: &str) -> Result<String> {
