@@ -36,6 +36,7 @@ pub struct SSOCredentialProvider {
     sso_region: Option<String>,
     sso_role_name: Option<String>,
     sso_start_url: Option<String>,
+    sso_endpoint: Option<String>, // Allow custom endpoint for testing
 }
 
 impl Default for SSOCredentialProvider {
@@ -53,6 +54,7 @@ impl SSOCredentialProvider {
             sso_region: None,
             sso_role_name: None,
             sso_start_url: None,
+            sso_endpoint: None,
         }
     }
 
@@ -83,6 +85,12 @@ impl SSOCredentialProvider {
     /// Set SSO start URL
     pub fn with_start_url(mut self, start_url: impl Into<String>) -> Self {
         self.sso_start_url = Some(start_url.into());
+        self
+    }
+
+    /// Set custom SSO endpoint (for testing)
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.sso_endpoint = Some(endpoint.into());
         self
     }
 
@@ -215,10 +223,17 @@ impl SSOCredentialProvider {
         config: &SSOConfig,
         access_token: &str,
     ) -> Result<Credential> {
-        let endpoint = format!(
-            "https://portal.sso.{}.amazonaws.com/federation/credentials",
-            config.sso_region
-        );
+        // Allow endpoint override for testing
+        let endpoint = self
+            .sso_endpoint
+            .clone()
+            .or_else(|| ctx.env_var("AWS_SSO_ENDPOINT"))
+            .unwrap_or_else(|| {
+                format!(
+                    "https://portal.sso.{}.amazonaws.com/federation/credentials",
+                    config.sso_region
+                )
+            });
 
         let params = serde_urlencoded::to_string([
             ("role_name", &config.sso_role_name),

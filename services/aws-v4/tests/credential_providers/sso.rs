@@ -23,6 +23,11 @@ async fn test_sso_credential_provider() {
         envs.insert("AWS_CONFIG_FILE".to_string(), config_file);
     }
 
+    // Allow custom SSO endpoint for testing
+    if let Ok(endpoint) = env::var("AWS_SSO_ENDPOINT") {
+        envs.insert("AWS_SSO_ENDPOINT".to_string(), endpoint);
+    }
+
     let ctx = create_test_context_with_env(envs);
     let provider = SSOCredentialProvider::new();
 

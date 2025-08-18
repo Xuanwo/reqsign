@@ -388,20 +388,113 @@ jobs:
 
   # SSOCredentialProvider test
   test_sso_provider:
-    needs: check_secrets
-    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled until SSO is configured
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
-        with:
-          connect-host: ${{ secrets.OP_CONNECT_HOST }}
-          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
-      - name: Setup SSO configuration
+      - name: Setup SSO Mock Environment
         run: |
-          # SSO configuration would be set up here
-          echo "SSO configuration setup would go here"
+          # Create test home directory structure
+          TEST_HOME=$(mktemp -d)
+          echo "TEST_HOME=$TEST_HOME" >> $GITHUB_ENV
+          
+          # Create AWS config with SSO profile
+          mkdir -p $TEST_HOME/.aws
+          cat > $TEST_HOME/.aws/config << 'EOF'
+          [profile test-sso]
+          sso_start_url = https://test-sso.awsapps.com/start
+          sso_region = us-east-1
+          sso_account_id = 123456789012
+          sso_role_name = TestRole
+          EOF
+          
+          # Create SSO cache directory
+          mkdir -p $TEST_HOME/.aws/sso/cache
+          
+          # Calculate cache file name (SHA1 of start URL)
+          START_URL="https://test-sso.awsapps.com/start"
+          CACHE_KEY=$(echo -n "$START_URL" | sha1sum | cut -d' ' -f1)
+          
+          # Create cached SSO token (expires in 1 hour)
+          EXPIRES_AT=$(date -u -d '+1 hour' '+%Y-%m-%dT%H:%M:%SZ')
+          cat > $TEST_HOME/.aws/sso/cache/${CACHE_KEY}.json << EOF
+          {
+            "accessToken": "test-access-token-for-sso",
+            "expiresAt": "$EXPIRES_AT"
+          }
+          EOF
+          
+          echo "SSO test environment configured at $TEST_HOME"
+          ls -la $TEST_HOME/.aws/
+          ls -la $TEST_HOME/.aws/sso/cache/
+      - name: Start SSO Mock Server
+        run: |
+          # Create mock SSO server
+          cat > mock_sso_server.py << 'EOF'
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          import json
+          import time
+          from urllib.parse import urlparse, parse_qs
+          
+          class SSOHandler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  parsed_url = urlparse(self.path)
+                  params = parse_qs(parsed_url.query)
+                  
+                  # Check if this is the SSO credentials endpoint
+                  if parsed_url.path == '/federation/credentials':
+                      # Verify required parameters
+                      if 'role_name' in params and 'account_id' in params:
+                          # Check for authorization header
+                          auth_header = self.headers.get('x-amz-sso_bearer_token')
+                          if auth_header != 'test-access-token-for-sso':
+                              self.send_response(401)
+                              self.end_headers()
+                              return
+                          
+                          # Return mock credentials
+                          expiration = int((time.time() + 3600) * 1000)  # 1 hour in milliseconds
+                          response = {
+                              'roleCredentials': {
+                                  'accessKeyId': 'ASIASSOEXAMPLE',
+                                  'secretAccessKey': 'sso/secret/key/EXAMPLE',
+                                  'sessionToken': 'FwoGZXIvYXdzEJv//////////wEaDEXAMPLETOKEN',
+                                  'expiration': expiration
+                              }
+                          }
+                          self.send_response(200)
+                          self.send_header('Content-Type', 'application/json')
+                          self.end_headers()
+                          self.wfile.write(json.dumps(response).encode())
+                      else:
+                          self.send_response(400)
+                          self.end_headers()
+                  else:
+                      self.send_response(404)
+                      self.end_headers()
+              
+              def log_message(self, format, *args):
+                  # Log to stdout for debugging
+                  print(f"SSO Mock Server: {format % args}")
+          
+          if __name__ == '__main__':
+              server = HTTPServer(('0.0.0.0', 8080), SSOHandler)
+              print('Mock SSO server running on port 8080')
+              server.serve_forever()
+          EOF
+          
+          # Start the mock server
+          python3 mock_sso_server.py &
+          SSO_PID=$!
+          echo "SSO_PID=$SSO_PID" >> $GITHUB_ENV
+          
+          # Wait for server to start
+          sleep 2
+          
+          # Test the mock server
+          echo "::group::Testing mock SSO server"
+          curl -v http://localhost:8080/federation/credentials?role_name=TestRole\&account_id=123456789012 \
+            -H "x-amz-sso_bearer_token: test-access-token-for-sso"
+          echo "::endgroup::"
       - name: Test SSOCredentialProvider
         working-directory: ./services/aws-v4
         run: |
@@ -411,6 +504,19 @@ jobs:
         env:
           RUST_LOG: DEBUG
           REQSIGN_AWS_V4_TEST_SSO: on
+          AWS_PROFILE: test-sso
+          AWS_CONFIG_FILE: ${{ env.TEST_HOME }}/.aws/config
+          HOME: ${{ env.TEST_HOME }}
+          AWS_SSO_ENDPOINT: http://localhost:8080/federation/credentials
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ ! -z "$SSO_PID" ]; then
+            kill $SSO_PID || true
+          fi
+          if [ ! -z "$TEST_HOME" ]; then
+            rm -rf $TEST_HOME || true
+          fi
 
   # ProcessCredentialProvider test
   test_process_provider:
