@@ -53,4 +53,5 @@ test-case.workspace = true
 tokio = { workspace = true, features = ["full"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+reqsign-command-execute-tokio = { path = "../../context/command-execute-tokio" }
 reqsign-file-read-tokio = { path = "../../context/file-read-tokio" }

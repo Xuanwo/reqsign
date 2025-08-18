@@ -20,10 +20,9 @@
 //! #[tokio::main]
 //! async fn main() -> Result<()> {
 //!     // Create context
-//!     let ctx = Context::new().with_file_read(
-//!         TokioFileRead::default(),
-//!         ReqwestHttpSend::default(),
-//!     );
+//!     let ctx = Context::new()
+//!         .with_file_read(TokioFileRead::default())
+//!         .with_http_send(ReqwestHttpSend::default());
 //!
 //!     // Create credential loader - uses environment variables by default
 //!     let loader = DefaultCredentialProvider::new();

@@ -215,6 +215,7 @@ impl ProvideCredential for ProcessCredentialProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use reqsign_command_execute_tokio::TokioCommandExecute;
     use reqsign_core::{OsEnv, StaticEnv};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
@@ -225,6 +226,7 @@ mod tests {
         let ctx = Context::new()
             .with_file_read(TokioFileRead)
             .with_http_send(ReqwestHttpSend::default())
+            .with_command_execute(TokioCommandExecute)
             .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: Some(std::path::PathBuf::from("/home/test")),

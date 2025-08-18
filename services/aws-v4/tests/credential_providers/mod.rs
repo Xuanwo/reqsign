@@ -21,6 +21,7 @@ pub fn create_test_context() -> Context {
     Context::new()
         .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
+        .with_command_execute(reqsign_command_execute_tokio::TokioCommandExecute)
 }
 
 pub fn create_test_context_with_env(envs: HashMap<String, String>) -> Context {
@@ -33,5 +34,6 @@ pub fn create_test_context_with_env(envs: HashMap<String, String>) -> Context {
     Context::new()
         .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
+        .with_command_execute(reqsign_command_execute_tokio::TokioCommandExecute)
         .with_env(StaticEnv { home_dir, envs })
 }
