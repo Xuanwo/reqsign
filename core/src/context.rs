@@ -57,12 +57,14 @@ impl Context {
     /// Use the `with_*` methods to configure the components you need.
     ///
     /// ```
-    /// use reqsign_core::{Context, OsEnv};
+    /// use reqsign_core::Context;
     ///
-    /// let ctx = Context::new()
-    ///     .with_file_read(my_file_reader)  // Optional: for file operations
-    ///     .with_http_send(my_http_client)  // Optional: for HTTP operations
-    ///     .with_env(OsEnv);                // Optional: for env var access
+    /// let ctx = Context::new();
+    /// // All components use no-op implementations by default
+    /// // You can configure specific components as needed:
+    /// // ctx.with_file_read(my_file_reader)
+    /// //    .with_http_send(my_http_client)
+    /// //    .with_env(my_env_provider);
     /// ```
     pub fn new() -> Self {
         Self {

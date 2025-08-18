@@ -35,7 +35,7 @@
 //! ## Usage with Service Signers
 //!
 //! ```no_run
-//! use reqsign_core::{Context, Signer};
+//! use reqsign_core::Context;
 //! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //!
@@ -43,8 +43,7 @@
 //! // Many cloud services require reading credentials from files
 //! let ctx = Context::new()
 //!     .with_file_read(TokioFileRead::default())
-//!     .with_http_send(ReqwestHttpSend::default())
-//!     .with_env(OsEnv);
+//!     .with_http_send(ReqwestHttpSend::default());
 //!
 //! // Create a signer that can load credentials from files
 //! // let signer = Signer::new(ctx, credential_loader, request_builder);
