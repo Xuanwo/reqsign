@@ -151,7 +151,7 @@ impl ProvideCredential for IMDSv2CredentialProvider {
         let resp: Ec2MetadataIamSecurityCredentials = serde_json::from_str(&content)
             .map_err(|e| Error::unexpected("failed to parse IMDS response").with_source(e))?;
         if resp.code == "AssumeRoleUnauthorizedAccess" {
-            return Err(Error::credential_denied(format!(
+            return Err(Error::permission_denied(format!(
                 "Incorrect IMDS/IAM configuration: [{}] {}. \
                         Hint: Does this role have a trust relationship with EC2?",
                 resp.code, resp.message

@@ -137,7 +137,7 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
             .map_err(|e| Error::unexpected("failed to send HTTP request to STS").with_source(e))?;
         if resp.status() != http::StatusCode::OK {
             let content = resp.into_body();
-            return Err(Error::credential_denied(format!(
+            return Err(Error::permission_denied(format!(
                 "request to AWS STS Services failed: {content}"
             )));
         }
