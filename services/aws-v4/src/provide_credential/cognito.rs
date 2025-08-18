@@ -250,7 +250,7 @@ impl ProvideCredential for CognitoIdentityCredentialProvider {
         // Check if identity pool ID is available from config or environment
         let has_pool_id = self.identity_pool_id.is_some()
             || ctx.env_var("AWS_COGNITO_IDENTITY_POOL_ID").is_some();
-        
+
         if !has_pool_id {
             debug!("Cognito Identity: no identity pool ID configured");
             return Ok(None);
