@@ -1,6 +1,6 @@
 use crate::constants::X_AMZ_CONTENT_SHA_256;
 use crate::credential::Credential;
-use crate::provide_credential::utils::sts_endpoint;
+use crate::provide_credential::utils::{parse_sts_error, sts_endpoint};
 use crate::EMPTY_STRING_SHA256;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -128,9 +128,7 @@ impl ProvideCredential for AssumeRoleCredentialProvider {
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         let endpoint = sts_endpoint(self.region.as_deref(), self.use_regional_sts_endpoint)
-            .map_err(|e| {
-                Error::config_invalid("failed to determine STS endpoint").with_source(e)
-            })?;
+            .map_err(|e| e.with_context(format!("role_arn: {}", self.role_arn)))?;
 
         // Construct request to AWS STS Service.
         let mut url = format!("https://{endpoint}/?Action=AssumeRole&RoleArn={}&Version=2011-06-15&RoleSessionName={}", self.role_arn, self.role_session_name);
@@ -171,25 +169,49 @@ impl ProvideCredential for AssumeRoleCredentialProvider {
             // Set content sha to empty string.
             .header(X_AMZ_CONTENT_SHA_256, EMPTY_STRING_SHA256)
             .body(Bytes::new())
-            .map_err(|e| Error::unexpected("failed to build HTTP request").with_source(e))?;
+            .map_err(|e| {
+                Error::request_invalid("failed to build STS AssumeRole request")
+                    .with_source(e)
+                    .with_context(format!("role_arn: {}", self.role_arn))
+                    .with_context(format!("endpoint: https://{}", endpoint))
+            })?;
 
         let (mut parts, body) = req.into_parts();
         self.sts_signer.sign(&mut parts, None).await?;
         let req = http::Request::from_parts(parts, body);
 
-        let resp = ctx
-            .http_send_as_string(req)
-            .await
-            .map_err(|e| Error::unexpected("failed to send HTTP request to STS").with_source(e))?;
-        if resp.status() != http::StatusCode::OK {
+        let resp = ctx.http_send_as_string(req).await.map_err(|e| {
+            Error::unexpected("failed to send AssumeRole request to STS")
+                .with_source(e)
+                .with_context(format!("role_arn: {}", self.role_arn))
+                .with_context(format!("endpoint: https://{}", endpoint))
+                .set_retryable(true)
+        })?;
+
+        // Extract request ID and status before consuming response
+        let status = resp.status();
+        let request_id = resp
+            .headers()
+            .get("x-amzn-requestid")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        if status != http::StatusCode::OK {
             let content = resp.into_body();
-            return Err(Error::credential_denied(format!(
-                "request to AWS STS Services failed: {content}"
-            )));
+            return Err(
+                parse_sts_error("AssumeRole", status, &content, request_id.as_deref())
+                    .with_context(format!("role_arn: {}", self.role_arn))
+                    .with_context(format!("session_name: {}", self.role_session_name)),
+            );
         }
 
-        let resp: AssumeRoleResponse = de::from_str(&resp.into_body())
-            .map_err(|e| Error::unexpected("failed to parse STS response").with_source(e))?;
+        let body = resp.into_body();
+        let resp: AssumeRoleResponse = de::from_str(&body).map_err(|e| {
+            Error::unexpected("failed to parse STS AssumeRole response")
+                .with_source(e)
+                .with_context(format!("response_length: {}", body.len()))
+                .with_context(format!("role_arn: {}", self.role_arn))
+        })?;
         let resp_cred = resp.result.credentials;
 
         let cred = Credential {
@@ -197,7 +219,10 @@ impl ProvideCredential for AssumeRoleCredentialProvider {
             secret_access_key: resp_cred.secret_access_key,
             session_token: Some(resp_cred.session_token),
             expires_in: Some(parse_rfc3339(&resp_cred.expiration).map_err(|e| {
-                Error::unexpected("failed to parse credential expiration time").with_source(e)
+                Error::unexpected("failed to parse AssumeRole credential expiration")
+                    .with_source(e)
+                    .with_context(format!("expiration_value: {}", resp_cred.expiration))
+                    .with_context(format!("role_arn: {}", self.role_arn))
             })?),
         };
 

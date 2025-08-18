@@ -270,7 +270,7 @@ impl SignRequest for RequestSigner {
                         let new_token = self.exchange_token(ctx, sa).await?;
                         self.build_token_auth(req, &new_token)?
                     } else {
-                        return Err(reqsign_core::Error::credential_expired(
+                        return Err(reqsign_core::Error::credential_invalid(
                             "token expired and no service account available",
                         ));
                     }
