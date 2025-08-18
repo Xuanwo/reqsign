@@ -325,14 +325,21 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v $HOME/.aws:/home/.aws \
             -e ECS_LOCAL_METADATA_PORT=80 \
+            -e AWS_DEFAULT_REGION=us-east-1 \
             public.ecr.aws/ecs-local/amazon-ecs-local-container-endpoints:latest
           
           # Wait for service to start
           sleep 5
           
+          # Check container logs
+          echo "::group::Container logs"
+          docker logs ecs-local-endpoints
+          echo "::endgroup::"
+          
           # Verify the service is running
           echo "::group::Verifying ECS local endpoints service"
-          curl -v http://localhost:51679/creds || echo "Credentials endpoint check"
+          curl -v http://localhost:51679/creds || echo "Credentials endpoint check failed"
+          curl -v http://localhost:51679/v2/metadata || echo "Metadata endpoint check failed"
           echo "::endgroup::"
       - name: Test ECSCredentialProvider with relative URI
         working-directory: ./services/aws-v4

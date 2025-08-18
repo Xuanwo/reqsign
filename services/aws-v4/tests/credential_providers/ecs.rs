@@ -14,6 +14,11 @@ async fn test_ecs_credential_provider() {
 
     let mut envs = HashMap::new();
 
+    // Add custom metadata endpoint if set (for testing)
+    if let Ok(metadata_uri) = env::var("ECS_CONTAINER_METADATA_URI") {
+        envs.insert("ECS_CONTAINER_METADATA_URI".to_string(), metadata_uri);
+    }
+
     // ECS can use either relative or full URI
     if let Ok(relative_uri) = env::var("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI") {
         envs.insert(
