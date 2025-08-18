@@ -40,7 +40,8 @@ impl IMDSv2CredentialProvider {
     fn get_endpoint(&self, ctx: &Context) -> String {
         ctx.env_vars()
             .get("AWS_EC2_METADATA_SERVICE_ENDPOINT")
-            .unwrap_or("http://169.254.169.254".to_string())
+            .cloned()
+            .unwrap_or_else(|| "http://169.254.169.254".into())
     }
 
     async fn load_ec2_metadata_token(&self, ctx: &Context) -> Result<String> {
