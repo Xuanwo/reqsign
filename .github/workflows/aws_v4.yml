@@ -307,7 +307,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       ecs-local-endpoints:
-        image: public.ecr.aws/aws-ecs/amazon-ecs-local-container-endpoints:latest
+        image: public.ecr.aws/ecs-local/amazon-ecs-local-container-endpoints:latest
         ports:
           - 51679:51679
         env:
