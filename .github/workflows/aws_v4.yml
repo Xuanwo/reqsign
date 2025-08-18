@@ -554,33 +554,39 @@ jobs:
         run: |
           echo "## AWS V4 Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Check if integration tests were run
-          if [[ "${{ needs.check_secrets.outputs.has_secrets }}" == "true" ]]; then
-            echo "✅ **Integration tests were executed**" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ **Integration tests were skipped** (forked repository or no secrets available)" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
+          
           echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "#### Core Tests" >> $GITHUB_STEP_SUMMARY
           echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Unit Tests | ${{ needs.unit_test.result }} |" >> $GITHUB_STEP_SUMMARY
-
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "#### Integration Tests (with real AWS credentials)" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ needs.check_secrets.outputs.has_secrets }}" == "true" ]]; then
+            echo "✅ **Integration tests with real AWS credentials were executed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
             echo "| Signing Tests | ${{ needs.signing_test.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| EnvCredentialProvider | ${{ needs.test_env_provider.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| ProfileCredentialProvider | ${{ needs.test_profile_provider.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| AssumeRoleCredentialProvider | ${{ needs.test_assume_role_provider.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| AssumeRoleWithWebIdentityCredentialProvider | ${{ needs.test_web_identity_provider.result }} |" >> $GITHUB_STEP_SUMMARY
-            echo "| IMDSv2CredentialProvider (mocked) | ${{ needs.test_imds_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Integration tests were skipped** (forked repository or no secrets available)" >> $GITHUB_STEP_SUMMARY
           fi
-
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Disabled Tests" >> $GITHUB_STEP_SUMMARY
-          echo "The following tests are disabled by default:" >> $GITHUB_STEP_SUMMARY
-          echo "- ECSCredentialProvider (requires ECS environment)" >> $GITHUB_STEP_SUMMARY
-          echo "- SSOCredentialProvider (requires SSO configuration)" >> $GITHUB_STEP_SUMMARY
-          echo "- ProcessCredentialProvider (requires process credential helper)" >> $GITHUB_STEP_SUMMARY
-          echo "- CognitoIdentityCredentialProvider (requires Cognito setup)" >> $GITHUB_STEP_SUMMARY
+          
+          echo "#### Mock Server Tests" >> $GITHUB_STEP_SUMMARY
+          echo "The following providers are tested using mock servers:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Provider | Mock Server | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| IMDSv2CredentialProvider | amazon-ec2-metadata-mock | ${{ needs.test_imds_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ECSCredentialProvider | Python mock (port 51679) | ${{ needs.test_ecs_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SSOCredentialProvider | Python mock (port 8080) | ${{ needs.test_sso_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ProcessCredentialProvider | Python credential helper | ${{ needs.test_process_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CognitoIdentityCredentialProvider | Python mock (port 8443) | ${{ needs.test_cognito_provider.result }} |" >> $GITHUB_STEP_SUMMARY
