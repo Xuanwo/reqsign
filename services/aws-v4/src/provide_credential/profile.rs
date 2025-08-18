@@ -96,8 +96,7 @@ impl ProfileCredentialProvider {
         };
 
         let conf = Ini::load_from_str(&String::from_utf8_lossy(&content)).map_err(|e| {
-            Error::config_invalid("failed to parse credentials file")
-                .with_source(anyhow::Error::new(e))
+            Error::config_invalid("failed to parse credentials file").with_source(e)
         })?;
 
         let props = match conf.section(Some(profile)) {
@@ -156,9 +155,8 @@ impl ProfileCredentialProvider {
             }
         };
 
-        let conf = Ini::load_from_str(&String::from_utf8_lossy(&content)).map_err(|e| {
-            Error::config_invalid("failed to parse config file").with_source(anyhow::Error::new(e))
-        })?;
+        let conf = Ini::load_from_str(&String::from_utf8_lossy(&content))
+            .map_err(|e| Error::config_invalid("failed to parse config file").with_source(e))?;
 
         let section = match profile {
             "default" => "default".to_string(),

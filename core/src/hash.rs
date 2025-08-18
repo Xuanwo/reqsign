@@ -1,7 +1,6 @@
 //! Hash related utils.
 
-use anyhow::anyhow;
-use anyhow::Result;
+use crate::Error;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use hmac::Hmac;
@@ -16,10 +15,10 @@ pub fn base64_encode(content: &[u8]) -> String {
 }
 
 /// Base64 decode
-pub fn base64_decode(content: &str) -> Result<Vec<u8>> {
+pub fn base64_decode(content: &str) -> crate::Result<Vec<u8>> {
     BASE64_STANDARD
         .decode(content)
-        .map_err(|e| anyhow!("base64 decode failed for {e:?}"))
+        .map_err(|e| Error::unexpected("base64 decode failed").with_source(e))
 }
 
 /// Hex encoded SHA1 hash.
@@ -40,7 +39,8 @@ pub fn hex_sha256(content: &[u8]) -> String {
 
 /// HMAC with SHA256 hash.
 pub fn hmac_sha256(key: &[u8], content: &[u8]) -> Vec<u8> {
-    let mut h = Hmac::<Sha256>::new_from_slice(key).expect("invalid key length");
+    // SAFETY: HMAC's new_from_slice always returns Ok - it handles any key length
+    let mut h = Hmac::<Sha256>::new_from_slice(key).unwrap();
     h.update(content);
 
     h.finalize().into_bytes().to_vec()
@@ -48,7 +48,8 @@ pub fn hmac_sha256(key: &[u8], content: &[u8]) -> Vec<u8> {
 
 /// Base64 encoded HMAC with SHA256 hash.
 pub fn base64_hmac_sha256(key: &[u8], content: &[u8]) -> String {
-    let mut h = Hmac::<Sha256>::new_from_slice(key).expect("invalid key length");
+    // SAFETY: HMAC's new_from_slice always returns Ok - it handles any key length
+    let mut h = Hmac::<Sha256>::new_from_slice(key).unwrap();
     h.update(content);
 
     base64_encode(&h.finalize().into_bytes())
@@ -59,7 +60,8 @@ pub fn base64_hmac_sha256(key: &[u8], content: &[u8]) -> String {
 /// Use this function instead of `hex::encode(hmac_sha1(key, content))` can
 /// reduce extra copy.
 pub fn hex_hmac_sha1(key: &[u8], content: &[u8]) -> String {
-    let mut h = Hmac::<Sha1>::new_from_slice(key).expect("invalid key length");
+    // SAFETY: HMAC's new_from_slice always returns Ok - it handles any key length
+    let mut h = Hmac::<Sha1>::new_from_slice(key).unwrap();
     h.update(content);
 
     hex::encode(h.finalize().into_bytes())
@@ -70,7 +72,8 @@ pub fn hex_hmac_sha1(key: &[u8], content: &[u8]) -> String {
 /// Use this function instead of `hex::encode(hmac_sha256(key, content))` can
 /// reduce extra copy.
 pub fn hex_hmac_sha256(key: &[u8], content: &[u8]) -> String {
-    let mut h = Hmac::<Sha256>::new_from_slice(key).expect("invalid key length");
+    // SAFETY: HMAC's new_from_slice always returns Ok - it handles any key length
+    let mut h = Hmac::<Sha256>::new_from_slice(key).unwrap();
     h.update(content);
 
     hex::encode(h.finalize().into_bytes())
@@ -78,7 +81,8 @@ pub fn hex_hmac_sha256(key: &[u8], content: &[u8]) -> String {
 
 /// Base64 encoded HMAC with SHA1 hash.
 pub fn base64_hmac_sha1(key: &[u8], content: &[u8]) -> String {
-    let mut h = Hmac::<Sha1>::new_from_slice(key).expect("invalid key length");
+    // SAFETY: HMAC's new_from_slice always returns Ok - it handles any key length
+    let mut h = Hmac::<Sha1>::new_from_slice(key).unwrap();
     h.update(content);
 
     base64_encode(&h.finalize().into_bytes())

@@ -74,37 +74,36 @@ impl SigningRequest {
             // Return authority back.
             uri_parts.authority = Some(self.authority);
             // Build path and query.
-            uri_parts.path_and_query = {
-                let paq = if query_size == 0 {
-                    self.path
-                } else {
-                    let mut s = self.path;
-                    s.reserve(query_size + 1);
+            uri_parts.path_and_query =
+                {
+                    let paq = if query_size == 0 {
+                        self.path
+                    } else {
+                        let mut s = self.path;
+                        s.reserve(query_size + 1);
 
-                    s.push('?');
-                    for (i, (k, v)) in self.query.iter().enumerate() {
-                        if i > 0 {
-                            s.push('&');
+                        s.push('?');
+                        for (i, (k, v)) in self.query.iter().enumerate() {
+                            if i > 0 {
+                                s.push('&');
+                            }
+
+                            s.push_str(k);
+                            if !v.is_empty() {
+                                s.push('=');
+                                s.push_str(v);
+                            }
                         }
 
-                        s.push_str(k);
-                        if !v.is_empty() {
-                            s.push('=');
-                            s.push_str(v);
-                        }
-                    }
+                        s
+                    };
 
-                    s
+                    Some(PathAndQuery::from_str(&paq).map_err(|e| {
+                        Error::request_invalid("invalid path and query").with_source(e)
+                    })?)
                 };
-
-                Some(PathAndQuery::from_str(&paq).map_err(|e| {
-                    Error::request_invalid("invalid path and query")
-                        .with_source(anyhow::Error::new(e))
-                })?)
-            };
-            Uri::from_parts(uri_parts).map_err(|e| {
-                Error::request_invalid("failed to build URI").with_source(anyhow::Error::new(e))
-            })?
+            Uri::from_parts(uri_parts)
+                .map_err(|e| Error::request_invalid("failed to build URI").with_source(e))?
         };
 
         Ok(())
@@ -209,9 +208,9 @@ impl SigningRequest {
     #[inline]
     pub fn header_get_or_default(&self, key: &HeaderName) -> Result<&str> {
         match self.headers.get(key) {
-            Some(v) => v.to_str().map_err(|e| {
-                Error::request_invalid("invalid header value").with_source(anyhow::Error::new(e))
-            }),
+            Some(v) => v
+                .to_str()
+                .map_err(|e| Error::request_invalid("invalid header value").with_source(e)),
             None => Ok(""),
         }
     }

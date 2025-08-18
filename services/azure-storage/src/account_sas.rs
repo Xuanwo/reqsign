@@ -1,4 +1,4 @@
-use anyhow::Result;
+use reqsign_core::Result;
 
 use reqsign_core::hash;
 use reqsign_core::time;

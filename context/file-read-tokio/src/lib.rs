@@ -65,8 +65,8 @@ pub struct TokioFileRead;
 #[async_trait]
 impl FileRead for TokioFileRead {
     async fn file_read(&self, path: &str) -> Result<Vec<u8>> {
-        tokio::fs::read(path).await.map_err(|e| {
-            Error::unexpected("failed to read file").with_source(anyhow::Error::new(e))
-        })
+        tokio::fs::read(path)
+            .await
+            .map_err(|e| Error::unexpected("failed to read file").with_source(e))
     }
 }
