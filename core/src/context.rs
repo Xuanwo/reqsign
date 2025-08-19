@@ -169,6 +169,34 @@ impl Context {
     pub async fn command_execute(&self, program: &str, args: &[&str]) -> Result<CommandOutput> {
         self.cmd.command_execute(program, args).await
     }
+
+    /// Execute a command through the system shell.
+    ///
+    /// This is useful for running commands that might be shell scripts or batch files,
+    /// or when you need shell features like pipes, redirects, or environment variable expansion.
+    ///
+    /// On Unix-like systems, this uses `/bin/sh -c`.
+    /// On Windows, this uses `cmd /C`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # async fn example(ctx: &reqsign_core::Context) -> reqsign_core::Result<()> {
+    /// // Run a command that might be a shell script
+    /// let output = ctx.shell_execute("az account show").await?;
+    ///
+    /// // Run a command with shell features
+    /// let output = ctx.shell_execute("echo $HOME | wc -l").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn shell_execute(&self, command: &str) -> Result<CommandOutput> {
+        if cfg!(target_os = "windows") {
+            self.cmd.command_execute("cmd", &["/C", command]).await
+        } else {
+            self.cmd.command_execute("sh", &["-c", command]).await
+        }
+    }
 }
 
 /// FileRead is used to read the file content entirely in `Vec<u8>`.
