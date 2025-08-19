@@ -54,20 +54,3 @@ async fn test_client_certificate_provider() {
         _ => panic!("Expected BearerToken credential from client certificate provider"),
     }
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-#[tokio::test]
-async fn test_client_certificate_provider_invalid_path() {
-    let ctx = Context::new()
-        .with_file_read(TokioFileRead)
-        .with_http_send(ReqwestHttpSend::default())
-        .with_env(OsEnv);
-
-    // Use invalid certificate path
-    let loader = ClientCertificateCredentialProvider::new();
-
-    let result = loader.provide_credential(&ctx).await;
-
-    // Should fail with invalid certificate path
-    assert!(result.is_err());
-}

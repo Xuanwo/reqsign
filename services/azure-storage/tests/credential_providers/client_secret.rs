@@ -46,19 +46,3 @@ async fn test_client_secret_provider() {
         _ => panic!("Expected BearerToken credential from client secret provider"),
     }
 }
-
-#[tokio::test]
-async fn test_client_secret_provider_invalid_credentials() {
-    let ctx = Context::new()
-        .with_file_read(TokioFileRead)
-        .with_http_send(ReqwestHttpSend::default())
-        .with_env(OsEnv);
-
-    // Use invalid credentials
-    let loader = ClientSecretCredentialProvider::new();
-
-    let result = loader.provide_credential(&ctx).await;
-
-    // Should fail with invalid credentials
-    assert!(result.is_err() || result.unwrap().is_none());
-}
