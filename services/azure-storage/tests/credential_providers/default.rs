@@ -43,7 +43,7 @@ async fn test_default_provider_chain() {
 
     // Test that DefaultCredentialProvider tries multiple sources
     let provider = DefaultCredentialProvider::new();
-    
+
     // This will try environment variables, IMDS, Azure CLI, etc.
     // The actual result depends on the environment
     let _ = provider.provide_credential(&ctx).await;

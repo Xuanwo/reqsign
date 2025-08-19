@@ -34,15 +34,18 @@ async fn test_client_certificate_provider() {
         .with_env(OsEnv);
 
     let loader = ClientCertificateCredentialProvider::new();
-    
+
     let result = loader.provide_credential(&ctx).await;
-    
+
     assert!(result.is_ok());
     let cred = result.unwrap();
     assert!(cred.is_some());
-    
+
     match cred.unwrap() {
-        Credential::BearerToken { token, expires_in: _ } => {
+        Credential::BearerToken {
+            token,
+            expires_in: _,
+        } => {
             assert!(!token.is_empty());
             // Token should be a valid JWT
             assert!(token.starts_with("eyJ"));
@@ -62,9 +65,9 @@ async fn test_client_certificate_provider_invalid_path() {
 
     // Use invalid certificate path
     let loader = ClientCertificateCredentialProvider::new();
-    
+
     let result = loader.provide_credential(&ctx).await;
-    
+
     // Should fail with invalid certificate path
     assert!(result.is_err());
 }

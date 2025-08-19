@@ -16,10 +16,11 @@ async fn test_sas_token_signing() {
 
     let url = std::env::var("REQSIGN_AZURE_STORAGE_URL")
         .unwrap_or_else(|_| "https://testaccount.blob.core.windows.net".to_string());
-    
+
     // SAS token can be provided or we use a dummy one for testing
-    let sas_token = std::env::var("REQSIGN_AZURE_STORAGE_SAS_TOKEN")
-        .unwrap_or_else(|_| "sv=2021-06-08&ss=b&srt=sco&sp=rwx&se=2025-01-01T00:00:00Z&sig=test".to_string());
+    let sas_token = std::env::var("REQSIGN_AZURE_STORAGE_SAS_TOKEN").unwrap_or_else(|_| {
+        "sv=2021-06-08&ss=b&srt=sco&sp=rwx&se=2025-01-01T00:00:00Z&sig=test".to_string()
+    });
 
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
@@ -42,7 +43,7 @@ async fn test_sas_token_signing() {
 
     // With SAS token, no Authorization header should be added
     assert!(!parts.headers.contains_key("authorization"));
-    
+
     // The SAS token should be appended to the URI as query parameter
     let uri = parts.uri.to_string();
     if !uri.contains('?') {
@@ -63,9 +64,10 @@ async fn test_sas_token_with_existing_query() {
 
     let base_url = std::env::var("REQSIGN_AZURE_STORAGE_URL")
         .unwrap_or_else(|_| "https://testaccount.blob.core.windows.net".to_string());
-    
-    let sas_token = std::env::var("REQSIGN_AZURE_STORAGE_SAS_TOKEN")
-        .unwrap_or_else(|_| "sv=2021-06-08&ss=b&srt=sco&sp=rwx&se=2025-01-01T00:00:00Z&sig=test".to_string());
+
+    let sas_token = std::env::var("REQSIGN_AZURE_STORAGE_SAS_TOKEN").unwrap_or_else(|_| {
+        "sv=2021-06-08&ss=b&srt=sco&sp=rwx&se=2025-01-01T00:00:00Z&sig=test".to_string()
+    });
 
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
@@ -78,7 +80,7 @@ async fn test_sas_token_with_existing_query() {
 
     // Test with existing query parameters
     let url_with_query = format!("{}?comp=list&maxresults=10", base_url);
-    
+
     let mut parts = http::Request::get(&url_with_query)
         .header("x-ms-version", "2021-12-02")
         .body(())
@@ -90,7 +92,7 @@ async fn test_sas_token_with_existing_query() {
 
     // No Authorization header with SAS token
     assert!(!parts.headers.contains_key("authorization"));
-    
+
     // Original query params should be preserved
     let uri = parts.uri.to_string();
     assert!(uri.contains("comp=list"));
@@ -106,9 +108,10 @@ async fn test_sas_token_preserves_headers() {
 
     let url = std::env::var("REQSIGN_AZURE_STORAGE_URL")
         .unwrap_or_else(|_| "https://testaccount.blob.core.windows.net".to_string());
-    
-    let sas_token = std::env::var("REQSIGN_AZURE_STORAGE_SAS_TOKEN")
-        .unwrap_or_else(|_| "sv=2021-06-08&ss=b&srt=sco&sp=rwx&se=2025-01-01T00:00:00Z&sig=test".to_string());
+
+    let sas_token = std::env::var("REQSIGN_AZURE_STORAGE_SAS_TOKEN").unwrap_or_else(|_| {
+        "sv=2021-06-08&ss=b&srt=sco&sp=rwx&se=2025-01-01T00:00:00Z&sig=test".to_string()
+    });
 
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
@@ -136,8 +139,5 @@ async fn test_sas_token_preserves_headers() {
         parts.headers.get("x-ms-client-request-id").unwrap(),
         "test-123"
     );
-    assert_eq!(
-        parts.headers.get("Custom-Header").unwrap(),
-        "custom-value"
-    );
+    assert_eq!(parts.headers.get("Custom-Header").unwrap(), "custom-value");
 }

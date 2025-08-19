@@ -217,6 +217,16 @@ jobs:
 
   # IMDS test with mock server
   test_imds_provider_mock:
+    needs:
+      - unit_test
+      - check_secrets
+      - signing_test
+      - test_env_provider
+      - test_static_provider
+      - test_client_secret_provider
+      - test_client_certificate_provider
+      - test_azure_cli_provider
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -232,49 +242,36 @@ jobs:
           export AZURE_IMDS_ENDPOINT=http://localhost:8080
           cargo test credential_providers::imds::test_imds_provider_with_mock --no-fail-fast -- --nocapture
           echo "::endgroup::"
-
-  # Test summary
-  test_summary:
-    needs: 
-      - unit_test
-      - signing_test
-      - test_env_provider
-      - test_static_provider
-      - test_client_secret_provider
-      - test_client_certificate_provider
-      - test_azure_cli_provider
-      - test_imds_provider_mock
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Summary
+      - name: Test Summary
         run: |
-          echo "## Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Azure Storage Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Check each job status
-          jobs=(
-            "unit_test:Unit Tests"
-            "signing_test:Signing Tests"
-            "test_env_provider:Env Provider"
-            "test_static_provider:Static Provider"
-            "test_client_secret_provider:Client Secret"
-            "test_client_certificate_provider:Client Certificate"
-            "test_azure_cli_provider:Azure CLI"
-            "test_imds_provider_mock:IMDS Mock"
-          )
-          
-          for job_info in "${jobs[@]}"; do
-            IFS=':' read -r job_id job_name <<< "$job_info"
-            job_result="${{ needs[job_id].result }}"
-            
-            if [[ "$job_result" == "success" ]]; then
-              echo "- ✅ $job_name" >> $GITHUB_STEP_SUMMARY
-            elif [[ "$job_result" == "failure" ]]; then
-              echo "- ❌ $job_name" >> $GITHUB_STEP_SUMMARY
-            elif [[ "$job_result" == "skipped" ]]; then
-              echo "- ⏭️ $job_name (skipped)" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "- ❓ $job_name (unknown)" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Core Tests" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit_test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Integration Tests (with real Azure credentials)" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.check_secrets.outputs.has_secrets }}" == "true" ]]; then
+            echo "✅ **Integration tests with real Azure credentials were executed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
+            echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Signing Tests | ${{ needs.signing_test.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| EnvCredentialProvider | ${{ needs.test_env_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| StaticCredentialProvider | ${{ needs.test_static_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| ClientSecretCredentialProvider | ${{ needs.test_client_secret_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| ClientCertificateCredentialProvider | ${{ needs.test_client_certificate_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| AzureCliCredentialProvider | ${{ needs.test_azure_cli_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **Integration tests were skipped** (forked repository or no secrets available)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Mock Server Tests" >> $GITHUB_STEP_SUMMARY
+          echo "The following providers are tested using mock servers:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Provider | Mock Server | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ImdsCredentialProvider | Python mock (port 8080) | Success (this test) |" >> $GITHUB_STEP_SUMMARY

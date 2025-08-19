@@ -8,7 +8,7 @@ pub mod azure_cli;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod client_certificate;
 
+pub mod azure_pipelines;
 pub mod client_secret;
 pub mod imds;
 pub mod workload_identity;
-pub mod azure_pipelines;

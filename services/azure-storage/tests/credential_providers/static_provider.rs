@@ -1,5 +1,5 @@
 use reqsign_azure_storage::{Credential, RequestSigner, StaticCredentialProvider};
-use reqsign_core::{Context, OsEnv, Signer, ProvideCredential};
+use reqsign_core::{Context, OsEnv, ProvideCredential, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 
@@ -33,10 +33,10 @@ async fn test_static_provider_shared_key() {
 
     let loader = StaticCredentialProvider::new_shared_key(&account_name, &account_key);
     let cred = loader.provide_credential(&ctx).await.unwrap();
-    
+
     assert!(cred.is_some());
     let cred = cred.unwrap();
-    
+
     match cred {
         Credential::SharedKey {
             account_name: name,
@@ -52,14 +52,10 @@ async fn test_static_provider_shared_key() {
     let builder = RequestSigner::new();
     let signer = Signer::new(ctx, loader, builder);
 
-    let mut parts = http::Request::get(&url)
-        .body(())
-        .unwrap()
-        .into_parts()
-        .0;
+    let mut parts = http::Request::get(&url).body(()).unwrap().into_parts().0;
 
     signer.sign(&mut parts, None).await.unwrap();
-    
+
     // Verify Authorization header was added
     assert!(parts.headers.contains_key("authorization"));
     assert!(parts.headers.contains_key("x-ms-date"));
@@ -84,10 +80,10 @@ async fn test_static_provider_sas_token() {
 
     let loader = StaticCredentialProvider::new_sas_token(&sas_token);
     let cred = loader.provide_credential(&ctx).await.unwrap();
-    
+
     assert!(cred.is_some());
     let cred = cred.unwrap();
-    
+
     match cred {
         Credential::SasToken { token } => {
             assert_eq!(token, sas_token);
@@ -106,12 +102,15 @@ async fn test_static_provider_bearer_token() {
     let test_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.test";
     let loader = StaticCredentialProvider::new_bearer_token(test_token);
     let cred = loader.provide_credential(&ctx).await.unwrap();
-    
+
     assert!(cred.is_some());
     let cred = cred.unwrap();
-    
+
     match cred {
-        Credential::BearerToken { token, expires_in: _ } => {
+        Credential::BearerToken {
+            token,
+            expires_in: _,
+        } => {
             assert_eq!(token, test_token);
         }
         _ => panic!("Expected BearerToken credential"),

@@ -26,25 +26,29 @@ async fn test_azure_cli_provider() {
         .with_env(OsEnv);
 
     let loader = AzureCliCredentialProvider::new();
-    
+
     // This test requires Azure CLI to be installed and logged in
     let result = loader.provide_credential(&ctx).await;
-    
+
     match result {
-        Ok(Some(cred)) => {
-            match cred {
-                Credential::BearerToken { token, expires_in: _ } => {
-                    assert!(!token.is_empty());
-                    eprintln!("Successfully obtained bearer token from Azure CLI");
-                }
-                _ => panic!("Expected BearerToken credential from Azure CLI"),
+        Ok(Some(cred)) => match cred {
+            Credential::BearerToken {
+                token,
+                expires_in: _,
+            } => {
+                assert!(!token.is_empty());
+                eprintln!("Successfully obtained bearer token from Azure CLI");
             }
-        }
+            _ => panic!("Expected BearerToken credential from Azure CLI"),
+        },
         Ok(None) => {
             eprintln!("Azure CLI returned no credentials (may not be logged in)");
         }
         Err(e) => {
-            eprintln!("Azure CLI test failed (expected when CLI not installed): {}", e);
+            eprintln!(
+                "Azure CLI test failed (expected when CLI not installed): {}",
+                e
+            );
         }
     }
 }
@@ -53,7 +57,7 @@ async fn test_azure_cli_provider() {
 #[tokio::test]
 async fn test_azure_cli_provider_not_installed() {
     use std::env;
-    
+
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
@@ -62,13 +66,13 @@ async fn test_azure_cli_provider_not_installed() {
     // Temporarily modify PATH to simulate Azure CLI not being installed
     let original_path = env::var("PATH").unwrap_or_default();
     env::set_var("PATH", "/nonexistent");
-    
+
     let loader = AzureCliCredentialProvider::new();
     let result = loader.provide_credential(&ctx).await;
-    
+
     // Restore original PATH
     env::set_var("PATH", original_path);
-    
+
     // Should fail or return None when Azure CLI is not available
     assert!(result.is_err() || result.unwrap().is_none());
 }

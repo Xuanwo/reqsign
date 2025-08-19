@@ -1,5 +1,5 @@
 use reqsign_azure_storage::{Credential, EnvCredentialProvider};
-use reqsign_core::{Context, StaticEnv, ProvideCredential};
+use reqsign_core::{Context, ProvideCredential, StaticEnv};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use std::collections::HashMap;
@@ -18,7 +18,7 @@ async fn test_env_provider_shared_key() {
     let account_name = std::env::var("AZURE_STORAGE_ACCOUNT_NAME")
         .or_else(|_| std::env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME"))
         .unwrap_or_else(|_| "testaccount".to_string());
-    
+
     let account_key = std::env::var("AZURE_STORAGE_ACCOUNT_KEY")
         .or_else(|_| std::env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY"))
         .unwrap_or_else(|_| "dGVzdGtleQ==".to_string());
@@ -29,17 +29,20 @@ async fn test_env_provider_shared_key() {
         .with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([
-                ("AZURE_STORAGE_ACCOUNT_NAME".to_string(), account_name.clone()),
+                (
+                    "AZURE_STORAGE_ACCOUNT_NAME".to_string(),
+                    account_name.clone(),
+                ),
                 ("AZURE_STORAGE_ACCOUNT_KEY".to_string(), account_key.clone()),
             ]),
         });
 
     let loader = EnvCredentialProvider::new();
     let cred = loader.provide_credential(&ctx).await.unwrap();
-    
+
     assert!(cred.is_some());
     let cred = cred.unwrap();
-    
+
     match cred {
         Credential::SharedKey {
             account_name: name,
@@ -55,23 +58,24 @@ async fn test_env_provider_shared_key() {
 #[tokio::test]
 async fn test_env_provider_sas_token() {
     let sas_token = "sv=2021-06-08&ss=b&srt=sco&sp=rwx&se=2025-01-01T00:00:00Z&sig=test";
-    
+
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
         .with_env(StaticEnv {
             home_dir: None,
-            envs: HashMap::from_iter([
-                ("AZURE_STORAGE_SAS_TOKEN".to_string(), sas_token.to_string()),
-            ]),
+            envs: HashMap::from_iter([(
+                "AZURE_STORAGE_SAS_TOKEN".to_string(),
+                sas_token.to_string(),
+            )]),
         });
 
     let loader = EnvCredentialProvider::new();
     let cred = loader.provide_credential(&ctx).await.unwrap();
-    
+
     assert!(cred.is_some());
     let cred = cred.unwrap();
-    
+
     match cred {
         Credential::SasToken { token } => {
             assert_eq!(token, sas_token);
@@ -86,25 +90,31 @@ async fn test_env_provider_priority() {
     let account_name = "testaccount";
     let account_key = "dGVzdGtleQ==";
     let sas_token = "sv=2021-06-08&ss=b&srt=sco&sp=rwx&se=2025-01-01T00:00:00Z&sig=test";
-    
+
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
         .with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([
-                ("AZURE_STORAGE_ACCOUNT_NAME".to_string(), account_name.to_string()),
-                ("AZURE_STORAGE_ACCOUNT_KEY".to_string(), account_key.to_string()),
+                (
+                    "AZURE_STORAGE_ACCOUNT_NAME".to_string(),
+                    account_name.to_string(),
+                ),
+                (
+                    "AZURE_STORAGE_ACCOUNT_KEY".to_string(),
+                    account_key.to_string(),
+                ),
                 ("AZURE_STORAGE_SAS_TOKEN".to_string(), sas_token.to_string()),
             ]),
         });
 
     let loader = EnvCredentialProvider::new();
     let cred = loader.provide_credential(&ctx).await.unwrap();
-    
+
     assert!(cred.is_some());
     let cred = cred.unwrap();
-    
+
     // Should prefer SharedKey when both are available
     match cred {
         Credential::SharedKey { .. } => {
@@ -126,6 +136,6 @@ async fn test_env_provider_no_credentials() {
 
     let loader = EnvCredentialProvider::new();
     let cred = loader.provide_credential(&ctx).await.unwrap();
-    
+
     assert!(cred.is_none());
 }

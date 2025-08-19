@@ -15,10 +15,10 @@ fn get_test_config() -> Option<(String, String, String, String, String)> {
     let url = std::env::var("REQSIGN_AZURE_STORAGE_URL").ok()?;
     let account_name = std::env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_NAME").ok()?;
     let account_key = std::env::var("REQSIGN_AZURE_STORAGE_ACCOUNT_KEY").ok()?;
-    let service = std::env::var("REQSIGN_AZURE_STORAGE_SERVICE")
-        .unwrap_or_else(|_| "blob".to_string());
-    let container = std::env::var("REQSIGN_AZURE_STORAGE_CONTAINER")
-        .unwrap_or_else(|_| "test".to_string());
+    let service =
+        std::env::var("REQSIGN_AZURE_STORAGE_SERVICE").unwrap_or_else(|_| "blob".to_string());
+    let container =
+        std::env::var("REQSIGN_AZURE_STORAGE_CONTAINER").unwrap_or_else(|_| "test".to_string());
 
     Some((url, account_name, account_key, service, container))
 }
@@ -52,9 +52,14 @@ async fn test_shared_key_signing_get() {
     // Verify required headers were added
     assert!(parts.headers.contains_key("authorization"));
     assert!(parts.headers.contains_key("x-ms-date"));
-    
+
     // Authorization header should contain SharedKey
-    let auth = parts.headers.get("authorization").unwrap().to_str().unwrap();
+    let auth = parts
+        .headers
+        .get("authorization")
+        .unwrap()
+        .to_str()
+        .unwrap();
     assert!(auth.starts_with("SharedKey"));
     assert!(auth.contains(&account_name));
 }
@@ -78,7 +83,7 @@ async fn test_shared_key_signing_put_with_body() {
     // Test PUT request with body
     let body = b"test content";
     let blob_url = format!("{}/{}/test.txt", url, container);
-    
+
     let mut parts = http::Request::put(&blob_url)
         .header("x-ms-version", "2021-12-02")
         .header("x-ms-blob-type", "BlockBlob")
@@ -93,8 +98,13 @@ async fn test_shared_key_signing_put_with_body() {
     // Verify required headers
     assert!(parts.headers.contains_key("authorization"));
     assert!(parts.headers.contains_key("x-ms-date"));
-    
-    let auth = parts.headers.get("authorization").unwrap().to_str().unwrap();
+
+    let auth = parts
+        .headers
+        .get("authorization")
+        .unwrap()
+        .to_str()
+        .unwrap();
     assert!(auth.starts_with("SharedKey"));
 }
 
@@ -116,7 +126,7 @@ async fn test_shared_key_signing_with_query_params() {
 
     // Test request with query parameters
     let list_url = format!("{}?comp=list&maxresults=10", url);
-    
+
     let mut parts = http::Request::get(&list_url)
         .header("x-ms-version", "2021-12-02")
         .body(())

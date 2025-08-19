@@ -24,20 +24,21 @@ async fn test_imds_provider() {
     let _msi_res_id = std::env::var("AZURE_MSI_RESOURCE_ID").ok();
 
     let loader = ImdsCredentialProvider::new();
-    
+
     // This test will only succeed when running on Azure VM with managed identity
     let result = loader.provide_credential(&ctx).await;
-    
+
     match result {
-        Ok(Some(cred)) => {
-            match cred {
-                Credential::BearerToken { token, expires_in: _ } => {
-                    assert!(!token.is_empty());
-                    eprintln!("Successfully obtained bearer token from IMDS");
-                }
-                _ => panic!("Expected BearerToken credential from IMDS"),
+        Ok(Some(cred)) => match cred {
+            Credential::BearerToken {
+                token,
+                expires_in: _,
+            } => {
+                assert!(!token.is_empty());
+                eprintln!("Successfully obtained bearer token from IMDS");
             }
-        }
+            _ => panic!("Expected BearerToken credential from IMDS"),
+        },
         Ok(None) => {
             eprintln!("IMDS returned no credentials (may not be running on Azure)");
         }
@@ -66,13 +67,16 @@ async fn test_imds_provider_with_mock() {
 
     let loader = ImdsCredentialProvider::new();
     let result = loader.provide_credential(&ctx).await;
-    
+
     assert!(result.is_ok());
     let cred = result.unwrap();
     assert!(cred.is_some());
-    
+
     match cred.unwrap() {
-        Credential::BearerToken { token, expires_in: _ } => {
+        Credential::BearerToken {
+            token,
+            expires_in: _,
+        } => {
             assert_eq!(token, "mock_bearer_token");
         }
         _ => panic!("Expected BearerToken credential"),
