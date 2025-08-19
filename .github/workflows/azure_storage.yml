@@ -234,6 +234,7 @@ jobs:
         working-directory: ./services/azure-storage
         env:
           REQSIGN_AZURE_STORAGE_TEST_CLI: on
+          PATH: /usr/bin:${{ env.PATH }}
         run: |
           echo "::group::Testing AzureCliCredentialProvider"
           cargo test credential_providers::azure_cli:: --no-fail-fast -- --nocapture
