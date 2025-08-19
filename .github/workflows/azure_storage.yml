@@ -224,6 +224,12 @@ jobs:
           client-id: ${{ env.AZURE_CLIENT_ID }}
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
+      - name: Verify Azure CLI
+        run: |
+          echo "Checking Azure CLI installation..."
+          which az || echo "Azure CLI not found in PATH"
+          az --version || echo "Azure CLI not installed"
+          az account show || echo "Not logged in to Azure"
       - name: Test AzureCliCredentialProvider
         working-directory: ./services/azure-storage
         env:
