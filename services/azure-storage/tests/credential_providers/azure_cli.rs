@@ -1,6 +1,8 @@
 #[cfg(not(target_arch = "wasm32"))]
 use reqsign_azure_storage::{AzureCliCredentialProvider, Credential};
 #[cfg(not(target_arch = "wasm32"))]
+use reqsign_command_execute_tokio::TokioCommandExecute;
+#[cfg(not(target_arch = "wasm32"))]
 use reqsign_core::{Context, OsEnv, ProvideCredential};
 #[cfg(not(target_arch = "wasm32"))]
 use reqsign_file_read_tokio::TokioFileRead;
@@ -23,6 +25,7 @@ async fn test_azure_cli_provider() {
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
+        .with_command_execute(TokioCommandExecute::default())
         .with_env(OsEnv);
 
     let loader = AzureCliCredentialProvider::new();
@@ -54,6 +57,7 @@ async fn test_azure_cli_provider_not_installed() {
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
+        .with_command_execute(TokioCommandExecute::default())
         .with_env(OsEnv);
 
     // Temporarily modify PATH to simulate Azure CLI not being installed
