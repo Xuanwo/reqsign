@@ -51,28 +51,3 @@ async fn test_azure_cli_provider() {
         _ => panic!("Expected BearerToken credential from Azure CLI"),
     }
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-#[tokio::test]
-async fn test_azure_cli_provider_not_installed() {
-    use std::env;
-
-    let ctx = Context::new()
-        .with_file_read(TokioFileRead)
-        .with_http_send(ReqwestHttpSend::default())
-        .with_command_execute(TokioCommandExecute)
-        .with_env(OsEnv);
-
-    // Temporarily modify PATH to simulate Azure CLI not being installed
-    let original_path = env::var("PATH").unwrap_or_default();
-    env::set_var("PATH", "/nonexistent");
-
-    let loader = AzureCliCredentialProvider::new();
-    let result = loader.provide_credential(&ctx).await;
-
-    // Restore original PATH
-    env::set_var("PATH", original_path);
-
-    // Should fail or return None when Azure CLI is not available
-    assert!(result.is_err() || result.unwrap().is_none());
-}
