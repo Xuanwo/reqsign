@@ -7,6 +7,7 @@ mod imds;
 #[cfg(not(target_arch = "wasm32"))]
 mod process;
 mod profile;
+mod s3_express;
 #[cfg(not(target_arch = "wasm32"))]
 mod sso;
 

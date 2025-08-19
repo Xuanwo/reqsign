@@ -313,10 +313,10 @@ jobs:
           python3 services/aws-v4/tests/mocks/ecs_mock_server.py 51679 &
           MOCK_PID=$!
           echo "MOCK_PID=$MOCK_PID" >> $GITHUB_ENV
-          
+
           # Wait for server to start
           sleep 2
-          
+
           # Verify the mock server is running
           echo "::group::Verifying mock ECS credentials server"
           curl -v http://localhost:51679/creds
@@ -362,7 +362,7 @@ jobs:
           TEST_HOME=$(mktemp -d)
           echo "TEST_HOME=$TEST_HOME" >> $GITHUB_ENV
           echo "HOME=$TEST_HOME" >> $GITHUB_ENV
-          
+
           # Create AWS config with SSO profile
           mkdir -p $TEST_HOME/.aws
           cat > $TEST_HOME/.aws/config << 'EOF'
@@ -372,14 +372,14 @@ jobs:
           sso_account_id = 123456789012
           sso_role_name = TestRole
           EOF
-          
+
           # Create SSO cache directory
           mkdir -p $TEST_HOME/.aws/sso/cache
-          
+
           # Calculate cache file name (SHA1 of start URL)
           START_URL="https://test-sso.awsapps.com/start"
           CACHE_KEY=$(echo -n "$START_URL" | sha1sum | cut -d' ' -f1)
-          
+
           # Create cached SSO token (expires in 1 hour)
           EXPIRES_AT=$(date -u -d '+1 hour' '+%Y-%m-%dT%H:%M:%SZ')
           cat > $TEST_HOME/.aws/sso/cache/${CACHE_KEY}.json << EOF
@@ -388,7 +388,7 @@ jobs:
             "expiresAt": "$EXPIRES_AT"
           }
           EOF
-          
+
           echo "SSO test environment configured at $TEST_HOME"
           ls -la $TEST_HOME/.aws/
           ls -la $TEST_HOME/.aws/sso/cache/
@@ -398,10 +398,10 @@ jobs:
           python3 services/aws-v4/tests/mocks/sso_mock_server.py 8080 &
           SSO_PID=$!
           echo "SSO_PID=$SSO_PID" >> $GITHUB_ENV
-          
+
           # Wait for server to start
           sleep 2
-          
+
           # Test the mock server
           echo "::group::Testing mock SSO server"
           curl -v http://localhost:8080/federation/credentials?role_name=TestRole\&account_id=123456789012 \
@@ -441,22 +441,22 @@ jobs:
           TEST_HOME=$(mktemp -d)
           echo "TEST_HOME=$TEST_HOME" >> $GITHUB_ENV
           echo "HOME=$TEST_HOME" >> $GITHUB_ENV
-          
+
           # Copy the credential helper script
           cp services/aws-v4/tests/mocks/credential_process_helper.py $TEST_HOME/credential-helper.py
           chmod +x $TEST_HOME/credential-helper.py
-          
+
           # Setup AWS config with credential_process
           mkdir -p $TEST_HOME/.aws
           cat > $TEST_HOME/.aws/config << EOF
           [default]
           credential_process = python3 $TEST_HOME/credential-helper.py
-          
+
           [profile test-process]
           credential_process = python3 $TEST_HOME/credential-helper.py --profile test
           region = us-west-2
           EOF
-          
+
           # Test the credential helper works
           echo "::group::Testing credential helper"
           python3 $TEST_HOME/credential-helper.py
@@ -502,10 +502,10 @@ jobs:
           python3 services/aws-v4/tests/mocks/cognito_mock_server.py 8443 &
           COGNITO_PID=$!
           echo "COGNITO_PID=$COGNITO_PID" >> $GITHUB_ENV
-          
+
           # Wait for server to start
           sleep 2
-          
+
           # Test the mock server
           echo "::group::Testing mock Cognito server"
           curl -X POST http://localhost:8443/ \
@@ -532,6 +532,35 @@ jobs:
             kill $COGNITO_PID || true
           fi
 
+  # S3ExpressSessionProvider test
+  test_s3_express_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AWS_V4_TEST_S3_EXPRESS: on
+          REQSIGN_AWS_V4_S3_EXPRESS_BUCKET: op://reqsign/aws-v4-s3-express/bucket
+          AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/access_key
+          AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/secret_key
+          AWS_REGION: op://reqsign/aws-v4-s3-express/region
+      - name: Test S3ExpressSessionProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing S3ExpressSessionProvider"
+          cargo test test_s3_express --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+
   # Summary report
   summary:
     if: always()
@@ -548,22 +577,23 @@ jobs:
       - test_sso_provider
       - test_process_provider
       - test_cognito_provider
+      - test_s3_express_provider
     runs-on: ubuntu-latest
     steps:
       - name: Test Summary
         run: |
           echo "## AWS V4 Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "### Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "#### Core Tests" >> $GITHUB_STEP_SUMMARY
           echo "| Test | Result |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Unit Tests | ${{ needs.unit_test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "#### Integration Tests (with real AWS credentials)" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ needs.check_secrets.outputs.has_secrets }}" == "true" ]]; then
             echo "✅ **Integration tests with real AWS credentials were executed**" >> $GITHUB_STEP_SUMMARY
@@ -575,11 +605,12 @@ jobs:
             echo "| ProfileCredentialProvider | ${{ needs.test_profile_provider.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| AssumeRoleCredentialProvider | ${{ needs.test_assume_role_provider.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| AssumeRoleWithWebIdentityCredentialProvider | ${{ needs.test_web_identity_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| S3ExpressSessionProvider | ${{ needs.test_s3_express_provider.result }} |" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ **Integration tests were skipped** (forked repository or no secrets available)" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "#### Mock Server Tests" >> $GITHUB_STEP_SUMMARY
           echo "The following providers are tested using mock servers:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
