@@ -25,7 +25,7 @@ async fn test_azure_cli_provider() {
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
-        .with_command_execute(TokioCommandExecute::default())
+        .with_command_execute(TokioCommandExecute)
         .with_env(OsEnv);
 
     let loader = AzureCliCredentialProvider::new();
@@ -57,7 +57,7 @@ async fn test_azure_cli_provider_not_installed() {
     let ctx = Context::new()
         .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
-        .with_command_execute(TokioCommandExecute::default())
+        .with_command_execute(TokioCommandExecute)
         .with_env(OsEnv);
 
     // Temporarily modify PATH to simulate Azure CLI not being installed
