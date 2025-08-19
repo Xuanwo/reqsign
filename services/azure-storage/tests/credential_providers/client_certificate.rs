@@ -37,11 +37,16 @@ async fn test_client_certificate_provider() {
 
     let result = loader.provide_credential(&ctx).await;
 
-    assert!(result.is_ok());
-    let cred = result.unwrap();
-    assert!(cred.is_some());
+    // Better error reporting
+    let cred = match result {
+        Ok(Some(cred)) => cred,
+        Ok(None) => panic!("Client certificate provider returned None when test is enabled"),
+        Err(e) => {
+            panic!("Client certificate provider failed with error: {e:?}\nError details: {e}")
+        }
+    };
 
-    match cred.unwrap() {
+    match cred {
         Credential::BearerToken {
             token,
             expires_in: _,

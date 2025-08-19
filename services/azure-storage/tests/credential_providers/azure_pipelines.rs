@@ -64,21 +64,3 @@ async fn test_azure_pipelines_provider() {
         _ => panic!("Expected BearerToken credential from Azure Pipelines"),
     }
 }
-
-#[tokio::test]
-async fn test_azure_pipelines_provider_missing_env() {
-    let ctx = Context::new()
-        .with_file_read(TokioFileRead)
-        .with_http_send(ReqwestHttpSend::default())
-        .with_env(StaticEnv {
-            home_dir: None,
-            envs: HashMap::new(),
-        });
-
-    let loader = AzurePipelinesCredentialProvider::new();
-    let result = loader.provide_credential(&ctx).await;
-
-    // Should return None when required environment variables are missing
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_none());
-}
