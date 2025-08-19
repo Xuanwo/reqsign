@@ -253,7 +253,7 @@ jobs:
           # Wait for server to start
           sleep 2
           # Verify server is running
-          curl -H "Metadata: true" "http://localhost:8080/metadata/identity/oauth2/token?api-version=2019-08-01&resource=https://storage.azure.com/" || exit 1
+          curl -H "Metadata: true" "http://localhost:8080/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com/" || exit 1
       - name: Test ImdsCredentialProvider
         working-directory: ./services/azure-storage
         env:
