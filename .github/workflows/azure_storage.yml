@@ -209,9 +209,10 @@ jobs:
         continue-on-error: true
       - name: Test AzureCliCredentialProvider
         working-directory: ./services/azure-storage
+        env:
+          REQSIGN_AZURE_STORAGE_TEST_CLI: on
         run: |
           echo "::group::Testing AzureCliCredentialProvider"
-          export REQSIGN_AZURE_STORAGE_TEST_CLI=on
           cargo test credential_providers::azure_cli:: --no-fail-fast -- --nocapture || true
           echo "::endgroup::"
 
@@ -236,10 +237,11 @@ jobs:
           sleep 2
       - name: Test ImdsCredentialProvider with mock
         working-directory: ./services/azure-storage
+        env:
+          REQSIGN_AZURE_STORAGE_TEST_IMDS_MOCK: on
+          AZURE_IMDS_ENDPOINT: http://localhost:8080
         run: |
           echo "::group::Testing ImdsCredentialProvider with mock"
-          export REQSIGN_AZURE_STORAGE_TEST_IMDS_MOCK=on
-          export AZURE_IMDS_ENDPOINT=http://localhost:8080
           cargo test credential_providers::imds::test_imds_provider_with_mock --no-fail-fast -- --nocapture
           echo "::endgroup::"
       - name: Test Summary
