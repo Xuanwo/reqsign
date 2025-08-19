@@ -76,7 +76,7 @@ impl ProvideCredential for AzureCliCredentialProvider {
 
         // Try to get access token from Azure CLI
         let token = self.get_access_token_from_cli(ctx, resource).await?;
-        
+
         // Calculate expiration time
         let expires_on = if let Some(timestamp) = token.expires_on_timestamp {
             Some(chrono::DateTime::from_timestamp(timestamp, 0).unwrap())
