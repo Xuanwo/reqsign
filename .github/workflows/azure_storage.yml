@@ -258,7 +258,7 @@ jobs:
         working-directory: ./services/azure-storage
         env:
           REQSIGN_AZURE_STORAGE_TEST_IMDS: on
-          AZURE_IMDS_ENDPOINT: http://localhost:8080
+          AZURE_IMDS_ENDPOINT: http://localhost:8080/metadata/identity/oauth2/token
         run: |
           echo "::group::Testing ImdsCredentialProvider"
           cargo test credential_providers::imds:: --no-fail-fast -- --nocapture
