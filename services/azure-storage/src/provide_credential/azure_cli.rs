@@ -22,14 +22,16 @@ impl AzureCliCredentialProvider {
         ctx: &Context,
         resource: &str,
     ) -> Result<AzureCliToken, reqsign_core::Error> {
-        // Build the Azure CLI command
-        let cmd = format!(
-            "az account get-access-token --resource {} --output json",
-            resource
-        );
+        let args = [
+            "account",
+            "get-access-token",
+            "--resource",
+            resource,
+            "--output",
+            "json",
+        ];
 
-        // Use shell_execute to handle potential shell scripts
-        let output = ctx.shell_execute(&cmd).await?;
+        let output = ctx.command_execute("az", &args).await?;
 
         if !output.success() {
             return Err(reqsign_core::Error::credential_invalid(format!(
