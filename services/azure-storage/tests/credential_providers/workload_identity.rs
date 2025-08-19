@@ -40,26 +40,19 @@ async fn test_workload_identity_provider() {
     // This test will only succeed in a Kubernetes environment with workload identity
     let result = loader.provide_credential(&ctx).await;
 
-    match result {
-        Ok(Some(cred)) => match cred {
-            Credential::BearerToken {
-                token,
-                expires_in: _,
-            } => {
-                assert!(!token.is_empty());
-                eprintln!("Successfully obtained bearer token from workload identity");
-            }
-            _ => panic!("Expected BearerToken credential from workload identity"),
-        },
-        Ok(None) => {
-            eprintln!("Workload identity returned no credentials");
+    let cred = result
+        .expect("Workload identity provider should succeed when test is enabled")
+        .expect("Workload identity provider should return credentials when test is enabled");
+
+    match cred {
+        Credential::BearerToken {
+            token,
+            expires_in: _,
+        } => {
+            assert!(!token.is_empty());
+            eprintln!("Successfully obtained bearer token from workload identity");
         }
-        Err(e) => {
-            eprintln!(
-                "Workload identity test failed (expected when not in K8s): {}",
-                e
-            );
-        }
+        _ => panic!("Expected BearerToken credential from workload identity"),
     }
 }
 

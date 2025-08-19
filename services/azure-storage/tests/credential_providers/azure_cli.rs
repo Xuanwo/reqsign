@@ -30,26 +30,19 @@ async fn test_azure_cli_provider() {
     // This test requires Azure CLI to be installed and logged in
     let result = loader.provide_credential(&ctx).await;
 
-    match result {
-        Ok(Some(cred)) => match cred {
-            Credential::BearerToken {
-                token,
-                expires_in: _,
-            } => {
-                assert!(!token.is_empty());
-                eprintln!("Successfully obtained bearer token from Azure CLI");
-            }
-            _ => panic!("Expected BearerToken credential from Azure CLI"),
-        },
-        Ok(None) => {
-            eprintln!("Azure CLI returned no credentials (may not be logged in)");
+    let cred = result
+        .expect("Azure CLI provider should succeed when test is enabled")
+        .expect("Azure CLI provider should return credentials when test is enabled");
+
+    match cred {
+        Credential::BearerToken {
+            token,
+            expires_in: _,
+        } => {
+            assert!(!token.is_empty());
+            eprintln!("Successfully obtained bearer token from Azure CLI");
         }
-        Err(e) => {
-            eprintln!(
-                "Azure CLI test failed (expected when CLI not installed): {}",
-                e
-            );
-        }
+        _ => panic!("Expected BearerToken credential from Azure CLI"),
     }
 }
 

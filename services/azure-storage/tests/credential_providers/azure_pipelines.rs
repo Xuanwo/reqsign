@@ -49,26 +49,19 @@ async fn test_azure_pipelines_provider() {
     // This test will only succeed in Azure Pipelines environment
     let result = loader.provide_credential(&ctx).await;
 
-    match result {
-        Ok(Some(cred)) => match cred {
-            Credential::BearerToken {
-                token,
-                expires_in: _,
-            } => {
-                assert!(!token.is_empty());
-                eprintln!("Successfully obtained bearer token from Azure Pipelines");
-            }
-            _ => panic!("Expected BearerToken credential from Azure Pipelines"),
-        },
-        Ok(None) => {
-            eprintln!("Azure Pipelines returned no credentials");
+    let cred = result
+        .expect("Azure Pipelines provider should succeed when test is enabled")
+        .expect("Azure Pipelines provider should return credentials when test is enabled");
+
+    match cred {
+        Credential::BearerToken {
+            token,
+            expires_in: _,
+        } => {
+            assert!(!token.is_empty());
+            eprintln!("Successfully obtained bearer token from Azure Pipelines");
         }
-        Err(e) => {
-            eprintln!(
-                "Azure Pipelines test failed (expected when not in Pipelines): {}",
-                e
-            );
-        }
+        _ => panic!("Expected BearerToken credential from Azure Pipelines"),
     }
 }
 

@@ -28,23 +28,19 @@ async fn test_imds_provider() {
     // This test will only succeed when running on Azure VM with managed identity
     let result = loader.provide_credential(&ctx).await;
 
-    match result {
-        Ok(Some(cred)) => match cred {
-            Credential::BearerToken {
-                token,
-                expires_in: _,
-            } => {
-                assert!(!token.is_empty());
-                eprintln!("Successfully obtained bearer token from IMDS");
-            }
-            _ => panic!("Expected BearerToken credential from IMDS"),
-        },
-        Ok(None) => {
-            eprintln!("IMDS returned no credentials (may not be running on Azure)");
+    let cred = result
+        .expect("IMDS provider should succeed when test is enabled")
+        .expect("IMDS provider should return credentials when test is enabled");
+
+    match cred {
+        Credential::BearerToken {
+            token,
+            expires_in: _,
+        } => {
+            assert!(!token.is_empty());
+            eprintln!("Successfully obtained bearer token from IMDS");
         }
-        Err(e) => {
-            eprintln!("IMDS test failed (expected when not on Azure): {}", e);
-        }
+        _ => panic!("Expected BearerToken credential from IMDS"),
     }
 }
 
