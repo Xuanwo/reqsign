@@ -194,7 +194,7 @@ impl Context {
         if cfg!(target_os = "windows") {
             self.cmd.command_execute("cmd", &["/C", command]).await
         } else {
-            self.cmd.command_execute("sh", &["-c", command]).await
+            self.cmd.command_execute("/bin/sh", &["-c", command]).await
         }
     }
 }
