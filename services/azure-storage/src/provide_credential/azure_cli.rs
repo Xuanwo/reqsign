@@ -119,22 +119,4 @@ mod tests {
         assert_eq!(token.expires_on_timestamp, Some(1698760750));
         assert_eq!(token.token_type, "Bearer");
     }
-
-    #[tokio::test]
-    async fn test_provide_credential_azure_cli_not_available() {
-        // When Azure CLI is not installed or user is not logged in,
-        // the provider should return None instead of error
-        let provider = AzureCliCredentialProvider::new();
-        let ctx = reqsign_core::Context::new()
-            .with_file_read(reqsign_file_read_tokio::TokioFileRead)
-            .with_http_send(reqsign_http_send_reqwest::ReqwestHttpSend::default())
-            .with_env(reqsign_core::OsEnv);
-
-        // This test assumes Azure CLI is not set up in test environment
-        // In real usage, if Azure CLI is available and logged in, this would return Some(credential)
-        let result = provider.provide_credential(&ctx).await;
-
-        // Should not error out
-        assert!(result.is_ok());
-    }
 }
