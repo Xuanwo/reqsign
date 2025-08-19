@@ -61,7 +61,7 @@ impl ProvideCredential for EnvCredentialProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reqsign_core::StaticEnv;
+    use reqsign_core::{OsEnv, StaticEnv};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
     use std::collections::HashMap;
@@ -78,10 +78,14 @@ mod tests {
             ),
         ]);
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
-            home_dir: None,
-            envs,
-        });
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv)
+            .with_env(StaticEnv {
+                home_dir: None,
+                envs,
+            });
 
         let provider = EnvCredentialProvider::new();
         let cred = provider.provide_credential(&ctx).await?;
@@ -97,7 +101,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_env_credential_provider_missing_credentials() -> anyhow::Result<()> {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
 
         let provider = EnvCredentialProvider::new();
         let cred = provider.provide_credential(&ctx).await?;
@@ -114,10 +121,14 @@ mod tests {
             (ORACLE_TENANCY.to_string(), "test_tenancy".to_string()),
         ]);
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
-            home_dir: None,
-            envs,
-        });
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv)
+            .with_env(StaticEnv {
+                home_dir: None,
+                envs,
+            });
 
         let provider = EnvCredentialProvider::new();
         let cred = provider.provide_credential(&ctx).await?;
@@ -138,10 +149,14 @@ mod tests {
             ),
         ]);
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
-            home_dir: Some("/home/user".into()),
-            envs,
-        });
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv)
+            .with_env(StaticEnv {
+                home_dir: Some("/home/user".into()),
+                envs,
+            });
 
         let provider = EnvCredentialProvider::new();
         let cred = provider.provide_credential(&ctx).await?;

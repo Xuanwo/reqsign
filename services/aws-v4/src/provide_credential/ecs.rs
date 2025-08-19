@@ -230,7 +230,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_ecs_provider_no_env() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::new(),
@@ -243,7 +245,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_endpoint_relative_uri() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([(
@@ -259,7 +263,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_endpoint_relative_uri_with_custom_base() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([
@@ -281,7 +287,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_endpoint_full_uri() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([(
@@ -297,7 +305,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_custom_endpoint() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let provider = ECSCredentialProvider::new().with_endpoint("http://custom-endpoint/creds");
 
         let endpoint = provider.get_endpoint(&ctx).unwrap();

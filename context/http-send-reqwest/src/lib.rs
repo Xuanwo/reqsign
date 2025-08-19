@@ -20,10 +20,9 @@
 //! #[tokio::main]
 //! async fn main() {
 //!     // Use default client
-//!     let ctx = Context::new(
-//!         TokioFileRead::default(),
-//!         ReqwestHttpSend::default(),
-//!     );
+//!     let ctx = Context::new()
+//!         .with_file_read(TokioFileRead::default())
+//!         .with_http_send(ReqwestHttpSend::default());
 //!
 //!     // Or use a custom configured client
 //!     let client = Client::builder()
@@ -31,10 +30,9 @@
 //!         .build()
 //!         .unwrap();
 //!     
-//!     let ctx = Context::new(
-//!         TokioFileRead::default(),
-//!         ReqwestHttpSend::new(client),
-//!     );
+//!     let ctx = Context::new()
+//!         .with_file_read(TokioFileRead::default())
+//!         .with_http_send(ReqwestHttpSend::new(client));
 //! }
 //! ```
 //!
@@ -48,10 +46,9 @@
 //!
 //! # async fn example() -> anyhow::Result<()> {
 //! // Create context with reqwest HTTP client
-//! let ctx = Context::new(
-//!     TokioFileRead::default(),
-//!     ReqwestHttpSend::default(),
-//! );
+//! let ctx = Context::new()
+//!     .with_file_read(TokioFileRead::default())
+//!     .with_http_send(ReqwestHttpSend::default());
 //!
 //! // The context can send HTTP requests
 //! let req = http::Request::builder()

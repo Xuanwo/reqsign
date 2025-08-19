@@ -46,7 +46,8 @@ jobs:
           cargo build --workspace \
             --target wasm32-unknown-unknown \
             --exclude reqsign-file-read-tokio \
-            --exclude reqsign-http-send-reqwest
+            --exclude reqsign-http-send-reqwest \
+            --exclude reqsign-command-execute-tokio
 
   unit:
     runs-on: ubuntu-latest

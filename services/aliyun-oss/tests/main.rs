@@ -9,7 +9,7 @@ use log::{debug, warn};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use reqsign_aliyun_oss::{RequestSigner, StaticCredentialProvider};
 use reqsign_core::Result;
-use reqsign_core::{Context, Signer};
+use reqsign_core::{Context, OsEnv, Signer};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
@@ -24,7 +24,10 @@ async fn init_signer() -> Option<(Context, Signer<reqsign_aliyun_oss::Credential
         return None;
     }
 
-    let context = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let context = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     let access_key_id = env::var("REQSIGN_ALIYUN_OSS_ACCESS_KEY")
         .expect("env REQSIGN_ALIYUN_OSS_ACCESS_KEY must set");

@@ -1,5 +1,3 @@
-use std::process::Command;
-
 use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential};
 use serde::Deserialize;
@@ -21,23 +19,21 @@ impl AzureCliCredentialProvider {
     /// Execute `az account get-access-token` command
     async fn get_access_token_from_cli(
         &self,
+        ctx: &Context,
         resource: &str,
     ) -> Result<AzureCliToken, reqsign_core::Error> {
-        let output = Command::new("az")
-            .args([
-                "account",
-                "get-access-token",
-                "--resource",
-                resource,
-                "--output",
-                "json",
-            ])
-            .output()
-            .map_err(|e| {
-                reqsign_core::Error::unexpected(format!("Failed to execute Azure CLI command: {e}"))
-            })?;
+        let args = [
+            "account",
+            "get-access-token",
+            "--resource",
+            resource,
+            "--output",
+            "json",
+        ];
 
-        if !output.status.success() {
+        let output = ctx.command_execute("az", &args).await?;
+
+        if !output.success() {
             return Err(reqsign_core::Error::credential_invalid(format!(
                 "Azure CLI command failed: {}",
                 String::from_utf8_lossy(&output.stderr)
@@ -73,13 +69,13 @@ impl ProvideCredential for AzureCliCredentialProvider {
 
     async fn provide_credential(
         &self,
-        _ctx: &Context,
+        ctx: &Context,
     ) -> Result<Option<Self::Credential>, reqsign_core::Error> {
         // For Azure Storage, we need the storage resource
         let resource = "https://storage.azure.com/";
 
         // Try to get access token from Azure CLI
-        match self.get_access_token_from_cli(resource).await {
+        match self.get_access_token_from_cli(ctx, resource).await {
             Ok(token) => {
                 // Calculate expiration time
                 let expires_on = if let Some(timestamp) = token.expires_on_timestamp {
@@ -135,10 +131,10 @@ mod tests {
         // When Azure CLI is not installed or user is not logged in,
         // the provider should return None instead of error
         let provider = AzureCliCredentialProvider::new();
-        let ctx = reqsign_core::Context::new(
-            reqsign_file_read_tokio::TokioFileRead,
-            reqsign_http_send_reqwest::ReqwestHttpSend::default(),
-        );
+        let ctx = reqsign_core::Context::new()
+            .with_file_read(reqsign_file_read_tokio::TokioFileRead)
+            .with_http_send(reqsign_http_send_reqwest::ReqwestHttpSend::default())
+            .with_env(reqsign_core::OsEnv);
 
         // This test assumes Azure CLI is not set up in test environment
         // In real usage, if Azure CLI is available and logged in, this would return Some(credential)

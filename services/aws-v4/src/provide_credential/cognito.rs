@@ -275,7 +275,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_cognito_provider_no_config() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
         let provider = CognitoIdentityCredentialProvider::new();
         let result = provider.provide_credential(&ctx).await.unwrap();
         assert!(result.is_none());

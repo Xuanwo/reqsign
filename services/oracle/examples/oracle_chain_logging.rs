@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use log::{debug, info};
-use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
+use reqsign_core::{Context, OsEnv, ProvideCredential, ProvideCredentialChain, Result};
 use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqsign_oracle::{
@@ -60,7 +60,10 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     // Create context
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(OsEnv);
 
     // Build a chain with logging
     let chain = ProvideCredentialChain::new()

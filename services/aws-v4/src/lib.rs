@@ -21,10 +21,9 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create context
-//!     let ctx = Context::new(
-//!         TokioFileRead::default(),
-//!         ReqwestHttpSend::default(),
-//!     );
+//!     let ctx = Context::new()
+//!         .with_file_read(TokioFileRead::default())
+//!         .with_http_send(ReqwestHttpSend::default());
 //!
 //!     // Create credential loader
 //!     let loader = DefaultCredentialProvider::new();

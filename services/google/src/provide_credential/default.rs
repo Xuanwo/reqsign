@@ -176,14 +176,13 @@ mod tests {
             ),
         )]);
 
-        let ctx = Context::new(
-            reqsign_file_read_tokio::TokioFileRead,
-            reqsign_http_send_reqwest::ReqwestHttpSend::default(),
-        )
-        .with_env(StaticEnv {
-            home_dir: None,
-            envs,
-        });
+        let ctx = Context::new()
+            .with_file_read(reqsign_file_read_tokio::TokioFileRead)
+            .with_http_send(reqsign_http_send_reqwest::ReqwestHttpSend::default())
+            .with_env(StaticEnv {
+                home_dir: None,
+                envs,
+            });
 
         let provider = DefaultCredentialProvider::new();
         let cred = provider
@@ -204,10 +203,9 @@ mod tests {
             .with_scope("https://www.googleapis.com/auth/devstorage.read_only");
 
         // Even without valid credentials, this should not panic
-        let ctx = Context::new(
-            reqsign_file_read_tokio::TokioFileRead,
-            reqsign_http_send_reqwest::ReqwestHttpSend::default(),
-        );
+        let ctx = Context::new()
+            .with_file_read(reqsign_file_read_tokio::TokioFileRead)
+            .with_http_send(reqsign_http_send_reqwest::ReqwestHttpSend::default());
         let _ = provider.provide_credential(&ctx).await;
     }
 }

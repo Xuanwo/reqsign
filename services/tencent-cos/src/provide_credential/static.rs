@@ -46,12 +46,16 @@ impl ProvideCredential for StaticCredentialProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use reqsign_core::OsEnv;
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
 
     #[tokio::test]
     async fn test_static_credential_provider() -> anyhow::Result<()> {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
 
         let provider = StaticCredentialProvider::new("test_secret_id", "test_secret_key");
         let cred = provider.provide_credential(&ctx).await?;

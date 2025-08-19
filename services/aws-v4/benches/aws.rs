@@ -38,7 +38,9 @@ pub fn bench(c: &mut Criterion) {
         };
 
         let s = AwsV4RequestSigner::new("s3", "test");
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
 
         b.to_async(&*RUNTIME).iter(|| async {
             let mut req = http::Request::new("");

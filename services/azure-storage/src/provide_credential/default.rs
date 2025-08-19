@@ -74,7 +74,10 @@ mod tests {
         };
 
         // Create a mock context - in real usage Context would be created with proper FileRead and HttpSend
-        let ctx = reqsign_core::Context::new(MockFileRead, MockHttpSend).with_env(env);
+        let ctx = reqsign_core::Context::new()
+            .with_file_read(MockFileRead)
+            .with_http_send(MockHttpSend)
+            .with_env(env);
 
         let loader = DefaultCredentialProvider::new();
 
@@ -101,7 +104,10 @@ mod tests {
             )]),
         };
 
-        let ctx = reqsign_core::Context::new(MockFileRead, MockHttpSend).with_env(env);
+        let ctx = reqsign_core::Context::new()
+            .with_file_read(MockFileRead)
+            .with_http_send(MockHttpSend)
+            .with_env(env);
 
         let loader = DefaultCredentialProvider::new();
 

@@ -398,7 +398,7 @@ fn canonicalize_resource(ctx: &mut SigningRequest, account_name: &str) -> String
 mod tests {
     use super::*;
     use http::Request;
-    use reqsign_core::Context;
+    use reqsign_core::{Context, OsEnv};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
     use std::time::Duration;
@@ -407,7 +407,10 @@ mod tests {
     async fn test_sas_token() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let cred = Credential::with_sas_token("sv=2021-01-01&ss=b&srt=c&sp=rwdlaciytfx&se=2022-01-01T11:00:14Z&st=2022-01-02T03:00:14Z&spr=https&sig=KEllk4N8f7rJfLjQCmikL2fRVt%2B%2Bl73UBkbgH%2FK3VGE%3D");
 
         let builder = RequestSigner::new();
@@ -429,7 +432,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_bearer_token() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let cred = Credential::with_bearer_token(
             "token",
             Some(now() + chrono::TimeDelta::try_hours(1).unwrap()),

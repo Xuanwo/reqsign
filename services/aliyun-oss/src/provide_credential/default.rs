@@ -49,7 +49,7 @@ impl ProvideCredential for DefaultCredentialProvider {
 mod tests {
     use super::*;
     use crate::constants::*;
-    use reqsign_core::StaticEnv;
+    use reqsign_core::{OsEnv, StaticEnv};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
     use std::collections::HashMap;
@@ -58,7 +58,10 @@ mod tests {
     async fn test_default_loader_without_env() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::new(),
@@ -74,7 +77,10 @@ mod tests {
     async fn test_default_loader_with_env() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([
@@ -100,7 +106,10 @@ mod tests {
     async fn test_default_loader_with_security_token() {
         let _ = env_logger::builder().is_test(true).try_init();
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: None,
             envs: HashMap::from_iter([

@@ -76,7 +76,9 @@ impl ProvideCredential for EnvCredentialProvider {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create context
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default());
 
     // Build a custom chain with specific priority order
     let chain = ProvideCredentialChain::new()

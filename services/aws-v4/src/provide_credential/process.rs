@@ -5,8 +5,6 @@ use ini::Ini;
 use log::debug;
 use reqsign_core::{Context, Error, ProvideCredential, Result};
 use serde::Deserialize;
-use std::process::Stdio;
-use tokio::process::Command;
 
 /// Process Credentials Provider
 ///
@@ -122,7 +120,11 @@ impl ProcessCredentialProvider {
             .map(|s| s.to_string())
     }
 
-    async fn execute_process(&self, command: &str) -> Result<ProcessCredentialOutput> {
+    async fn execute_process(
+        &self,
+        ctx: &Context,
+        command: &str,
+    ) -> Result<ProcessCredentialOutput> {
         debug!("executing credential process: {command}");
 
         // Parse command into program and arguments
@@ -136,16 +138,10 @@ impl ProcessCredentialProvider {
         let program = parts[0];
         let args = &parts[1..];
 
-        // Execute the process
-        let output = Command::new(program)
-            .args(args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .await
-            .map_err(|e| Error::unexpected(format!("failed to execute credential process: {e}")))?;
+        // Execute the process using Context's command executor
+        let output = ctx.command_execute(program, args).await?;
 
-        if !output.status.success() {
+        if !output.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(Error::unexpected(format!(
                 "credential process failed with status {}: {}",
@@ -196,7 +192,7 @@ impl ProvideCredential for ProcessCredentialProvider {
             }
         };
 
-        let output = self.execute_process(&command).await?;
+        let output = self.execute_process(ctx, &command).await?;
 
         let expires_in =
             if let Some(exp_str) = &output.expiration {
@@ -219,14 +215,19 @@ impl ProvideCredential for ProcessCredentialProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reqsign_core::StaticEnv;
+    use reqsign_command_execute_tokio::TokioCommandExecute;
+    use reqsign_core::{OsEnv, StaticEnv};
     use reqsign_file_read_tokio::TokioFileRead;
     use reqsign_http_send_reqwest::ReqwestHttpSend;
     use std::collections::HashMap;
 
     #[tokio::test]
     async fn test_process_provider_no_config() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_command_execute(TokioCommandExecute)
+            .with_env(OsEnv);
         let ctx = ctx.with_env(StaticEnv {
             home_dir: Some(std::path::PathBuf::from("/home/test")),
             envs: HashMap::new(),

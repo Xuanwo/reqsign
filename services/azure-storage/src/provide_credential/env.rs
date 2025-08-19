@@ -70,10 +70,13 @@ mod tests {
             ("AZBLOB_ACCOUNT_KEY".to_string(), "mykey".to_string()),
         ]);
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
-            home_dir: None,
-            envs,
-        });
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(StaticEnv {
+                home_dir: None,
+                envs,
+            });
 
         let provider = EnvCredentialProvider::new();
         let cred = provider.provide_credential(&ctx).await.unwrap();
@@ -97,10 +100,13 @@ mod tests {
             "mysastoken".to_string(),
         )]);
 
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default()).with_env(StaticEnv {
-            home_dir: None,
-            envs,
-        });
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(StaticEnv {
+                home_dir: None,
+                envs,
+            });
 
         let provider = EnvCredentialProvider::new();
         let cred = provider.provide_credential(&ctx).await.unwrap();
@@ -115,7 +121,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_env_credential_provider_none() {
-        let ctx = Context::new(TokioFileRead, ReqwestHttpSend::default());
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default());
 
         let provider = EnvCredentialProvider::new();
         let cred = provider.provide_credential(&ctx).await.unwrap();
