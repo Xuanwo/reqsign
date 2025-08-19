@@ -230,6 +230,14 @@ jobs:
           REQSIGN_AZURE_STORAGE_TEST_CLI: on
         run: |
           echo "::group::Testing AzureCliCredentialProvider"
+          echo "=== Debug: What is az? ==="
+          which az
+          AZ_PATH=$(which az)
+          echo "az is at: $AZ_PATH"
+          file "$AZ_PATH"
+          echo "=== Content of az script ==="
+          cat "$AZ_PATH"
+          echo "=== Running actual test ==="
           cargo test credential_providers::azure_cli:: --no-fail-fast -- --nocapture
           echo "::endgroup::"
 
