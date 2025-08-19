@@ -33,6 +33,8 @@ services/
 │   ├── web_identity_role_arn           # ARN for WebIdentity role
 │   ├── test_cognito_enabled            # "on" to enable Cognito tests
 │   └── cognito_identity_pool_id        # Cognito identity pool ID
+├── aws-v4-s3-express/
+│   └── bucket                          # S3 Express bucket name (format: name--azid--x-s3)
 ├── azure-storage/
 │   ├── test_enabled                    # "on"
 │   ├── account_name                    # Azure storage account name
@@ -62,6 +64,13 @@ Fields:
   - service: s3
   - url: https://my-test-bucket.s3.amazonaws.com
   ...
+```
+
+Example for S3 Express:
+```
+Title: aws-v4-s3-express
+Fields:
+  - bucket: my-bucket--use1-az5--x-s3
 ```
 
 ## GitHub Actions Usage

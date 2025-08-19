@@ -532,6 +532,35 @@ jobs:
             kill $COGNITO_PID || true
           fi
 
+  # S3ExpressSessionProvider test
+  test_s3_express_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AWS_V4_TEST_S3_EXPRESS: on
+          REQSIGN_AWS_V4_S3_EXPRESS_BUCKET: op://reqsign/aws-v4-s3-express/bucket
+          AWS_ACCESS_KEY_ID: op://reqsign/aws-v4/access_key
+          AWS_SECRET_ACCESS_KEY: op://reqsign/aws-v4/secret_key
+          AWS_REGION: op://reqsign/aws-v4/region
+      - name: Test S3ExpressSessionProvider
+        working-directory: ./services/aws-v4
+        run: |
+          echo "::group::Testing S3ExpressSessionProvider"
+          cargo test test_s3_express --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+
   # Summary report
   summary:
     if: always()
@@ -548,6 +577,7 @@ jobs:
       - test_sso_provider
       - test_process_provider
       - test_cognito_provider
+      - test_s3_express_provider
     runs-on: ubuntu-latest
     steps:
       - name: Test Summary
@@ -575,6 +605,7 @@ jobs:
             echo "| ProfileCredentialProvider | ${{ needs.test_profile_provider.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| AssumeRoleCredentialProvider | ${{ needs.test_assume_role_provider.result }} |" >> $GITHUB_STEP_SUMMARY
             echo "| AssumeRoleWithWebIdentityCredentialProvider | ${{ needs.test_web_identity_provider.result }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| S3ExpressSessionProvider | ${{ needs.test_s3_express_provider.result }} |" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ **Integration tests were skipped** (forked repository or no secrets available)" >> $GITHUB_STEP_SUMMARY
           fi
