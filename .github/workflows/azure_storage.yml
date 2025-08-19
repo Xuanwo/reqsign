@@ -192,7 +192,7 @@ jobs:
         working-directory: ./services/azure-storage
         run: |
           echo "::group::Testing ClientCertificateCredentialProvider"
-          cargo test credential_providers::client_certificate:: --no-fail-fast -- --nocapture || true
+          cargo test credential_providers::client_certificate:: --no-fail-fast -- --nocapture
           echo "::endgroup::"
 
   # Azure CLI test (only on runners with Azure CLI)
@@ -200,20 +200,37 @@ jobs:
     needs: check_secrets
     if: needs.check_secrets.outputs.has_secrets == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v5
-      - name: Azure Login
-        uses: azure/login@v1
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-        continue-on-error: true
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AZURE_STORAGE_TEST_CLI: on
+          AZURE_TENANT_ID: op://reqsign/azure-storage/tenant_id
+          AZURE_CLIENT_ID: op://reqsign/azure-storage/client_id
+      - name: Azure Login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
       - name: Test AzureCliCredentialProvider
         working-directory: ./services/azure-storage
         env:
           REQSIGN_AZURE_STORAGE_TEST_CLI: on
         run: |
           echo "::group::Testing AzureCliCredentialProvider"
-          cargo test credential_providers::azure_cli:: --no-fail-fast -- --nocapture || true
+          cargo test credential_providers::azure_cli:: --no-fail-fast -- --nocapture
           echo "::endgroup::"
 
   # IMDS test with mock server
