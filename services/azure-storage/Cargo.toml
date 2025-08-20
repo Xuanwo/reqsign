@@ -23,6 +23,7 @@ reqsign-core.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha1.workspace = true
 sha2.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -36,6 +37,7 @@ pem = "3.0"
 async-trait.workspace = true
 dotenv.workspace = true
 env_logger.workspace = true
+reqsign-command-execute-tokio = { path = "../../context/command-execute-tokio" }
 reqsign-file-read-tokio = { path = "../../context/file-read-tokio" }
 reqsign-http-send-reqwest = { path = "../../context/http-send-reqwest" }
 reqwest = { workspace = true, features = ["rustls-tls"] }

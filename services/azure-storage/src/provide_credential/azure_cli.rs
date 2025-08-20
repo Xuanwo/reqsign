@@ -75,30 +75,24 @@ impl ProvideCredential for AzureCliCredentialProvider {
         let resource = "https://storage.azure.com/";
 
         // Try to get access token from Azure CLI
-        match self.get_access_token_from_cli(ctx, resource).await {
-            Ok(token) => {
-                // Calculate expiration time
-                let expires_on = if let Some(timestamp) = token.expires_on_timestamp {
-                    Some(chrono::DateTime::from_timestamp(timestamp, 0).unwrap())
-                } else if let Some(expires_str) = token.expires_on {
-                    // Parse the string format "2023-10-31 21:59:10.000000"
-                    chrono::NaiveDateTime::parse_from_str(&expires_str, "%Y-%m-%d %H:%M:%S%.f")
-                        .ok()
-                        .map(|dt| chrono::DateTime::from_naive_utc_and_offset(dt, chrono::Utc))
-                } else {
-                    None
-                };
+        let token = self.get_access_token_from_cli(ctx, resource).await?;
 
-                Ok(Some(Credential::with_bearer_token(
-                    &token.access_token,
-                    expires_on,
-                )))
-            }
-            Err(_) => {
-                // Azure CLI is not available or user is not logged in
-                Ok(None)
-            }
-        }
+        // Calculate expiration time
+        let expires_on = if let Some(timestamp) = token.expires_on_timestamp {
+            Some(chrono::DateTime::from_timestamp(timestamp, 0).unwrap())
+        } else if let Some(expires_str) = token.expires_on {
+            // Parse the string format "2023-10-31 21:59:10.000000"
+            chrono::NaiveDateTime::parse_from_str(&expires_str, "%Y-%m-%d %H:%M:%S%.f")
+                .ok()
+                .map(|dt| chrono::DateTime::from_naive_utc_and_offset(dt, chrono::Utc))
+        } else {
+            None
+        };
+
+        Ok(Some(Credential::with_bearer_token(
+            &token.access_token,
+            expires_on,
+        )))
     }
 }
 
@@ -124,23 +118,5 @@ mod tests {
         );
         assert_eq!(token.expires_on_timestamp, Some(1698760750));
         assert_eq!(token.token_type, "Bearer");
-    }
-
-    #[tokio::test]
-    async fn test_provide_credential_azure_cli_not_available() {
-        // When Azure CLI is not installed or user is not logged in,
-        // the provider should return None instead of error
-        let provider = AzureCliCredentialProvider::new();
-        let ctx = reqsign_core::Context::new()
-            .with_file_read(reqsign_file_read_tokio::TokioFileRead)
-            .with_http_send(reqsign_http_send_reqwest::ReqwestHttpSend::default())
-            .with_env(reqsign_core::OsEnv);
-
-        // This test assumes Azure CLI is not set up in test environment
-        // In real usage, if Azure CLI is available and logged in, this would return Some(credential)
-        let result = provider.provide_credential(&ctx).await;
-
-        // Should not error out
-        assert!(result.is_ok());
     }
 }

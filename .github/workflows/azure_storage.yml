@@ -12,21 +12,316 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
+env:
+  RUST_LOG: DEBUG
+  RUST_BACKTRACE: full
+
 jobs:
+  # Unit tests - always run, no secrets needed
   unit_test:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run unit tests
+        working-directory: ./services/azure-storage
+        run: |
+          echo "::group::Running unit tests"
+          cargo test --lib --no-fail-fast
+          cargo test --doc --no-fail-fast
+          echo "::endgroup::"
+
+  # Check if we can run integration tests
+  check_secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      has_secrets: ${{ steps.check.outputs.has_secrets }}
+    steps:
+      - name: Check if secrets are available
+        id: check
+        run: |
+          if [[ "${{ github.event_name }}" == "push" || ( "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "false" ) ]]; then
+            echo "has_secrets=true" >> $GITHUB_OUTPUT
+            echo "::notice::Integration tests will be executed (base repository)"
+          else
+            echo "has_secrets=false" >> $GITHUB_OUTPUT
+            echo "::warning::Integration tests will be skipped (forked repository or no secrets available)"
+          fi
+
+  # Signing tests - test signature algorithm with static credentials
+  signing_test:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AZURE_STORAGE_TEST: on
+          REQSIGN_AZURE_STORAGE_URL: op://reqsign/azure-storage/url
+          REQSIGN_AZURE_STORAGE_ACCOUNT_NAME: op://reqsign/azure-storage/account_name
+          REQSIGN_AZURE_STORAGE_ACCOUNT_KEY: op://reqsign/azure-storage/account_key
+          REQSIGN_AZURE_STORAGE_SAS_TOKEN: op://reqsign/azure-storage/sas_token
+      - name: Test signing
+        working-directory: ./services/azure-storage
+        run: |
+          echo "::group::Running signing tests"
+          cargo test signing:: --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+
+  # EnvCredentialProvider test
+  test_env_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AZURE_STORAGE_TEST_ENV: on
+          AZURE_STORAGE_ACCOUNT_NAME: op://reqsign/azure-storage/account_name
+          AZURE_STORAGE_ACCOUNT_KEY: op://reqsign/azure-storage/account_key
+          AZURE_STORAGE_SAS_TOKEN: op://reqsign/azure-storage/sas_token
+      - name: Test EnvCredentialProvider
+        working-directory: ./services/azure-storage
+        run: |
+          echo "::group::Testing EnvCredentialProvider"
+          cargo test credential_providers::env:: --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+
+  # StaticCredentialProvider test
+  test_static_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AZURE_STORAGE_TEST: on
+          REQSIGN_AZURE_STORAGE_URL: op://reqsign/azure-storage/url
+          REQSIGN_AZURE_STORAGE_ACCOUNT_NAME: op://reqsign/azure-storage/account_name
+          REQSIGN_AZURE_STORAGE_ACCOUNT_KEY: op://reqsign/azure-storage/account_key
+          REQSIGN_AZURE_STORAGE_SAS_TOKEN: op://reqsign/azure-storage/sas_token
+      - name: Test StaticCredentialProvider
+        working-directory: ./services/azure-storage
+        run: |
+          echo "::group::Testing StaticCredentialProvider"
+          cargo test credential_providers::static_provider:: --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+
+  # ClientSecretCredentialProvider test
+  test_client_secret_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AZURE_STORAGE_TEST_CLIENT_SECRET: on
+          AZURE_TENANT_ID: op://reqsign/azure-storage/tenant_id
+          AZURE_CLIENT_ID: op://reqsign/azure-storage/client_id
+          AZURE_CLIENT_SECRET: op://reqsign/azure-storage/client_secret
+      - name: Test ClientSecretCredentialProvider
+        working-directory: ./services/azure-storage
+        run: |
+          echo "::group::Testing ClientSecretCredentialProvider"
+          cargo test credential_providers::client_secret:: --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+
+  # ClientCertificateCredentialProvider test
+  test_client_certificate_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          REQSIGN_AZURE_STORAGE_TEST_CLIENT_CERTIFICATE: on
+          AZURE_TENANT_ID: op://reqsign/azure-storage/tenant_id
+          AZURE_CLIENT_ID: op://reqsign/azure-storage/client_id
+          AZURE_CLIENT_CERTIFICATE_BASE64: op://reqsign/azure-storage/certificate_pem_base64
+      - name: Setup certificate
+        run: |
+          # Decode base64 certificate content and write to file
+          echo "$AZURE_CLIENT_CERTIFICATE_BASE64" | base64 -d > /tmp/azure-test-cert.pem
+          # Verify the certificate was decoded correctly
+          if [ ! -s /tmp/azure-test-cert.pem ]; then
+            echo "Error: Certificate file is empty after decoding"
+            exit 1
+          fi
+          # Set the path for the test
+          echo "AZURE_CLIENT_CERTIFICATE_PATH=/tmp/azure-test-cert.pem" >> $GITHUB_ENV
+      - name: Test ClientCertificateCredentialProvider
+        working-directory: ./services/azure-storage
+        env:
+          REQSIGN_AZURE_STORAGE_TEST_CLIENT_CERTIFICATE: on
+        run: |
+          echo "::group::Testing ClientCertificateCredentialProvider"
+          cargo test credential_providers::client_certificate:: --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+
+  # Azure CLI test (only on runners with Azure CLI)
+  test_azure_cli_provider:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v5
-      - name: Test
-        working-directory: ./services/aws-v4
-        run: cargo test --no-fail-fast
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
         env:
-          RUST_LOG: DEBUG
-          RUST_BACKTRACE: full
-          # Azure Storage Test
-          REQSIGN_AZURE_STORAGE_TEST: ${{ secrets.REQSIGN_AZURE_STORAGE_TEST }}
-          REQSIGN_AZURE_STORAGE_URL: ${{ secrets.REQSIGN_AZURE_STORAGE_URL }}
-          REQSIGN_AZURE_STORAGE_ACCOUNT_NAME: ${{ secrets.REQSIGN_AZURE_STORAGE_ACCOUNT_NAME }}
-          REQSIGN_AZURE_STORAGE_ACCOUNT_KEY: ${{ secrets.REQSIGN_AZURE_STORAGE_ACCOUNT_KEY }}
+          REQSIGN_AZURE_STORAGE_TEST_CLI: on
+          AZURE_TENANT_ID: op://reqsign/azure-storage/tenant_id
+          AZURE_CLIENT_ID: op://reqsign/azure-storage/client_id
+      - name: Azure Login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Test AzureCliCredentialProvider
+        working-directory: ./services/azure-storage
+        env:
+          REQSIGN_AZURE_STORAGE_TEST_CLI: on
+        run: |
+          echo "::group::Testing AzureCliCredentialProvider"
+          cargo test credential_providers::azure_cli:: --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+
+  # IMDS test with mock server
+  test_imds_provider:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start IMDS mock server
+        run: |
+          python3 ./services/azure-storage/tests/mocks/imds_mock.py 8080 &
+          MOCK_PID=$!
+          echo "MOCK_PID=$MOCK_PID" >> $GITHUB_ENV
+          # Wait for server to start
+          sleep 2
+          # Verify server is running
+          curl -H "Metadata: true" "http://localhost:8080/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com/" || exit 1
+      - name: Test ImdsCredentialProvider
+        working-directory: ./services/azure-storage
+        env:
+          REQSIGN_AZURE_STORAGE_TEST_IMDS: on
+          AZURE_IMDS_ENDPOINT: http://localhost:8080/metadata/identity/oauth2/token
+        run: |
+          echo "::group::Testing ImdsCredentialProvider"
+          cargo test credential_providers::imds:: --no-fail-fast -- --nocapture
+          echo "::endgroup::"
+      - name: Stop mock server
+        if: always()
+        run: |
+          if [ ! -z "$MOCK_PID" ]; then
+            kill $MOCK_PID || true
+          fi
+
+  # Summary job to collect all test results
+  test_summary:
+    name: Test Summary
+    needs:
+      - unit_test
+      - check_secrets
+      - signing_test
+      - test_env_provider
+      - test_static_provider
+      - test_client_secret_provider
+      - test_client_certificate_provider
+      - test_azure_cli_provider
+      - test_imds_provider
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "## Azure Storage Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "| Test | Status | Type |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.unit_test.result }} | Core |" >> $GITHUB_STEP_SUMMARY
+          echo "| Signing Tests | ${{ needs.signing_test.result }} | Integration |" >> $GITHUB_STEP_SUMMARY
+          echo "| EnvCredentialProvider | ${{ needs.test_env_provider.result }} | Integration |" >> $GITHUB_STEP_SUMMARY
+          echo "| StaticCredentialProvider | ${{ needs.test_static_provider.result }} | Integration |" >> $GITHUB_STEP_SUMMARY
+          echo "| ClientSecretCredentialProvider | ${{ needs.test_client_secret_provider.result }} | Integration |" >> $GITHUB_STEP_SUMMARY
+          echo "| ClientCertificateCredentialProvider | ${{ needs.test_client_certificate_provider.result }} | Integration |" >> $GITHUB_STEP_SUMMARY
+          echo "| AzureCliCredentialProvider | ${{ needs.test_azure_cli_provider.result }} | Integration |" >> $GITHUB_STEP_SUMMARY
+          echo "| ImdsCredentialProvider | ${{ needs.test_imds_provider.result }} | Mock |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.check_secrets.outputs.has_secrets }}" != "true" ]]; then
+            echo "⚠️ **Note:** Integration tests requiring secrets were skipped (forked repository or no secrets available)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check if any test failed
+          if [[ "${{ needs.unit_test.result }}" == "failure" ]] || \
+             [[ "${{ needs.signing_test.result }}" == "failure" ]] || \
+             [[ "${{ needs.test_env_provider.result }}" == "failure" ]] || \
+             [[ "${{ needs.test_static_provider.result }}" == "failure" ]] || \
+             [[ "${{ needs.test_client_secret_provider.result }}" == "failure" ]] || \
+             [[ "${{ needs.test_client_certificate_provider.result }}" == "failure" ]] || \
+             [[ "${{ needs.test_azure_cli_provider.result }}" == "failure" ]] || \
+             [[ "${{ needs.test_imds_provider.result }}" == "failure" ]]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Some tests failed. Please check the logs above.**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **All tests passed!**" >> $GITHUB_STEP_SUMMARY
+          fi

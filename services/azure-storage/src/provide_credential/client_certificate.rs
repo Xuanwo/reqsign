@@ -9,7 +9,7 @@ use reqsign_core::{Context, ProvideCredential};
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::RsaPrivateKey;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha1::{Digest, Sha1};
 
 use crate::credential::Credential;
 
@@ -93,21 +93,37 @@ impl ClientCertificateCredentialProvider {
             ))
         })?;
 
-        // Extract certificate
-        let cert_pem = pem::parse(&pem_str).map_err(|e| {
+        // Parse all PEM blocks
+        let pems = pem::parse_many(&pem_str).map_err(|e| {
             reqsign_core::Error::credential_invalid(format!("Failed to parse PEM: {e}"))
         })?;
 
-        if cert_pem.tag() != "CERTIFICATE" {
-            return Err(reqsign_core::Error::credential_invalid(
-                "PEM does not contain a certificate",
-            ));
+        // Find certificate and private key
+        let mut cert_der = None;
+        let mut private_key_pem = None;
+
+        for pem_block in &pems {
+            match pem_block.tag() {
+                "CERTIFICATE" => {
+                    cert_der = Some(pem_block.contents().to_vec());
+                }
+                "PRIVATE KEY" | "RSA PRIVATE KEY" => {
+                    private_key_pem = Some(pem::encode(pem_block));
+                }
+                _ => {}
+            }
         }
 
-        let cert_der = cert_pem.contents().to_vec();
+        let cert_der = cert_der.ok_or_else(|| {
+            reqsign_core::Error::credential_invalid("PEM does not contain a certificate")
+        })?;
 
-        // Extract private key
-        let private_key = RsaPrivateKey::from_pkcs8_pem(&pem_str).map_err(|e| {
+        let private_key_pem = private_key_pem.ok_or_else(|| {
+            reqsign_core::Error::credential_invalid("PEM does not contain a private key")
+        })?;
+
+        // Parse private key
+        let private_key = RsaPrivateKey::from_pkcs8_pem(&private_key_pem).map_err(|e| {
             reqsign_core::Error::credential_invalid(format!(
                 "Failed to parse private key from PEM: {e}"
             ))
@@ -117,8 +133,9 @@ impl ClientCertificateCredentialProvider {
     }
 
     /// Calculate certificate thumbprint (x5t)
+    /// Azure AD expects SHA1 thumbprint for x5t field
     fn calculate_thumbprint(&self, cert_der: &[u8]) -> String {
-        let hash = Sha256::digest(cert_der);
+        let hash = Sha1::digest(cert_der);
         URL_SAFE_NO_PAD.encode(hash)
     }
 

@@ -24,7 +24,7 @@
 //!         .with_file_read(TokioFileRead::default())
 //!         .with_http_send(ReqwestHttpSend::default())
 //!         .with_command_execute(TokioCommandExecute::default())
-//!         
+//!
 //!         .unwrap();
 //!
 //!     // The context can now execute commands asynchronously
@@ -83,7 +83,7 @@ impl CommandExecute for TokioCommandExecute {
             .output()
             .await
             .map_err(|e| {
-                Error::unexpected(format!("failed to execute command '{program}': {e}"))
+                Error::unexpected(format!("failed to execute command '{program}'")).with_source(e)
             })?;
 
         Ok(CommandOutput {

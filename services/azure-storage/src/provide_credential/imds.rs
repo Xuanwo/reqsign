@@ -28,9 +28,13 @@ impl ProvideCredential for ImdsCredentialProvider {
         let expires_on = if token.expires_on.is_empty() {
             reqsign_core::time::now() + chrono::TimeDelta::try_minutes(10).expect("in bounds")
         } else {
-            reqsign_core::time::parse_rfc3339(&token.expires_on).map_err(|e| {
-                reqsign_core::Error::unexpected("failed to parse expires_on time").with_source(e)
-            })?
+            // Azure IMDS returns expires_on as Unix timestamp (seconds since epoch)
+            let timestamp = token.expires_on.parse::<i64>().map_err(|e| {
+                reqsign_core::Error::unexpected("failed to parse expires_on timestamp")
+                    .with_source(e)
+            })?;
+            chrono::DateTime::from_timestamp(timestamp, 0)
+                .ok_or_else(|| reqsign_core::Error::unexpected("invalid expires_on timestamp"))?
         };
 
         Ok(Some(Credential::with_bearer_token(
@@ -95,4 +99,42 @@ async fn get_access_token(resource: &str, ctx: &Context) -> Result<AccessTokenRe
         reqsign_core::Error::unexpected("failed to parse IMDS response").with_source(e)
     })?;
     Ok(token)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_standard_imds_response() {
+        // Standard IMDS token response format
+        let json_response = r#"{
+            "access_token": "eyJ0eXAi...",
+            "refresh_token": "",
+            "expires_in": "3599",
+            "expires_on": "1506484173",
+            "not_before": "1506480273",
+            "resource": "https://management.azure.com/",
+            "token_type": "Bearer"
+        }"#;
+
+        let parsed: AccessTokenResponse = serde_json::from_str(json_response).unwrap();
+
+        assert_eq!(parsed.access_token, "eyJ0eXAi...");
+        assert_eq!(parsed.expires_on, "1506484173");
+    }
+
+    #[test]
+    fn test_parse_minimal_imds_response() {
+        // Minimal response with only required fields
+        let json_response = r#"{
+            "access_token": "test_token",
+            "expires_on": "1506484173"
+        }"#;
+
+        let parsed: AccessTokenResponse = serde_json::from_str(json_response).unwrap();
+
+        assert_eq!(parsed.access_token, "test_token");
+        assert_eq!(parsed.expires_on, "1506484173");
+    }
 }
