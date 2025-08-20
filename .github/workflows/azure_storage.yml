@@ -180,7 +180,7 @@ jobs:
         env:
           REQSIGN_AZURE_STORAGE_TEST_CLIENT_CERTIFICATE: on
           AZURE_TENANT_ID: op://reqsign/azure-storage/tenant_id
-          AZURE_CLIENT_ID: op://reqsign/azure-storage/cert_client_id
+          AZURE_CLIENT_ID: op://reqsign/azure-storage/client_id
           AZURE_CLIENT_CERTIFICATE_BASE64: op://reqsign/azure-storage/certificate_pem_base64
       - name: Setup certificate
         run: |
@@ -292,7 +292,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "| Test | Status | Type |" >> $GITHUB_STEP_SUMMARY
           echo "|------|--------|------|" >> $GITHUB_STEP_SUMMARY
           echo "| Unit Tests | ${{ needs.unit_test.result }} | Core |" >> $GITHUB_STEP_SUMMARY
@@ -304,11 +304,11 @@ jobs:
           echo "| AzureCliCredentialProvider | ${{ needs.test_azure_cli_provider.result }} | Integration |" >> $GITHUB_STEP_SUMMARY
           echo "| ImdsCredentialProvider | ${{ needs.test_imds_provider.result }} | Mock |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ needs.check_secrets.outputs.has_secrets }}" != "true" ]]; then
             echo "⚠️ **Note:** Integration tests requiring secrets were skipped (forked repository or no secrets available)" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           # Check if any test failed
           if [[ "${{ needs.unit_test.result }}" == "failure" ]] || \
              [[ "${{ needs.signing_test.result }}" == "failure" ]] || \
