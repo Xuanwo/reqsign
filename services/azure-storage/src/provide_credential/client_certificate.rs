@@ -9,7 +9,7 @@ use reqsign_core::{Context, ProvideCredential};
 use rsa::pkcs8::DecodePrivateKey;
 use rsa::RsaPrivateKey;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use sha1::{Digest, Sha1};
 
 use crate::credential::Credential;
 
@@ -133,8 +133,9 @@ impl ClientCertificateCredentialProvider {
     }
 
     /// Calculate certificate thumbprint (x5t)
+    /// Azure AD expects SHA1 thumbprint for x5t field
     fn calculate_thumbprint(&self, cert_der: &[u8]) -> String {
-        let hash = Sha256::digest(cert_der);
+        let hash = Sha1::digest(cert_der);
         URL_SAFE_NO_PAD.encode(hash)
     }
 
