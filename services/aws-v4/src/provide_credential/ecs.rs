@@ -160,8 +160,7 @@ impl ECSCredentialProvider {
         if let Some(relative_uri) = &self.relative_uri {
             let base_endpoint = self
                 .metadata_uri_override
-                .as_ref()
-                .map(|s| s.as_str())
+                .as_deref()
                 .unwrap_or(ECS_METADATA_ENDPOINT);
             return Ok(format!("{base_endpoint}{relative_uri}"));
         }
