@@ -16,7 +16,7 @@ use super::{
 ///
 /// It follows the Google Application Default Credentials (ADC) strategy:
 /// 1. GOOGLE_APPLICATION_CREDENTIALS environment variable
-/// 2. gcloud credential file (~/.config/gcloud/application_default_credentials.json)  
+/// 2. gcloud credential file (~/.config/gcloud/application_default_credentials.json)
 /// 3. Metadata server (for GCE/Cloud Functions/App Engine)
 ///
 /// The provider automatically handles all credential types including:
