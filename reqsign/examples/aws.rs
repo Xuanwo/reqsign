@@ -1,19 +1,13 @@
 use anyhow::Result;
 use reqsign::aws::{DefaultCredentialProvider, RequestSigner};
-use reqsign::{Context, DefaultContext, Signer};
+use reqsign::{default_context, Signer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
 
-    // Create a default context implementation
-    let ctx_impl = DefaultContext::new();
-
-    // Create a Context from the implementation
-    let ctx = Context::new()
-        .with_file_read(ctx_impl.clone())
-        .with_http_send(ctx_impl.clone())
-        .with_env(ctx_impl.clone());
+    // Create a context with default implementations
+    let ctx = default_context();
 
     // Create credential loader
     let loader = DefaultCredentialProvider::new();

@@ -1,119 +1,66 @@
-use async_trait::async_trait;
-use bytes::Bytes;
-use reqsign_core::Result;
-use reqsign_core::{Env, FileRead, HttpSend};
-use reqwest::Client;
-use std::collections::HashMap;
-#[cfg(not(target_arch = "wasm32"))]
-use std::env;
-use std::path::PathBuf;
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::fs;
-
-#[derive(Debug, Default, Clone)]
-pub struct DefaultContext {
-    client: Client,
-}
-
-impl DefaultContext {
-    pub fn new() -> Self {
-        Self {
-            client: Client::new(),
-        }
-    }
-
-    pub fn with_client(client: Client) -> Self {
-        Self { client }
-    }
-}
+use reqsign_core::{Context, OsEnv};
 
 #[cfg(not(target_arch = "wasm32"))]
-#[async_trait]
-impl FileRead for DefaultContext {
-    async fn file_read(&self, path: &str) -> Result<Vec<u8>> {
-        Ok(fs::read(path).await?)
-    }
-}
+use reqsign_command_execute_tokio::TokioCommandExecute;
+#[cfg(not(target_arch = "wasm32"))]
+use reqsign_file_read_tokio::TokioFileRead;
+use reqsign_http_send_reqwest::ReqwestHttpSend;
 
-#[cfg(target_arch = "wasm32")]
-#[async_trait]
-impl FileRead for DefaultContext {
-    async fn file_read(&self, _path: &str) -> Result<Vec<u8>> {
-        Err(reqsign_core::Error::unexpected(
-            "File reading is not supported on WASM",
-        ))
-    }
-}
-
-#[async_trait]
-impl HttpSend for DefaultContext {
-    async fn http_send(&self, req: http::Request<Bytes>) -> Result<http::Response<Bytes>> {
-        // Convert http::Request to reqwest::Request
-        let method = req.method().clone();
-        let uri = req.uri().to_string();
-        let headers = req.headers().clone();
-        let body = req.into_body();
-
-        let mut reqwest_req = self.client.request(method, uri);
-        reqwest_req = reqwest_req.headers(headers);
-        reqwest_req = reqwest_req.body(body);
-
-        let reqwest_resp = reqwest_req
-            .send()
-            .await
-            .map_err(|e| reqsign_core::Error::unexpected(format!("HTTP request failed: {e}")))?;
-
-        // Convert reqwest::Response to http::Response
-        let status = reqwest_resp.status();
-        let headers = reqwest_resp.headers().clone();
-        let body = reqwest_resp.bytes().await.map_err(|e| {
-            reqsign_core::Error::unexpected(format!("Failed to read response body: {e}"))
-        })?;
-
-        let mut http_resp = http::Response::builder().status(status);
-
-        for (k, v) in headers {
-            if let Some(name) = k {
-                http_resp = http_resp.header(name, v);
-            }
-        }
-
-        Ok(http_resp.body(body)?)
-    }
-}
-
-impl Env for DefaultContext {
-    fn var(&self, key: &str) -> Option<String> {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            env::var(key).ok()
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            _ = key;
-            None
-        }
+/// Create a Context with default implementations.
+///
+/// This function returns a Context configured with:
+/// - `TokioCommandExecute` for command execution (non-WASM only)
+/// - `TokioFileRead` for file reading (non-WASM only)
+/// - `ReqwestHttpSend` for HTTP requests
+/// - `OsEnv` for environment variable access
+///
+/// # Example
+///
+/// ```no_run
+/// # async fn example() -> reqsign_core::Result<()> {
+/// let ctx = reqsign::default_context();
+///
+/// // Use the context directly
+/// let response = ctx.http_send(http::Request::builder()
+///     .uri("https://api.example.com")
+///     .body(bytes::Bytes::new())?)
+///     .await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Customization
+///
+/// You can replace any component by chaining method calls:
+///
+/// ```no_run
+/// # async fn example() -> reqsign_core::Result<()> {
+/// // Example: Replace with a custom environment implementation
+/// use reqsign_core::StaticEnv;
+/// use std::collections::HashMap;
+///
+/// let mut envs = HashMap::new();
+/// envs.insert("AWS_ACCESS_KEY_ID".to_string(), "my-key".to_string());
+///
+/// let ctx = reqsign::default_context()
+///     .with_env(StaticEnv { envs, home_dir: None });
+/// # Ok(())
+/// # }
+/// ```
+pub fn default_context() -> Context {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        Context::new()
+            .with_command_execute(TokioCommandExecute)
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv)
     }
 
-    fn vars(&self) -> HashMap<String, String> {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            env::vars().collect()
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            HashMap::new()
-        }
-    }
-
-    fn home_dir(&self) -> Option<PathBuf> {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            home::home_dir()
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            None
-        }
+    #[cfg(target_arch = "wasm32")]
+    {
+        Context::new()
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv)
     }
 }
