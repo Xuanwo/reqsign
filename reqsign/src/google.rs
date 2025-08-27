@@ -48,10 +48,22 @@ pub type DefaultSigner = Signer<Credential>;
 ///
 /// ```no_run
 /// # async fn example() -> reqsign_core::Result<()> {
-/// use reqsign::google::default_signer;
+/// use reqsign::google::{default_signer, StaticCredentialProvider};
+///
+/// // Example: use a static credential provider with service account JSON
+/// let service_account_json = r#"{
+///     "type": "service_account",
+///     "project_id": "my-project",
+///     "private_key_id": "key-id",
+///     "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+///     "client_email": "my-service-account@my-project.iam.gserviceaccount.com",
+///     "client_id": "123456789",
+///     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+///     "token_uri": "https://oauth2.googleapis.com/token"
+/// }"#;
 ///
 /// let signer = default_signer("storage.googleapis.com")
-///     .with_credential_provider(my_custom_provider);
+///     .with_credential_provider(StaticCredentialProvider::new(service_account_json));
 /// # Ok(())
 /// # }
 /// ```

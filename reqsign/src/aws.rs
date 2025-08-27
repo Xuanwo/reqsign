@@ -48,15 +48,13 @@ pub type DefaultSigner = Signer<Credential>;
 ///
 /// ```no_run
 /// # async fn example() -> reqsign_core::Result<()> {
-/// use reqsign::aws::{default_signer, StaticCredentialProvider, SigningCredential};
+/// use reqsign::aws::{default_signer, StaticCredentialProvider};
 ///
 /// let signer = default_signer("s3", "us-east-1")
-///     .with_credential_provider(StaticCredentialProvider::new(SigningCredential {
-///         access_key_id: "my-access-key".to_string(),
-///         secret_access_key: "my-secret-key".to_string(),
-///         session_token: None,
-///         expires_in: None,
-///     }));
+///     .with_credential_provider(StaticCredentialProvider::new(
+///         "my-access-key",
+///         "my-secret-key",
+///     ));
 /// # Ok(())
 /// # }
 /// ```

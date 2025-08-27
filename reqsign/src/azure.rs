@@ -48,13 +48,13 @@ pub type DefaultSigner = Signer<Credential>;
 ///
 /// ```no_run
 /// # async fn example() -> reqsign_core::Result<()> {
-/// use reqsign::azure::{default_signer, StaticCredentialProvider, SigningCredential};
+/// use reqsign::azure::{default_signer, StaticCredentialProvider};
 ///
 /// let signer = default_signer()
-///     .with_credential_provider(StaticCredentialProvider::new(SigningCredential {
-///         account_name: "myaccount".to_string(),
-///         account_key: "my-account-key".to_string(),
-///     }));
+///     .with_credential_provider(StaticCredentialProvider::new_shared_key(
+///         "myaccount",
+///         "my-account-key",
+///     ));
 /// # Ok(())
 /// # }
 /// ```
