@@ -176,26 +176,25 @@ jobs:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        id: load_secrets
         uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
         env:
+          REQSIGN_GOOGLE_TEST_WORKLOAD_IDENTITY: on
           GOOGLE_WORKLOAD_IDENTITY_PROVIDER: op://reqsign/google/workload_identity_provider
           GOOGLE_SERVICE_ACCOUNT: op://reqsign/google/service_account_email
-      - name: Setup Workload Identity
-        id: auth
+      - name: Setup Workload Identity with Google Auth
         uses: google-github-actions/auth@v2
-        continue-on-error: true
         with:
-          workload_identity_provider: ${{ steps.load_secrets.outputs.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ steps.load_secrets.outputs.GOOGLE_SERVICE_ACCOUNT }}
           create_credentials_file: true
+          workload_identity_provider: ${{ env.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GOOGLE_SERVICE_ACCOUNT }}
       - name: Test ExternalAccountCredentialProvider
-        if: steps.auth.outcome == 'success'
         working-directory: ./services/google
         run: |
           echo "::group::Testing ExternalAccountCredentialProvider"
-          export REQSIGN_GOOGLE_TEST_WORKLOAD_IDENTITY=on
-          export GOOGLE_APPLICATION_CREDENTIALS=${{ steps.auth.outputs.credentials_file_path }}
+          # The google-github-actions/auth action sets GOOGLE_APPLICATION_CREDENTIALS
+          # reqsign should be able to use this external_account configuration
           cargo test test_external_account_with_workload_identity --no-fail-fast -- --nocapture
           echo "::endgroup::"
 
@@ -259,7 +258,17 @@ jobs:
 
   # Summary
   test_summary:
-    needs: [unit_test, signing_test, test_default_provider, test_static_provider, test_authorized_user_provider, test_external_account_provider, test_impersonated_service_account_provider, test_vm_metadata_provider]
+    needs:
+      [
+        unit_test,
+        signing_test,
+        test_default_provider,
+        test_static_provider,
+        test_authorized_user_provider,
+        test_external_account_provider,
+        test_impersonated_service_account_provider,
+        test_vm_metadata_provider,
+      ]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -267,7 +276,7 @@ jobs:
         run: |
           echo "## Google Cloud Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Unit tests status
           if [[ "${{ needs.unit_test.result }}" == "success" ]]; then
             echo "✅ Unit tests passed" >> $GITHUB_STEP_SUMMARY
@@ -280,7 +289,7 @@ jobs:
           # Integration tests status
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Integration Tests" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ needs.signing_test.result }}" == "success" ]]; then
             echo "✅ Signing tests passed" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ needs.signing_test.result }}" == "skipped" ]]; then
@@ -288,7 +297,7 @@ jobs:
           else
             echo "❌ Signing tests failed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [[ "${{ needs.test_default_provider.result }}" == "success" ]]; then
             echo "✅ DefaultCredentialProvider tests passed" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ needs.test_default_provider.result }}" == "skipped" ]]; then
@@ -296,7 +305,7 @@ jobs:
           else
             echo "❌ DefaultCredentialProvider tests failed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [[ "${{ needs.test_static_provider.result }}" == "success" ]]; then
             echo "✅ StaticCredentialProvider tests passed" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ needs.test_static_provider.result }}" == "skipped" ]]; then
@@ -304,7 +313,7 @@ jobs:
           else
             echo "❌ StaticCredentialProvider tests failed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [[ "${{ needs.test_authorized_user_provider.result }}" == "success" ]]; then
             echo "✅ AuthorizedUserCredentialProvider tests passed" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ needs.test_authorized_user_provider.result }}" == "skipped" ]]; then
@@ -312,7 +321,7 @@ jobs:
           else
             echo "❌ AuthorizedUserCredentialProvider tests failed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [[ "${{ needs.test_external_account_provider.result }}" == "success" ]]; then
             echo "✅ ExternalAccountCredentialProvider tests passed" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ needs.test_external_account_provider.result }}" == "skipped" ]]; then
@@ -320,7 +329,7 @@ jobs:
           else
             echo "❌ ExternalAccountCredentialProvider tests failed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [[ "${{ needs.test_impersonated_service_account_provider.result }}" == "success" ]]; then
             echo "✅ ImpersonatedServiceAccountCredentialProvider tests passed" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ needs.test_impersonated_service_account_provider.result }}" == "skipped" ]]; then
@@ -328,7 +337,7 @@ jobs:
           else
             echo "❌ ImpersonatedServiceAccountCredentialProvider tests failed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [[ "${{ needs.test_vm_metadata_provider.result }}" == "success" ]]; then
             echo "✅ VmMetadataCredentialProvider tests passed" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ needs.test_vm_metadata_provider.result }}" == "skipped" ]]; then
@@ -336,7 +345,7 @@ jobs:
           else
             echo "❌ VmMetadataCredentialProvider tests failed" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           # Overall status
           echo "" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ needs.unit_test.result }}" == "success" ]] && \
