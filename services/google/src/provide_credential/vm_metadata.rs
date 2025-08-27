@@ -51,8 +51,13 @@ impl ProvideCredential for VmMetadataCredentialProvider {
             service_account
         );
 
+        // Allow overriding metadata host for testing
+        let metadata_host = ctx
+            .env_var("GCE_METADATA_HOST")
+            .unwrap_or_else(|| "metadata.google.internal".to_string());
+
         let url = format!(
-            "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/{service_account}/token?scopes={scope}"
+            "http://{metadata_host}/computeMetadata/v1/instance/service-accounts/{service_account}/token?scopes={scope}"
         );
 
         let req = http::Request::builder()
