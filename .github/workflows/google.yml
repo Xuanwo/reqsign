@@ -152,7 +152,7 @@ jobs:
       - name: Setup test credentials file
         run: |
           echo "${{ steps.load_secrets.outputs.AUTHORIZED_USER_CREDENTIALS_BASE64 }}" | base64 -d > /tmp/authorized_user.json
-          echo "GOOGLE_AUTHORIZED_USER_CREDENTIALS=/tmp/authorized_user.json" >> $GITHUB_ENV
+          echo "REQSIGN_GOOGLE_AUTHORIZED_USER_CREDENTIALS=/tmp/authorized_user.json" >> $GITHUB_ENV
       - name: Test AuthorizedUserCredentialProvider
         working-directory: ./services/google
         run: |
@@ -220,7 +220,7 @@ jobs:
       - name: Setup test credentials file
         run: |
           echo "${{ steps.load_secrets.outputs.IMPERSONATED_SA_CREDENTIALS_BASE64 }}" | base64 -d > /tmp/impersonated_sa.json
-          echo "GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS=/tmp/impersonated_sa.json" >> $GITHUB_ENV
+          echo "REQSIGN_GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS=/tmp/impersonated_sa.json" >> $GITHUB_ENV
       - name: Test ImpersonatedServiceAccountCredentialProvider
         working-directory: ./services/google
         run: |
@@ -228,24 +228,38 @@ jobs:
           cargo test test_impersonated_service_account_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
 
-  # VmMetadataCredentialProvider test (only runs on actual GCP VMs)
+  # VmMetadataCredentialProvider test
   test_vm_metadata_provider:
     needs: check_secrets
-    if: needs.check_secrets.outputs.has_secrets == 'true' && false # Disabled by default, enable only on GCP VMs
+    if: needs.check_secrets.outputs.has_secrets == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Test VmMetadataCredentialProvider
+      - name: Start mock metadata server
+        run: |
+          python3 services/google/tests/mocks/vm_metadata_mock_server.py 8080 &
+          echo "MOCK_PID=$!" >> $GITHUB_ENV
+          sleep 2
+          # Verify the mock server is running
+          curl -f -H "Metadata-Flavor: Google" http://127.0.0.1:8080/computeMetadata/v1/instance/service-accounts/ || exit 1
+      - name: Test VmMetadataCredentialProvider with mock
         working-directory: ./services/google
         run: |
-          echo "::group::Testing VmMetadataCredentialProvider"
-          export REQSIGN_GOOGLE_TEST_VM_METADATA=on
-          cargo test test_vm_metadata_credential_provider --no-fail-fast -- --nocapture
+          echo "::group::Testing VmMetadataCredentialProvider with mock"
+          export REQSIGN_GOOGLE_TEST_VM_METADATA_MOCK=on
+          export GCE_METADATA_HOST=127.0.0.1:8080
+          cargo test test_vm_metadata_credential_provider_with_mock --no-fail-fast -- --nocapture
           echo "::endgroup::"
+      - name: Stop mock server
+        if: always()
+        run: |
+          if [ ! -z "$MOCK_PID" ]; then
+            kill $MOCK_PID || true
+          fi
 
   # Summary
   test_summary:
-    needs: [unit_test, signing_test, test_default_provider, test_static_provider, test_authorized_user_provider, test_external_account_provider, test_impersonated_service_account_provider]
+    needs: [unit_test, signing_test, test_default_provider, test_static_provider, test_authorized_user_provider, test_external_account_provider, test_impersonated_service_account_provider, test_vm_metadata_provider]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -315,6 +329,14 @@ jobs:
             echo "❌ ImpersonatedServiceAccountCredentialProvider tests failed" >> $GITHUB_STEP_SUMMARY
           fi
           
+          if [[ "${{ needs.test_vm_metadata_provider.result }}" == "success" ]]; then
+            echo "✅ VmMetadataCredentialProvider tests passed" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ needs.test_vm_metadata_provider.result }}" == "skipped" ]]; then
+            echo "⏭️ VmMetadataCredentialProvider tests skipped (no secrets)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ VmMetadataCredentialProvider tests failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
           # Overall status
           echo "" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ needs.unit_test.result }}" == "success" ]] && \
@@ -323,7 +345,8 @@ jobs:
              ( [[ "${{ needs.test_static_provider.result }}" == "success" ]] || [[ "${{ needs.test_static_provider.result }}" == "skipped" ]] ) && \
              ( [[ "${{ needs.test_authorized_user_provider.result }}" == "success" ]] || [[ "${{ needs.test_authorized_user_provider.result }}" == "skipped" ]] ) && \
              ( [[ "${{ needs.test_external_account_provider.result }}" == "success" ]] || [[ "${{ needs.test_external_account_provider.result }}" == "skipped" ]] ) && \
-             ( [[ "${{ needs.test_impersonated_service_account_provider.result }}" == "success" ]] || [[ "${{ needs.test_impersonated_service_account_provider.result }}" == "skipped" ]] ); then
+             ( [[ "${{ needs.test_impersonated_service_account_provider.result }}" == "success" ]] || [[ "${{ needs.test_impersonated_service_account_provider.result }}" == "skipped" ]] ) && \
+             ( [[ "${{ needs.test_vm_metadata_provider.result }}" == "success" ]] || [[ "${{ needs.test_vm_metadata_provider.result }}" == "skipped" ]] ); then
             echo "### ✅ All tests completed successfully" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ❌ Some tests failed" >> $GITHUB_STEP_SUMMARY

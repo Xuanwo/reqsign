@@ -13,8 +13,8 @@ async fn test_external_account_credential_provider() -> Result<()> {
     }
 
     // This test requires a valid external account credential file
-    let cred_path = env::var("GOOGLE_EXTERNAL_ACCOUNT_CREDENTIALS")
-        .expect("GOOGLE_EXTERNAL_ACCOUNT_CREDENTIALS must be set for this test");
+    let cred_path = env::var("REQSIGN_GOOGLE_EXTERNAL_ACCOUNT_CREDENTIALS")
+        .expect("REQSIGN_GOOGLE_EXTERNAL_ACCOUNT_CREDENTIALS must be set for this test");
 
     // Verify the file exists and is an external_account type
     let content = std::fs::read_to_string(&cred_path)

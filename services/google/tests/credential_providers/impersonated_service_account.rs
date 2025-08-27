@@ -13,8 +13,8 @@ async fn test_impersonated_service_account_credential_provider() -> Result<()> {
     }
 
     // This test requires a valid impersonated service account credential file
-    let cred_path = env::var("GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS")
-        .expect("GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS must be set for this test");
+    let cred_path = env::var("REQSIGN_GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS")
+        .expect("REQSIGN_GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS must be set for this test");
 
     // Verify the file exists and is an impersonated_service_account type
     let content = std::fs::read_to_string(&cred_path)
@@ -56,8 +56,8 @@ async fn test_impersonated_service_account_with_real_credentials() -> Result<()>
     // 2. The source credentials (OAuth2 or service account) must have impersonation permissions
     // 3. The target service account must exist
     
-    let cred_path = env::var("GOOGLE_IMPERSONATED_CREDENTIALS")
-        .expect("GOOGLE_IMPERSONATED_CREDENTIALS must be set for this test");
+    let cred_path = env::var("REQSIGN_GOOGLE_IMPERSONATED_CREDENTIALS")
+        .expect("REQSIGN_GOOGLE_IMPERSONATED_CREDENTIALS must be set for this test");
 
     // Verify the file is an impersonated_service_account type
     let content = std::fs::read_to_string(&cred_path)
@@ -95,8 +95,8 @@ async fn test_impersonated_service_account_with_delegates() -> Result<()> {
     }
 
     // This test requires a valid impersonated service account credential with delegation
-    let cred_path = env::var("GOOGLE_IMPERSONATED_DELEGATES_CREDENTIALS")
-        .expect("GOOGLE_IMPERSONATED_DELEGATES_CREDENTIALS must be set for this test");
+    let cred_path = env::var("REQSIGN_GOOGLE_IMPERSONATED_DELEGATES_CREDENTIALS")
+        .expect("REQSIGN_GOOGLE_IMPERSONATED_DELEGATES_CREDENTIALS must be set for this test");
 
     // Verify the file is an impersonated_service_account type with delegates
     let content = std::fs::read_to_string(&cred_path)

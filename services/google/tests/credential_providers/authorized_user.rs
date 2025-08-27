@@ -14,8 +14,8 @@ async fn test_authorized_user_credential_provider() -> Result<()> {
 
     // This test requires a valid authorized user credential file
     // It can be created with: gcloud auth application-default login
-    let cred_path = env::var("GOOGLE_AUTHORIZED_USER_CREDENTIALS")
-        .expect("GOOGLE_AUTHORIZED_USER_CREDENTIALS must be set for this test");
+    let cred_path = env::var("REQSIGN_GOOGLE_AUTHORIZED_USER_CREDENTIALS")
+        .expect("REQSIGN_GOOGLE_AUTHORIZED_USER_CREDENTIALS must be set for this test");
 
     // Verify the file exists and is an authorized_user type
     let content = std::fs::read_to_string(&cred_path)
