@@ -13,8 +13,9 @@ async fn test_impersonated_service_account_credential_provider() -> Result<()> {
     }
 
     // This test requires a valid impersonated service account credential file
-    let cred_path = env::var("REQSIGN_GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS")
-        .expect("REQSIGN_GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS must be set for this test");
+    let cred_path = env::var("REQSIGN_GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS").expect(
+        "REQSIGN_GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS must be set for this test",
+    );
 
     // Verify the file exists and is an impersonated_service_account type
     let content = std::fs::read_to_string(&cred_path)
@@ -39,7 +40,10 @@ async fn test_impersonated_service_account_credential_provider() -> Result<()> {
 
     assert!(credential.has_token(), "Must have access token");
     assert!(credential.has_valid_token(), "Token must be valid");
-    assert!(!credential.has_service_account(), "Should not have service account");
+    assert!(
+        !credential.has_service_account(),
+        "Should not have service account"
+    );
 
     Ok(())
 }
@@ -55,13 +59,13 @@ async fn test_impersonated_service_account_with_real_credentials() -> Result<()>
     // 1. A valid impersonated service account credential file
     // 2. The source credentials (OAuth2 or service account) must have impersonation permissions
     // 3. The target service account must exist
-    
+
     let cred_path = env::var("REQSIGN_GOOGLE_IMPERSONATED_CREDENTIALS")
         .expect("REQSIGN_GOOGLE_IMPERSONATED_CREDENTIALS must be set for this test");
 
     // Verify the file is an impersonated_service_account type
-    let content = std::fs::read_to_string(&cred_path)
-        .expect("Failed to read impersonated credential file");
+    let content =
+        std::fs::read_to_string(&cred_path).expect("Failed to read impersonated credential file");
     assert!(
         content.contains(r#""type": "impersonated_service_account""#),
         "Credential file must be impersonated_service_account type"
@@ -82,7 +86,10 @@ async fn test_impersonated_service_account_with_real_credentials() -> Result<()>
 
     assert!(credential.has_token(), "Must have access token");
     assert!(credential.has_valid_token(), "Token must be valid");
-    assert!(!credential.has_service_account(), "Should not have service account");
+    assert!(
+        !credential.has_service_account(),
+        "Should not have service account"
+    );
 
     Ok(())
 }
@@ -125,7 +132,10 @@ async fn test_impersonated_service_account_with_delegates() -> Result<()> {
 
     assert!(credential.has_token(), "Must have access token");
     assert!(credential.has_valid_token(), "Token must be valid");
-    assert!(!credential.has_service_account(), "Should not have service account");
+    assert!(
+        !credential.has_service_account(),
+        "Should not have service account"
+    );
 
     Ok(())
 }

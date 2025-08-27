@@ -74,11 +74,9 @@ async fn test_get_object_with_signed_url() -> Result<()> {
     debug!("got response: {resp:?}");
     debug!(
         "got body: {}",
-        resp.text()
-            .await
-            .map_err(|e| {
-                reqsign_core::Error::unexpected("failed to read response body").with_source(e)
-            })?
+        resp.text().await.map_err(|e| {
+            reqsign_core::Error::unexpected("failed to read response body").with_source(e)
+        })?
     );
     assert_eq!(StatusCode::NOT_FOUND, code);
     Ok(())
@@ -118,7 +116,10 @@ async fn test_create_signed_url_for_upload() -> Result<()> {
     debug!("signed upload URL: {:?}", parts.uri);
 
     // Verify the URL contains expected query parameters
-    let query = parts.uri.query().expect("signed URL must have query params");
+    let query = parts
+        .uri
+        .query()
+        .expect("signed URL must have query params");
     assert!(query.contains("X-Goog-Algorithm="));
     assert!(query.contains("X-Goog-Credential="));
     assert!(query.contains("X-Goog-Date="));

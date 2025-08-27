@@ -39,7 +39,10 @@ async fn test_external_account_credential_provider() -> Result<()> {
 
     assert!(credential.has_token(), "Must have access token");
     assert!(credential.has_valid_token(), "Token must be valid");
-    assert!(!credential.has_service_account(), "Should not have service account");
+    assert!(
+        !credential.has_service_account(),
+        "Should not have service account"
+    );
 
     Ok(())
 }
@@ -57,8 +60,7 @@ async fn test_external_account_with_workload_identity() -> Result<()> {
         .expect("GOOGLE_APPLICATION_CREDENTIALS must be set for workload identity test");
 
     // Verify the file is an external account type
-    let content = std::fs::read_to_string(&cred_path)
-        .expect("Failed to read credential file");
+    let content = std::fs::read_to_string(&cred_path).expect("Failed to read credential file");
     assert!(
         content.contains(r#""type": "external_account""#),
         "Credential file must be external_account type for workload identity"
@@ -79,7 +81,10 @@ async fn test_external_account_with_workload_identity() -> Result<()> {
 
     assert!(credential.has_token(), "Must have access token");
     assert!(credential.has_valid_token(), "Token must be valid");
-    assert!(!credential.has_service_account(), "Should not have service account");
+    assert!(
+        !credential.has_service_account(),
+        "Should not have service account"
+    );
 
     Ok(())
 }

@@ -1,8 +1,7 @@
-use super::{create_test_context, create_test_context_with_env};
+use super::create_test_context;
 use log::warn;
 use reqsign_core::{ProvideCredential, Result};
 use reqsign_google::VmMetadataCredentialProvider;
-use std::collections::HashMap;
 use std::env;
 
 #[tokio::test]

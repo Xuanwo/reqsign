@@ -39,7 +39,10 @@ async fn test_authorized_user_credential_provider() -> Result<()> {
     // Authorized user credentials should have a token
     assert!(credential.has_token(), "Must have access token");
     assert!(credential.has_valid_token(), "Token must be valid");
-    assert!(!credential.has_service_account(), "Should not have service account");
+    assert!(
+        !credential.has_service_account(),
+        "Should not have service account"
+    );
 
     Ok(())
 }
@@ -74,7 +77,10 @@ async fn test_authorized_user_from_well_known_location() -> Result<()> {
 
     assert!(credential.has_token(), "Must have access token");
     assert!(credential.has_valid_token(), "Token must be valid");
-    assert!(!credential.has_service_account(), "Should not have service account");
+    assert!(
+        !credential.has_service_account(),
+        "Should not have service account"
+    );
 
     Ok(())
 }
