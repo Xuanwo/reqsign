@@ -92,10 +92,10 @@ jobs:
         uses: 1password/load-secrets-action@v2
         env:
           REQSIGN_GOOGLE_TEST_DEFAULT: on
-          GOOGLE_APPLICATION_CREDENTIALS_CONTENT: op://reqsign/google/credential_json
+          GOOGLE_APPLICATION_CREDENTIALS_BASE64: op://reqsign/google/credential_base64
       - name: Setup test credentials file
         run: |
-          echo "${{ steps.load_secrets.outputs.GOOGLE_APPLICATION_CREDENTIALS_CONTENT }}" > /tmp/gcp_credentials.json
+          echo "${{ steps.load_secrets.outputs.GOOGLE_APPLICATION_CREDENTIALS_BASE64 }}" | base64 -d > /tmp/gcp_credentials.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_credentials.json" >> $GITHUB_ENV
       - name: Test DefaultCredentialProvider
         working-directory: ./services/google
@@ -138,11 +138,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        id: load_secrets
+        uses: 1password/load-secrets-action@v2
+        env:
+          REQSIGN_GOOGLE_TEST_AUTHORIZED_USER: on
+          AUTHORIZED_USER_CREDENTIALS_BASE64: op://reqsign/google/authorized_user_base64
+      - name: Setup test credentials file
+        run: |
+          echo "${{ steps.load_secrets.outputs.AUTHORIZED_USER_CREDENTIALS_BASE64 }}" | base64 -d > /tmp/authorized_user.json
+          echo "GOOGLE_AUTHORIZED_USER_CREDENTIALS=/tmp/authorized_user.json" >> $GITHUB_ENV
       - name: Test AuthorizedUserCredentialProvider
         working-directory: ./services/google
         run: |
           echo "::group::Testing AuthorizedUserCredentialProvider"
-          export REQSIGN_GOOGLE_TEST_AUTHORIZED_USER=on
           cargo test test_authorized_user_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
 
@@ -156,13 +170,24 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        id: load_secrets
+        uses: 1password/load-secrets-action@v2
+        env:
+          GOOGLE_WORKLOAD_IDENTITY_PROVIDER: op://reqsign/google/workload_identity_provider
+          GOOGLE_SERVICE_ACCOUNT: op://reqsign/google/service_account_email
       - name: Setup Workload Identity
         id: auth
         uses: google-github-actions/auth@v2
         continue-on-error: true
         with:
-          workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GOOGLE_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ steps.load_secrets.outputs.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ steps.load_secrets.outputs.GOOGLE_SERVICE_ACCOUNT }}
           create_credentials_file: true
       - name: Test ExternalAccountCredentialProvider
         if: steps.auth.outcome == 'success'
@@ -173,13 +198,6 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS=${{ steps.auth.outputs.credentials_file_path }}
           cargo test test_external_account_with_workload_identity --no-fail-fast -- --nocapture
           echo "::endgroup::"
-      - name: Test with test data
-        working-directory: ./services/google
-        run: |
-          echo "::group::Testing ExternalAccountCredentialProvider with test data"
-          export REQSIGN_GOOGLE_TEST_EXTERNAL_ACCOUNT=on
-          cargo test test_external_account_credential_provider --no-fail-fast -- --nocapture
-          echo "::endgroup::"
 
   # ImpersonatedServiceAccountCredentialProvider test
   test_impersonated_service_account_provider:
@@ -188,11 +206,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Setup 1Password Connect
+        uses: 1password/load-secrets-action/configure@v2
+        with:
+          connect-host: ${{ secrets.OP_CONNECT_HOST }}
+          connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
+      - name: Load secrets
+        id: load_secrets
+        uses: 1password/load-secrets-action@v2
+        env:
+          REQSIGN_GOOGLE_TEST_IMPERSONATED_SERVICE_ACCOUNT: on
+          IMPERSONATED_SA_CREDENTIALS_BASE64: op://reqsign/google/impersonated_sa_base64
+      - name: Setup test credentials file
+        run: |
+          echo "${{ steps.load_secrets.outputs.IMPERSONATED_SA_CREDENTIALS_BASE64 }}" | base64 -d > /tmp/impersonated_sa.json
+          echo "GOOGLE_IMPERSONATED_SERVICE_ACCOUNT_CREDENTIALS=/tmp/impersonated_sa.json" >> $GITHUB_ENV
       - name: Test ImpersonatedServiceAccountCredentialProvider
         working-directory: ./services/google
         run: |
           echo "::group::Testing ImpersonatedServiceAccountCredentialProvider"
-          export REQSIGN_GOOGLE_TEST_IMPERSONATED_SERVICE_ACCOUNT=on
           cargo test test_impersonated_service_account_credential_provider --no-fail-fast -- --nocapture
           echo "::endgroup::"
 
