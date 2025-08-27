@@ -1,22 +1,12 @@
 use anyhow::Result;
-use reqsign::aws::{DefaultCredentialProvider, RequestSigner};
-use reqsign::{default_context, Signer};
+use reqsign::aws;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
 
-    // Create a context with default implementations
-    let ctx = default_context();
-
-    // Create credential loader
-    let loader = DefaultCredentialProvider::new();
-
-    // Create request builder for S3
-    let builder = RequestSigner::new("s3", "us-east-1");
-
-    // Create the signer
-    let signer = Signer::new(ctx.clone(), loader, builder);
+    // Create a default signer for S3 in us-east-1
+    let signer = aws::default_signer("s3", "us-east-1");
 
     // Build a request
     let mut req = http::Request::builder()
@@ -30,10 +20,9 @@ async fn main() -> Result<()> {
     // Sign the request
     signer.sign(&mut req, None).await?;
 
-    // Execute the request - rebuild the request
-    let signed_req = http::Request::from_parts(req, bytes::Bytes::new());
-    let resp = ctx.http_send(signed_req).await?;
-    println!("Response status: {}", resp.status());
+    // Execute the request would require rebuilding with body
+    // In real usage, you'd use your HTTP client here
+    println!("Request signed successfully!");
 
     Ok(())
 }

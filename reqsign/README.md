@@ -8,7 +8,7 @@ This crate provides a unified interface for signing HTTP requests across multipl
 
 - **AWS**: Signature V4 for AWS services
 - **Azure**: Azure Storage services
-- **Google**: Google Cloud services  
+- **Google**: Google Cloud services
 - **Aliyun**: Aliyun Object Storage Service (OSS)
 - **Huawei Cloud**: Object Storage Service (OBS)
 - **Tencent Cloud**: Cloud Object Storage (COS)
@@ -32,29 +32,24 @@ To use specific services only:
 reqsign = { version = "0.17", default-features = false, features = ["aws", "default-context"] }
 ```
 
-## Example
+## Examples
+
+### Option 1: Using Default Signers (Recommended)
+
+The easiest way to get started is using the default signers provided for each service:
 
 ```rust,ignore
 use anyhow::Result;
-use reqsign::aws::{Config, DefaultCredentialProvider, RequestSigner};
-use reqsign::{Context, DefaultContext, Signer};
+use reqsign::aws;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Create a default context implementation
-    let ctx_impl = DefaultContext::new();
-    
-    // Create a Context from the implementation
-    let ctx = Context::new(ctx_impl.clone(), ctx_impl.clone()).with_env(ctx_impl.clone());
-    
-    // Configure AWS credential loading
-    let config = Config::default();
-    let loader = DefaultCredentialProvider::new(config.into());
-    
-    // Create signer for S3
-    let builder = RequestSigner::new("s3", "us-east-1");
-    let signer = Signer::new(ctx.clone(), loader, builder);
-    
+    // Create a default signer for AWS S3 in us-east-1
+    // This will automatically:
+    // - Set up HTTP client and file reader
+    // - Load credentials from environment, config files, or instance metadata
+    let signer = aws::default_signer("s3", "us-east-1");
+
     // Build and sign a request
     let mut req = http::Request::builder()
         .method(http::Method::GET)
@@ -63,16 +58,101 @@ async fn main() -> Result<()> {
         .unwrap()
         .into_parts()
         .0;
-    
+
     signer.sign(&mut req, None).await?;
-    
-    // Execute the signed request
-    let signed_req = http::Request::from_parts(req, bytes::Bytes::new());
-    let resp = ctx.http_send(signed_req).await?;
-    println!("Response status: {}", resp.status());
-    
+
+    println!("Request signed successfully!");
     Ok(())
 }
+```
+
+### Option 2: Custom Assembly
+
+For more control, you can manually assemble the signer components:
+
+```rust,ignore
+use anyhow::Result;
+use reqsign::{Context, Signer, default_context};
+use reqsign::aws::{DefaultCredentialProvider, RequestSigner};
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Create a context with default implementations
+    let ctx = default_context();
+
+    // Or build your own context with specific implementations
+    let ctx = Context::new()
+        .with_file_read(reqsign_file_read_tokio::TokioFileRead)
+        .with_http_send(reqsign_http_send_reqwest::ReqwestHttpSend::default())
+        .with_env(reqsign::OsEnv);
+
+    // Configure credential provider and request signer
+    let credential_provider = DefaultCredentialProvider::new();
+    let request_signer = RequestSigner::new("s3", "us-east-1");
+
+    // Assemble the signer
+    let signer = Signer::new(ctx, credential_provider, request_signer);
+
+    // Build and sign a request
+    let mut req = http::Request::builder()
+        .method(http::Method::GET)
+        .uri("https://s3.amazonaws.com/my-bucket/my-object")
+        .body(())
+        .unwrap()
+        .into_parts()
+        .0;
+
+    signer.sign(&mut req, None).await?;
+
+    println!("Request signed successfully!");
+    Ok(())
+}
+```
+
+### Customizing Default Signers
+
+You can customize the default signers using the `with_*` methods:
+
+```rust,ignore
+use reqsign::aws;
+use reqsign::aws::StaticCredentialProvider;
+
+// Start with default signer and customize components
+let signer = aws::default_signer("s3", "us-east-1")
+    .with_credential_provider(StaticCredentialProvider::new(
+        "my-access-key",
+        "my-secret-key",
+        None,  // Optional session token
+    ))
+    .with_context(my_custom_context);
+```
+
+### Examples for Other Services
+
+```rust,ignore
+// Azure Storage
+use reqsign::azure;
+let signer = azure::default_signer();
+
+// Google Cloud
+use reqsign::google;
+let signer = google::default_signer("storage.googleapis.com");
+
+// Aliyun OSS
+use reqsign::aliyun;
+let signer = aliyun::default_signer("mybucket");
+
+// Huawei Cloud OBS
+use reqsign::huaweicloud;
+let signer = huaweicloud::default_signer("mybucket");
+
+// Tencent COS
+use reqsign::tencent;
+let signer = tencent::default_signer();
+
+// Oracle Cloud
+use reqsign::oracle;
+let signer = oracle::default_signer();
 ```
 
 ## Feature Flags
@@ -80,25 +160,12 @@ async fn main() -> Result<()> {
 - `default`: Enables `default-context`
 - `default-context`: Provides a default context implementation using `reqwest` and `tokio`
 - `aliyun`: Enable Aliyun OSS support
-- `aws`: Enable AWS services support  
+- `aws`: Enable AWS services support
 - `azure`: Enable Azure Storage support
 - `google`: Enable Google Cloud support
 - `huaweicloud`: Enable Huawei Cloud OBS support
 - `oracle`: Enable Oracle Cloud support
 - `tencent`: Enable Tencent COS support
-- `full`: Enable all service features
-- `custom-context`: For advanced users who want to implement their own context
-
-## Custom Context
-
-If you need custom HTTP client or file system implementations, disable the default features and implement the required traits:
-
-```toml
-[dependencies]
-reqsign = { version = "0.17", default-features = false, features = ["aws", "custom-context"] }
-```
-
-Then implement the `Context`, `FileRead`, `HttpSend`, and `Env` traits for your custom context type.
 
 ## WASM Support
 
