@@ -6,7 +6,7 @@ edition = "2021"
 keywords = ["command", "tokio", "reqsign", "async"]
 license = "Apache-2.0"
 name = "reqsign-command-execute-tokio"
-repository = "https://github.com/causal-agent/reqsign"
+repository = "https://github.com/Xuanwo/reqsign"
 version = "1.0.0"
 
 [dependencies]
