@@ -1,13 +1,13 @@
 [package]
-name = "reqsign-command-execute-tokio"
-version = "1.0.0"
-edition = "2021"
 authors = ["Xuanwo <github@xuanwo.io>"]
-description = "Tokio-based command execution implementation for reqsign"
-repository = "https://github.com/causal-agent/reqsign"
-license = "Apache-2.0"
-keywords = ["command", "tokio", "reqsign", "async"]
 categories = ["asynchronous"]
+description = "Tokio-based command execution implementation for reqsign"
+edition = "2021"
+keywords = ["command", "tokio", "reqsign", "async"]
+license = "Apache-2.0"
+name = "reqsign-command-execute-tokio"
+repository = "https://github.com/causal-agent/reqsign"
+version = "1.0.0"
 
 [dependencies]
 async-trait = "0.1"
@@ -15,4 +15,4 @@ reqsign-core.workspace = true
 tokio = { version = "1", features = ["process", "io-util"] }
 
 [dev-dependencies]
-tokio = { version = "1", features =  ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
