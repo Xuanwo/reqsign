@@ -24,9 +24,9 @@ reqsign-oracle = { version = "1.0.0", path = "../services/oracle", optional = tr
 reqsign-tencent-cos = { version = "1.0.0", path = "../services/tencent-cos", optional = true }
 
 # Context implementations (optional but included by default)
-reqsign-command-execute-tokio = { version = "0.1", path = "../context/command-execute-tokio", optional = true }
-reqsign-file-read-tokio = { version = "0.1", path = "../context/file-read-tokio", optional = true }
-reqsign-http-send-reqwest = { version = "0.1", path = "../context/http-send-reqwest", optional = true }
+reqsign-command-execute-tokio = { version = "1.0.0", path = "../context/command-execute-tokio", optional = true }
+reqsign-file-read-tokio = { version = "1.0.0", path = "../context/file-read-tokio", optional = true }
+reqsign-http-send-reqwest = { version = "1.0.0", path = "../context/http-send-reqwest", optional = true }
 
 [features]
 default = ["default-context"]
