@@ -27,6 +27,28 @@ impl<K: SigningCredential> Signer<K> {
         }
     }
 
+    /// Replace the context while keeping credential provider and request signer.
+    pub fn with_context(mut self, ctx: Context) -> Self {
+        self.ctx = ctx;
+        self
+    }
+
+    /// Replace the credential provider while keeping context and request signer.
+    pub fn with_credential_provider(
+        mut self,
+        provider: impl ProvideCredential<Credential = K>,
+    ) -> Self {
+        self.loader = Arc::new(provider);
+        self.credential = Arc::new(Mutex::new(None)); // Clear cached credential
+        self
+    }
+
+    /// Replace the request signer while keeping context and credential provider.
+    pub fn with_request_signer(mut self, signer: impl SignRequest<Credential = K>) -> Self {
+        self.builder = Arc::new(signer);
+        self
+    }
+
     /// Signing request.
     pub async fn sign(
         &self,

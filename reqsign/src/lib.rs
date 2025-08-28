@@ -1,44 +1,33 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
+// Re-export core types
 pub use reqsign_core::*;
 
-#[cfg(all(feature = "default-context", not(target_arch = "wasm32")))]
+// Context utilities
+#[cfg(feature = "default-context")]
 mod context;
-#[cfg(all(feature = "default-context", not(target_arch = "wasm32")))]
-pub use context::DefaultContext;
+#[cfg(feature = "default-context")]
+pub use context::default_context;
 
+// Service modules with convenience APIs
 #[cfg(feature = "aliyun")]
-pub mod aliyun {
-    pub use reqsign_aliyun_oss::*;
-}
+pub mod aliyun;
 
 #[cfg(feature = "aws")]
-pub mod aws {
-    pub use reqsign_aws_v4::*;
-}
+pub mod aws;
 
 #[cfg(feature = "azure")]
-pub mod azure {
-    pub use reqsign_azure_storage::*;
-}
+pub mod azure;
 
 #[cfg(feature = "google")]
-pub mod google {
-    pub use reqsign_google::*;
-}
+pub mod google;
 
 #[cfg(feature = "huaweicloud")]
-pub mod huaweicloud {
-    pub use reqsign_huaweicloud_obs::*;
-}
+pub mod huaweicloud;
 
 #[cfg(feature = "oracle")]
-pub mod oracle {
-    pub use reqsign_oracle::*;
-}
+pub mod oracle;
 
 #[cfg(feature = "tencent")]
-pub mod tencent {
-    pub use reqsign_tencent_cos::*;
-}
+pub mod tencent;

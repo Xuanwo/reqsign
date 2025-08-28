@@ -14,44 +14,137 @@ Most API is simple. But they could be complicated when they are hidden from comp
 
 ## Quick Start
 
+### Option 1: Use Default Signer (Recommended)
+
+The simplest way to use `reqsign` is with the default signers provided by each service:
+
 ```rust
 use anyhow::Result;
-use reqsign_aws_v4::{Config, DefaultCredentialProvider, RequestSigner, EMPTY_STRING_SHA256};
-use reqsign_core::{Context, Signer};
-use reqsign_file_read_tokio::TokioFileRead;
-use reqsign_http_send_reqwest::ReqwestHttpSend;
-use reqwest::Client;
-use std::sync::Arc;
+use reqsign::aws;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Create HTTP client and context
-    let client = Client::new();
-    let ctx = Context::new(TokioFileRead, ReqwestHttpSend::new(client.clone()));
+    // Create a default signer for S3 in us-east-1
+    // This will automatically:
+    // - Load credentials from environment variables, config files, or IAM roles
+    // - Set up the default HTTP client and file reader
+    let signer = aws::default_signer("s3", "us-east-1");
     
-    // Configure AWS credentials (loads from env by default)
-    let config = Config::default().from_env(&ctx);
-    let loader = DefaultCredentialProvider::new(Arc::new(config));
-    
-    // Create request signer for S3
-    let builder = RequestSigner::new("s3", "us-east-1");
-    let signer = Signer::new(ctx, loader, builder);
-    
-    // Construct and sign the request
-    let req = http::Request::get("https://s3.amazonaws.com/testbucket")
-        .header("x-amz-content-sha256", EMPTY_STRING_SHA256)
-        .body(reqwest::Body::from(""))?;
-    let (mut parts, body) = req.into_parts();
+    // Build your request
+    let mut req = http::Request::builder()
+        .method("GET")
+        .uri("https://s3.amazonaws.com/testbucket")
+        .body(())
+        .unwrap()
+        .into_parts()
+        .0;
     
     // Sign the request
-    signer.sign(&mut parts, None).await?;
-    let req = http::Request::from_parts(parts, body).try_into()?;
+    signer.sign(&mut req, None).await?;
     
-    // Send the signed request
-    let resp = client.execute(req).await?;
-    println!("resp got status: {}", resp.status());
+    // Send the request with your preferred HTTP client
+    println!("Request has been signed!");
     Ok(())
 }
+```
+
+### Option 2: Custom Assembly
+
+For more control over the components, you can manually assemble the signer:
+
+```rust
+use anyhow::Result;
+use reqsign::{Context, Signer};
+use reqsign_aws_v4::{DefaultCredentialProvider, RequestSigner};
+use reqsign_file_read_tokio::TokioFileRead;
+use reqsign_http_send_reqwest::ReqwestHttpSend;
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Build your own context with specific implementations
+    let ctx = Context::new()
+        .with_file_read(TokioFileRead)
+        .with_http_send(ReqwestHttpSend::default())
+        .with_env(reqsign::OsEnv);
+    
+    // Configure credential provider
+    let credential_provider = DefaultCredentialProvider::new();
+    
+    // Configure request signer for S3
+    let request_signer = RequestSigner::new("s3", "us-east-1");
+    
+    // Assemble the signer
+    let signer = Signer::new(ctx, credential_provider, request_signer);
+    
+    // Build and sign the request
+    let mut req = http::Request::builder()
+        .method("GET")
+        .uri("https://s3.amazonaws.com/testbucket")
+        .body(())
+        .unwrap()
+        .into_parts()
+        .0;
+    
+    // Sign the request
+    signer.sign(&mut req, None).await?;
+    
+    println!("Request has been signed!");
+    Ok(())
+}
+```
+
+### Customizing Default Signers
+
+You can also customize the default signers using the `with_*` methods:
+
+```rust
+use reqsign::aws;
+use reqsign_aws_v4::StaticCredentialProvider;
+
+// Start with default signer and customize specific components
+let signer = aws::default_signer("s3", "us-east-1")
+    .with_credential_provider(StaticCredentialProvider::new(
+        "my-access-key",
+        "my-secret-key",
+        None,  // Optional session token
+    ));
+```
+
+### More Services Examples
+
+#### Azure Storage
+
+```rust
+use reqsign::azure;
+
+// Default signer for Azure Storage
+let signer = azure::default_signer();
+
+// With custom credentials
+use reqsign_azure_storage::StaticCredentialProvider;
+let signer = azure::default_signer()
+    .with_credential_provider(StaticCredentialProvider::new(
+        "account-name",
+        "account-key",
+    ));
+```
+
+#### Google Cloud
+
+```rust
+use reqsign::google;
+
+// Default signer for Google Cloud Storage
+let signer = google::default_signer("storage.googleapis.com");
+```
+
+#### Aliyun OSS
+
+```rust
+use reqsign::aliyun;
+
+// Default signer for Aliyun OSS
+let signer = aliyun::default_signer();
 ```
 
 ## Features
