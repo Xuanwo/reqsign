@@ -32,8 +32,3 @@ windows-sys = { version = "0.60.2", features = [
   "Win32_UI_Shell",
   "Win32_System_Com",
 ] }
-
-[dev-dependencies]
-reqsign-file-read-tokio.workspace = true
-reqsign-http-send-reqwest.workspace = true
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
