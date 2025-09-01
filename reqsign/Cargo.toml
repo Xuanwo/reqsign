@@ -12,21 +12,21 @@ keywords = ["http", "requests", "signing", "aws", "azure"]
 
 [dependencies]
 # Core functionality (always included)
-reqsign-core = { version = "1.0.0", path = "../core" }
+reqsign-core.workspace = true
 
 # Service implementations (optional)
-reqsign-aliyun-oss = { version = "1.0.0", path = "../services/aliyun-oss", optional = true }
-reqsign-aws-v4 = { version = "1.0.0", path = "../services/aws-v4", optional = true }
-reqsign-azure-storage = { version = "1.0.0", path = "../services/azure-storage", optional = true }
-reqsign-google = { version = "1.0.0", path = "../services/google", optional = true }
-reqsign-huaweicloud-obs = { version = "1.0.0", path = "../services/huaweicloud-obs", optional = true }
-reqsign-oracle = { version = "1.0.0", path = "../services/oracle", optional = true }
-reqsign-tencent-cos = { version = "1.0.0", path = "../services/tencent-cos", optional = true }
+reqsign-aliyun-oss = { workspace = true, optional = true }
+reqsign-aws-v4 = { workspace = true, optional = true }
+reqsign-azure-storage = { workspace = true, optional = true }
+reqsign-google = { workspace = true, optional = true }
+reqsign-huaweicloud-obs = { workspace = true, optional = true }
+reqsign-oracle = { workspace = true, optional = true }
+reqsign-tencent-cos = { workspace = true, optional = true }
 
 # Context implementations (optional but included by default)
-reqsign-command-execute-tokio = { version = "1.0.0", path = "../context/command-execute-tokio", optional = true }
-reqsign-file-read-tokio = { version = "1.0.0", path = "../context/file-read-tokio", optional = true }
-reqsign-http-send-reqwest = { version = "1.0.0", path = "../context/http-send-reqwest", optional = true }
+reqsign-command-execute-tokio = { workspace = true, optional = true }
+reqsign-file-read-tokio = { workspace = true, optional = true }
+reqsign-http-send-reqwest = { workspace = true, optional = true }
 
 [features]
 default = ["default-context"]
