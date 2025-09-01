@@ -16,13 +16,9 @@ use std::sync::Arc;
 ///
 /// ```
 /// use reqsign_core::{Context, OsEnv};
-/// use reqsign_file_read_tokio::TokioFileRead;
-/// use reqsign_http_send_reqwest::ReqwestHttpSend;
 ///
 /// // Create a context with explicit implementations
 /// let ctx = Context::new()
-///     .with_file_read(TokioFileRead)
-///     .with_http_send(ReqwestHttpSend::default())
 ///     .with_env(OsEnv);  // Optionally configure environment implementation
 /// ```
 #[derive(Clone)]
