@@ -18,5 +18,4 @@ reqsign-core.workspace = true
 reqwest = { version = "0.12", default-features = false }
 
 [dev-dependencies]
-reqsign-file-read-tokio.workspace = true
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
