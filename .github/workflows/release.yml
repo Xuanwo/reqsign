@@ -36,7 +36,7 @@ jobs:
     needs: check-version
     if: needs.check-version.outputs.is_prerelease == 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: |
           cargo publish -p reqsign-core 2>&1 | tee /tmp/publish.log || {
             if grep -q "already uploaded" /tmp/publish.log || grep -q "already exists" /tmp/publish.log; then
@@ -68,7 +68,7 @@ jobs:
           - reqsign-oracle
           - reqsign-tencent-cos
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: |
           cargo publish -p ${{ matrix.package }} 2>&1 | tee /tmp/publish.log || {
             if grep -q "already uploaded" /tmp/publish.log || grep -q "already exists" /tmp/publish.log; then
@@ -87,7 +87,7 @@ jobs:
     needs: [check-version, publish-dependencies]
     if: needs.check-version.outputs.is_prerelease == 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: |
           cargo publish -p reqsign 2>&1 | tee /tmp/publish.log || {
             if grep -q "already uploaded" /tmp/publish.log || grep -q "already exists" /tmp/publish.log; then
