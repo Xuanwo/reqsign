@@ -1,16 +1,12 @@
 use anyhow::Result;
 use reqsign_core::{Context, OsEnv};
 use reqsign_file_read_tokio::TokioFileRead;
-use reqsign_http_send_reqwest::ReqwestHttpSend;
 use std::env;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create a context with Tokio file reader
-    let ctx = Context::new()
-        .with_file_read(TokioFileRead)
-        .with_http_send(ReqwestHttpSend::default())
-        .with_env(OsEnv);
+    let ctx = Context::new().with_file_read(TokioFileRead).with_env(OsEnv);
 
     // Get the path from command line arguments or use a demo file
     let path = env::args().nth(1).unwrap_or_else(|| {

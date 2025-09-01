@@ -1,7 +1,6 @@
 use anyhow::Result;
 use bytes::Bytes;
 use reqsign_core::{Context, OsEnv};
-use reqsign_file_read_tokio::TokioFileRead;
 use reqsign_http_send_reqwest::ReqwestHttpSend;
 use reqwest::Client;
 use std::time::Duration;
@@ -23,7 +22,6 @@ async fn main() -> Result<()> {
 
     // Create context with the custom client
     let ctx = Context::new()
-        .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::new(client))
         .with_env(OsEnv);
 
@@ -59,7 +57,6 @@ async fn main() -> Result<()> {
     // Demonstrate using the default client
     println!("\n--- Using default client ---");
     let default_ctx = Context::new()
-        .with_file_read(TokioFileRead)
         .with_http_send(ReqwestHttpSend::default())
         .with_env(OsEnv);
 

@@ -13,7 +13,6 @@
 //!
 //! ```no_run
 //! use reqsign_core::Context;
-//! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //! use reqwest::Client;
 //!
@@ -21,7 +20,6 @@
 //! async fn main() {
 //!     // Use default client
 //!     let ctx = Context::new()
-//!         .with_file_read(TokioFileRead::default())
 //!         .with_http_send(ReqwestHttpSend::default());
 //!
 //!     // Or use a custom configured client
@@ -29,9 +27,8 @@
 //!         .timeout(std::time::Duration::from_secs(30))
 //!         .build()
 //!         .unwrap();
-//!     
+//!
 //!     let ctx = Context::new()
-//!         .with_file_read(TokioFileRead::default())
 //!         .with_http_send(ReqwestHttpSend::new(client));
 //! }
 //! ```
@@ -40,14 +37,12 @@
 //!
 //! ```no_run
 //! use reqsign_core::{Context, Signer};
-//! use reqsign_file_read_tokio::TokioFileRead;
 //! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //! use bytes::Bytes;
 //!
 //! # async fn example() -> anyhow::Result<()> {
 //! // Create context with reqwest HTTP client
 //! let ctx = Context::new()
-//!     .with_file_read(TokioFileRead::default())
 //!     .with_http_send(ReqwestHttpSend::default());
 //!
 //! // The context can send HTTP requests
