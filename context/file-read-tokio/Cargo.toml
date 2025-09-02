@@ -15,5 +15,4 @@ reqsign-core.workspace = true
 tokio = { version = "1", features = ["fs"] }
 
 [dev-dependencies]
-reqsign-http-send-reqwest.workspace = true
 tokio = { version = "1", features = ["fs", "macros", "rt-multi-thread"] }

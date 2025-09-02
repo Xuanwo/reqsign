@@ -14,14 +14,12 @@
 //! ```no_run
 //! use reqsign_core::{Context, OsEnv};
 //! use reqsign_file_read_tokio::TokioFileRead;
-//! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //!
 //! #[tokio::main]
 //! async fn main() {
 //!     // Create a context with Tokio file reader
 //!     let ctx = Context::new()
 //!         .with_file_read(TokioFileRead::default())
-//!         .with_http_send(ReqwestHttpSend::default())
 //!         .with_env(OsEnv);
 //!
 //!     // The context can now read files asynchronously
@@ -37,13 +35,11 @@
 //! ```no_run
 //! use reqsign_core::Context;
 //! use reqsign_file_read_tokio::TokioFileRead;
-//! use reqsign_http_send_reqwest::ReqwestHttpSend;
 //!
 //! # async fn example() -> anyhow::Result<()> {
 //! // Many cloud services require reading credentials from files
 //! let ctx = Context::new()
-//!     .with_file_read(TokioFileRead::default())
-//!     .with_http_send(ReqwestHttpSend::default());
+//!     .with_file_read(TokioFileRead::default());
 //!
 //! // Create a signer that can load credentials from files
 //! // let signer = Signer::new(ctx, credential_loader, request_builder);
