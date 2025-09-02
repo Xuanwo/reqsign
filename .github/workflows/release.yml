@@ -37,16 +37,7 @@ jobs:
     if: needs.check-version.outputs.is_prerelease == 'false'
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          cargo publish -p reqsign-core 2>&1 | tee /tmp/publish.log || {
-            if grep -q "already uploaded" /tmp/publish.log || grep -q "already exists" /tmp/publish.log; then
-              echo "::warning::reqsign-core version already published, skipping"
-              exit 0
-            else
-              echo "::error::Failed to publish reqsign-core"
-              exit 1
-            fi
-          }
+      - run: cargo publish -p reqsign-core
 
   # Phase 2: Publish context and service crates (depend on core)
   publish-dependencies:
@@ -69,16 +60,7 @@ jobs:
           - reqsign-tencent-cos
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          cargo publish -p ${{ matrix.package }} 2>&1 | tee /tmp/publish.log || {
-            if grep -q "already uploaded" /tmp/publish.log || grep -q "already exists" /tmp/publish.log; then
-              echo "::warning::${{ matrix.package }} version already published, skipping"
-              exit 0
-            else
-              echo "::error::Failed to publish ${{ matrix.package }}"
-              exit 1
-            fi
-          }
+      - run: cargo publish -p ${{ matrix.package }}
 
   # Phase 3: Publish main crate (depends on all others)
   publish-reqsign:
@@ -88,13 +70,4 @@ jobs:
     if: needs.check-version.outputs.is_prerelease == 'false'
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          cargo publish -p reqsign 2>&1 | tee /tmp/publish.log || {
-            if grep -q "already uploaded" /tmp/publish.log || grep -q "already exists" /tmp/publish.log; then
-              echo "::warning::reqsign version already published, skipping"
-              exit 0
-            else
-              echo "::error::Failed to publish reqsign"
-              exit 1
-            fi
-          }
+      - run: cargo publish -p reqsign
