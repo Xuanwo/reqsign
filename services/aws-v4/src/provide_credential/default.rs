@@ -60,6 +60,24 @@ impl DefaultCredentialProvider {
     pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
         Self { chain }
     }
+    
+    /// Add a credential provider to the front of the default chain.
+    /// 
+    /// This allows adding a high-priority credential source that will be tried
+    /// before all other providers in the default chain.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use reqsign_aws_v4::{DefaultCredentialProvider, StaticCredentialProvider};
+    /// 
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .push_front(StaticCredentialProvider::new("access_key", "secret_key"));
+    /// ```
+    pub fn push_front(mut self, provider: impl ProvideCredential<Credential = Credential> + 'static) -> Self {
+        self.chain = self.chain.push_front(provider);
+        self
+    }
 }
 
 #[async_trait]
@@ -202,6 +220,46 @@ mod tests {
         let x = l.provide_credential(&ctx).await.unwrap().unwrap();
         assert_eq!("shared_access_key_id", x.access_key_id);
         assert_eq!("shared_secret_access_key", x.secret_access_key);
+    }
+
+    #[tokio::test]
+    async fn test_default_credential_provider_prepend() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
+        let ctx = ctx.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::from_iter([
+                // Set environment variables that would normally be loaded
+                (AWS_ACCESS_KEY_ID.to_string(), "env_access_key".to_string()),
+                (
+                    AWS_SECRET_ACCESS_KEY.to_string(),
+                    "env_secret_key".to_string(),
+                ),
+            ]),
+        });
+        
+        // Create a static provider with different credentials
+        let static_provider = crate::StaticCredentialProvider::new(
+            "static_access_key",
+            "static_secret_key",
+        );
+        
+        // Create default provider and push_front the static provider
+        let provider = DefaultCredentialProvider::new().push_front(static_provider);
+        
+        // The static provider should take precedence over environment variables
+        let cred = provider
+            .provide_credential(&ctx)
+            .await
+            .expect("load must succeed")
+            .expect("credential must exist");
+            
+        assert_eq!("static_access_key", cred.access_key_id);
+        assert_eq!("static_secret_key", cred.secret_access_key);
     }
 
     /// AWS_SHARED_CREDENTIALS_FILE should be taken first.

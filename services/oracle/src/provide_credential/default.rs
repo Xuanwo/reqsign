@@ -22,6 +22,24 @@ impl DefaultCredentialProvider {
 
         Self { chain }
     }
+    
+    /// Add a credential provider to the front of the default chain.
+    /// 
+    /// This allows adding a high-priority credential source that will be tried
+    /// before all other providers in the default chain.
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use reqsign_oracle::{DefaultCredentialProvider, StaticCredentialProvider};
+    /// 
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .push_front(StaticCredentialProvider::new("tenancy", "user", "fingerprint", "private_key"));
+    /// ```
+    pub fn push_front(mut self, provider: impl ProvideCredential<Credential = Credential> + 'static) -> Self {
+        self.chain = self.chain.push_front(provider);
+        self
+    }
 }
 
 #[async_trait]
