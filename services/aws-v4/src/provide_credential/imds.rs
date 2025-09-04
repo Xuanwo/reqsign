@@ -8,10 +8,14 @@ use reqsign_core::time::{now, parse_rfc3339, DateTime};
 use reqsign_core::{Context, Error, ProvideCredential, Result};
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct IMDSv2CredentialProvider {
     disabled: Option<bool>,
+    endpoint: Option<String>,
+    timeout: Option<Duration>,
+    retry_attempts: Option<u32>,
     token: Arc<Mutex<(String, DateTime)>>,
 }
 
@@ -19,6 +23,9 @@ impl Default for IMDSv2CredentialProvider {
     fn default() -> Self {
         Self {
             disabled: None,
+            endpoint: None,
+            timeout: None,
+            retry_attempts: None,
             token: Arc::new(Mutex::new((String::new(), DateTime::default()))),
         }
     }
@@ -30,19 +37,40 @@ impl IMDSv2CredentialProvider {
         Self::default()
     }
 
-    /// Disable the provider.
-    pub fn disabled(mut self) -> Self {
-        self.disabled = Some(true);
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
+    }
+    
+    /// Set the endpoint for the metadata service.
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint = Some(endpoint.into());
+        self
+    }
+    
+    /// Set the timeout for metadata requests.
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+    
+    /// Set the number of retry attempts.
+    pub fn with_retry_attempts(mut self, attempts: u32) -> Self {
+        self.retry_attempts = Some(attempts);
         self
     }
 }
 
 impl IMDSv2CredentialProvider {
     fn get_endpoint(&self, ctx: &Context) -> String {
-        ctx.env_vars()
-            .get("AWS_EC2_METADATA_SERVICE_ENDPOINT")
-            .cloned()
-            .unwrap_or_else(|| "http://169.254.169.254".into())
+        // First check configured endpoint, then environment, then default
+        self.endpoint.clone().unwrap_or_else(|| {
+            ctx.env_vars()
+                .get("AWS_EC2_METADATA_SERVICE_ENDPOINT")
+                .cloned()
+                .unwrap_or_else(|| "http://169.254.169.254".into())
+        })
     }
 
     async fn load_ec2_metadata_token(&self, ctx: &Context) -> Result<String> {

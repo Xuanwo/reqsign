@@ -30,6 +30,7 @@ const AWS_SSO_SESSION_NAME: &str = "sso_session";
 /// ```
 #[derive(Debug, Clone)]
 pub struct SSOCredentialProvider {
+    disabled: Option<bool>,
     profile: Option<String>,
     sso_account_id: Option<String>,
     sso_region: Option<String>,
@@ -48,6 +49,7 @@ impl SSOCredentialProvider {
     /// Create a new SSO credential provider
     pub fn new() -> Self {
         Self {
+            disabled: None,
             profile: None,
             sso_account_id: None,
             sso_region: None,
@@ -55,6 +57,12 @@ impl SSOCredentialProvider {
             sso_start_url: None,
             sso_endpoint: None,
         }
+    }
+    
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
     }
 
     /// Set the profile name to use
@@ -317,6 +325,11 @@ impl ProvideCredential for SSOCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        // Check if disabled
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+        
         let config = match self.load_sso_config(ctx).await {
             Ok(c) => c,
             Err(_) => {

@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use ini::Ini;
 use log::debug;
 use reqsign_core::{Context, Error, ProvideCredential, Result};
+use std::time::Duration;
 use serde::Deserialize;
 
 /// Process Credentials Provider
@@ -31,8 +32,10 @@ use serde::Deserialize;
 /// ```
 #[derive(Debug, Clone)]
 pub struct ProcessCredentialProvider {
+    disabled: Option<bool>,
     profile: Option<String>,
     command: Option<String>,
+    timeout: Option<Duration>,
 }
 
 impl Default for ProcessCredentialProvider {
@@ -45,9 +48,23 @@ impl ProcessCredentialProvider {
     /// Create a new process credential provider
     pub fn new() -> Self {
         Self {
+            disabled: None,
             profile: None,
             command: None,
+            timeout: None,
         }
+    }
+    
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
+    }
+    
+    /// Set the timeout for the credential process.
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
     }
 
     /// Set the profile name to use
@@ -184,6 +201,11 @@ impl ProvideCredential for ProcessCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        // Check if disabled
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+        
         let command = match self.get_command(ctx).await {
             Ok(cmd) => cmd,
             Err(_) => {
