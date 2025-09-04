@@ -60,21 +60,24 @@ impl DefaultCredentialProvider {
     pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
         Self { chain }
     }
-    
+
     /// Add a credential provider to the front of the default chain.
-    /// 
+    ///
     /// This allows adding a high-priority credential source that will be tried
     /// before all other providers in the default chain.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// use reqsign_aws_v4::{DefaultCredentialProvider, StaticCredentialProvider};
-    /// 
+    ///
     /// let provider = DefaultCredentialProvider::new()
     ///     .push_front(StaticCredentialProvider::new("access_key", "secret_key"));
     /// ```
-    pub fn push_front(mut self, provider: impl ProvideCredential<Credential = Credential> + 'static) -> Self {
+    pub fn push_front(
+        mut self,
+        provider: impl ProvideCredential<Credential = Credential> + 'static,
+    ) -> Self {
         self.chain = self.chain.push_front(provider);
         self
     }
@@ -241,23 +244,21 @@ mod tests {
                 ),
             ]),
         });
-        
+
         // Create a static provider with different credentials
-        let static_provider = crate::StaticCredentialProvider::new(
-            "static_access_key",
-            "static_secret_key",
-        );
-        
+        let static_provider =
+            crate::StaticCredentialProvider::new("static_access_key", "static_secret_key");
+
         // Create default provider and push_front the static provider
         let provider = DefaultCredentialProvider::new().push_front(static_provider);
-        
+
         // The static provider should take precedence over environment variables
         let cred = provider
             .provide_credential(&ctx)
             .await
             .expect("load must succeed")
             .expect("credential must exist");
-            
+
         assert_eq!("static_access_key", cred.access_key_id);
         assert_eq!("static_secret_key", cred.secret_access_key);
     }
