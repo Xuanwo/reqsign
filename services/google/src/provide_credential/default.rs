@@ -50,10 +50,10 @@ impl DefaultCredentialProvider {
     /// # Example
     ///
     /// ```no_run
-    /// use reqsign_google::{DefaultCredentialProvider, ServiceAccountCredentialProvider};
+    /// use reqsign_google::{DefaultCredentialProvider, StaticCredentialProvider};
     ///
     /// let provider = DefaultCredentialProvider::new()
-    ///     .push_front(ServiceAccountCredentialProvider::from_key_file("path/to/key.json"));
+    ///     .push_front(StaticCredentialProvider::new("service_account_json"));
     /// ```
     pub fn push_front(
         self,
