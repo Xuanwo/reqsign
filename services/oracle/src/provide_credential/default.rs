@@ -34,7 +34,7 @@ impl DefaultCredentialProvider {
     /// use reqsign_oracle::{DefaultCredentialProvider, StaticCredentialProvider};
     ///
     /// let provider = DefaultCredentialProvider::new()
-    ///     .push_front(StaticCredentialProvider::new("tenancy", "user", "fingerprint", "private_key"));
+    ///     .push_front(StaticCredentialProvider::new("user", "tenancy", "key_file", "fingerprint"));
     /// ```
     pub fn push_front(
         mut self,

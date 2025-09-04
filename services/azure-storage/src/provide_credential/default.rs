@@ -52,10 +52,10 @@ impl DefaultCredentialProvider {
     /// # Example
     ///
     /// ```no_run
-    /// use reqsign_azure_storage::{DefaultCredentialProvider, AccountKeyProvider};
+    /// use reqsign_azure_storage::{DefaultCredentialProvider, StaticCredentialProvider};
     ///
     /// let provider = DefaultCredentialProvider::new()
-    ///     .push_front(AccountKeyProvider::new("my-account", "my-key"));
+    ///     .push_front(StaticCredentialProvider::new_shared_key("account_name", "account_key"));
     /// ```
     pub fn push_front(
         mut self,

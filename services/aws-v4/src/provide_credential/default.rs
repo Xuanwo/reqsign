@@ -72,7 +72,7 @@ impl DefaultCredentialProvider {
     /// use reqsign_aws_v4::{DefaultCredentialProvider, StaticCredentialProvider};
     ///
     /// let provider = DefaultCredentialProvider::new()
-    ///     .push_front(StaticCredentialProvider::new("access_key", "secret_key"));
+    ///     .push_front(StaticCredentialProvider::new("access_key_id", "secret_access_key"));
     /// ```
     pub fn push_front(
         mut self,

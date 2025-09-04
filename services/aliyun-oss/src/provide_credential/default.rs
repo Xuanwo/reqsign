@@ -46,7 +46,7 @@ impl DefaultCredentialProvider {
     /// use reqsign_aliyun_oss::{DefaultCredentialProvider, StaticCredentialProvider};
     ///
     /// let provider = DefaultCredentialProvider::new()
-    ///     .push_front(StaticCredentialProvider::new("access_key", "secret_key"));
+    ///     .push_front(StaticCredentialProvider::new("access_key_id", "access_key_secret"));
     /// ```
     pub fn push_front(
         mut self,
