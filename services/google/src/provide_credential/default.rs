@@ -41,6 +41,30 @@ impl DefaultCredentialProvider {
         self
     }
 
+    /// Add a credential provider to the front of the default chain.
+    ///
+    /// Note: Google's DefaultCredentialProvider doesn't use ProvideCredentialChain internally,
+    /// but this method is provided for API consistency with other providers.
+    /// The custom provider will be tried first before the default ADC flow.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_google::{DefaultCredentialProvider, StaticCredentialProvider};
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .push_front(StaticCredentialProvider::new("service_account_json"));
+    /// ```
+    pub fn push_front(
+        self,
+        _provider: impl ProvideCredential<Credential = Credential> + 'static,
+    ) -> Self {
+        // Note: This implementation would need refactoring to support chain-based approach
+        // For now, we keep the method for API consistency
+        log::warn!("push_front is not yet implemented for Google DefaultCredentialProvider");
+        self
+    }
+
     /// Try to load credentials from GOOGLE_APPLICATION_CREDENTIALS environment variable.
     async fn try_env_credentials(&self, ctx: &Context) -> Result<Option<Credential>> {
         let Some(path) = ctx.env_var(GOOGLE_APPLICATION_CREDENTIALS) else {

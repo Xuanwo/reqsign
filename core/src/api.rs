@@ -86,7 +86,7 @@ pub trait SignRequest: Debug + Send + Sync + Unpin + 'static {
 /// #[async_trait]
 /// impl ProvideCredential for EnvironmentProvider {
 ///     type Credential = MyCredential;
-///     
+///
 ///     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
 ///         // Implementation
 ///         Ok(None)
@@ -96,7 +96,7 @@ pub trait SignRequest: Debug + Send + Sync + Unpin + 'static {
 /// # async fn example(ctx: Context) {
 /// let chain = ProvideCredentialChain::new()
 ///     .push(EnvironmentProvider);
-///     
+///
 /// let credentials = chain.provide_credential(&ctx).await;
 /// # }
 /// ```
@@ -118,6 +118,17 @@ where
     /// Add a credential provider to the chain.
     pub fn push(mut self, provider: impl ProvideCredential<Credential = C> + 'static) -> Self {
         self.providers.push(Box::new(provider));
+        self
+    }
+
+    /// Add a credential provider to the front of the chain.
+    ///
+    /// This provider will be tried first before all existing providers.
+    pub fn push_front(
+        mut self,
+        provider: impl ProvideCredential<Credential = C> + 'static,
+    ) -> Self {
+        self.providers.insert(0, Box::new(provider));
         self
     }
 
