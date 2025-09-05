@@ -11,6 +11,7 @@ use crate::credential::Credential;
 /// This provider uses OIDC tokens from Azure Pipelines to authenticate with Azure AD
 #[derive(Clone, Debug, Default)]
 pub struct AzurePipelinesCredentialProvider {
+    disabled: Option<bool>,
     tenant_id: Option<String>,
     client_id: Option<String>,
     service_connection_id: Option<String>,
@@ -19,6 +20,12 @@ pub struct AzurePipelinesCredentialProvider {
 impl AzurePipelinesCredentialProvider {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
     }
 
     /// Set the tenant ID
@@ -159,6 +166,11 @@ impl ProvideCredential for AzurePipelinesCredentialProvider {
         &self,
         ctx: &Context,
     ) -> Result<Option<Self::Credential>, reqsign_core::Error> {
+        // Check if disabled
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let envs = ctx.env_vars();
 
         // Check for required environment variables

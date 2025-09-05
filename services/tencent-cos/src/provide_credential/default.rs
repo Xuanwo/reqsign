@@ -1,3 +1,6 @@
+use crate::provide_credential::{
+    AssumeRoleWithWebIdentityCredentialProvider, EnvCredentialProvider,
+};
 use crate::Credential;
 use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
@@ -10,6 +13,8 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
+    env_provider: EnvCredentialProvider,
+    assume_role_provider: AssumeRoleWithWebIdentityCredentialProvider,
 }
 
 impl Default for DefaultCredentialProvider {
@@ -21,16 +26,78 @@ impl Default for DefaultCredentialProvider {
 impl DefaultCredentialProvider {
     /// Create a new DefaultCredentialProvider
     pub fn new() -> Self {
-        let chain = ProvideCredentialChain::new()
-            .push(super::EnvCredentialProvider::new())
-            .push(super::AssumeRoleWithWebIdentityCredentialProvider::new());
+        let env_provider = EnvCredentialProvider::new();
+        let assume_role_provider = AssumeRoleWithWebIdentityCredentialProvider::new();
 
-        Self { chain }
+        let mut provider = Self {
+            chain: ProvideCredentialChain::new(),
+            env_provider,
+            assume_role_provider,
+        };
+
+        provider.rebuild_chain();
+        provider
+    }
+
+    /// Rebuild the internal chain based on current provider configurations.
+    fn rebuild_chain(&mut self) {
+        self.chain = ProvideCredentialChain::new()
+            .push(self.env_provider.clone())
+            .push(self.assume_role_provider.clone());
     }
 
     /// Create with a custom credential chain.
     pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
-        Self { chain }
+        // When using custom chain, we don't have individual providers
+        // This maintains backward compatibility
+        let env_provider = EnvCredentialProvider::new();
+        let assume_role_provider = AssumeRoleWithWebIdentityCredentialProvider::new();
+
+        Self {
+            chain,
+            env_provider,
+            assume_role_provider,
+        }
+    }
+
+    /// Configure the environment credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_tencent_cos::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_env(|p| p.with_disabled(true));
+    /// ```
+    pub fn configure_env<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(EnvCredentialProvider) -> EnvCredentialProvider,
+    {
+        self.env_provider = f(self.env_provider);
+        self.rebuild_chain();
+        self
+    }
+
+    /// Configure the assume role with web identity credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_tencent_cos::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_assume_role(|p| p.with_disabled(true));
+    /// ```
+    pub fn configure_assume_role<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(
+            AssumeRoleWithWebIdentityCredentialProvider,
+        ) -> AssumeRoleWithWebIdentityCredentialProvider,
+    {
+        self.assume_role_provider = f(self.assume_role_provider);
+        self.rebuild_chain();
+        self
     }
 
     /// Add a credential provider to the front of the default chain.

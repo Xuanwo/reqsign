@@ -9,13 +9,28 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// using a federated token.
 ///
 /// Reference: <https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview>
-#[derive(Debug, Default)]
-pub struct WorkloadIdentityCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct WorkloadIdentityCredentialProvider {
+    disabled: Option<bool>,
+    tenant_id: Option<String>,
+}
 
 impl WorkloadIdentityCredentialProvider {
     /// Create a new workload identity loader.
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
+    }
+
+    /// Set the tenant ID.
+    pub fn with_tenant_id(mut self, tenant_id: impl Into<String>) -> Self {
+        self.tenant_id = Some(tenant_id.into());
+        self
     }
 }
 
@@ -24,6 +39,11 @@ impl ProvideCredential for WorkloadIdentityCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        // Check if disabled
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let envs = ctx.env_vars();
 
         // Check if all required parameters are available from environment

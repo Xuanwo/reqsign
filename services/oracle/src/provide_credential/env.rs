@@ -9,13 +9,21 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// - `OCI_TENANCY`: The Oracle Cloud tenancy ID
 /// - `OCI_KEY_FILE`: The path to the private key file
 /// - `OCI_FINGERPRINT`: The fingerprint of the key
-#[derive(Debug, Default)]
-pub struct EnvCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct EnvCredentialProvider {
+    disabled: Option<bool>,
+}
 
 impl EnvCredentialProvider {
     /// Create a new EnvCredentialProvider.
     pub fn new() -> Self {
-        Self
+        Self { disabled: None }
+    }
+
+    /// Set whether this provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
     }
 }
 
@@ -24,6 +32,10 @@ impl ProvideCredential for EnvCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let envs = ctx.env_vars();
 
         let user = envs.get(ORACLE_USER);

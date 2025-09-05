@@ -9,13 +9,21 @@ use reqsign_core::{Context, ProvideCredential};
 use serde::{Deserialize, Serialize};
 
 /// Loader that loads credential via AssumeRoleWithWebIdentity.
-#[derive(Debug, Default)]
-pub struct AssumeRoleWithWebIdentityCredentialProvider {}
+#[derive(Debug, Default, Clone)]
+pub struct AssumeRoleWithWebIdentityCredentialProvider {
+    disabled: Option<bool>,
+}
 
 impl AssumeRoleWithWebIdentityCredentialProvider {
     /// Create a new AssumeRoleWithWebIdentityCredentialProvider
     pub fn new() -> Self {
-        Self {}
+        Self { disabled: None }
+    }
+
+    /// Set whether this provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
     }
 }
 
@@ -24,6 +32,10 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         // Read environment variables at runtime
         let region = ctx
             .env_var(TENCENTCLOUD_REGION)

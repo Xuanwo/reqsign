@@ -59,6 +59,7 @@ const ECS_CONTAINER_METADATA_URI: &str = "ECS_CONTAINER_METADATA_URI";
 /// ```
 #[derive(Debug, Clone)]
 pub struct ECSCredentialProvider {
+    disabled: Option<bool>,
     endpoint: Option<String>,
     auth_token: Option<String>,
     auth_token_file: Option<String>,
@@ -76,12 +77,19 @@ impl ECSCredentialProvider {
     /// Create a new ECS credential provider
     pub fn new() -> Self {
         Self {
+            disabled: None,
             endpoint: None,
             auth_token: None,
             auth_token_file: None,
             relative_uri: None,
             metadata_uri_override: None,
         }
+    }
+
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
     }
 
     /// Create with custom endpoint
@@ -205,6 +213,10 @@ impl ProvideCredential for ECSCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        // Check if disabled
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
         let endpoint = match self.get_endpoint(ctx) {
             Ok(ep) => ep,
             Err(_) => {

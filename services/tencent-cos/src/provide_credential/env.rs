@@ -8,13 +8,21 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// - `TENCENTCLOUD_SECRET_ID` or `TKE_SECRET_ID`: The Tencent Cloud secret ID
 /// - `TENCENTCLOUD_SECRET_KEY` or `TKE_SECRET_KEY`: The Tencent Cloud secret key
 /// - `TENCENTCLOUD_TOKEN`, `TENCENTCLOUD_SECURITY_TOKEN`, or `QCLOUD_SECRET_TOKEN`: The security token (optional)
-#[derive(Debug, Default)]
-pub struct EnvCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct EnvCredentialProvider {
+    disabled: Option<bool>,
+}
 
 impl EnvCredentialProvider {
     /// Create a new EnvCredentialProvider.
     pub fn new() -> Self {
-        Self
+        Self { disabled: None }
+    }
+
+    /// Set whether this provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
     }
 }
 
@@ -23,6 +31,10 @@ impl ProvideCredential for EnvCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let envs = ctx.env_vars();
 
         // Try to get secret_id from multiple env vars

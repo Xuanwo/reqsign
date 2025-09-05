@@ -22,6 +22,15 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
+    env_provider: EnvCredentialProvider,
+    profile_provider: ProfileCredentialProvider,
+    #[cfg(not(target_arch = "wasm32"))]
+    sso_provider: SSOCredentialProvider,
+    assume_role_provider: AssumeRoleWithWebIdentityCredentialProvider,
+    #[cfg(not(target_arch = "wasm32"))]
+    process_provider: ProcessCredentialProvider,
+    ecs_provider: ECSCredentialProvider,
+    imds_provider: IMDSv2CredentialProvider,
 }
 
 impl Default for DefaultCredentialProvider {
@@ -33,32 +42,84 @@ impl Default for DefaultCredentialProvider {
 impl DefaultCredentialProvider {
     /// Create a new `DefaultCredentialProvider` instance.
     pub fn new() -> Self {
+        let env_provider = EnvCredentialProvider::new();
+        let profile_provider = ProfileCredentialProvider::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        let sso_provider = SSOCredentialProvider::new();
+        let assume_role_provider = AssumeRoleWithWebIdentityCredentialProvider::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        let process_provider = ProcessCredentialProvider::new();
+        let ecs_provider = ECSCredentialProvider::new();
+        let imds_provider = IMDSv2CredentialProvider::new();
+
+        let mut provider = Self {
+            chain: ProvideCredentialChain::new(),
+            env_provider,
+            profile_provider,
+            #[cfg(not(target_arch = "wasm32"))]
+            sso_provider,
+            assume_role_provider,
+            #[cfg(not(target_arch = "wasm32"))]
+            process_provider,
+            ecs_provider,
+            imds_provider,
+        };
+
+        provider.rebuild_chain();
+        provider
+    }
+
+    /// Rebuild the internal chain based on current provider configurations.
+    fn rebuild_chain(&mut self) {
         let mut chain = ProvideCredentialChain::new()
-            .push(EnvCredentialProvider::new())
-            .push(ProfileCredentialProvider::new());
+            .push(self.env_provider.clone())
+            .push(self.profile_provider.clone());
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            chain = chain.push(SSOCredentialProvider::new());
+            chain = chain.push(self.sso_provider.clone());
         }
 
-        chain = chain.push(AssumeRoleWithWebIdentityCredentialProvider::new());
+        chain = chain.push(self.assume_role_provider.clone());
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            chain = chain.push(ProcessCredentialProvider::new());
+            chain = chain.push(self.process_provider.clone());
         }
 
         chain = chain
-            .push(ECSCredentialProvider::new())
-            .push(IMDSv2CredentialProvider::new());
+            .push(self.ecs_provider.clone())
+            .push(self.imds_provider.clone());
 
-        Self { chain }
+        self.chain = chain;
     }
 
     /// Create with a custom credential chain.
     pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
-        Self { chain }
+        // When using custom chain, we don't have individual providers
+        // This maintains backward compatibility
+        let env_provider = EnvCredentialProvider::new();
+        let profile_provider = ProfileCredentialProvider::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        let sso_provider = SSOCredentialProvider::new();
+        let assume_role_provider = AssumeRoleWithWebIdentityCredentialProvider::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        let process_provider = ProcessCredentialProvider::new();
+        let ecs_provider = ECSCredentialProvider::new();
+        let imds_provider = IMDSv2CredentialProvider::new();
+
+        Self {
+            chain,
+            env_provider,
+            profile_provider,
+            #[cfg(not(target_arch = "wasm32"))]
+            sso_provider,
+            assume_role_provider,
+            #[cfg(not(target_arch = "wasm32"))]
+            process_provider,
+            ecs_provider,
+            imds_provider,
+        }
     }
 
     /// Add a credential provider to the front of the default chain.
@@ -79,6 +140,125 @@ impl DefaultCredentialProvider {
         provider: impl ProvideCredential<Credential = Credential> + 'static,
     ) -> Self {
         self.chain = self.chain.push_front(provider);
+        self
+    }
+
+    /// Configure the IMDSv2 credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_aws_v4::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_imds(|p| p.with_disabled(true));
+    /// ```
+    pub fn configure_imds<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(IMDSv2CredentialProvider) -> IMDSv2CredentialProvider,
+    {
+        self.imds_provider = f(self.imds_provider);
+        self.rebuild_chain();
+        self
+    }
+
+    /// Configure the profile credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_aws_v4::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_profile(|p| p.with_profile("development"));
+    /// ```
+    pub fn configure_profile<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(ProfileCredentialProvider) -> ProfileCredentialProvider,
+    {
+        self.profile_provider = f(self.profile_provider);
+        self.rebuild_chain();
+        self
+    }
+
+    /// Configure the SSO credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_aws_v4::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_sso(|p| p.with_endpoint("https://sso.internal"));
+    /// ```
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn configure_sso<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(SSOCredentialProvider) -> SSOCredentialProvider,
+    {
+        self.sso_provider = f(self.sso_provider);
+        self.rebuild_chain();
+        self
+    }
+
+    /// Configure the assume role with web identity credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_aws_v4::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_assume_role(|p| p.with_disabled(true));
+    /// ```
+    pub fn configure_assume_role<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(
+            AssumeRoleWithWebIdentityCredentialProvider,
+        ) -> AssumeRoleWithWebIdentityCredentialProvider,
+    {
+        self.assume_role_provider = f(self.assume_role_provider);
+        self.rebuild_chain();
+        self
+    }
+
+    /// Configure the process credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_aws_v4::DefaultCredentialProvider;
+    /// use std::time::Duration;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_process(|p| p.with_timeout(Duration::from_secs(30)));
+    /// ```
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn configure_process<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(ProcessCredentialProvider) -> ProcessCredentialProvider,
+    {
+        self.process_provider = f(self.process_provider);
+        self.rebuild_chain();
+        self
+    }
+
+    /// Configure the ECS credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_aws_v4::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_ecs(|p| p.with_endpoint("http://ecs.internal"));
+    /// ```
+    pub fn configure_ecs<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(ECSCredentialProvider) -> ECSCredentialProvider,
+    {
+        self.ecs_provider = f(self.ecs_provider);
+        self.rebuild_chain();
         self
     }
 }
@@ -261,6 +441,64 @@ mod tests {
 
         assert_eq!("static_access_key", cred.access_key_id);
         assert_eq!("static_secret_key", cred.secret_access_key);
+    }
+
+    #[tokio::test]
+    async fn test_default_credential_provider_configure_imds() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
+        let ctx = ctx.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::new(),
+        });
+
+        // Configure IMDS to be disabled
+        let provider = DefaultCredentialProvider::new().configure_imds(|p| p.with_disabled(true));
+
+        // Even though IMDS is the last provider, it should return None when disabled
+        let cred = provider
+            .provide_credential(&ctx)
+            .await
+            .expect("load must succeed");
+        assert!(cred.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_default_credential_provider_configure_profile() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let ctx = Context::new()
+            .with_file_read(TokioFileRead)
+            .with_http_send(ReqwestHttpSend::default())
+            .with_env(OsEnv);
+        let ctx = ctx.with_env(StaticEnv {
+            home_dir: None,
+            envs: HashMap::new(),
+        });
+
+        // Configure profile provider with custom files
+        let provider = DefaultCredentialProvider::new().configure_profile(|p| {
+            p.with_config_file(format!(
+                "{}/testdata/default_config",
+                env::current_dir()
+                    .expect("current_dir must exist")
+                    .to_string_lossy()
+            ))
+        });
+
+        // Should load from the custom config
+        let cred = provider
+            .provide_credential(&ctx)
+            .await
+            .expect("load must succeed");
+        // The testdata/default_config has credentials
+        let cred = cred.expect("credential should exist");
+        assert_eq!("config_access_key_id", cred.access_key_id);
+        assert_eq!("config_secret_access_key", cred.secret_access_key);
     }
 
     /// AWS_SHARED_CREDENTIALS_FILE should be taken first.

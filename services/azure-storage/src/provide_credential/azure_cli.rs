@@ -9,11 +9,19 @@ use crate::credential::Credential;
 /// This provider reads tokens from Azure CLI's local storage or invokes
 /// `az account get-access-token` to retrieve fresh tokens.
 #[derive(Clone, Debug, Default)]
-pub struct AzureCliCredentialProvider {}
+pub struct AzureCliCredentialProvider {
+    disabled: Option<bool>,
+}
 
 impl AzureCliCredentialProvider {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
+    }
+
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
     }
 
     /// Execute `az account get-access-token` command
@@ -71,6 +79,11 @@ impl ProvideCredential for AzureCliCredentialProvider {
         &self,
         ctx: &Context,
     ) -> Result<Option<Self::Credential>, reqsign_core::Error> {
+        // Check if disabled
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         // For Azure Storage, we need the storage resource
         let resource = "https://storage.azure.com/";
 

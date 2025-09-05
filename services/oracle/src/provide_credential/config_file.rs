@@ -12,13 +12,21 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// The config file path and profile name can be overridden using environment variables:
 /// - `OCI_CONFIG_FILE`: Override the config file path
 /// - `OCI_PROFILE`: Override the profile name (default is "DEFAULT")
-#[derive(Debug, Default)]
-pub struct ConfigFileCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct ConfigFileCredentialProvider {
+    disabled: Option<bool>,
+}
 
 impl ConfigFileCredentialProvider {
     /// Create a new ConfigFileCredentialProvider.
     pub fn new() -> Self {
-        Self
+        Self { disabled: None }
+    }
+
+    /// Set whether this provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
     }
 }
 
@@ -27,6 +35,10 @@ impl ProvideCredential for ConfigFileCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let envs = ctx.env_vars();
 
         // Determine config file path from env or use default

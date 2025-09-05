@@ -24,20 +24,78 @@ use super::{
 /// - External Account (Workload Identity)
 /// - Impersonated Service Account
 /// - Authorized User (OAuth2)
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct DefaultCredentialProvider {
     scope: Option<String>,
+    vm_metadata_disabled: Option<bool>,
+    vm_metadata_endpoint: Option<String>,
+    skip_env: Option<bool>,
+    skip_well_known: Option<bool>,
+}
+
+impl Default for DefaultCredentialProvider {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DefaultCredentialProvider {
     /// Create a new DefaultCredentialProvider.
     pub fn new() -> Self {
-        Self { scope: None }
+        Self {
+            scope: None,
+            vm_metadata_disabled: None,
+            vm_metadata_endpoint: None,
+            skip_env: None,
+            skip_well_known: None,
+        }
     }
 
     /// Set the OAuth2 scope.
     pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
         self.scope = Some(scope.into());
+        self
+    }
+
+    /// Configure VM metadata provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_google::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_vm_metadata(|p| p.with_disabled(true));
+    /// ```
+    pub fn configure_vm_metadata<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(&mut Self) -> &mut Self,
+    {
+        f(&mut self);
+        self
+    }
+
+    /// Set whether VM metadata is disabled.
+    pub fn with_vm_metadata_disabled(mut self, disabled: bool) -> Self {
+        self.vm_metadata_disabled = Some(disabled);
+        self
+    }
+
+    /// Set VM metadata endpoint.
+    pub fn with_vm_metadata_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.vm_metadata_endpoint = Some(endpoint.into());
+        self
+    }
+
+    /// Skip loading from GOOGLE_APPLICATION_CREDENTIALS environment variable.
+    pub fn skip_env_credentials(mut self, skip: bool) -> Self {
+        self.skip_env = Some(skip);
+        self
+    }
+
+    /// Skip loading from well-known location.
+    pub fn skip_well_known_location(mut self, skip: bool) -> Self {
+        self.skip_well_known = Some(skip);
         self
     }
 
@@ -67,6 +125,10 @@ impl DefaultCredentialProvider {
 
     /// Try to load credentials from GOOGLE_APPLICATION_CREDENTIALS environment variable.
     async fn try_env_credentials(&self, ctx: &Context) -> Result<Option<Credential>> {
+        if self.skip_env.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let Some(path) = ctx.env_var(GOOGLE_APPLICATION_CREDENTIALS) else {
             return Ok(None);
         };
@@ -77,6 +139,10 @@ impl DefaultCredentialProvider {
 
     /// Try to load credentials from gcloud default location.
     async fn try_well_known_location(&self, ctx: &Context) -> Result<Option<Credential>> {
+        if self.skip_well_known.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let config_dir = if let Some(v) = ctx.env_var("APPDATA") {
             v
         } else if let Some(v) = ctx.env_var("XDG_CONFIG_HOME") {
@@ -98,12 +164,20 @@ impl DefaultCredentialProvider {
 
     /// Try to load credentials from metadata server.
     async fn try_metadata_server(&self, ctx: &Context) -> Result<Option<Credential>> {
+        if self.vm_metadata_disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         debug!("trying to load credential from metadata server");
 
-        let provider = match &self.scope {
+        let mut provider = match &self.scope {
             Some(scope) => VmMetadataCredentialProvider::new().with_scope(scope),
             None => VmMetadataCredentialProvider::new(),
         };
+
+        if let Some(endpoint) = &self.vm_metadata_endpoint {
+            provider = provider.with_endpoint(endpoint);
+        }
 
         provider.provide_credential(ctx).await
     }
