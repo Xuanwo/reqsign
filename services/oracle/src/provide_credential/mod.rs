@@ -15,4 +15,4 @@ mod config_file;
 pub use config_file::ConfigFileCredentialProvider;
 
 mod default;
-pub use default::DefaultCredentialProvider;
+pub use default::{DefaultCredentialProvider, DefaultCredentialProviderBuilder};

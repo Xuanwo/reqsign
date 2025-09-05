@@ -8,7 +8,7 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// - `ALIBABA_CLOUD_ACCESS_KEY_ID`: The Alibaba Cloud access key ID
 /// - `ALIBABA_CLOUD_ACCESS_KEY_SECRET`: The Alibaba Cloud access key secret
 /// - `ALIBABA_CLOUD_SECURITY_TOKEN`: The Alibaba Cloud security token (optional)
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct EnvCredentialProvider;
 
 impl EnvCredentialProvider {

@@ -20,7 +20,7 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// 1. The `AWS_PROFILE` environment variable
 /// 2. The profile specified via `with_profile()`
 /// 3. Default to "default"
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProfileCredentialProvider {
     profile: String,
     config_file: Option<String>,

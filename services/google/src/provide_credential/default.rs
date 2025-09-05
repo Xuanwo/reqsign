@@ -1,6 +1,6 @@
 use log::debug;
 
-use reqsign_core::{Context, ProvideCredential, Result};
+use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 
 use crate::constants::{DEFAULT_SCOPE, GOOGLE_APPLICATION_CREDENTIALS, GOOGLE_SCOPE};
 use crate::credential::{Credential, CredentialFile};
@@ -12,71 +12,121 @@ use super::{
     vm_metadata::VmMetadataCredentialProvider,
 };
 
-/// DefaultCredentialProvider tries to load credentials from multiple sources in order.
-///
-/// It follows the Google Application Default Credentials (ADC) strategy:
-/// 1. GOOGLE_APPLICATION_CREDENTIALS environment variable
-/// 2. gcloud credential file (~/.config/gcloud/application_default_credentials.json)
-/// 3. Metadata server (for GCE/Cloud Functions/App Engine)
-///
-/// The provider automatically handles all credential types including:
-/// - Service Account
-/// - External Account (Workload Identity)
-/// - Impersonated Service Account
-/// - Authorized User (OAuth2)
-#[derive(Debug, Clone, Default)]
+#[derive(Debug)]
 pub struct DefaultCredentialProvider {
-    scope: Option<String>,
+    chain: ProvideCredentialChain<Credential>,
+}
+
+impl Default for DefaultCredentialProvider {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DefaultCredentialProvider {
-    /// Create a new DefaultCredentialProvider.
-    pub fn new() -> Self {
-        Self { scope: None }
+    /// Create a builder to configure the default credential chain.
+    pub fn builder() -> DefaultCredentialProviderBuilder {
+        DefaultCredentialProviderBuilder::default()
     }
 
-    /// Set the OAuth2 scope.
-    pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
-        self.scope = Some(scope.into());
-        self
+    /// Create a new DefaultCredentialProvider with the default chain:
+    /// env ADC -> well-known ADC -> VM metadata
+    pub fn new() -> Self {
+        Self::builder().build()
+    }
+
+    /// Create with a custom credential chain.
+    pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
+        Self { chain }
     }
 
     /// Add a credential provider to the front of the default chain.
-    ///
-    /// Note: Google's DefaultCredentialProvider doesn't use ProvideCredentialChain internally,
-    /// but this method is provided for API consistency with other providers.
-    /// The custom provider will be tried first before the default ADC flow.
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use reqsign_google::{DefaultCredentialProvider, StaticCredentialProvider};
-    ///
-    /// let provider = DefaultCredentialProvider::new()
-    ///     .push_front(StaticCredentialProvider::new("service_account_json"));
-    /// ```
     pub fn push_front(
-        self,
-        _provider: impl ProvideCredential<Credential = Credential> + 'static,
+        mut self,
+        provider: impl ProvideCredential<Credential = Credential> + 'static,
     ) -> Self {
-        // Note: This implementation would need refactoring to support chain-based approach
-        // For now, we keep the method for API consistency
-        log::warn!("push_front is not yet implemented for Google DefaultCredentialProvider");
+        self.chain = self.chain.push_front(provider);
         self
     }
 
-    /// Try to load credentials from GOOGLE_APPLICATION_CREDENTIALS environment variable.
-    async fn try_env_credentials(&self, ctx: &Context) -> Result<Option<Credential>> {
-        let Some(path) = ctx.env_var(GOOGLE_APPLICATION_CREDENTIALS) else {
+    #[deprecated(since = "1.0.0", note = "Use DefaultCredentialProvider::builder().disable_env(skip).build() instead")]
+    pub fn skip_env_credentials(self, skip: bool) -> Self {
+        DefaultCredentialProvider::builder()
+            .disable_env(skip)
+            .build()
+    }
+
+    #[deprecated(since = "1.0.0", note = "Use DefaultCredentialProvider::builder().disable_well_known(skip).build() instead")]
+    pub fn skip_well_known_location(self, skip: bool) -> Self {
+        DefaultCredentialProvider::builder()
+            .disable_well_known(skip)
+            .build()
+    }
+}
+
+#[async_trait::async_trait]
+impl ProvideCredential for DefaultCredentialProvider {
+    type Credential = Credential;
+
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        self.chain.provide_credential(ctx).await
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+struct EnvAdcCredentialProvider {
+    disabled: Option<bool>,
+    scope: Option<String>,
+}
+
+impl EnvAdcCredentialProvider {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[async_trait::async_trait]
+impl ProvideCredential for EnvAdcCredentialProvider {
+    type Credential = Credential;
+
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        if self.disabled.unwrap_or(false) {
             return Ok(None);
+        }
+
+        let path = match ctx.env_var(GOOGLE_APPLICATION_CREDENTIALS) {
+            Some(path) if !path.is_empty() => path,
+            _ => return Ok(None),
         };
 
         debug!("trying to load credential from env GOOGLE_APPLICATION_CREDENTIALS: {path}");
-        self.load_credential_from_path(ctx, &path).await
-    }
 
-    /// Try to load credentials from gcloud default location.
-    async fn try_well_known_location(&self, ctx: &Context) -> Result<Option<Credential>> {
+        let content = ctx.file_read(&path).await?;
+        parse_credential_bytes(ctx, &content, self.scope.clone()).await
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+struct WellKnownAdcCredentialProvider {
+    disabled: Option<bool>,
+    scope: Option<String>,
+}
+
+impl WellKnownAdcCredentialProvider {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[async_trait::async_trait]
+impl ProvideCredential for WellKnownAdcCredentialProvider {
+    type Credential = Credential;
+
+    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let config_dir = if let Some(v) = ctx.env_var("APPDATA") {
             v
         } else if let Some(v) = ctx.env_var("XDG_CONFIG_HOME") {
@@ -90,94 +140,125 @@ impl DefaultCredentialProvider {
         let path = format!("{config_dir}/gcloud/application_default_credentials.json");
         debug!("trying to load credential from well-known location: {path}");
 
-        match self.load_credential_from_path(ctx, &path).await {
-            Ok(cred) => Ok(cred),
-            Err(_) => Ok(None), // Ignore errors for well-known location
-        }
-    }
-
-    /// Try to load credentials from metadata server.
-    async fn try_metadata_server(&self, ctx: &Context) -> Result<Option<Credential>> {
-        debug!("trying to load credential from metadata server");
-
-        let provider = match &self.scope {
-            Some(scope) => VmMetadataCredentialProvider::new().with_scope(scope),
-            None => VmMetadataCredentialProvider::new(),
+        let content = match ctx.file_read(&path).await {
+            Ok(v) => v,
+            Err(_) => return Ok(None),
         };
 
-        provider.provide_credential(ctx).await
-    }
-
-    /// Load credential from a file path and handle all credential types.
-    async fn load_credential_from_path(
-        &self,
-        ctx: &Context,
-        path: &str,
-    ) -> Result<Option<Credential>> {
-        let content = ctx.file_read(path).await.map_err(|err| {
-            debug!("failed to read credential file {path}: {err:?}");
-            err
-        })?;
-
-        let cred_file = CredentialFile::from_slice(&content).map_err(|err| {
-            debug!("failed to parse credential file {path}: {err:?}");
-            err
-        })?;
-
-        // Get scope from instance, environment, or use default
-        let scope = self
-            .scope
-            .clone()
-            .or_else(|| ctx.env_var(GOOGLE_SCOPE))
-            .unwrap_or_else(|| DEFAULT_SCOPE.to_string());
-
-        match cred_file {
-            CredentialFile::ServiceAccount(sa) => {
-                debug!("loaded service account credential");
-                Ok(Some(Credential::with_service_account(sa)))
-            }
-            CredentialFile::ExternalAccount(ea) => {
-                debug!("loaded external account credential, exchanging for token");
-                let provider = ExternalAccountCredentialProvider::new(ea).with_scope(&scope);
-                provider.provide_credential(ctx).await
-            }
-            CredentialFile::ImpersonatedServiceAccount(isa) => {
-                debug!("loaded impersonated service account credential, exchanging for token");
-                let provider =
-                    ImpersonatedServiceAccountCredentialProvider::new(isa).with_scope(&scope);
-                provider.provide_credential(ctx).await
-            }
-            CredentialFile::AuthorizedUser(au) => {
-                debug!("loaded authorized user credential, exchanging for token");
-                let provider = AuthorizedUserCredentialProvider::new(au);
-                provider.provide_credential(ctx).await
-            }
+        match parse_credential_bytes(ctx, &content, self.scope.clone()).await {
+            Ok(v) => Ok(v),
+            Err(_) => Ok(None),
         }
     }
 }
 
-#[async_trait::async_trait]
-impl ProvideCredential for DefaultCredentialProvider {
-    type Credential = Credential;
+async fn parse_credential_bytes(
+    ctx: &Context,
+    content: &[u8],
+    scope_override: Option<String>,
+) -> Result<Option<Credential>> {
+    let cred_file = CredentialFile::from_slice(content)?;
 
-    async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        // 1. Try environment variable
-        if let Some(cred) = self.try_env_credentials(ctx).await? {
-            return Ok(Some(cred));
+    let scope = scope_override
+        .or_else(|| ctx.env_var(GOOGLE_SCOPE))
+        .unwrap_or_else(|| DEFAULT_SCOPE.to_string());
+
+    match cred_file {
+        CredentialFile::ServiceAccount(sa) => {
+            debug!("loaded service account credential");
+            Ok(Some(Credential::with_service_account(sa)))
+        }
+        CredentialFile::ExternalAccount(ea) => {
+            debug!("loaded external account credential, exchanging for token");
+            let provider = ExternalAccountCredentialProvider::new(ea).with_scope(&scope);
+            provider.provide_credential(ctx).await
+        }
+        CredentialFile::ImpersonatedServiceAccount(isa) => {
+            debug!("loaded impersonated service account credential, exchanging for token");
+            let provider =
+                ImpersonatedServiceAccountCredentialProvider::new(isa).with_scope(&scope);
+            provider.provide_credential(ctx).await
+        }
+        CredentialFile::AuthorizedUser(au) => {
+            debug!("loaded authorized user credential, exchanging for token");
+            let provider = AuthorizedUserCredentialProvider::new(au);
+            provider.provide_credential(ctx).await
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct DefaultCredentialProviderBuilder {
+    env_adc: Option<EnvAdcCredentialProvider>,
+    well_known_adc: Option<WellKnownAdcCredentialProvider>,
+    vm_metadata: Option<VmMetadataCredentialProvider>,
+}
+
+impl DefaultCredentialProviderBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    // No global scope configurator; configure scope on specific providers if needed.
+
+    pub fn configure_vm_metadata<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(VmMetadataCredentialProvider) -> VmMetadataCredentialProvider,
+    {
+        let p = self.vm_metadata.take().unwrap_or_default();
+        self.vm_metadata = Some(f(p));
+        self
+    }
+
+    pub fn disable_env(mut self, disable: bool) -> Self {
+        if disable {
+            self.env_adc = None;
+        } else if self.env_adc.is_none() {
+            self.env_adc = Some(EnvAdcCredentialProvider::new());
+        }
+        self
+    }
+
+    pub fn disable_well_known(mut self, disable: bool) -> Self {
+        if disable {
+            self.well_known_adc = None;
+        } else if self.well_known_adc.is_none() {
+            self.well_known_adc = Some(WellKnownAdcCredentialProvider::new());
+        }
+        self
+    }
+
+    pub fn disable_vm_metadata(mut self, disable: bool) -> Self {
+        if disable {
+            self.vm_metadata = None;
+        } else if self.vm_metadata.is_none() {
+            self.vm_metadata = Some(VmMetadataCredentialProvider::new());
+        }
+        self
+    }
+
+    pub fn build(self) -> DefaultCredentialProvider {
+        let mut chain = ProvideCredentialChain::new();
+
+        if let Some(p) = self.env_adc {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(EnvAdcCredentialProvider::new());
         }
 
-        // 2. Try well-known location
-        if let Some(cred) = self.try_well_known_location(ctx).await? {
-            return Ok(Some(cred));
+        if let Some(p) = self.well_known_adc {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(WellKnownAdcCredentialProvider::new());
         }
 
-        // 3. Try metadata server
-        if let Some(cred) = self.try_metadata_server(ctx).await? {
-            return Ok(Some(cred));
+        if let Some(p) = self.vm_metadata {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(VmMetadataCredentialProvider::new());
         }
 
-        debug!("no valid credential source found");
-        Ok(None)
+        DefaultCredentialProvider::with_chain(chain)
     }
 }
 
@@ -223,8 +304,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_default_provider_with_scope() {
-        let provider = DefaultCredentialProvider::new()
-            .with_scope("https://www.googleapis.com/auth/devstorage.read_only");
+        let provider = DefaultCredentialProvider::builder().build();
 
         // Even without valid credentials, this should not panic
         let ctx = Context::new()

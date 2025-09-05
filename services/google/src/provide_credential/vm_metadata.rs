@@ -16,12 +16,13 @@ struct VmMetadataTokenResponse {
 #[derive(Debug, Clone, Default)]
 pub struct VmMetadataCredentialProvider {
     scope: Option<String>,
+    endpoint: Option<String>,
 }
 
 impl VmMetadataCredentialProvider {
     /// Create a new VmMetadataCredentialProvider.
     pub fn new() -> Self {
-        Self { scope: None }
+        Self::default()
     }
 
     /// Set the OAuth2 scope.
@@ -29,6 +30,14 @@ impl VmMetadataCredentialProvider {
         self.scope = Some(scope.into());
         self
     }
+
+    /// Set the metadata endpoint.
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint = Some(endpoint.into());
+        self
+    }
+
+    
 }
 
 #[async_trait::async_trait]
@@ -52,8 +61,10 @@ impl ProvideCredential for VmMetadataCredentialProvider {
         );
 
         // Allow overriding metadata host for testing
-        let metadata_host = ctx
-            .env_var("GCE_METADATA_HOST")
+        let metadata_host = self
+            .endpoint
+            .clone()
+            .or_else(|| ctx.env_var("GCE_METADATA_HOST"))
             .unwrap_or_else(|| "metadata.google.internal".to_string());
 
         let url = format!(

@@ -13,7 +13,7 @@ pub struct AzureCliCredentialProvider {}
 
 impl AzureCliCredentialProvider {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 
     /// Execute `az account get-access-token` command

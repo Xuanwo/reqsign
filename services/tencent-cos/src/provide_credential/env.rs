@@ -8,13 +8,13 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// - `TENCENTCLOUD_SECRET_ID` or `TKE_SECRET_ID`: The Tencent Cloud secret ID
 /// - `TENCENTCLOUD_SECRET_KEY` or `TKE_SECRET_KEY`: The Tencent Cloud secret key
 /// - `TENCENTCLOUD_TOKEN`, `TENCENTCLOUD_SECURITY_TOKEN`, or `QCLOUD_SECRET_TOKEN`: The security token (optional)
-#[derive(Debug, Default)]
-pub struct EnvCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct EnvCredentialProvider {}
 
 impl EnvCredentialProvider {
     /// Create a new EnvCredentialProvider.
     pub fn new() -> Self {
-        Self
+        Self {}
     }
 }
 

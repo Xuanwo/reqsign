@@ -1,3 +1,6 @@
+use crate::provide_credential::{
+    AssumeRoleWithWebIdentityCredentialProvider, EnvCredentialProvider,
+};
 use crate::Credential;
 use async_trait::async_trait;
 use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
@@ -19,13 +22,14 @@ impl Default for DefaultCredentialProvider {
 }
 
 impl DefaultCredentialProvider {
-    /// Create a new DefaultCredentialProvider
-    pub fn new() -> Self {
-        let chain = ProvideCredentialChain::new()
-            .push(super::EnvCredentialProvider::new())
-            .push(super::AssumeRoleWithWebIdentityCredentialProvider::new());
+    /// Create a builder to configure the default credential chain.
+    pub fn builder() -> DefaultCredentialProviderBuilder {
+        DefaultCredentialProviderBuilder::default()
+    }
 
-        Self { chain }
+    /// Create a new DefaultCredentialProvider using the default chain.
+    pub fn new() -> Self {
+        Self::builder().build()
     }
 
     /// Create with a custom credential chain.
@@ -52,6 +56,74 @@ impl DefaultCredentialProvider {
     ) -> Self {
         self.chain = self.chain.push_front(provider);
         self
+    }
+}
+
+#[derive(Default)]
+pub struct DefaultCredentialProviderBuilder {
+    env: Option<EnvCredentialProvider>,
+    assume_role: Option<AssumeRoleWithWebIdentityCredentialProvider>,
+}
+
+impl DefaultCredentialProviderBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn configure_env<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(EnvCredentialProvider) -> EnvCredentialProvider,
+    {
+        let p = self.env.take().unwrap_or_default();
+        self.env = Some(f(p));
+        self
+    }
+
+    pub fn disable_env(mut self, disable: bool) -> Self {
+        if disable {
+            self.env = None;
+        } else if self.env.is_none() {
+            self.env = Some(EnvCredentialProvider::new());
+        }
+        self
+    }
+
+    pub fn configure_assume_role<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(AssumeRoleWithWebIdentityCredentialProvider) ->
+            AssumeRoleWithWebIdentityCredentialProvider,
+    {
+        let p = self
+            .assume_role
+            .take()
+            .unwrap_or_default();
+        self.assume_role = Some(f(p));
+        self
+    }
+
+    pub fn disable_assume_role(mut self, disable: bool) -> Self {
+        if disable {
+            self.assume_role = None;
+        } else if self.assume_role.is_none() {
+            self.assume_role = Some(AssumeRoleWithWebIdentityCredentialProvider::new());
+        }
+        self
+    }
+
+    pub fn build(self) -> DefaultCredentialProvider {
+        let mut chain = ProvideCredentialChain::new();
+        if let Some(p) = self.env {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(EnvCredentialProvider::new());
+        }
+        if let Some(p) = self.assume_role {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(AssumeRoleWithWebIdentityCredentialProvider::new());
+        }
+
+        DefaultCredentialProvider::with_chain(chain)
     }
 }
 

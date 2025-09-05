@@ -1,5 +1,6 @@
 mod default;
-pub use default::DefaultCredentialProvider;
+#[allow(unused_imports)]
+pub use default::{DefaultCredentialProvider, DefaultCredentialProviderBuilder};
 
 mod vm_metadata;
 pub use vm_metadata::VmMetadataCredentialProvider;

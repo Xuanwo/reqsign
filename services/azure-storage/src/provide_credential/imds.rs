@@ -8,13 +8,21 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// which is available on Azure VMs and other Azure compute resources.
 ///
 /// Reference: <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
-#[derive(Debug, Default)]
-pub struct ImdsCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct ImdsCredentialProvider {
+    endpoint: Option<String>,
+}
 
 impl ImdsCredentialProvider {
     /// Create a new IMDS loader.
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    /// Set the IMDS endpoint.
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint = Some(endpoint.into());
+        self
     }
 }
 

@@ -14,7 +14,7 @@ use std::path::PathBuf;
 /// This provider reads configuration from:
 /// 1. Constructor parameters (if provided)
 /// 2. Environment variables (when constructor parameters are not set)
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct AssumeRoleWithWebIdentityCredentialProvider {
     // Web Identity configuration
     role_arn: Option<String>,
@@ -41,6 +41,18 @@ impl AssumeRoleWithWebIdentityCredentialProvider {
             region: None,
             use_regional_sts_endpoint: None,
         }
+    }
+
+    /// Set the role ARN.
+    pub fn with_role_arn(mut self, role_arn: impl Into<String>) -> Self {
+        self.role_arn = Some(role_arn.into());
+        self
+    }
+
+    /// Set the web identity token file path.
+    pub fn with_web_identity_token_file(mut self, token_file: impl Into<PathBuf>) -> Self {
+        self.web_identity_token_file = Some(token_file.into());
+        self
     }
 
     /// Set the role session name.

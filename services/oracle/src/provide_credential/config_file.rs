@@ -12,13 +12,13 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// The config file path and profile name can be overridden using environment variables:
 /// - `OCI_CONFIG_FILE`: Override the config file path
 /// - `OCI_PROFILE`: Override the profile name (default is "DEFAULT")
-#[derive(Debug, Default)]
-pub struct ConfigFileCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct ConfigFileCredentialProvider {}
 
 impl ConfigFileCredentialProvider {
     /// Create a new ConfigFileCredentialProvider.
     pub fn new() -> Self {
-        Self
+        Self {}
     }
 }
 

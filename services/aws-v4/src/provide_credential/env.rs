@@ -8,7 +8,7 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// - `AWS_ACCESS_KEY_ID`: The AWS access key ID
 /// - `AWS_SECRET_ACCESS_KEY`: The AWS secret access key
 /// - `AWS_SESSION_TOKEN`: The AWS session token (optional)
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct EnvCredentialProvider;
 
 impl EnvCredentialProvider {

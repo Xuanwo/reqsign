@@ -8,7 +8,7 @@ mod cognito;
 pub use cognito::CognitoIdentityCredentialProvider;
 
 mod default;
-pub use default::DefaultCredentialProvider;
+pub use default::{DefaultCredentialProvider, DefaultCredentialProviderBuilder};
 
 mod ecs;
 pub use ecs::ECSCredentialProvider;
