@@ -30,6 +30,7 @@ fn generate_jti(now: u64) -> String {
 /// ClientCertificateCredentialProvider provides credentials using a client certificate
 #[derive(Clone, Debug)]
 pub struct ClientCertificateCredentialProvider {
+    disabled: Option<bool>,
     tenant_id: Option<String>,
     client_id: Option<String>,
     certificate_path: Option<String>,
@@ -45,11 +46,18 @@ impl Default for ClientCertificateCredentialProvider {
 impl ClientCertificateCredentialProvider {
     pub fn new() -> Self {
         Self {
+            disabled: None,
             tenant_id: None,
             client_id: None,
             certificate_path: None,
             certificate_password: None,
         }
+    }
+
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
     }
 
     /// Set the tenant ID
@@ -257,6 +265,11 @@ impl ProvideCredential for ClientCertificateCredentialProvider {
         &self,
         ctx: &Context,
     ) -> Result<Option<Self::Credential>, reqsign_core::Error> {
+        // Check if disabled
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let envs = ctx.env_vars();
 
         // Try to get credentials from environment variables or configured values

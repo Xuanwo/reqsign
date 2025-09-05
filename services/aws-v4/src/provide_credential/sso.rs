@@ -58,7 +58,7 @@ impl SSOCredentialProvider {
             sso_endpoint: None,
         }
     }
-    
+
     /// Set whether the provider is disabled.
     pub fn with_disabled(mut self, disabled: bool) -> Self {
         self.disabled = Some(disabled);
@@ -329,7 +329,7 @@ impl ProvideCredential for SSOCredentialProvider {
         if self.disabled.unwrap_or(false) {
             return Ok(None);
         }
-        
+
         let config = match self.load_sso_config(ctx).await {
             Ok(c) => c,
             Err(_) => {

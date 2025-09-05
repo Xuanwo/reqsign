@@ -64,11 +64,11 @@ impl DefaultCredentialProvider {
             ecs_provider,
             imds_provider,
         };
-        
+
         provider.rebuild_chain();
         provider
     }
-    
+
     /// Rebuild the internal chain based on current provider configurations.
     fn rebuild_chain(&mut self) {
         let mut chain = ProvideCredentialChain::new()
@@ -107,8 +107,8 @@ impl DefaultCredentialProvider {
         let process_provider = ProcessCredentialProvider::new();
         let ecs_provider = ECSCredentialProvider::new();
         let imds_provider = IMDSv2CredentialProvider::new();
-        
-        Self { 
+
+        Self {
             chain,
             env_provider,
             profile_provider,
@@ -142,7 +142,7 @@ impl DefaultCredentialProvider {
         self.chain = self.chain.push_front(provider);
         self
     }
-    
+
     /// Configure the IMDSv2 credential provider.
     ///
     /// # Example
@@ -180,7 +180,7 @@ impl DefaultCredentialProvider {
         self.rebuild_chain();
         self
     }
-    
+
     /// Configure the SSO credential provider.
     ///
     /// # Example
@@ -200,7 +200,7 @@ impl DefaultCredentialProvider {
         self.rebuild_chain();
         self
     }
-    
+
     /// Configure the assume role with web identity credential provider.
     ///
     /// # Example
@@ -213,13 +213,15 @@ impl DefaultCredentialProvider {
     /// ```
     pub fn configure_assume_role<F>(mut self, f: F) -> Self
     where
-        F: FnOnce(AssumeRoleWithWebIdentityCredentialProvider) -> AssumeRoleWithWebIdentityCredentialProvider,
+        F: FnOnce(
+            AssumeRoleWithWebIdentityCredentialProvider,
+        ) -> AssumeRoleWithWebIdentityCredentialProvider,
     {
         self.assume_role_provider = f(self.assume_role_provider);
         self.rebuild_chain();
         self
     }
-    
+
     /// Configure the process credential provider.
     ///
     /// # Example
@@ -240,7 +242,7 @@ impl DefaultCredentialProvider {
         self.rebuild_chain();
         self
     }
-    
+
     /// Configure the ECS credential provider.
     ///
     /// # Example
@@ -455,11 +457,13 @@ mod tests {
         });
 
         // Configure IMDS to be disabled
-        let provider = DefaultCredentialProvider::new()
-            .configure_imds(|p| p.with_disabled(true));
+        let provider = DefaultCredentialProvider::new().configure_imds(|p| p.with_disabled(true));
 
         // Even though IMDS is the last provider, it should return None when disabled
-        let cred = provider.provide_credential(&ctx).await.expect("load must succeed");
+        let cred = provider
+            .provide_credential(&ctx)
+            .await
+            .expect("load must succeed");
         assert!(cred.is_none());
     }
 
@@ -477,15 +481,14 @@ mod tests {
         });
 
         // Configure profile provider with custom files
-        let provider = DefaultCredentialProvider::new()
-            .configure_profile(|p| p
-                .with_config_file(format!(
-                    "{}/testdata/default_config",
-                    env::current_dir()
-                        .expect("current_dir must exist")
-                        .to_string_lossy()
-                ))
-            );
+        let provider = DefaultCredentialProvider::new().configure_profile(|p| {
+            p.with_config_file(format!(
+                "{}/testdata/default_config",
+                env::current_dir()
+                    .expect("current_dir must exist")
+                    .to_string_lossy()
+            ))
+        });
 
         // Should load from the custom config
         let cred = provider

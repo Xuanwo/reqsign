@@ -85,7 +85,7 @@ impl ECSCredentialProvider {
             metadata_uri_override: None,
         }
     }
-    
+
     /// Set whether the provider is disabled.
     pub fn with_disabled(mut self, disabled: bool) -> Self {
         self.disabled = Some(disabled);

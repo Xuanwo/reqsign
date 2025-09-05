@@ -32,7 +32,7 @@ impl AssumeRoleWithWebIdentityCredentialProvider {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Set whether the provider is disabled.
     pub fn with_disabled(mut self, disabled: bool) -> Self {
         self.disabled = Some(disabled);
@@ -50,13 +50,13 @@ impl AssumeRoleWithWebIdentityCredentialProvider {
             use_regional_sts_endpoint: None,
         }
     }
-    
+
     /// Set the role ARN.
     pub fn with_role_arn(mut self, role_arn: impl Into<String>) -> Self {
         self.role_arn = Some(role_arn.into());
         self
     }
-    
+
     /// Set the web identity token file path.
     pub fn with_web_identity_token_file(mut self, token_file: impl Into<PathBuf>) -> Self {
         self.web_identity_token_file = Some(token_file.into());
@@ -91,7 +91,7 @@ impl ProvideCredential for AssumeRoleWithWebIdentityCredentialProvider {
         if self.disabled.unwrap_or(false) {
             return Ok(None);
         }
-        
+
         let envs = ctx.env_vars();
 
         // Get role_arn from config or environment

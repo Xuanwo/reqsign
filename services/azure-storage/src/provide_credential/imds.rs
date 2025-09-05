@@ -8,13 +8,28 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// which is available on Azure VMs and other Azure compute resources.
 ///
 /// Reference: <https://learn.microsoft.com/en-us/azure/app-service/overview-managed-identity?tabs=portal,http#using-the-rest-protocol>
-#[derive(Debug, Default)]
-pub struct ImdsCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct ImdsCredentialProvider {
+    disabled: Option<bool>,
+    endpoint: Option<String>,
+}
 
 impl ImdsCredentialProvider {
     /// Create a new IMDS loader.
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
+        self
+    }
+
+    /// Set the IMDS endpoint.
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint = Some(endpoint.into());
+        self
     }
 }
 
@@ -23,6 +38,11 @@ impl ProvideCredential for ImdsCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        // Check if disabled
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         let token = get_access_token("https://storage.azure.com/", ctx).await?;
 
         let expires_on = if token.expires_on.is_empty() {

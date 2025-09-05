@@ -18,33 +18,77 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 /// 5. Azure Pipelines (workload identity)
 /// 6. Workload identity (federated credentials)
 /// 7. IMDS (Azure VM managed identity)
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
+    env_provider: EnvCredentialProvider,
+    #[cfg(not(target_arch = "wasm32"))]
+    azure_cli_provider: AzureCliCredentialProvider,
+    #[cfg(not(target_arch = "wasm32"))]
+    client_certificate_provider: ClientCertificateCredentialProvider,
+    client_secret_provider: ClientSecretCredentialProvider,
+    azure_pipelines_provider: AzurePipelinesCredentialProvider,
+    workload_identity_provider: WorkloadIdentityCredentialProvider,
+    imds_provider: ImdsCredentialProvider,
+}
+
+impl Default for DefaultCredentialProvider {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DefaultCredentialProvider {
     /// Create a new default loader.
     pub fn new() -> Self {
-        let mut chain = ProvideCredentialChain::new().push(EnvCredentialProvider::new());
+        let env_provider = EnvCredentialProvider::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        let azure_cli_provider = AzureCliCredentialProvider::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        let client_certificate_provider = ClientCertificateCredentialProvider::new();
+        let client_secret_provider = ClientSecretCredentialProvider::new();
+        let azure_pipelines_provider = AzurePipelinesCredentialProvider::new();
+        let workload_identity_provider = WorkloadIdentityCredentialProvider::new();
+        let imds_provider = ImdsCredentialProvider::new();
+
+        let mut provider = Self {
+            chain: ProvideCredentialChain::new(),
+            env_provider,
+            #[cfg(not(target_arch = "wasm32"))]
+            azure_cli_provider,
+            #[cfg(not(target_arch = "wasm32"))]
+            client_certificate_provider,
+            client_secret_provider,
+            azure_pipelines_provider,
+            workload_identity_provider,
+            imds_provider,
+        };
+
+        provider.rebuild_chain();
+        provider
+    }
+
+    /// Rebuild the internal chain based on current provider configurations.
+    fn rebuild_chain(&mut self) {
+        let mut chain = ProvideCredentialChain::new().push(self.env_provider.clone());
 
         #[cfg(not(target_arch = "wasm32"))]
         {
             chain = chain
-                .push(AzureCliCredentialProvider::new())
-                .push(ClientCertificateCredentialProvider::new());
+                .push(self.azure_cli_provider.clone())
+                .push(self.client_certificate_provider.clone());
         }
 
         chain = chain
-            .push(ClientSecretCredentialProvider::new())
-            .push(AzurePipelinesCredentialProvider::new())
-            .push(WorkloadIdentityCredentialProvider::new())
-            .push(ImdsCredentialProvider::new());
+            .push(self.client_secret_provider.clone())
+            .push(self.azure_pipelines_provider.clone())
+            .push(self.workload_identity_provider.clone())
+            .push(self.imds_provider.clone());
 
-        Self { chain }
+        self.chain = chain;
     }
 
-    /// Add a credential provider to the front of the default chain.
+    /// Configure the IMDS credential provider.\n    ///\n    /// # Example\n    ///\n    /// ```no_run\n    /// use reqsign_azure_storage::DefaultCredentialProvider;\n    ///\n    /// let provider = DefaultCredentialProvider::new()\n    ///     .configure_imds(|p| p.with_disabled(true));\n    /// ```\n    pub fn configure_imds<F>(mut self, f: F) -> Self\n    where\n        F: FnOnce(ImdsCredentialProvider) -> ImdsCredentialProvider,\n    {\n        self.imds_provider = f(self.imds_provider);\n        self.rebuild_chain();\n        self\n    }\n\n    /// Configure the Azure CLI credential provider.\n    ///\n    /// # Example\n    ///\n    /// ```no_run\n    /// use reqsign_azure_storage::DefaultCredentialProvider;\n    ///\n    /// let provider = DefaultCredentialProvider::new()\n    ///     .configure_azure_cli(|p| p.with_disabled(true));\n    /// ```\n    #[cfg(not(target_arch = \"wasm32\"))]\n    pub fn configure_azure_cli<F>(mut self, f: F) -> Self\n    where\n        F: FnOnce(AzureCliCredentialProvider) -> AzureCliCredentialProvider,\n    {\n        self.azure_cli_provider = f(self.azure_cli_provider);\n        self.rebuild_chain();\n        self\n    }\n\n    /// Configure the client certificate credential provider.\n    ///\n    /// # Example\n    ///\n    /// ```no_run\n    /// use reqsign_azure_storage::DefaultCredentialProvider;\n    ///\n    /// let provider = DefaultCredentialProvider::new()\n    ///     .configure_client_certificate(|p| p.with_tenant_id(\"tenant\"));\n    /// ```\n    #[cfg(not(target_arch = \"wasm32\"))]\n    pub fn configure_client_certificate<F>(mut self, f: F) -> Self\n    where\n        F: FnOnce(ClientCertificateCredentialProvider) -> ClientCertificateCredentialProvider,\n    {\n        self.client_certificate_provider = f(self.client_certificate_provider);\n        self.rebuild_chain();\n        self\n    }\n\n    /// Configure the client secret credential provider.\n    ///\n    /// # Example\n    ///\n    /// ```no_run\n    /// use reqsign_azure_storage::DefaultCredentialProvider;\n    ///\n    /// let provider = DefaultCredentialProvider::new()\n    ///     .configure_client_secret(|p| p.with_tenant_id(\"tenant\"));\n    /// ```\n    pub fn configure_client_secret<F>(mut self, f: F) -> Self\n    where\n        F: FnOnce(ClientSecretCredentialProvider) -> ClientSecretCredentialProvider,\n    {\n        self.client_secret_provider = f(self.client_secret_provider);\n        self.rebuild_chain();\n        self\n    }\n\n    /// Configure the Azure Pipelines credential provider.\n    ///\n    /// # Example\n    ///\n    /// ```no_run\n    /// use reqsign_azure_storage::DefaultCredentialProvider;\n    ///\n    /// let provider = DefaultCredentialProvider::new()\n    ///     .configure_azure_pipelines(|p| p.with_disabled(true));\n    /// ```\n    pub fn configure_azure_pipelines<F>(mut self, f: F) -> Self\n    where\n        F: FnOnce(AzurePipelinesCredentialProvider) -> AzurePipelinesCredentialProvider,\n    {\n        self.azure_pipelines_provider = f(self.azure_pipelines_provider);\n        self.rebuild_chain();\n        self\n    }\n\n    /// Configure the workload identity credential provider.\n    ///\n    /// # Example\n    ///\n    /// ```no_run\n    /// use reqsign_azure_storage::DefaultCredentialProvider;\n    ///\n    /// let provider = DefaultCredentialProvider::new()\n    ///     .configure_workload_identity(|p| p.with_tenant_id(\"tenant\"));\n    /// ```\n    pub fn configure_workload_identity<F>(mut self, f: F) -> Self\n    where\n        F: FnOnce(WorkloadIdentityCredentialProvider) -> WorkloadIdentityCredentialProvider,\n    {\n        self.workload_identity_provider = f(self.workload_identity_provider);\n        self.rebuild_chain();\n        self\n    }\n\n    /// Add a credential provider to the front of the default chain.
     ///
     /// This allows adding a high-priority credential source that will be tried
     /// before all other providers in the default chain.

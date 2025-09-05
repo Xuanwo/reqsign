@@ -42,19 +42,19 @@ impl IMDSv2CredentialProvider {
         self.disabled = Some(disabled);
         self
     }
-    
+
     /// Set the endpoint for the metadata service.
     pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
         self.endpoint = Some(endpoint.into());
         self
     }
-    
+
     /// Set the timeout for metadata requests.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
-    
+
     /// Set the number of retry attempts.
     pub fn with_retry_attempts(mut self, attempts: u32) -> Self {
         self.retry_attempts = Some(attempts);

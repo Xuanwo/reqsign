@@ -11,16 +11,69 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 #[derive(Debug, Default)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
+    env_provider: EnvCredentialProvider,
+    config_file_provider: ConfigFileCredentialProvider,
 }
 
 impl DefaultCredentialProvider {
     /// Create a new DefaultCredentialProvider
     pub fn new() -> Self {
-        let chain = ProvideCredentialChain::new()
-            .push(EnvCredentialProvider::new())
-            .push(ConfigFileCredentialProvider::new());
+        let env_provider = EnvCredentialProvider::new();
+        let config_file_provider = ConfigFileCredentialProvider::new();
 
-        Self { chain }
+        let mut provider = Self {
+            chain: ProvideCredentialChain::new(),
+            env_provider,
+            config_file_provider,
+        };
+
+        provider.rebuild_chain();
+        provider
+    }
+
+    /// Rebuild the internal chain based on current provider configurations.
+    fn rebuild_chain(&mut self) {
+        self.chain = ProvideCredentialChain::new()
+            .push(self.env_provider.clone())
+            .push(self.config_file_provider.clone());
+    }
+
+    /// Configure the environment credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_oracle::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_env(|p| p.with_disabled(true));
+    /// ```
+    pub fn configure_env<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(EnvCredentialProvider) -> EnvCredentialProvider,
+    {
+        self.env_provider = f(self.env_provider);
+        self.rebuild_chain();
+        self
+    }
+
+    /// Configure the config file credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_oracle::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_config_file(|p| p.with_disabled(true));
+    /// ```
+    pub fn configure_config_file<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(ConfigFileCredentialProvider) -> ConfigFileCredentialProvider,
+    {
+        self.config_file_provider = f(self.config_file_provider);
+        self.rebuild_chain();
+        self
     }
 
     /// Add a credential provider to the front of the default chain.

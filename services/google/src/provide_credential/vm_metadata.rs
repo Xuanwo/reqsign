@@ -16,17 +16,31 @@ struct VmMetadataTokenResponse {
 #[derive(Debug, Clone, Default)]
 pub struct VmMetadataCredentialProvider {
     scope: Option<String>,
+    endpoint: Option<String>,
+    disabled: Option<bool>,
 }
 
 impl VmMetadataCredentialProvider {
     /// Create a new VmMetadataCredentialProvider.
     pub fn new() -> Self {
-        Self { scope: None }
+        Self::default()
     }
 
     /// Set the OAuth2 scope.
     pub fn with_scope(mut self, scope: impl Into<String>) -> Self {
         self.scope = Some(scope.into());
+        self
+    }
+
+    /// Set the metadata endpoint.
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint = Some(endpoint.into());
+        self
+    }
+
+    /// Set whether the provider is disabled.
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = Some(disabled);
         self
     }
 }
@@ -36,6 +50,11 @@ impl ProvideCredential for VmMetadataCredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
+        // Check if disabled
+        if self.disabled.unwrap_or(false) {
+            return Ok(None);
+        }
+
         // Get scope from instance, environment, or use default
         let scope = self
             .scope
@@ -52,8 +71,10 @@ impl ProvideCredential for VmMetadataCredentialProvider {
         );
 
         // Allow overriding metadata host for testing
-        let metadata_host = ctx
-            .env_var("GCE_METADATA_HOST")
+        let metadata_host = self
+            .endpoint
+            .clone()
+            .or_else(|| ctx.env_var("GCE_METADATA_HOST"))
             .unwrap_or_else(|| "metadata.google.internal".to_string());
 
         let url = format!(

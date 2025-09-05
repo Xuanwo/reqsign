@@ -4,8 +4,8 @@ use chrono::{DateTime, Utc};
 use ini::Ini;
 use log::debug;
 use reqsign_core::{Context, Error, ProvideCredential, Result};
-use std::time::Duration;
 use serde::Deserialize;
+use std::time::Duration;
 
 /// Process Credentials Provider
 ///
@@ -54,13 +54,13 @@ impl ProcessCredentialProvider {
             timeout: None,
         }
     }
-    
+
     /// Set whether the provider is disabled.
     pub fn with_disabled(mut self, disabled: bool) -> Self {
         self.disabled = Some(disabled);
         self
     }
-    
+
     /// Set the timeout for the credential process.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
@@ -205,7 +205,7 @@ impl ProvideCredential for ProcessCredentialProvider {
         if self.disabled.unwrap_or(false) {
             return Ok(None);
         }
-        
+
         let command = match self.get_command(ctx).await {
             Ok(cmd) => cmd,
             Err(_) => {

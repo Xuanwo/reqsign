@@ -13,6 +13,7 @@ use crate::provide_credential::EnvCredentialProvider;
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
+    env_provider: EnvCredentialProvider,
 }
 
 impl Default for DefaultCredentialProvider {
@@ -24,14 +25,51 @@ impl Default for DefaultCredentialProvider {
 impl DefaultCredentialProvider {
     /// Create a new DefaultCredentialProvider
     pub fn new() -> Self {
-        let chain = ProvideCredentialChain::new().push(EnvCredentialProvider::new());
+        let env_provider = EnvCredentialProvider::new();
 
-        Self { chain }
+        let mut provider = Self {
+            chain: ProvideCredentialChain::new(),
+            env_provider,
+        };
+
+        provider.rebuild_chain();
+        provider
+    }
+
+    /// Rebuild the internal chain based on current provider configurations.
+    fn rebuild_chain(&mut self) {
+        self.chain = ProvideCredentialChain::new().push(self.env_provider.clone());
     }
 
     /// Create with a custom credential chain.
     pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
-        Self { chain }
+        // When using custom chain, we don't have individual providers
+        // This maintains backward compatibility
+        let env_provider = EnvCredentialProvider::new();
+
+        Self {
+            chain,
+            env_provider,
+        }
+    }
+
+    /// Configure the environment credential provider.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use reqsign_huaweicloud_obs::DefaultCredentialProvider;
+    ///
+    /// let provider = DefaultCredentialProvider::new()
+    ///     .configure_env(|p| p.with_disabled(true));
+    /// ```
+    pub fn configure_env<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(EnvCredentialProvider) -> EnvCredentialProvider,
+    {
+        self.env_provider = f(self.env_provider);
+        self.rebuild_chain();
+        self
     }
 
     /// Add a credential provider to the front of the default chain.
