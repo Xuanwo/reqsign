@@ -24,7 +24,6 @@ log.workspace = true
 percent-encoding.workspace = true
 quick-xml.workspace = true
 reqsign-core.workspace = true
-reqwest.workspace = true
 rust-ini.workspace = true
 serde.workspace = true
 serde_json.workspace = true
