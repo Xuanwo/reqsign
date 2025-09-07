@@ -72,12 +72,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -100,13 +100,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
         id: load_secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         env:
           REQSIGN_GOOGLE_TEST_DEFAULT: on
           GOOGLE_APPLICATION_CREDENTIALS_BASE64: op://reqsign/google/credential_base64
@@ -129,12 +129,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -156,13 +156,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
         id: load_secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         env:
           REQSIGN_GOOGLE_TEST_AUTHORIZED_USER: on
           AUTHORIZED_USER_CREDENTIALS_BASE64: op://reqsign/google/authorized_user_base64
@@ -188,12 +188,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -201,7 +201,7 @@ jobs:
           GOOGLE_WORKLOAD_IDENTITY_PROVIDER: op://reqsign/google/workload_identity_provider
           GOOGLE_SERVICE_ACCOUNT: op://reqsign/google/service_account_email
       - name: Setup Workload Identity with Google Auth
-        uses: google-github-actions/auth@v3
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           create_credentials_file: true
           workload_identity_provider: ${{ env.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
@@ -223,13 +223,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
         id: load_secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         env:
           REQSIGN_GOOGLE_TEST_IMPERSONATED_SERVICE_ACCOUNT: on
           IMPERSONATED_SA_CREDENTIALS_BASE64: op://reqsign/google/impersonated_sa_base64
