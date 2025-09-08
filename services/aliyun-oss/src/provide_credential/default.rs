@@ -116,10 +116,7 @@ impl DefaultCredentialProviderBuilder {
     where
         F: FnOnce(AssumeRoleWithOidcCredentialProvider) -> AssumeRoleWithOidcCredentialProvider,
     {
-        let p = self
-            .assume_role
-            .take()
-            .unwrap_or_default();
+        let p = self.assume_role.take().unwrap_or_default();
         self.assume_role = Some(f(p));
         self
     }

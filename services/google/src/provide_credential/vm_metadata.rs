@@ -53,8 +53,6 @@ impl VmMetadataCredentialProvider {
         self.endpoint = Some(endpoint.into());
         self
     }
-
-    
 }
 
 #[async_trait::async_trait]

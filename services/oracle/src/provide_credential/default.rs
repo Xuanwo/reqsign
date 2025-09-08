@@ -110,10 +110,7 @@ impl DefaultCredentialProviderBuilder {
     where
         F: FnOnce(ConfigFileCredentialProvider) -> ConfigFileCredentialProvider,
     {
-        let p = self
-            .config_file
-            .take()
-            .unwrap_or_default();
+        let p = self.config_file.take().unwrap_or_default();
         self.config_file = Some(f(p));
         self
     }

@@ -72,14 +72,40 @@ impl DefaultCredentialProvider {
         self
     }
 
-    #[deprecated(since = "1.0.0", note = "Use DefaultCredentialProvider::builder().disable_env(skip).build() instead")]
+    /// Set the OAuth2 scope for ADC providers (deprecated).
+    ///
+    /// This helper configures the scope used by the environment and
+    /// well-known ADC providers, as well as the VM metadata provider, by
+    /// constructing a new chain with the provided scope. Prefer configuring
+    /// scope via specific providers (e.g., `VmMetadataCredentialProvider::with_scope`)
+    /// or using the `GOOGLE_SCOPE` environment variable.
+    #[deprecated(
+        since = "1.0.0",
+        note = "Configure scope via specific providers or GOOGLE_SCOPE env var"
+    )]
+    pub fn with_scope(self, scope: impl Into<String>) -> Self {
+        let s = scope.into();
+        let chain = ProvideCredentialChain::new()
+            .push(EnvAdcCredentialProvider::new().with_scope(s.clone()))
+            .push(WellKnownAdcCredentialProvider::new().with_scope(s.clone()))
+            .push(VmMetadataCredentialProvider::new().with_scope(s));
+        Self { chain }
+    }
+
+    #[deprecated(
+        since = "1.0.0",
+        note = "Use DefaultCredentialProvider::builder().disable_env(skip).build() instead"
+    )]
     pub fn skip_env_credentials(self, skip: bool) -> Self {
         DefaultCredentialProvider::builder()
             .disable_env(skip)
             .build()
     }
 
-    #[deprecated(since = "1.0.0", note = "Use DefaultCredentialProvider::builder().disable_well_known(skip).build() instead")]
+    #[deprecated(
+        since = "1.0.0",
+        note = "Use DefaultCredentialProvider::builder().disable_well_known(skip).build() instead"
+    )]
     pub fn skip_well_known_location(self, skip: bool) -> Self {
         DefaultCredentialProvider::builder()
             .disable_well_known(skip)
@@ -105,6 +131,12 @@ struct EnvAdcCredentialProvider {
 impl EnvAdcCredentialProvider {
     fn new() -> Self {
         Self::default()
+    }
+
+    /// Set the OAuth2 scope to request when exchanging ADC credentials.
+    fn with_scope(mut self, scope: impl Into<String>) -> Self {
+        self.scope = Some(scope.into());
+        self
     }
 }
 
@@ -138,6 +170,12 @@ struct WellKnownAdcCredentialProvider {
 impl WellKnownAdcCredentialProvider {
     fn new() -> Self {
         Self::default()
+    }
+
+    /// Set the OAuth2 scope to request when exchanging ADC credentials.
+    fn with_scope(mut self, scope: impl Into<String>) -> Self {
+        self.scope = Some(scope.into());
+        self
     }
 }
 

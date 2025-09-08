@@ -116,13 +116,11 @@ impl DefaultCredentialProviderBuilder {
     /// Configure the web-identity assume-role credential provider.
     pub fn configure_assume_role<F>(mut self, f: F) -> Self
     where
-        F: FnOnce(AssumeRoleWithWebIdentityCredentialProvider) ->
+        F: FnOnce(
             AssumeRoleWithWebIdentityCredentialProvider,
+        ) -> AssumeRoleWithWebIdentityCredentialProvider,
     {
-        let p = self
-            .assume_role
-            .take()
-            .unwrap_or_default();
+        let p = self.assume_role.take().unwrap_or_default();
         self.assume_role = Some(f(p));
         self
     }
