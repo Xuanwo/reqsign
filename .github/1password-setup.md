@@ -79,13 +79,13 @@ The workflow uses 1Password GitHub Action to load secrets:
 
 ```yaml
 - name: Setup 1Password Connect
-  uses: 1password/load-secrets-action/configure@v2
+  uses: 1password/load-secrets-action/configure@v3
   with:
     connect-host: ${{ secrets.OP_CONNECT_HOST }}
     connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
 
 - name: Load secrets
-  uses: 1password/load-secrets-action@v2
+  uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6
   with:
     export-env: true
   env:

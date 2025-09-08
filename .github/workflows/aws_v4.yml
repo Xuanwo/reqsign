@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 name: AWS V4 Test
 
 on:
@@ -55,12 +72,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -74,7 +91,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Running signing tests"
-          cargo test signing:: --no-fail-fast -- --nocapture
+          cargo test signing:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # EnvCredentialProvider test
@@ -85,12 +102,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -101,7 +118,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing EnvCredentialProvider"
-          cargo test test_env_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_env_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # ProfileCredentialProvider test
@@ -112,13 +129,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
         id: load_secret
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         env:
           REQSIGN_AWS_V4_TEST_ENV: on
           REQSIGN_AWS_V4_TEST_PROFILE: on
@@ -149,7 +166,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ProfileCredentialProvider"
-          cargo test test_profile_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_profile_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # AssumeRoleCredentialProvider test
@@ -160,12 +177,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -178,7 +195,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing AssumeRoleCredentialProvider"
-          cargo test test_assume_role_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_assume_role_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # AssumeRoleWithWebIdentityCredentialProvider test
@@ -192,7 +209,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Get GitHub OIDC token
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         id: idtoken
         with:
           script: |
@@ -205,12 +222,12 @@ jobs:
 
             console.log('GitHub OIDC token obtained and saved');
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -221,7 +238,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing AssumeRoleWithWebIdentityCredentialProvider"
-          cargo test test_assume_role_with_web_identity_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_assume_role_with_web_identity_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           AWS_WEB_IDENTITY_TOKEN_FILE: /tmp/web_identity_token
@@ -289,7 +306,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing IMDSv2CredentialProvider"
-          cargo test test_imds_v2_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_imds_v2_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -325,7 +342,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ECSCredentialProvider with relative URI"
-          cargo test test_ecs_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_ecs_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -337,7 +354,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ECSCredentialProvider with full URI"
-          cargo test test_ecs_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_ecs_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -411,7 +428,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing SSOCredentialProvider"
-          cargo test test_sso_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_sso_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -465,7 +482,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ProcessCredentialProvider (default profile)"
-          cargo test test_process_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_process_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -476,7 +493,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ProcessCredentialProvider (named profile)"
-          cargo test test_process_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_process_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -517,7 +534,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing CognitoIdentityCredentialProvider (Unauthenticated)"
-          cargo test test_cognito_identity_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_cognito_identity_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           REQSIGN_AWS_V4_TEST_COGNITO: on
@@ -540,12 +557,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -558,7 +575,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing S3ExpressSessionProvider"
-          cargo test test_s3_express --no-fail-fast -- --nocapture
+          cargo test test_s3_express --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # Summary report

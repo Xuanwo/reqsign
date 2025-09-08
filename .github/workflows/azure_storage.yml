@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 name: Azure Storage Test
 
 on:
@@ -55,12 +72,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -73,7 +90,7 @@ jobs:
         working-directory: ./services/azure-storage
         run: |
           echo "::group::Running signing tests"
-          cargo test signing:: --no-fail-fast -- --nocapture
+          cargo test signing:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # EnvCredentialProvider test
@@ -84,12 +101,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -101,7 +118,7 @@ jobs:
         working-directory: ./services/azure-storage
         run: |
           echo "::group::Testing EnvCredentialProvider"
-          cargo test credential_providers::env:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::env:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # StaticCredentialProvider test
@@ -112,12 +129,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -130,7 +147,7 @@ jobs:
         working-directory: ./services/azure-storage
         run: |
           echo "::group::Testing StaticCredentialProvider"
-          cargo test credential_providers::static_provider:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::static_provider:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # ClientSecretCredentialProvider test
@@ -141,12 +158,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -158,7 +175,7 @@ jobs:
         working-directory: ./services/azure-storage
         run: |
           echo "::group::Testing ClientSecretCredentialProvider"
-          cargo test credential_providers::client_secret:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::client_secret:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # ClientCertificateCredentialProvider test
@@ -169,12 +186,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -199,7 +216,7 @@ jobs:
           REQSIGN_AZURE_STORAGE_TEST_CLIENT_CERTIFICATE: on
         run: |
           echo "::group::Testing ClientCertificateCredentialProvider"
-          cargo test credential_providers::client_certificate:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::client_certificate:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # Azure CLI test (only on runners with Azure CLI)
@@ -213,12 +230,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Setup 1Password Connect
-        uses: 1password/load-secrets-action/configure@v2
+        uses: 1password/load-secrets-action/configure@v3
         with:
           connect-host: ${{ secrets.OP_CONNECT_HOST }}
           connect-token: ${{ secrets.OP_CONNECT_TOKEN }}
       - name: Load secrets
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@13f58eec611f8e5db52ec16247f58c508398f3e6 # v3
         with:
           export-env: true
         env:
@@ -237,7 +254,7 @@ jobs:
           REQSIGN_AZURE_STORAGE_TEST_CLI: on
         run: |
           echo "::group::Testing AzureCliCredentialProvider"
-          cargo test credential_providers::azure_cli:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::azure_cli:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # IMDS test with mock server
@@ -261,7 +278,7 @@ jobs:
           AZURE_IMDS_ENDPOINT: http://localhost:8080/metadata/identity/oauth2/token
         run: |
           echo "::group::Testing ImdsCredentialProvider"
-          cargo test credential_providers::imds:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::imds:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
       - name: Stop mock server
         if: always()
