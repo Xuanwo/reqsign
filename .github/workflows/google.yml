@@ -89,7 +89,7 @@ jobs:
         working-directory: ./services/google
         run: |
           echo "::group::Running signing tests"
-          cargo test signing:: --no-fail-fast -- --nocapture
+          cargo test signing:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # DefaultCredentialProvider test
@@ -118,7 +118,7 @@ jobs:
         working-directory: ./services/google
         run: |
           echo "::group::Testing DefaultCredentialProvider"
-          cargo test test_default_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_default_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # StaticCredentialProvider test
@@ -145,7 +145,7 @@ jobs:
         working-directory: ./services/google
         run: |
           echo "::group::Testing StaticCredentialProvider"
-          cargo test test_static_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_static_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # AuthorizedUserCredentialProvider test
@@ -174,7 +174,7 @@ jobs:
         working-directory: ./services/google
         run: |
           echo "::group::Testing AuthorizedUserCredentialProvider"
-          cargo test test_authorized_user_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_authorized_user_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # ExternalAccountCredentialProvider test (Workload Identity)
@@ -212,7 +212,7 @@ jobs:
           echo "::group::Testing ExternalAccountCredentialProvider"
           # The google-github-actions/auth action sets GOOGLE_APPLICATION_CREDENTIALS
           # reqsign should be able to use this external_account configuration
-          cargo test test_external_account_with_workload_identity --no-fail-fast -- --nocapture
+          cargo test test_external_account_with_workload_identity --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # ImpersonatedServiceAccountCredentialProvider test
@@ -241,7 +241,7 @@ jobs:
         working-directory: ./services/google
         run: |
           echo "::group::Testing ImpersonatedServiceAccountCredentialProvider"
-          cargo test test_impersonated_service_account_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_impersonated_service_account_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # VmMetadataCredentialProvider test
@@ -264,7 +264,7 @@ jobs:
           echo "::group::Testing VmMetadataCredentialProvider with mock"
           export REQSIGN_GOOGLE_TEST_VM_METADATA_MOCK=on
           export GCE_METADATA_HOST=127.0.0.1:8080
-          cargo test test_vm_metadata_credential_provider_with_mock --no-fail-fast -- --nocapture
+          cargo test test_vm_metadata_credential_provider_with_mock --no-fail-fast -- --no-capture
           echo "::endgroup::"
       - name: Stop mock server
         if: always()

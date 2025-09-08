@@ -91,7 +91,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Running signing tests"
-          cargo test signing:: --no-fail-fast -- --nocapture
+          cargo test signing:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # EnvCredentialProvider test
@@ -118,7 +118,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing EnvCredentialProvider"
-          cargo test test_env_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_env_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # ProfileCredentialProvider test
@@ -166,7 +166,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ProfileCredentialProvider"
-          cargo test test_profile_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_profile_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # AssumeRoleCredentialProvider test
@@ -195,7 +195,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing AssumeRoleCredentialProvider"
-          cargo test test_assume_role_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_assume_role_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # AssumeRoleWithWebIdentityCredentialProvider test
@@ -238,7 +238,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing AssumeRoleWithWebIdentityCredentialProvider"
-          cargo test test_assume_role_with_web_identity_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_assume_role_with_web_identity_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           AWS_WEB_IDENTITY_TOKEN_FILE: /tmp/web_identity_token
@@ -306,7 +306,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing IMDSv2CredentialProvider"
-          cargo test test_imds_v2_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_imds_v2_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -342,7 +342,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ECSCredentialProvider with relative URI"
-          cargo test test_ecs_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_ecs_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -354,7 +354,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ECSCredentialProvider with full URI"
-          cargo test test_ecs_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_ecs_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -428,7 +428,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing SSOCredentialProvider"
-          cargo test test_sso_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_sso_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -482,7 +482,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ProcessCredentialProvider (default profile)"
-          cargo test test_process_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_process_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -493,7 +493,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing ProcessCredentialProvider (named profile)"
-          cargo test test_process_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_process_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           RUST_LOG: DEBUG
@@ -534,7 +534,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing CognitoIdentityCredentialProvider (Unauthenticated)"
-          cargo test test_cognito_identity_credential_provider --no-fail-fast -- --nocapture
+          cargo test test_cognito_identity_credential_provider --no-fail-fast -- --no-capture
           echo "::endgroup::"
         env:
           REQSIGN_AWS_V4_TEST_COGNITO: on
@@ -575,7 +575,7 @@ jobs:
         working-directory: ./services/aws-v4
         run: |
           echo "::group::Testing S3ExpressSessionProvider"
-          cargo test test_s3_express --no-fail-fast -- --nocapture
+          cargo test test_s3_express --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # Summary report

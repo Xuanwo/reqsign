@@ -90,7 +90,7 @@ jobs:
         working-directory: ./services/azure-storage
         run: |
           echo "::group::Running signing tests"
-          cargo test signing:: --no-fail-fast -- --nocapture
+          cargo test signing:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # EnvCredentialProvider test
@@ -118,7 +118,7 @@ jobs:
         working-directory: ./services/azure-storage
         run: |
           echo "::group::Testing EnvCredentialProvider"
-          cargo test credential_providers::env:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::env:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # StaticCredentialProvider test
@@ -147,7 +147,7 @@ jobs:
         working-directory: ./services/azure-storage
         run: |
           echo "::group::Testing StaticCredentialProvider"
-          cargo test credential_providers::static_provider:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::static_provider:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # ClientSecretCredentialProvider test
@@ -175,7 +175,7 @@ jobs:
         working-directory: ./services/azure-storage
         run: |
           echo "::group::Testing ClientSecretCredentialProvider"
-          cargo test credential_providers::client_secret:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::client_secret:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # ClientCertificateCredentialProvider test
@@ -216,7 +216,7 @@ jobs:
           REQSIGN_AZURE_STORAGE_TEST_CLIENT_CERTIFICATE: on
         run: |
           echo "::group::Testing ClientCertificateCredentialProvider"
-          cargo test credential_providers::client_certificate:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::client_certificate:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # Azure CLI test (only on runners with Azure CLI)
@@ -254,7 +254,7 @@ jobs:
           REQSIGN_AZURE_STORAGE_TEST_CLI: on
         run: |
           echo "::group::Testing AzureCliCredentialProvider"
-          cargo test credential_providers::azure_cli:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::azure_cli:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
 
   # IMDS test with mock server
@@ -278,7 +278,7 @@ jobs:
           AZURE_IMDS_ENDPOINT: http://localhost:8080/metadata/identity/oauth2/token
         run: |
           echo "::group::Testing ImdsCredentialProvider"
-          cargo test credential_providers::imds:: --no-fail-fast -- --nocapture
+          cargo test credential_providers::imds:: --no-fail-fast -- --no-capture
           echo "::endgroup::"
       - name: Stop mock server
         if: always()
