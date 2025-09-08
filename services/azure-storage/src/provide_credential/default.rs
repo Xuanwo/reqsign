@@ -67,6 +67,11 @@ impl DefaultCredentialProvider {
     }
 }
 
+/// Builder for `DefaultCredentialProvider`.
+///
+/// Use `configure_*` to adjust provider behavior and `disable_*(bool)` to
+/// control participation in the chain. Then call `build()` to construct the
+/// final provider that resolves credentials in the documented order.
 #[derive(Default)]
 pub struct DefaultCredentialProviderBuilder {
     env: Option<EnvCredentialProvider>,
@@ -103,6 +108,12 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the Azure CLI credential provider.
+    ///
+    /// This is typically used for local development where Azure CLI is
+    /// available and authenticated. You can tweak behavior (like alternative
+    /// token acquisition strategies) via the provided closure. Only available
+    /// on non-wasm32 targets.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn configure_azure_cli<F>(mut self, f: F) -> Self
     where
@@ -113,6 +124,10 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the Azure CLI provider.
+    ///
+    /// Useful in CI or constrained environments where Azure CLI is not
+    /// present, or to explicitly opt out. Only available on non-wasm32 targets.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn disable_azure_cli(mut self, disable: bool) -> Self {
         if disable {
@@ -123,6 +138,10 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the client certificate credential provider.
+    ///
+    /// Customize certificate-based SPN authentication (tenant/client/cert
+    /// parameters). Only available on non-wasm32 targets.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn configure_client_certificate<F>(mut self, f: F) -> Self
     where
@@ -133,6 +152,10 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the client certificate provider.
+    ///
+    /// Use to explicitly remove certificate-based auth from the chain or to
+    /// ensure participation. Only available on non-wasm32 targets.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn disable_client_certificate(mut self, disable: bool) -> Self {
         if disable {
@@ -143,6 +166,10 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the client secret credential provider.
+    ///
+    /// Customize tenant/client parameters used to exchange a client secret
+    /// for an access token suitable for Azure Storage.
     pub fn configure_client_secret<F>(mut self, f: F) -> Self
     where
         F: FnOnce(ClientSecretCredentialProvider) -> ClientSecretCredentialProvider,
@@ -152,6 +179,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the client secret provider.
     pub fn disable_client_secret(mut self, disable: bool) -> Self {
         if disable {
             self.client_secret = None;
@@ -161,6 +189,10 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the Azure Pipelines workload identity provider.
+    ///
+    /// Allows customizing how OIDC tokens from Azure Pipelines are exchanged
+    /// for Azure AD access tokens.
     pub fn configure_azure_pipelines<F>(mut self, f: F) -> Self
     where
         F: FnOnce(AzurePipelinesCredentialProvider) -> AzurePipelinesCredentialProvider,
@@ -170,6 +202,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the Azure Pipelines provider.
     pub fn disable_azure_pipelines(mut self, disable: bool) -> Self {
         if disable {
             self.azure_pipelines = None;
@@ -179,6 +212,10 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the Kubernetes workload identity provider.
+    ///
+    /// Allows customizing tenant or other parameters used to exchange
+    /// federated tokens for Azure AD access tokens.
     pub fn configure_workload_identity<F>(mut self, f: F) -> Self
     where
         F: FnOnce(WorkloadIdentityCredentialProvider) -> WorkloadIdentityCredentialProvider,
@@ -188,6 +225,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the workload identity provider.
     pub fn disable_workload_identity(mut self, disable: bool) -> Self {
         if disable {
             self.workload_identity = None;
@@ -197,6 +235,10 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the Azure IMDS provider.
+    ///
+    /// Allows setting an alternate metadata endpoint or other parameters used
+    /// to obtain managed identity tokens on Azure VMs.
     pub fn configure_imds<F>(mut self, f: F) -> Self
     where
         F: FnOnce(ImdsCredentialProvider) -> ImdsCredentialProvider,
@@ -206,6 +248,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the IMDS provider.
     pub fn disable_imds(mut self, disable: bool) -> Self {
         if disable {
             self.imds = None;
@@ -215,6 +258,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Build the `DefaultCredentialProvider` with the configured options.
     pub fn build(self) -> DefaultCredentialProvider {
         let mut chain = ProvideCredentialChain::new();
 

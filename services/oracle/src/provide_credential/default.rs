@@ -51,6 +51,11 @@ impl DefaultCredentialProvider {
     }
 }
 
+/// Builder for `DefaultCredentialProvider`.
+///
+/// Use `configure_env` / `configure_config_file` to customize providers, and
+/// `disable_env(bool)` / `disable_config_file(bool)` to control participation.
+/// Finish with `build()` to construct the provider.
 #[derive(Default)]
 pub struct DefaultCredentialProviderBuilder {
     env: Option<EnvCredentialProvider>,
@@ -58,10 +63,12 @@ pub struct DefaultCredentialProviderBuilder {
 }
 
 impl DefaultCredentialProviderBuilder {
+    /// Create a new builder with default state.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Configure the environment credential provider.
     pub fn configure_env<F>(mut self, f: F) -> Self
     where
         F: FnOnce(EnvCredentialProvider) -> EnvCredentialProvider,
@@ -71,6 +78,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the environment provider.
     pub fn disable_env(mut self, disable: bool) -> Self {
         if disable {
             self.env = None;
@@ -80,6 +88,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the config-file credential provider.
     pub fn configure_config_file<F>(mut self, f: F) -> Self
     where
         F: FnOnce(ConfigFileCredentialProvider) -> ConfigFileCredentialProvider,
@@ -92,6 +101,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the config-file provider.
     pub fn disable_config_file(mut self, disable: bool) -> Self {
         if disable {
             self.config_file = None;
@@ -101,6 +111,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Build the `DefaultCredentialProvider` with the configured options.
     pub fn build(self) -> DefaultCredentialProvider {
         let mut chain = ProvideCredentialChain::new();
         if let Some(p) = self.env {

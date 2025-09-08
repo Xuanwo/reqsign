@@ -69,6 +69,11 @@ impl DefaultCredentialProvider {
 
 }
 
+/// Builder for `DefaultCredentialProvider`.
+///
+/// Use `configure_*` to customize provider behavior and `disable_*(bool)` to
+/// include or exclude providers from the default chain. Call `build()` to
+/// construct the provider.
 #[derive(Default)]
 pub struct DefaultCredentialProviderBuilder {
     env: Option<EnvCredentialProvider>,
@@ -83,10 +88,12 @@ pub struct DefaultCredentialProviderBuilder {
 }
 
 impl DefaultCredentialProviderBuilder {
+    /// Create a new builder with default state.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Configure the environment credential provider.
     pub fn configure_env<F>(mut self, f: F) -> Self
     where
         F: FnOnce(EnvCredentialProvider) -> EnvCredentialProvider,
@@ -96,6 +103,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the environment provider.
     pub fn disable_env(mut self, disable: bool) -> Self {
         if disable {
             self.env = None;
@@ -105,6 +113,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the profile credential provider.
     pub fn configure_profile<F>(mut self, f: F) -> Self
     where
         F: FnOnce(ProfileCredentialProvider) -> ProfileCredentialProvider,
@@ -117,6 +126,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the profile provider.
     pub fn disable_profile(mut self, disable: bool) -> Self {
         if disable {
             self.profile = None;
@@ -126,6 +136,13 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the SSO credential provider.
+    ///
+    /// This customizes how AWS SSO (IAM Identity Center) credentials are
+    /// discovered and exchanged from local SSO caches. Typical use cases
+    /// include setting an alternative endpoint for testing, or overriding the
+    /// profile-derived values. This method is only available for non-wasm32
+    /// targets where process and filesystem access is supported.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn configure_sso<F>(mut self, f: F) -> Self
     where
@@ -136,6 +153,12 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the SSO provider.
+    ///
+    /// Use this to explicitly remove SSO from the default credential
+    /// resolution chain (disable = true) or ensure it participates (disable = false).
+    /// This is useful in controlled environments (e.g., CI) or when SSO is
+    /// not configured. Only available on non-wasm32 targets.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn disable_sso(mut self, disable: bool) -> Self {
         if disable {
@@ -146,6 +169,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the web-identity assume-role credential provider.
     pub fn configure_assume_role<F>(mut self, f: F) -> Self
     where
         F: FnOnce(AssumeRoleWithWebIdentityCredentialProvider) ->
@@ -159,6 +183,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the assume role provider.
     pub fn disable_assume_role(mut self, disable: bool) -> Self {
         if disable {
             self.assume_role = None;
@@ -168,6 +193,11 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the external process credential provider.
+    ///
+    /// This allows setting parameters like process timeout or overriding the
+    /// profile-derived command used to obtain credentials via
+    /// `credential_process`. Only available on non-wasm32 targets.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn configure_process<F>(mut self, f: F) -> Self
     where
@@ -181,6 +211,11 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the process provider.
+    ///
+    /// Use this to explicitly remove the external process credential source
+    /// (disable = true) or ensure it participates (disable = false). This is
+    /// only meaningful on non-wasm32 targets.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn disable_process(mut self, disable: bool) -> Self {
         if disable {
@@ -191,6 +226,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the ECS (container/task) credential provider.
     pub fn configure_ecs<F>(mut self, f: F) -> Self
     where
         F: FnOnce(ECSCredentialProvider) -> ECSCredentialProvider,
@@ -200,6 +236,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the ECS provider.
     pub fn disable_ecs(mut self, disable: bool) -> Self {
         if disable {
             self.ecs = None;
@@ -209,6 +246,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the EC2 IMDSv2 credential provider.
     pub fn configure_imds<F>(mut self, f: F) -> Self
     where
         F: FnOnce(IMDSv2CredentialProvider) -> IMDSv2CredentialProvider,
@@ -218,6 +256,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the IMDSv2 provider.
     pub fn disable_imds(mut self, disable: bool) -> Self {
         if disable {
             self.imds = None;
@@ -227,6 +266,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Build the `DefaultCredentialProvider` with the configured options.
     pub fn build(self) -> DefaultCredentialProvider {
         let mut chain = ProvideCredentialChain::new();
 

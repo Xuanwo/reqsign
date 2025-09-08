@@ -12,6 +12,12 @@ use super::{
     vm_metadata::VmMetadataCredentialProvider,
 };
 
+/// Default credential provider for Google Cloud Storage (GCS).
+///
+/// Resolution order follows ADC (Application Default Credentials):
+/// 1. Env var `GOOGLE_APPLICATION_CREDENTIALS`
+/// 2. Well-known location (`~/.config/gcloud/application_default_credentials.json`)
+/// 3. VM metadata service (GCE / Cloud Functions / App Engine)
 #[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
@@ -24,7 +30,7 @@ impl Default for DefaultCredentialProvider {
 }
 
 impl DefaultCredentialProvider {
-    /// Create a builder to configure the default credential chain.
+    /// Create a builder to configure the default ADC chain for GCS.
     pub fn builder() -> DefaultCredentialProviderBuilder {
         DefaultCredentialProviderBuilder::default()
     }
@@ -187,6 +193,11 @@ async fn parse_credential_bytes(
     }
 }
 
+/// Builder for `DefaultCredentialProvider`.
+///
+/// Use `configure_vm_metadata` to customize VM metadata behavior and
+/// `disable_env` / `disable_well_known` / `disable_vm_metadata` to control
+/// participation. Call `build()` to construct the provider.
 #[derive(Default)]
 pub struct DefaultCredentialProviderBuilder {
     env_adc: Option<EnvAdcCredentialProvider>,
@@ -195,12 +206,17 @@ pub struct DefaultCredentialProviderBuilder {
 }
 
 impl DefaultCredentialProviderBuilder {
+    /// Create a new builder with default state.
     pub fn new() -> Self {
         Self::default()
     }
 
     // No global scope configurator; configure scope on specific providers if needed.
 
+    /// Configure the VM metadata provider.
+    ///
+    /// This allows setting a custom endpoint or other options for retrieving
+    /// tokens when running on Google Compute Engine or compatible environments.
     pub fn configure_vm_metadata<F>(mut self, f: F) -> Self
     where
         F: FnOnce(VmMetadataCredentialProvider) -> VmMetadataCredentialProvider,
@@ -210,6 +226,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the env-based ADC provider.
     pub fn disable_env(mut self, disable: bool) -> Self {
         if disable {
             self.env_adc = None;
@@ -219,6 +236,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the well-known ADC provider.
     pub fn disable_well_known(mut self, disable: bool) -> Self {
         if disable {
             self.well_known_adc = None;
@@ -228,6 +246,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the VM metadata provider.
     pub fn disable_vm_metadata(mut self, disable: bool) -> Self {
         if disable {
             self.vm_metadata = None;
@@ -237,6 +256,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Build the `DefaultCredentialProvider` with the configured options.
     pub fn build(self) -> DefaultCredentialProvider {
         let mut chain = ProvideCredentialChain::new();
 

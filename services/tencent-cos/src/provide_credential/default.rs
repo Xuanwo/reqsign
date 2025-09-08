@@ -59,6 +59,11 @@ impl DefaultCredentialProvider {
     }
 }
 
+/// Builder for `DefaultCredentialProvider`.
+///
+/// - Use `configure_*` to customize a provider.
+/// - Use `disable_*(bool)` to disable (true) or ensure enabled (false).
+/// - Call `build()` to construct the provider in the default order.
 #[derive(Default)]
 pub struct DefaultCredentialProviderBuilder {
     env: Option<EnvCredentialProvider>,
@@ -66,10 +71,12 @@ pub struct DefaultCredentialProviderBuilder {
 }
 
 impl DefaultCredentialProviderBuilder {
+    /// Create a new builder with default state.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Configure the environment credential provider.
     pub fn configure_env<F>(mut self, f: F) -> Self
     where
         F: FnOnce(EnvCredentialProvider) -> EnvCredentialProvider,
@@ -79,6 +86,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the environment provider.
     pub fn disable_env(mut self, disable: bool) -> Self {
         if disable {
             self.env = None;
@@ -88,6 +96,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Configure the web-identity assume-role credential provider.
     pub fn configure_assume_role<F>(mut self, f: F) -> Self
     where
         F: FnOnce(AssumeRoleWithWebIdentityCredentialProvider) ->
@@ -101,6 +110,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Disable (true) or ensure enabled (false) the web-identity assume-role provider.
     pub fn disable_assume_role(mut self, disable: bool) -> Self {
         if disable {
             self.assume_role = None;
@@ -110,6 +120,7 @@ impl DefaultCredentialProviderBuilder {
         self
     }
 
+    /// Build the `DefaultCredentialProvider` with the configured options.
     pub fn build(self) -> DefaultCredentialProvider {
         let mut chain = ProvideCredentialChain::new();
         if let Some(p) = self.env {
