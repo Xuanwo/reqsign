@@ -26,13 +26,13 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// - `OCI_TENANCY`: The Oracle Cloud tenancy ID
 /// - `OCI_KEY_FILE`: The path to the private key file
 /// - `OCI_FINGERPRINT`: The fingerprint of the key
-#[derive(Debug, Default)]
-pub struct EnvCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct EnvCredentialProvider {}
 
 impl EnvCredentialProvider {
     /// Create a new EnvCredentialProvider.
     pub fn new() -> Self {
-        Self
+        Self {}
     }
 }
 

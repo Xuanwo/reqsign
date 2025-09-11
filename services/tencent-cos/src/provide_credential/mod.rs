@@ -24,7 +24,7 @@ mod config;
 pub use config::ConfigCredentialProvider;
 
 mod default;
-pub use default::DefaultCredentialProvider;
+pub use default::{DefaultCredentialProvider, DefaultCredentialProviderBuilder};
 
 mod assume_role_with_web_identity;
 pub use assume_role_with_web_identity::AssumeRoleWithWebIdentityCredentialProvider;

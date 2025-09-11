@@ -22,7 +22,7 @@ mod static_provider;
 pub use static_provider::StaticCredentialProvider;
 
 mod default;
-pub use default::DefaultCredentialProvider;
+pub use default::{DefaultCredentialProvider, DefaultCredentialProviderBuilder};
 
 mod imds;
 pub use imds::ImdsCredentialProvider;

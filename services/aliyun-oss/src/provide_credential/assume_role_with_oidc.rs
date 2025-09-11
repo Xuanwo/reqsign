@@ -29,17 +29,29 @@ use serde::Deserialize;
 /// - `ALIBABA_CLOUD_OIDC_PROVIDER_ARN`: The ARN of the OIDC provider
 /// - `ALIBABA_CLOUD_OIDC_TOKEN_FILE`: Path to the OIDC token file
 /// - `ALIBABA_CLOUD_STS_ENDPOINT`: Optional custom STS endpoint
-#[derive(Debug, Default)]
-pub struct AssumeRoleWithOidcCredentialProvider {}
+#[derive(Debug, Default, Clone)]
+pub struct AssumeRoleWithOidcCredentialProvider {
+    sts_endpoint: Option<String>,
+}
 
 impl AssumeRoleWithOidcCredentialProvider {
     /// Create a new `AssumeRoleWithOidcCredentialProvider` instance.
     /// This will read configuration from environment variables at runtime.
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 
-    fn get_sts_endpoint(envs: &std::collections::HashMap<String, String>) -> String {
+    /// Set the STS endpoint.
+    pub fn with_sts_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.sts_endpoint = Some(endpoint.into());
+        self
+    }
+
+    fn get_sts_endpoint(&self, envs: &std::collections::HashMap<String, String>) -> String {
+        if let Some(endpoint) = &self.sts_endpoint {
+            return endpoint.clone();
+        }
+
         match envs.get(ALIBABA_CLOUD_STS_ENDPOINT) {
             Some(endpoint) => format!("https://{endpoint}"),
             None => "https://sts.aliyuncs.com".to_string(),
@@ -71,7 +83,7 @@ impl ProvideCredential for AssumeRoleWithOidcCredentialProvider {
         // Construct request to Aliyun STS Service.
         let url = format!(
             "{}/?Action=AssumeRoleWithOIDC&OIDCProviderArn={}&RoleArn={}&RoleSessionName={}&Format=JSON&Version=2015-04-01&Timestamp={}&OIDCToken={}",
-            Self::get_sts_endpoint(&envs),
+            self.get_sts_endpoint(&envs),
             provider_arn,
             role_arn,
             role_session_name,

@@ -26,13 +26,21 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// using a federated token.
 ///
 /// Reference: <https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview>
-#[derive(Debug, Default)]
-pub struct WorkloadIdentityCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct WorkloadIdentityCredentialProvider {
+    tenant_id: Option<String>,
+}
 
 impl WorkloadIdentityCredentialProvider {
     /// Create a new workload identity loader.
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    /// Set the tenant ID.
+    pub fn with_tenant_id(mut self, tenant_id: impl Into<String>) -> Self {
+        self.tenant_id = Some(tenant_id.into());
+        self
     }
 }
 

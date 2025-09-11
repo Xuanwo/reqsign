@@ -26,13 +26,28 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// a client ID and client secret.
 ///
 /// Reference: <https://learn.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-client-creds-grant-flow>
-#[derive(Debug, Default)]
-pub struct ClientSecretCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct ClientSecretCredentialProvider {
+    tenant_id: Option<String>,
+    client_id: Option<String>,
+}
 
 impl ClientSecretCredentialProvider {
     /// Create a new client secret loader.
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    /// Set the tenant ID.
+    pub fn with_tenant_id(mut self, tenant_id: impl Into<String>) -> Self {
+        self.tenant_id = Some(tenant_id.into());
+        self
+    }
+
+    /// Set the client ID.
+    pub fn with_client_id(mut self, client_id: impl Into<String>) -> Self {
+        self.client_id = Some(client_id.into());
+        self
     }
 }
 
@@ -43,8 +58,12 @@ impl ProvideCredential for ClientSecretCredentialProvider {
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
         let envs = ctx.env_vars();
 
-        // Check if all required parameters are available from environment
-        let tenant_id = match envs.get("AZURE_TENANT_ID") {
+        // Check if all required parameters are available from environment or config
+        let tenant_id = match self
+            .tenant_id
+            .as_ref()
+            .or_else(|| envs.get("AZURE_TENANT_ID"))
+        {
             Some(id) if !id.is_empty() => id,
             _ => return Ok(None),
         };

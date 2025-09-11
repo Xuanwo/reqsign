@@ -38,13 +38,14 @@ impl Default for DefaultCredentialProvider {
 }
 
 impl DefaultCredentialProvider {
-    /// Create a new `DefaultCredentialProvider` instance.
-    pub fn new() -> Self {
-        let chain = ProvideCredentialChain::new()
-            .push(EnvCredentialProvider::new())
-            .push(AssumeRoleWithOidcCredentialProvider::new());
+    /// Create a builder to configure the default credential chain.
+    pub fn builder() -> DefaultCredentialProviderBuilder {
+        DefaultCredentialProviderBuilder::default()
+    }
 
-        Self { chain }
+    /// Create a new `DefaultCredentialProvider` instance using the default chain.
+    pub fn new() -> Self {
+        Self::builder().build()
     }
 
     /// Create with a custom credential chain.
@@ -71,6 +72,79 @@ impl DefaultCredentialProvider {
     ) -> Self {
         self.chain = self.chain.push_front(provider);
         self
+    }
+}
+
+/// Builder for `DefaultCredentialProvider`.
+///
+/// Use `configure_*` to customize providers and `disable_*(bool)` to control
+/// participation in the chain. Finally call `build()` to create the provider.
+#[derive(Default)]
+pub struct DefaultCredentialProviderBuilder {
+    env: Option<EnvCredentialProvider>,
+    assume_role: Option<AssumeRoleWithOidcCredentialProvider>,
+}
+
+impl DefaultCredentialProviderBuilder {
+    /// Create a new builder with default state.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Configure the environment credential provider.
+    pub fn configure_env<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(EnvCredentialProvider) -> EnvCredentialProvider,
+    {
+        let p = self.env.take().unwrap_or_default();
+        self.env = Some(f(p));
+        self
+    }
+
+    /// Disable (true) or ensure enabled (false) the environment provider.
+    pub fn disable_env(mut self, disable: bool) -> Self {
+        if disable {
+            self.env = None;
+        } else if self.env.is_none() {
+            self.env = Some(EnvCredentialProvider::new());
+        }
+        self
+    }
+
+    /// Configure the OIDC assume-role credential provider.
+    pub fn configure_assume_role<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(AssumeRoleWithOidcCredentialProvider) -> AssumeRoleWithOidcCredentialProvider,
+    {
+        let p = self.assume_role.take().unwrap_or_default();
+        self.assume_role = Some(f(p));
+        self
+    }
+
+    /// Disable (true) or ensure enabled (false) the assume-role provider.
+    pub fn disable_assume_role(mut self, disable: bool) -> Self {
+        if disable {
+            self.assume_role = None;
+        } else if self.assume_role.is_none() {
+            self.assume_role = Some(AssumeRoleWithOidcCredentialProvider::new());
+        }
+        self
+    }
+
+    /// Build the `DefaultCredentialProvider` with the configured options.
+    pub fn build(self) -> DefaultCredentialProvider {
+        let mut chain = ProvideCredentialChain::new();
+        if let Some(p) = self.env {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(EnvCredentialProvider::new());
+        }
+        if let Some(p) = self.assume_role {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(AssumeRoleWithOidcCredentialProvider::new());
+        }
+        DefaultCredentialProvider::with_chain(chain)
     }
 }
 

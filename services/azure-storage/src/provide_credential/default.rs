@@ -35,29 +35,30 @@ use reqsign_core::{Context, ProvideCredential, ProvideCredentialChain, Result};
 /// 5. Azure Pipelines (workload identity)
 /// 6. Workload identity (federated credentials)
 /// 7. IMDS (Azure VM managed identity)
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct DefaultCredentialProvider {
     chain: ProvideCredentialChain<Credential>,
 }
 
+impl Default for DefaultCredentialProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DefaultCredentialProvider {
+    /// Create a builder to configure the default credential chain.
+    pub fn builder() -> DefaultCredentialProviderBuilder {
+        DefaultCredentialProviderBuilder::default()
+    }
+
     /// Create a new default loader.
     pub fn new() -> Self {
-        let mut chain = ProvideCredentialChain::new().push(EnvCredentialProvider::new());
+        Self::builder().build()
+    }
 
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            chain = chain
-                .push(AzureCliCredentialProvider::new())
-                .push(ClientCertificateCredentialProvider::new());
-        }
-
-        chain = chain
-            .push(ClientSecretCredentialProvider::new())
-            .push(AzurePipelinesCredentialProvider::new())
-            .push(WorkloadIdentityCredentialProvider::new())
-            .push(ImdsCredentialProvider::new());
-
+    /// Create with a custom credential chain.
+    pub fn with_chain(chain: ProvideCredentialChain<Credential>) -> Self {
         Self { chain }
     }
 
@@ -80,6 +81,250 @@ impl DefaultCredentialProvider {
     ) -> Self {
         self.chain = self.chain.push_front(provider);
         self
+    }
+}
+
+/// Builder for `DefaultCredentialProvider`.
+///
+/// Use `configure_*` to adjust provider behavior and `disable_*(bool)` to
+/// control participation in the chain. Then call `build()` to construct the
+/// final provider that resolves credentials in the documented order.
+#[derive(Default)]
+pub struct DefaultCredentialProviderBuilder {
+    env: Option<EnvCredentialProvider>,
+    #[cfg(not(target_arch = "wasm32"))]
+    azure_cli: Option<AzureCliCredentialProvider>,
+    #[cfg(not(target_arch = "wasm32"))]
+    client_certificate: Option<ClientCertificateCredentialProvider>,
+    client_secret: Option<ClientSecretCredentialProvider>,
+    azure_pipelines: Option<AzurePipelinesCredentialProvider>,
+    workload_identity: Option<WorkloadIdentityCredentialProvider>,
+    imds: Option<ImdsCredentialProvider>,
+}
+
+impl DefaultCredentialProviderBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn configure_env<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(EnvCredentialProvider) -> EnvCredentialProvider,
+    {
+        let p = self.env.take().unwrap_or_default();
+        self.env = Some(f(p));
+        self
+    }
+
+    pub fn disable_env(mut self, disable: bool) -> Self {
+        if disable {
+            self.env = None;
+        } else if self.env.is_none() {
+            self.env = Some(EnvCredentialProvider::new());
+        }
+        self
+    }
+
+    /// Configure the Azure CLI credential provider.
+    ///
+    /// This is typically used for local development where Azure CLI is
+    /// available and authenticated. You can tweak behavior (like alternative
+    /// token acquisition strategies) via the provided closure. Only available
+    /// on non-wasm32 targets.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn configure_azure_cli<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(AzureCliCredentialProvider) -> AzureCliCredentialProvider,
+    {
+        let p = self.azure_cli.take().unwrap_or_default();
+        self.azure_cli = Some(f(p));
+        self
+    }
+
+    /// Disable (true) or ensure enabled (false) the Azure CLI provider.
+    ///
+    /// Useful in CI or constrained environments where Azure CLI is not
+    /// present, or to explicitly opt out. Only available on non-wasm32 targets.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn disable_azure_cli(mut self, disable: bool) -> Self {
+        if disable {
+            self.azure_cli = None;
+        } else if self.azure_cli.is_none() {
+            self.azure_cli = Some(AzureCliCredentialProvider::new());
+        }
+        self
+    }
+
+    /// Configure the client certificate credential provider.
+    ///
+    /// Customize certificate-based SPN authentication (tenant/client/cert
+    /// parameters). Only available on non-wasm32 targets.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn configure_client_certificate<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(ClientCertificateCredentialProvider) -> ClientCertificateCredentialProvider,
+    {
+        let p = self.client_certificate.take().unwrap_or_default();
+        self.client_certificate = Some(f(p));
+        self
+    }
+
+    /// Disable (true) or ensure enabled (false) the client certificate provider.
+    ///
+    /// Use to explicitly remove certificate-based auth from the chain or to
+    /// ensure participation. Only available on non-wasm32 targets.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn disable_client_certificate(mut self, disable: bool) -> Self {
+        if disable {
+            self.client_certificate = None;
+        } else if self.client_certificate.is_none() {
+            self.client_certificate = Some(ClientCertificateCredentialProvider::new());
+        }
+        self
+    }
+
+    /// Configure the client secret credential provider.
+    ///
+    /// Customize tenant/client parameters used to exchange a client secret
+    /// for an access token suitable for Azure Storage.
+    pub fn configure_client_secret<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(ClientSecretCredentialProvider) -> ClientSecretCredentialProvider,
+    {
+        let p = self.client_secret.take().unwrap_or_default();
+        self.client_secret = Some(f(p));
+        self
+    }
+
+    /// Disable (true) or ensure enabled (false) the client secret provider.
+    pub fn disable_client_secret(mut self, disable: bool) -> Self {
+        if disable {
+            self.client_secret = None;
+        } else if self.client_secret.is_none() {
+            self.client_secret = Some(ClientSecretCredentialProvider::new());
+        }
+        self
+    }
+
+    /// Configure the Azure Pipelines workload identity provider.
+    ///
+    /// Allows customizing how OIDC tokens from Azure Pipelines are exchanged
+    /// for Azure AD access tokens.
+    pub fn configure_azure_pipelines<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(AzurePipelinesCredentialProvider) -> AzurePipelinesCredentialProvider,
+    {
+        let p = self.azure_pipelines.take().unwrap_or_default();
+        self.azure_pipelines = Some(f(p));
+        self
+    }
+
+    /// Disable (true) or ensure enabled (false) the Azure Pipelines provider.
+    pub fn disable_azure_pipelines(mut self, disable: bool) -> Self {
+        if disable {
+            self.azure_pipelines = None;
+        } else if self.azure_pipelines.is_none() {
+            self.azure_pipelines = Some(AzurePipelinesCredentialProvider::new());
+        }
+        self
+    }
+
+    /// Configure the Kubernetes workload identity provider.
+    ///
+    /// Allows customizing tenant or other parameters used to exchange
+    /// federated tokens for Azure AD access tokens.
+    pub fn configure_workload_identity<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(WorkloadIdentityCredentialProvider) -> WorkloadIdentityCredentialProvider,
+    {
+        let p = self.workload_identity.take().unwrap_or_default();
+        self.workload_identity = Some(f(p));
+        self
+    }
+
+    /// Disable (true) or ensure enabled (false) the workload identity provider.
+    pub fn disable_workload_identity(mut self, disable: bool) -> Self {
+        if disable {
+            self.workload_identity = None;
+        } else if self.workload_identity.is_none() {
+            self.workload_identity = Some(WorkloadIdentityCredentialProvider::new());
+        }
+        self
+    }
+
+    /// Configure the Azure IMDS provider.
+    ///
+    /// Allows setting an alternate metadata endpoint or other parameters used
+    /// to obtain managed identity tokens on Azure VMs.
+    pub fn configure_imds<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(ImdsCredentialProvider) -> ImdsCredentialProvider,
+    {
+        let p = self.imds.take().unwrap_or_default();
+        self.imds = Some(f(p));
+        self
+    }
+
+    /// Disable (true) or ensure enabled (false) the IMDS provider.
+    pub fn disable_imds(mut self, disable: bool) -> Self {
+        if disable {
+            self.imds = None;
+        } else if self.imds.is_none() {
+            self.imds = Some(ImdsCredentialProvider::new());
+        }
+        self
+    }
+
+    /// Build the `DefaultCredentialProvider` with the configured options.
+    pub fn build(self) -> DefaultCredentialProvider {
+        let mut chain = ProvideCredentialChain::new();
+
+        if let Some(p) = self.env {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(EnvCredentialProvider::new());
+        }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if let Some(p) = self.azure_cli {
+                chain = chain.push(p);
+            } else {
+                chain = chain.push(AzureCliCredentialProvider::new());
+            }
+
+            if let Some(p) = self.client_certificate {
+                chain = chain.push(p);
+            } else {
+                chain = chain.push(ClientCertificateCredentialProvider::new());
+            }
+        }
+
+        if let Some(p) = self.client_secret {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(ClientSecretCredentialProvider::new());
+        }
+
+        if let Some(p) = self.azure_pipelines {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(AzurePipelinesCredentialProvider::new());
+        }
+
+        if let Some(p) = self.workload_identity {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(WorkloadIdentityCredentialProvider::new());
+        }
+
+        if let Some(p) = self.imds {
+            chain = chain.push(p);
+        } else {
+            chain = chain.push(ImdsCredentialProvider::new());
+        }
+
+        DefaultCredentialProvider::with_chain(chain)
     }
 }
 

@@ -28,14 +28,14 @@ use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub struct IMDSv2CredentialProvider {
-    disabled: Option<bool>,
+    endpoint: Option<String>,
     token: Arc<Mutex<(String, DateTime)>>,
 }
 
 impl Default for IMDSv2CredentialProvider {
     fn default() -> Self {
         Self {
-            disabled: None,
+            endpoint: None,
             token: Arc::new(Mutex::new((String::new(), DateTime::default()))),
         }
     }
@@ -47,19 +47,22 @@ impl IMDSv2CredentialProvider {
         Self::default()
     }
 
-    /// Disable the provider.
-    pub fn disabled(mut self) -> Self {
-        self.disabled = Some(true);
+    /// Set the endpoint for the metadata service.
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint = Some(endpoint.into());
         self
     }
 }
 
 impl IMDSv2CredentialProvider {
     fn get_endpoint(&self, ctx: &Context) -> String {
-        ctx.env_vars()
-            .get("AWS_EC2_METADATA_SERVICE_ENDPOINT")
-            .cloned()
-            .unwrap_or_else(|| "http://169.254.169.254".into())
+        // First check configured endpoint, then environment, then default
+        self.endpoint.clone().unwrap_or_else(|| {
+            ctx.env_vars()
+                .get("AWS_EC2_METADATA_SERVICE_ENDPOINT")
+                .cloned()
+                .unwrap_or_else(|| "http://169.254.169.254".into())
+        })
     }
 
     async fn load_ec2_metadata_token(&self, ctx: &Context) -> Result<String> {
@@ -118,15 +121,14 @@ impl ProvideCredential for IMDSv2CredentialProvider {
     type Credential = Credential;
 
     async fn provide_credential(&self, ctx: &Context) -> Result<Option<Self::Credential>> {
-        // Check if disabled, first from config, then from environment
-        let disabled = self.disabled.unwrap_or_else(|| {
-            ctx.env_vars()
-                .get("AWS_EC2_METADATA_DISABLED")
-                .map(|v| v == "true")
-                .unwrap_or(false)
-        });
+        // Check if disabled via environment
+        let disabled_env = ctx
+            .env_vars()
+            .get("AWS_EC2_METADATA_DISABLED")
+            .map(|v| v == "true")
+            .unwrap_or(false);
 
-        if disabled {
+        if disabled_env {
             return Ok(None);
         }
 

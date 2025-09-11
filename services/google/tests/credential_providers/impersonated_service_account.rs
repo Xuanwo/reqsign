@@ -42,13 +42,15 @@ async fn test_impersonated_service_account_credential_provider() -> Result<()> {
         "Credential file must be impersonated_service_account type"
     );
 
-    let ctx = create_test_context_with_env(HashMap::from_iter([(
-        "GOOGLE_APPLICATION_CREDENTIALS".to_string(),
-        cred_path,
-    )]));
+    let ctx = create_test_context_with_env(HashMap::from_iter([
+        ("GOOGLE_APPLICATION_CREDENTIALS".to_string(), cred_path),
+        (
+            "GOOGLE_SCOPE".to_string(),
+            "https://www.googleapis.com/auth/devstorage.read_write".to_string(),
+        ),
+    ]));
 
-    let provider = DefaultCredentialProvider::new()
-        .with_scope("https://www.googleapis.com/auth/devstorage.read_write");
+    let provider = DefaultCredentialProvider::new();
 
     let credential = provider
         .provide_credential(&ctx)
@@ -88,13 +90,15 @@ async fn test_impersonated_service_account_with_real_credentials() -> Result<()>
         "Credential file must be impersonated_service_account type"
     );
 
-    let ctx = create_test_context_with_env(HashMap::from_iter([(
-        "GOOGLE_APPLICATION_CREDENTIALS".to_string(),
-        cred_path,
-    )]));
+    let ctx = create_test_context_with_env(HashMap::from_iter([
+        ("GOOGLE_APPLICATION_CREDENTIALS".to_string(), cred_path),
+        (
+            "GOOGLE_SCOPE".to_string(),
+            "https://www.googleapis.com/auth/devstorage.read_write".to_string(),
+        ),
+    ]));
 
-    let provider = DefaultCredentialProvider::new()
-        .with_scope("https://www.googleapis.com/auth/devstorage.read_write");
+    let provider = DefaultCredentialProvider::new();
 
     let credential = provider
         .provide_credential(&ctx)
@@ -134,13 +138,15 @@ async fn test_impersonated_service_account_with_delegates() -> Result<()> {
         "Credential file must contain delegation chain"
     );
 
-    let ctx = create_test_context_with_env(HashMap::from_iter([(
-        "GOOGLE_APPLICATION_CREDENTIALS".to_string(),
-        cred_path,
-    )]));
+    let ctx = create_test_context_with_env(HashMap::from_iter([
+        ("GOOGLE_APPLICATION_CREDENTIALS".to_string(), cred_path),
+        (
+            "GOOGLE_SCOPE".to_string(),
+            "https://www.googleapis.com/auth/devstorage.read_write".to_string(),
+        ),
+    ]));
 
-    let provider = DefaultCredentialProvider::new()
-        .with_scope("https://www.googleapis.com/auth/devstorage.read_write");
+    let provider = DefaultCredentialProvider::new();
 
     let credential = provider
         .provide_credential(&ctx)

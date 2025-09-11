@@ -25,13 +25,13 @@ use reqsign_core::{Context, ProvideCredential, Result};
 /// - `HUAWEI_CLOUD_ACCESS_KEY_ID`: The Huawei Cloud access key ID
 /// - `HUAWEI_CLOUD_SECRET_ACCESS_KEY`: The Huawei Cloud secret access key
 /// - `HUAWEI_CLOUD_SECURITY_TOKEN`: The Huawei Cloud security token (optional)
-#[derive(Debug, Default)]
-pub struct EnvCredentialProvider;
+#[derive(Debug, Default, Clone)]
+pub struct EnvCredentialProvider {}
 
 impl EnvCredentialProvider {
     /// Create a new EnvCredentialProvider.
     pub fn new() -> Self {
-        Self
+        Self {}
     }
 }
 

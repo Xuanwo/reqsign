@@ -26,7 +26,7 @@ use reqsign_core::{Context, ProvideCredential};
 use serde::{Deserialize, Serialize};
 
 /// Loader that loads credential via AssumeRoleWithWebIdentity.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct AssumeRoleWithWebIdentityCredentialProvider {}
 
 impl AssumeRoleWithWebIdentityCredentialProvider {
