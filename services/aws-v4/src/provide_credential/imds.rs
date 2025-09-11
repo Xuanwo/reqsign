@@ -25,13 +25,10 @@ use reqsign_core::time::{now, parse_rfc3339, DateTime};
 use reqsign_core::{Context, Error, ProvideCredential, Result};
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct IMDSv2CredentialProvider {
     endpoint: Option<String>,
-    timeout: Option<Duration>,
-    retry_attempts: Option<u32>,
     token: Arc<Mutex<(String, DateTime)>>,
 }
 
@@ -39,8 +36,6 @@ impl Default for IMDSv2CredentialProvider {
     fn default() -> Self {
         Self {
             endpoint: None,
-            timeout: None,
-            retry_attempts: None,
             token: Arc::new(Mutex::new((String::new(), DateTime::default()))),
         }
     }
@@ -55,18 +50,6 @@ impl IMDSv2CredentialProvider {
     /// Set the endpoint for the metadata service.
     pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
         self.endpoint = Some(endpoint.into());
-        self
-    }
-
-    /// Set the timeout for metadata requests.
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = Some(timeout);
-        self
-    }
-
-    /// Set the number of retry attempts.
-    pub fn with_retry_attempts(mut self, attempts: u32) -> Self {
-        self.retry_attempts = Some(attempts);
         self
     }
 }
