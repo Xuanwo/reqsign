@@ -206,9 +206,9 @@ impl DefaultCredentialProviderBuilder {
 
     /// Configure the external process credential provider.
     ///
-    /// This allows setting parameters like process timeout or overriding the
-    /// profile-derived command used to obtain credentials via
-    /// `credential_process`. Only available on non-wasm32 targets.
+    /// This allows overriding the profile-derived command used to obtain
+    /// credentials via `credential_process`. Only available on non-wasm32
+    /// targets.
     #[cfg(not(target_arch = "wasm32"))]
     pub fn configure_process<F>(mut self, f: F) -> Self
     where
