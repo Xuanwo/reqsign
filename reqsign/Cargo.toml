@@ -27,6 +27,9 @@ categories = ["authentication", "web-programming::http-client"]
 description = "Signing HTTP requests for AWS, Azure, Google, Huawei, Aliyun, Tencent and Oracle services"
 keywords = ["http", "requests", "signing", "aws", "azure"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
 # Core functionality (always included)
 reqsign-core.workspace = true
